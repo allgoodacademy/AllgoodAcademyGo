@@ -1,14 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper: Checks if the user requesting data has "isInsider: true" on their own profile
-    function isInsider(appId) {
-      return get(/databases/$(database)/documents/artifacts/$(appId)/users/$(request.auth.uid)).data.isInsider == true;
+    // Admin access is locked to these two accounts by their verified sign-in email —
+    // not a document field, since any signed-in user could otherwise write that field
+    // on their own profile and grant themselves access.
+    function isAllowlistedAdmin() {
+      return request.auth != null &&
+        request.auth.token.email in ['balgood93@gmail.com', 'learning@allgoodacademy.com'];
     }
 
-    // 1. Allow Insiders to list the entire "users" collection (Critical for the Roster Table)
+    // 1. Allow the admin allowlist to list the entire "users" collection (Insider directory)
     match /artifacts/{appId}/users {
-      allow list: if request.auth != null && isInsider(appId);
+      allow list: if isAllowlistedAdmin();
     }
 
     // 2. Individual User Documents & Subcollections (Launches, Scores, etc.)
@@ -16,8 +19,8 @@ service cloud.firestore {
       // Rule A: Owners can read/write their own data
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Rule B: Insiders can READ any user's data (but not write/edit it)
-      allow read: if request.auth != null && isInsider(appId);
+      // Rule B: The admin allowlist can READ any user's data (but not write/edit it)
+      allow read: if isAllowlistedAdmin();
     }
 
     // 4. NEW — Teachers can list + read (not write) the top-level profiles of students who
@@ -36,12 +39,13 @@ service cloud.firestore {
     //    - Anyone signed in can GET a specific code (needed so a student can validate a code exists)
     //    - Only a teacher can CREATE a classroom, and only naming themselves as its teacher
     //    - Only that classroom's teacher can update/delete it later
-    //    - LIST is denied — codes are shared out-of-band, no one should be able to browse all classrooms
+    //    - LIST is denied to everyone except the admin allowlist (Insider's classrooms overview) —
+    //      codes are otherwise shared out-of-band, no student/teacher should browse all classrooms
     match /artifacts/{appId}/classrooms/{code} {
       allow get: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.teacherUid == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.teacherUid == request.auth.uid;
-      allow list: if false;
+      allow list: if isAllowlistedAdmin();
     }
 
     // 6. NEW — Teachers can READ (not write) a classroom student's subcollections too
