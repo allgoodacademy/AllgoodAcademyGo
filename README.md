@@ -22,9 +22,10 @@ public/
   404.html, privacy.html, terms.html, favicon.png
 ```
 
-Firebase Hosting project: `allgood-academy-goodblocks` (see `.firebaserc`). Note this is a
-*different* Firebase project than the one referenced inside the pages' `firebaseConfig`
-(`allgood-academy`, used for Auth/Firestore) — that's expected, not a bug.
+Firebase Hosting project: `allgood-academy` (see `.firebaserc`) — this is the same project
+already serving `allgoodacademy.com` and `www.allgoodacademy.com`, currently updated by manual
+`firebase deploy` runs. Connecting this repo's GitHub integration to it replaces those manual
+deploys with auto-deploy on push to `main`.
 
 ## Connecting GitHub to Firebase Hosting (one-time, no terminal needed)
 
