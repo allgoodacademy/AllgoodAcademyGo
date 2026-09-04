@@ -25,7 +25,7 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, onAuthStateChanged, updateProfile, signOut, GoogleAuthProvider, signInWithPopup, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         /* ADDED: limit */
-        import { getFirestore, doc, setDoc, getDoc, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         setLogLevel('Debug');
@@ -70,24 +70,84 @@
         // GLOBAL REGISTRY FOR LIVE SVG ASSETS
         window.userEarnedBadges = {};
 
-        async function writeUserDataToFirestore(user, name, email, isGuest) {
+        // --- TEACHER / STUDENT ROLE STATE ---
+        function generateClassroomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
+            let code = '';
+            for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            return code;
+        }
+
+        // --- MODULE REGISTRY ---
+        // Single source of truth for every LIVE module in the library, used by classroom
+        // assignment and generic per-module completion detection. Everything else has been
+        // archived (moved out of public/, no longer hosted) — this registry only lists what's
+        // actually reachable, so a teacher can't accidentally assign a dead link.
+        //
+        // Completion rules below are confirmed against each module's actual Firestore writes,
+        // not guessed: DDC and Jolene's both gate on a finalScore threshold (no fake flags),
+        // the two Jodi's Schoolhouse pieces use an explicit `completed: true` signal.
+        const MODULE_REGISTRY = [
+            { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
+              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 80 },
+            { id: 'jolene', name: "Jolene's Lemonade", category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge',
+              gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800 },
+            { id: 'rage', name: 'Rage Revenue', category: 'lesson', url: 'https://allgoodacademy.com/jsh/rage-revenue/',
+              gameNames: ['Rage Revenue'], isComplete: (d) => d.completed === true },
+            { id: 'finding', name: 'Finding Yourself', category: 'lesson', url: 'https://allgoodacademy.com/jsh/finding-yourself/',
+              gameNames: ["Jodi's Schoolhouse: Finding Yourself"], isComplete: (d) => d.completed === true },
+        ];
+        function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
+
+        // Given one student's fetched game_scores docs, work out their status for a specific
+        // registry module, plus the real badge artifact if one was earned (every module stores
+        // its actual certificate SVG under `badgeArtifact` or `badgeSVG` on the winning doc).
+        function computeModuleStatus(moduleId, scoreDocs) {
+            const mod = getModuleById(moduleId);
+            if (!mod) return { status: 'not_started', badgeSvg: null };
+            let sawAttempt = false;
+            for (const data of scoreDocs) {
+                if (!mod.gameNames.includes(data.gameName)) continue;
+                sawAttempt = true;
+                if (mod.isComplete(data)) {
+                    return { status: 'completed', badgeSvg: data.badgeArtifact || data.badgeSVG || null };
+                }
+            }
+            return { status: sawAttempt ? 'in_progress' : 'not_started', badgeSvg: null };
+        }
+
+        async function writeUserDataToFirestore(user, name, email, isGuest, opts = {}) {
+             const silent = opts.silent === true;
              const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
              
              if (isGuest && user.displayName !== name) {
                 await updateProfile(user, { displayName: name });
              }
 
-             await setDoc(userRef, {
+             // Check if this user already has a role on file (returning user) — never
+             // downgrade an existing teacher back to student on a later login.
+             const existingSnap = await getDoc(userRef);
+             const existingData = existingSnap.exists() ? existingSnap.data() : null;
+
+             let userDoc = {
                  displayName: name,
                  email: email || (isGuest ? null : user.email || null),
                  isGuest: isGuest,
                  lastLogin: serverTimestamp(),
                  onboardingComplete: true
-             }, { merge: true });
+             };
+
+             // Everyone defaults to student. Becoming a teacher is a deliberate, separate
+             // action (see window.upgradeToTeacher) — never a first-touch choice.
+             userDoc.role = (existingData && existingData.role) ? existingData.role : 'student';
+             if (existingData && existingData.classroomCode) userDoc.classroomCode = existingData.classroomCode;
+
+             await setDoc(userRef, userDoc, { merge: true });
 
              localStorage.setItem('aa_is_guest', isGuest);
              localStorage.setItem('aa_username', name);
              localStorage.setItem('aa_uid', user.uid);
+             localStorage.setItem('aa_role', userDoc.role);
              
              window.updateUI(name); 
              document.getElementById('page-dashboard').classList.add('active');
@@ -96,12 +156,112 @@
              // Show navbar
              document.querySelector('.navbar-content').classList.remove('opacity-0');
              
-             closeLoginModal();
+             window.applyRoleUI(userDoc.role);
              
              window.startLaunchListener(user.uid);
              window.startDecisionsStatusListener(user.uid);
              window.startIntelListener(user.uid); // NEW: Start Intel Check
+
+             if (!silent) {
+                 // This was a real identification (name/email or Google), not the invisible
+                 // power-up sign-in — close the modal, mark them identified, and resume
+                 // whatever course launch triggered this prompt in the first place.
+                 closeLoginModal();
+                 localStorage.setItem('aa_identified', 'true');
+                 window.resumePendingLaunch();
+             }
         }
+
+        // Called the instant someone powers up with no existing session — creates a real,
+        // trackable identity behind the scenes with zero visible form. Their real name/email
+        // is only asked for later, at the moment they actually launch a course.
+        window.silentSignIn = async () => {
+            try {
+                const userCredential = await signInAnonymously(auth);
+                const user = userCredential.user;
+                await writeUserDataToFirestore(user, 'Agent Learner', null, true, { silent: true });
+            } catch (error) {
+                console.error("Silent sign-in failed:", error);
+                showStatusMessage("Connection failed. Check network or rules.", 'error');
+            }
+        };
+
+        // If a course launch was interrupted to ask "who's launching this?", this resumes
+        // it once that question is answered — so identifying yourself and launching feels
+        // like one motion, not two separate steps.
+        window.resumePendingLaunch = () => {
+            if (window._pendingLaunch) {
+                const { courseName, url, element } = window._pendingLaunch;
+                window._pendingLaunch = null;
+                window.launchCourse(courseName, url, element);
+            }
+        };
+
+        // Updates the classroom menu entry's label based on current role — always visible,
+        // but reads differently depending on whether you're already a teacher.
+        window.applyRoleUI = (role) => {
+            const label = document.getElementById('menu-classroom-label');
+            if (label) label.textContent = role === 'teacher' ? 'My Classroom' : 'Set Up a Classroom';
+        };
+
+        // Smart entry point: teachers land in their existing classroom, everyone else is
+        // offered the (entirely optional) chance to become one.
+        window.openClassroomEntry = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            const role = localStorage.getItem('aa_role');
+            if (!uid) return;
+
+            if (role === 'teacher') {
+                window.openTeacherDashboard();
+            } else {
+                const menu = document.getElementById('menu-modal');
+                if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
+                const modal = document.getElementById('become-teacher-modal');
+                if (modal) { modal.classList.remove('hidden-modal'); modal.classList.add('visible-modal'); }
+            }
+        };
+
+        window.closeBecomeTeacherModal = () => {
+            const modal = document.getElementById('become-teacher-modal');
+            if (modal) { modal.classList.add('hidden-modal'); modal.classList.remove('visible-modal'); }
+        };
+
+        // Deliberate, separate upgrade action — never triggered as part of normal signup.
+        window.upgradeToTeacher = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+            const userRef = doc(db, 'artifacts', appId, 'users', uid);
+
+            try {
+                const userSnap = await getDoc(userRef);
+                const name = (userSnap.exists() && userSnap.data().displayName) || localStorage.getItem('aa_username') || 'Teacher';
+
+                const code = generateClassroomCode();
+                await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), {
+                    teacherUid: uid,
+                    teacherName: name,
+                    createdAt: serverTimestamp()
+                });
+                await setDoc(userRef, { role: 'teacher', classroomCode: code }, { merge: true });
+
+                localStorage.setItem('aa_role', 'teacher');
+                window.applyRoleUI('teacher');
+                window.closeBecomeTeacherModal();
+                showStatusMessage("Classroom created!", 'info');
+                setTimeout(() => window.openTeacherDashboard(), 400);
+            } catch (e) {
+                console.error("Failed to create classroom:", e);
+                showStatusMessage("Couldn't create your classroom — please try again.", 'error');
+            }
+        };
+
+        window.copyClassroomCode = () => {
+            const code = document.getElementById('admin-stat-code')?.textContent;
+            if (code && code !== 'allgood.ac/tf/8821') {
+                navigator.clipboard.writeText(code);
+                showStatusMessage("Classroom code copied!", 'info');
+            }
+        };
 
         window.handleGuestLogin = async () => {
             sfx.click();
@@ -159,12 +319,16 @@
         };
 
         window.launchCourse = async (courseName, url, element) => {
-            if (!auth.currentUser) {
+            const isIdentified = localStorage.getItem('aa_identified') === 'true';
+
+            if (!auth.currentUser || !isIdentified) {
+                // Stash what they were trying to do so it resumes automatically once they
+                // answer the "who's launching this?" prompt — feels like one motion, not two.
+                window._pendingLaunch = { courseName, url, element };
                 const loginModal = document.getElementById('login-modal');
                 if (loginModal) {
                     loginModal.classList.remove('hidden-modal');
                     loginModal.classList.add('visible-modal');
-                    showStatusMessage("Please sign in to launch modules.", 'info');
                 }
                 return;
             }
@@ -314,8 +478,6 @@
             localStorage.removeItem('aa_uid');
             localStorage.removeItem('aa_ddc_complete');
             localStorage.removeItem('aa_jlc_complete');
-            localStorage.removeItem('aa_identity_complete');
-            localStorage.removeItem('aa_defense_complete');
             localStorage.removeItem('aa_intel_sent');
             localStorage.removeItem('aa_finding_complete'); // NEW: Clear Finding status
 
@@ -432,8 +594,8 @@
             if (parseInt(launches) > 0) badgeCount++;
             if (localStorage.getItem('aa_ddc_complete') === 'true') badgeCount++;
             if (localStorage.getItem('aa_jlc_complete') === 'true') badgeCount++;
-            if (localStorage.getItem('aa_identity_complete') === 'true') badgeCount++;
-            if (localStorage.getItem('aa_defense_complete') === 'true') badgeCount++;
+            if (localStorage.getItem('aa_intel_sent') === 'true') badgeCount++;
+            if (localStorage.getItem('aa_finding_complete') === 'true') badgeCount++;
 
             const statBadges = document.getElementById('profile-stat-badges');
             if(statBadges) statBadges.textContent = badgeCount;
@@ -516,6 +678,32 @@
             
             window.toggleProfileEdit(false);
         }
+
+        // Lets a student join a classroom anytime from their Profile — no longer forced
+        // into the first-touch login form, since it's genuinely optional.
+        window.joinClassroom = async () => {
+            const input = document.getElementById('profile-classroom-input');
+            const statusEl = document.getElementById('profile-classroom-status');
+            const code = (input?.value || '').trim().toUpperCase();
+            if (!code) return;
+
+            const user = auth.currentUser;
+            if (!user) return;
+
+            try {
+                const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
+                if (!classroomSnap.exists()) {
+                    if (statusEl) { statusEl.textContent = "Code not found — double check with your teacher."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+                    return;
+                }
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
+                if (statusEl) { statusEl.textContent = "Joined! Your teacher can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
+                if (window.sfx) window.sfx.confirm();
+            } catch (e) {
+                console.error("Failed to join classroom:", e);
+                if (statusEl) { statusEl.textContent = "Something went wrong — please try again."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+            }
+        };
 
         window.initModuleElements = function() {
             window.allModuleElements = {};
@@ -673,14 +861,6 @@
                 // Store JLC Status
                 if (isJLCComplete) localStorage.setItem('aa_jlc_complete', 'true');
                 else localStorage.removeItem('aa_jlc_complete');
-                
-                // Store Identity Status
-                if (completedModules.has("Your Digital Identity")) localStorage.setItem('aa_identity_complete', 'true');
-                else localStorage.removeItem('aa_identity_complete');
-
-                // Store Defense Status (NEW)
-                if (completedModules.has("Digital Asset Defense")) localStorage.setItem('aa_defense_complete', 'true');
-                else localStorage.removeItem('aa_defense_complete');
 
                 // Store Finding Yourself Status (NEW - Badge 9)
                 if (completedModules.has("Finding Yourself")) localStorage.setItem('aa_finding_complete', 'true');
@@ -765,17 +945,11 @@
             const jlcComplete = localStorage.getItem('aa_jlc_complete') === 'true';
             if (jlcComplete) badgeCount++; // 5. Certified Entrepreneur
 
-            const identityComplete = localStorage.getItem('aa_identity_complete') === 'true';
-            if (identityComplete) badgeCount++; // 6. Identity Guardian
-
-            const defenseComplete = localStorage.getItem('aa_defense_complete') === 'true';
-            if (defenseComplete) badgeCount++; // 7. Asset Defender
-
             const intelSent = localStorage.getItem('aa_intel_sent') === 'true';
-            if (intelSent) badgeCount++; // 8. Intel Officer
+            if (intelSent) badgeCount++; // 6. Intel Officer
 
             const findingComplete = localStorage.getItem('aa_finding_complete') === 'true';
-            if (findingComplete) badgeCount++; // 9. Origin Scout
+            if (findingComplete) badgeCount++; // 7. Origin Scout
 
             // Update Header Display
             const badgeCountEl = document.getElementById('badge-count-display');
@@ -790,10 +964,6 @@
             updateBadgeSlot('badge-slot-4', ddcComplete);
             // Badge 5 (Entrepreneur - JLC)
             updateBadgeSlot('badge-slot-5', jlcComplete);
-            // Badge 6 (Identity Guardian)
-            updateBadgeSlot('badge-slot-6', identityComplete);
-            // Badge 7 (Asset Defender)
-            updateBadgeSlot('badge-slot-7', defenseComplete);
             // Badge 8 (Intel Officer)
             updateBadgeSlot('badge-slot-8', intelSent);
             // Badge 9 (Origin Scout)
@@ -1121,9 +1291,17 @@
         window.restoreSessionState = function() {
             const storedName = localStorage.getItem('aa_username');
             const storedUID = localStorage.getItem('aa_uid');
+            const storedRole = localStorage.getItem('aa_role');
             const dashboard = document.getElementById('page-dashboard');
 
             if (storedName && storedUID) {
+                // Migration shim: anyone with a real name already on file predates the
+                // "identified" flag — treat them as identified rather than re-prompting
+                // people who already gave their name under the old flow.
+                if (localStorage.getItem('aa_identified') !== 'true' && storedName !== 'Agent Learner') {
+                    localStorage.setItem('aa_identified', 'true');
+                }
+
                 window.updateUI(storedName);
                 if (dashboard) {
                     dashboard.classList.add('active');
@@ -1131,6 +1309,7 @@
                 }
                 // Show Navbar
                 document.querySelector('.navbar-content').classList.remove('opacity-0');
+                if (storedRole) window.applyRoleUI(storedRole);
                 
                 window.startLaunchListener(storedUID);
                 window.startDecisionsStatusListener(storedUID); 
@@ -1213,71 +1392,7 @@
             }
         }
 
-        // --- NEW ADMIN FUNCTIONS ---
-        window.openAdminLogin = () => {
-            const menu = document.getElementById('menu-modal');
-            if (menu) {
-                menu.classList.add('hidden-modal');
-                menu.classList.remove('visible-modal');
-            }
-            const modal = document.getElementById('admin-login-modal');
-            modal.classList.remove('hidden-modal');
-            modal.classList.add('visible-modal');
-            sfx.click();
-            setTimeout(() => document.getElementById('admin-password-input').focus(), 100);
-        };
-
-        window.closeAdminLogin = () => {
-            const modal = document.getElementById('admin-login-modal');
-            modal.classList.add('hidden-modal');
-            modal.classList.remove('visible-modal');
-            sfx.click();
-        };
-
-        window.handleAdminAuth = async (bypass = false) => {
-            sfx.click();
-            const input = document.getElementById('admin-password-input');
-            const val = input.value.trim();
-            const btn = document.getElementById('btn-admin-submit');
-            
-            // Bypass Logic (Opt-out)
-            if (bypass) {
-                window.openAdminDashboard();
-                return;
-            }
-
-            // Simple validation check for email format
-            if (val.includes('@') && val.length > 5) {
-                // Log email if we had a backend for it, for now just allow entry
-                // Could save to Firestore 'leads' collection here if needed later
-                window.openAdminDashboard();
-                input.value = ""; // Clear input
-            } else {
-                // Error feedback
-                btn.classList.add('bg-red-600');
-                btn.textContent = "INVALID FORMAT";
-                sfx.powerOff();
-                setTimeout(() => {
-                    btn.classList.remove('bg-red-600');
-                    btn.textContent = "AUTHENTICATE";
-                }, 1500);
-            }
-        };
-
-        window.openAdminDashboard = () => {
-            sfx.confirm();
-            window.closeAdminLogin();
-            
-            // Hide standard dashboard
-            document.getElementById('page-dashboard').style.display = 'none';
-            
-            // Show Admin Dashboard
-            const adminPage = document.getElementById('page-admin');
-            adminPage.style.display = 'block';
-            adminPage.classList.add('active');
-        };
-
-        window.closeAdminDashboard = () => {
+        window.closeTeacherDashboard = () => {
             sfx.nav();
             const adminPage = document.getElementById('page-admin');
             adminPage.style.display = 'none';
@@ -1285,6 +1400,280 @@
             
             // Restore standard dashboard
             document.getElementById('page-dashboard').style.display = 'block';
+        };
+
+        // --- REAL TEACHER DASHBOARD (reuses the admin page's UI, real data instead of demo rows) ---
+        let _currentRosterFull = [];
+        let _currentAssignedModuleIds = [];
+        let _studentStatusCache = {};
+
+        window.openTeacherDashboard = async () => {
+            const menu = document.getElementById('menu-modal');
+            if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
+
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+
+            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+            const userData = userSnap.exists() ? userSnap.data() : null;
+            const code = userData ? userData.classroomCode : null;
+
+            if (!code) {
+                showStatusMessage("No classroom code on file for this account yet.", 'error');
+                return;
+            }
+
+            sfx.confirm();
+            document.getElementById('page-dashboard').style.display = 'none';
+            const adminPage = document.getElementById('page-admin');
+            adminPage.style.display = 'block';
+            adminPage.classList.add('active');
+
+            document.getElementById('admin-page-title').textContent = 'My Classroom';
+            document.getElementById('admin-page-subtitle').innerHTML = `Classroom Code: <span class="text-allgood-secondary font-mono">${code}</span>`;
+            document.getElementById('admin-stat1-label').textContent = 'Total Students';
+            document.getElementById('admin-stat2-label').textContent = 'Avg. Assigned Completion';
+            document.getElementById('admin-stat3-label').textContent = 'Classroom Code';
+            document.getElementById('admin-stat-code').textContent = code;
+            document.getElementById('admin-roster-title').textContent = 'Student Roster';
+
+            const rosterBody = document.getElementById('admin-roster-body');
+            rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">Loading roster...</p>';
+            lucide.createIcons();
+
+            try {
+                const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
+                const assignedModuleIds = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
+                _currentAssignedModuleIds = assignedModuleIds;
+
+                const assignedLabel = document.getElementById('admin-assigned-summary');
+                if (assignedLabel) {
+                    assignedLabel.textContent = assignedModuleIds.length
+                        ? `${assignedModuleIds.length} module${assignedModuleIds.length === 1 ? '' : 's'} assigned: ${assignedModuleIds.map(id => getModuleById(id)?.name || id).join(', ')}`
+                        : 'No modules assigned yet.';
+                }
+
+                if (assignedModuleIds.length === 0) {
+                    rosterBody.innerHTML = '<div class="p-6 text-center"><p class="text-xs text-gray-400 italic mb-3">No modules assigned yet — students won\'t have anything to work toward until you assign at least one.</p><button onclick="window.openAssignmentPicker()" class="bg-allgood-primary text-white text-[10px] font-bold uppercase px-4 py-2 rounded-full">Assign Modules</button></div>';
+                    document.getElementById('admin-stat-total').textContent = '—';
+                    document.getElementById('admin-stat-completion').textContent = '—';
+                    _currentRosterFull = [];
+                    lucide.createIcons();
+                    return;
+                }
+
+                const studentsQuery = query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', code), where('role', '==', 'student'));
+                const studentsSnap = await getDocs(studentsQuery);
+
+                document.getElementById('admin-stat-total').textContent = studentsSnap.size;
+
+                if (studentsSnap.empty) {
+                    rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">No students have joined this classroom yet. Share your code to get started.</p>';
+                    document.getElementById('admin-stat-completion').textContent = '—';
+                    _currentRosterFull = [];
+                    lucide.createIcons();
+                    return;
+                }
+
+                const rosterFull = [];
+                let totalCompletionPairs = 0;
+                let completedPairs = 0;
+
+                for (const sDoc of studentsSnap.docs) {
+                    const sData = sDoc.data();
+                    let scoreDocs = [];
+                    try {
+                        const scoresSnap = await getDocs(collection(db, 'artifacts', appId, 'users', sDoc.id, 'game_scores'));
+                        scoreDocs = scoresSnap.docs.map(d => d.data());
+                    } catch (e) {
+                        console.error("Couldn't read a student's scores (permissions?) — showing their assigned modules as Not Started.", e);
+                    }
+
+                    const moduleStatuses = {};
+                    assignedModuleIds.forEach(moduleId => {
+                        const result = computeModuleStatus(moduleId, scoreDocs);
+                        moduleStatuses[moduleId] = result;
+                        totalCompletionPairs++;
+                        if (result.status === 'completed') completedPairs++;
+                    });
+
+                    const lastActive = sData.lastLogin && sData.lastLogin.toDate ? sData.lastLogin.toDate().toLocaleDateString() : '—';
+                    rosterFull.push({
+                        uid: sDoc.id,
+                        name: sData.displayName || 'Student',
+                        email: sData.email || '',
+                        lastActive,
+                        moduleStatuses
+                    });
+                }
+
+                document.getElementById('admin-stat-completion').textContent = totalCompletionPairs
+                    ? Math.round((completedPairs / totalCompletionPairs) * 100) + '%'
+                    : '—';
+
+                _currentRosterFull = rosterFull;
+                _studentStatusCache = {};
+                rosterFull.forEach(r => { _studentStatusCache[r.uid] = r; });
+
+                window.renderRosterRows('all');
+            } catch (e) {
+                console.error("Roster fetch failed — check that firestore.rules has been deployed with the teacher-classroom rules.", e);
+                rosterBody.innerHTML = '<p class="text-xs text-red-400 italic p-4">Couldn\'t load roster — this usually means the security rules update hasn\'t been deployed yet.</p>';
+            }
+        };
+
+        // Renders roster rows from the already-fetched _currentRosterFull cache — no refetching,
+        // so the status filter dropdown can re-render instantly.
+        window.renderRosterRows = (filter) => {
+            const rosterBody = document.getElementById('admin-roster-body');
+            const assignedCount = _currentAssignedModuleIds.length;
+
+            const filtered = _currentRosterFull.filter(r => {
+                if (filter === 'all') return true;
+                const statuses = Object.values(r.moduleStatuses).map(m => m.status);
+                if (filter === 'completed_all') return statuses.length > 0 && statuses.every(s => s === 'completed');
+                if (filter === 'in_progress') return statuses.some(s => s === 'in_progress' || s === 'completed') && !statuses.every(s => s === 'completed');
+                if (filter === 'not_started') return statuses.every(s => s === 'not_started');
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">No students match this filter.</p>';
+                return;
+            }
+
+            rosterBody.innerHTML = '';
+            filtered.forEach(r => {
+                const completedCount = Object.values(r.moduleStatuses).filter(m => m.status === 'completed').length;
+                const hasAnyBadge = Object.values(r.moduleStatuses).some(m => m.badgeSvg);
+                const initials = (r.name || 'St').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                const progressLabel = `${completedCount}/${assignedCount} Complete`;
+                const progressClass = completedCount === assignedCount ? 'bg-emerald-100 text-emerald-700' : (completedCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500');
+
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-12 gap-4 px-4 py-3 items-center rounded-lg hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100 cursor-pointer';
+                row.onclick = () => window.openStudentProfile(r.uid);
+                row.innerHTML = `
+                    <div class="col-span-4 flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">${initials}</div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-slate-700 truncate">${r.name}</p>
+                            <p class="text-[10px] text-slate-400 truncate">${r.email}</p>
+                        </div>
+                    </div>
+                    <div class="col-span-2"><span class="${progressClass} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${progressLabel}</span></div>
+                    <div class="col-span-2 flex justify-center">${hasAnyBadge ? '<i data-lucide="shield" class="w-4 h-4 text-allgood-primary"></i>' : '<span class="text-[9px] text-slate-300">—</span>'}</div>
+                    <div class="col-span-2 text-center text-[10px] text-slate-500 font-mono">${r.lastActive}</div>
+                    <div class="col-span-2 flex justify-end"><span class="text-slate-400 text-[9px] font-bold uppercase hover:text-allgood-secondary">View Profile</span></div>
+                `;
+                rosterBody.appendChild(row);
+            });
+            lucide.createIcons();
+        };
+
+        // --- STUDENT PROFILE DRILL-DOWN ---
+        window.openStudentProfile = (studentUid) => {
+            const student = _studentStatusCache[studentUid];
+            if (!student) return;
+
+            document.getElementById('profile-student-name').textContent = student.name;
+            document.getElementById('profile-student-email').textContent = student.email;
+
+            const list = document.getElementById('profile-module-list');
+            const entries = Object.entries(student.moduleStatuses);
+            if (entries.length === 0) {
+                list.innerHTML = '<p class="text-xs text-gray-400 italic">No modules assigned.</p>';
+            } else {
+                list.innerHTML = entries.map(([moduleId, result]) => {
+                    const mod = getModuleById(moduleId);
+                    const { status, badgeSvg } = result;
+                    const statusClass = status === 'completed' ? 'bg-emerald-100 text-emerald-700' : status === 'in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500';
+                    const statusLabel = status === 'completed' ? 'Completed' : status === 'in_progress' ? 'In Progress' : 'Not Started';
+                    // Real earned badge: render the module's own certificate SVG when available,
+                    // rather than a generic icon standing in for it.
+                    const badgeHtml = badgeSvg
+                        ? `<div class="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white p-1"><div class="w-full aspect-[3/2] overflow-hidden">${badgeSvg}</div></div>`
+                        : '';
+                    return `<div class="p-3 bg-slate-50 rounded-lg mb-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-700">${mod ? mod.name : moduleId}</span>
+                            <span class="${statusClass} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${statusLabel}</span>
+                        </div>
+                        ${badgeHtml}
+                    </div>`;
+                }).join('');
+            }
+
+            document.getElementById('student-profile-modal').classList.remove('hidden-modal');
+            document.getElementById('student-profile-modal').classList.add('visible-modal');
+            lucide.createIcons();
+        };
+
+        window.closeStudentProfile = () => {
+            document.getElementById('student-profile-modal').classList.add('hidden-modal');
+            document.getElementById('student-profile-modal').classList.remove('visible-modal');
+        };
+
+        // --- ASSIGNMENT MANAGEMENT ---
+        window.openAssignmentPicker = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+            const code = userSnap.exists() ? userSnap.data().classroomCode : null;
+            if (!code) return;
+
+            const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
+            const assigned = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
+
+            const list = document.getElementById('assignment-picker-list');
+            list.innerHTML = MODULE_REGISTRY.map(m => `
+                <label class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-100">
+                    <input type="checkbox" value="${m.id}" ${assigned.includes(m.id) ? 'checked' : ''} class="assignment-checkbox w-4 h-4 accent-allgood-primary">
+                    <span class="text-xs font-bold text-slate-700">${m.name}</span>
+                    <span class="text-[9px] uppercase text-slate-400 ml-auto">${m.category}</span>
+                </label>
+            `).join('');
+
+            document.getElementById('assignment-picker-modal').classList.remove('hidden-modal');
+            document.getElementById('assignment-picker-modal').classList.add('visible-modal');
+        };
+
+        window.closeAssignmentPicker = () => {
+            document.getElementById('assignment-picker-modal').classList.add('hidden-modal');
+            document.getElementById('assignment-picker-modal').classList.remove('visible-modal');
+        };
+
+        window.saveAssignments = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+            const code = userSnap.exists() ? userSnap.data().classroomCode : null;
+            if (!code) return;
+
+            const checked = Array.from(document.querySelectorAll('.assignment-checkbox:checked')).map(cb => cb.value);
+            await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), { assignedModules: checked }, { merge: true });
+            showStatusMessage("Assignments updated.", 'info');
+            window.closeAssignmentPicker();
+            window.openTeacherDashboard(); // refresh roster against the new assignment set
+        };
+
+        window.exportRosterCSV = () => {
+            if (!_currentRosterFull.length) { showStatusMessage("No roster data to export yet.", 'info'); return; }
+            const moduleIds = _currentAssignedModuleIds;
+            let csv = 'Name,Email,Last Active,' + moduleIds.map(id => `"${(getModuleById(id)?.name || id)}"`).join(',') + '\n';
+            _currentRosterFull.forEach(r => {
+                const statusCols = moduleIds.map(id => `"${(r.moduleStatuses[id] && r.moduleStatuses[id].status) || 'not_started'}"`).join(',');
+                csv += `"${r.name}","${r.email}","${r.lastActive}",${statusCols}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'classroom-roster.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         };
 
         const startupScreen = document.getElementById('startup-screen');
@@ -1305,11 +1694,11 @@
                     window.restoreSessionState();
                     window.initDashboard(); 
                 } else {
-                    const loginModal = document.getElementById('login-modal');
-                    if (loginModal) {
-                        loginModal.classList.remove('hidden-modal');
-                        loginModal.classList.add('visible-modal');
-                    }
+                    // New visitor: no form, no interruption — sign in silently and go
+                    // straight to the dashboard. Their real name is asked for later,
+                    // only when they actually launch something.
+                    window.silentSignIn();
+                    window.initDashboard();
                 }
                 
                 setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
@@ -1401,11 +1790,11 @@
 
         /* --- TABLET FRAME (FIXED CHASSIS MANDATE) --- */
         .tablet-frame {
-            height: 80vh;
+            height: 88vh;
             width: auto;
             aspect-ratio: 16/10;
-            max-width: 1100px;
-            max-height: 95vh;
+            max-width: min(1700px, 94vw);
+            max-height: 96vh;
             min-height: 0;
             min-width: 0;
             /* Brushed Aluminum & Depth Gradients - FIXED */
@@ -1723,10 +2112,10 @@
                 <div id="login-modal" class="absolute inset-0 z-[4000] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
                     <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
                         <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
-                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">One Quick Thing</h2>
                         
                         <div class="flex items-center justify-center gap-2 mb-6 relative">
-                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <p class="text-gray-500 text-sm font-body">Who's launching this?</p>
                             <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                                 <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
@@ -1743,7 +2132,7 @@
 
                         <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
                         <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
-                        
+
                         <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">
                             Enter Dashboard
                         </button>
@@ -1765,7 +2154,7 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <!-- 2.5 STATUS MODAL -->
                 <div id="status-modal" class="hidden-modal absolute top-16 right-4 z-[500] flex items-center justify-center p-4 modal-transition pointer-events-none">
                     <div class="bg-white rounded-lg shadow-xl p-4 max-w-xs w-full text-left border-l-4 border-blue-500 flex items-center space-x-3 modal-content-base">
@@ -1774,31 +2163,39 @@
                     </div>
                 </div>
 
-                <!-- 2.7 ADMIN LOGIN MODAL (NEW - PROFESSIONAL) -->
-                <div id="admin-login-modal" class="hidden-modal absolute inset-0 z-[260] bg-slate-900/50 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeAdminLogin()">
-                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
-                        <button onclick="window.closeAdminLogin()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <!-- BECOME A TEACHER MODAL: deliberate, separate confirmation - never bundled into signup -->
+                <div id="become-teacher-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeBecomeTeacherModal()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeBecomeTeacherModal()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <i data-lucide="graduation-cap" class="w-10 h-10 text-allgood-secondary mx-auto mb-3"></i>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Set Up a Classroom?</h3>
+                        <p class="text-xs text-gray-500 mb-5">This gives you a classroom code to share with students, and a roster where you can see their progress. You can do this anytime — no rush.</p>
+                        <button onclick="window.upgradeToTeacher()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide mb-2">Yes, Set It Up</button>
+                        <button onclick="window.closeBecomeTeacherModal()" class="w-full text-gray-400 hover:text-gray-600 text-xs font-bold uppercase py-2">Not Right Now</button>
+                    </div>
+                </div>
 
-                        <div class="mb-6 mt-2">
-                            <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <i data-lucide="lock" class="w-6 h-6 text-allgood-secondary"></i>
-                            </div>
-                            <h2 class="text-xl font-heading font-bold text-allgood-dark">Administrator Access</h2>
-                            <p class="text-xs text-gray-500 mt-1">Please verify your credentials.</p>
+                <!-- ASSIGNMENT PICKER MODAL: teacher chooses which modules apply to their classroom -->
+                <div id="assignment-picker-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeAssignmentPicker()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeAssignmentPicker()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Manage Assignments</h3>
+                        <p class="text-xs text-gray-500 mb-4">Choose which modules apply to your classroom. Students will see these as their assigned work.</p>
+                        <div id="assignment-picker-list" class="max-h-72 overflow-y-auto space-y-1 mb-4 border border-slate-100 rounded-lg p-2"></div>
+                        <button onclick="window.saveAssignments()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide">Save Assignments</button>
+                    </div>
+                </div>
+
+                <!-- STUDENT PROFILE MODAL: per-module status breakdown for one student -->
+                <div id="student-profile-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeStudentProfile()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeStudentProfile()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <div class="mb-4">
+                            <h3 id="profile-student-name" class="text-lg font-heading font-bold text-allgood-dark">Student</h3>
+                            <p id="profile-student-email" class="text-xs text-gray-400"></p>
                         </div>
-                        
-                        <div class="text-left mb-4">
-                            <label class="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Admin Password</label>
-                            <input type="password" id="admin-password-input" class="w-full border border-gray-300 rounded p-3 text-gray-800 focus:ring-2 focus:ring-allgood-secondary focus:border-transparent outline-none transition-all font-body" placeholder="••••••••">
-                        </div>
-                        
-                        <button id="btn-admin-submit" onclick="window.handleAdminAuth()" class="w-full bg-allgood-secondary hover:bg-allgood-accent text-white font-bold py-3 rounded shadow-md transition-all font-body uppercase tracking-wide mb-3">
-                            Sign In
-                        </button>
-                        
-                        <button onclick="window.handleAdminAuth(true)" class="text-xs text-gray-400 hover:text-allgood-primary underline underline-offset-4 decoration-dotted font-body">
-                            Enter Preview Mode (Guest)
-                        </button>
+                        <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-2">Assigned Modules</p>
+                        <div id="profile-module-list" class="max-h-72 overflow-y-auto"></div>
                     </div>
                 </div>
 
@@ -1846,9 +2243,10 @@
                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openProfileModal()">
                                 <i data-lucide="user" class="w-4 h-4 mr-3 text-allgood-secondary"></i>My Profile
                             </button>
-                            <!-- ADMIN ENTRY -->
-                            <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openAdminLogin()">
-                                <i data-lucide="lock" class="w-4 h-4 mr-3 text-allgood-secondary"></i>Admin Console
+                            <!-- CLASSROOM ENTRY: always visible. Smart destination - teachers land in their
+                                 classroom, everyone else gets the option to set one up. -->
+                            <button id="menu-btn-classroom" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openClassroomEntry()">
+                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i><span id="menu-classroom-label">Set Up a Classroom</span>
                             </button>
                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openAboutModal()">
                                 <i data-lucide="info" class="w-4 h-4 mr-3 text-slate-500"></i>About Us
@@ -1882,7 +2280,7 @@
                         </div>
                         <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
                             <div>
-                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">12</span>
+                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">4</span>
                                 <span class="text-[10px] uppercase text-slate-400 font-bold">MODULES</span>
                             </div>
                             <div>
@@ -1894,15 +2292,10 @@
 
                     <!-- TAB NAVIGATION: COMMAND RAIL (Mobile Optimized) -->
                     <div class="bg-white/40 backdrop-blur-md p-1.5 rounded-xl border border-white/60 shadow-sm flex space-x-2 mb-6 mx-auto max-w-3xl">
-                        <button id="tab-btn-goodblocks" onclick="switchTab('goodblocks')" 
+                        <button id="tab-btn-challenges" onclick="switchTab('challenges')" 
                             class="tab-btn active-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
-                            <i data-lucide="box" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i> 
-                            <span class="hidden sm:inline">GoodBlocks</span>
-                        </button>
-                        <button id="tab-btn-games" onclick="switchTab('games')" 
-                            class="tab-btn inactive-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
-                            <i data-lucide="gamepad-2" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i> 
-                            <span class="hidden sm:inline">Games & Sims</span>
+                            <i data-lucide="target" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i> 
+                            <span class="hidden sm:inline">Challenges</span>
                         </button>
                         <button id="tab-btn-courses" onclick="switchTab('courses')" 
                             class="tab-btn inactive-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
@@ -1911,91 +2304,8 @@
                         </button>
                     </div>
 
-                    <!-- TAB 1: GOODBLOCKS -->
-                    <div id="tab-goodblocks" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div onclick="window.launchCourse('Airport Navigator', 'https://www.allgoodacademy.com/goodblocks/airport-navigator', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                            <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
-                            <div class="w-16 h-16 bg-sky-50 rounded-full flex items-center justify-center border border-sky-100 flex-shrink-0 group-hover:bg-sky-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🛫</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Airport Navigator</h3>
-                                    <span class="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Master the logistical flow from curb to gate with zero friction.</p>
-                            </div>
-                        </div>
-                        
-                        <!-- UPDATED CARD: JONATHAN HURTADO'S COUNTDOWN TO KEYS -->
-                        <div class="mission-file status-locked p-5 flex items-start gap-4 group opacity-70">
-                            <div class="headshot-container flex-shrink-0 bg-slate-100">
-                                <!-- Headshot Image Replacement -->
-                                <img src="https://github.com/allgoodacademy/ImageAndAssets/blob/main/J.Hurtado_HeadShot.jpg?raw=true" 
-                                     alt="Jonathan Hurtado's Headshot"
-                                     onerror="this.onerror=null; this.src='https://placehold.co/64x64/334155/f8fafc?text=JH'" 
-                                     class="rounded object-cover w-full h-full">
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-500 text-lg mb-1 uppercase">Jonathan Hurtado's Countdown to Keys</h3>
-                                    <span class="bg-slate-200 text-slate-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Coming Soon</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Execute the 100-day protocol to secure your first home.</p>
-                            </div>
-                        </div>
-                        <!-- END UPDATED CARD -->
-
-                        <div onclick="window.launchCourse('Digital Asset Defense', 'https://www.allgoodacademy.com/goodblocks/digital-asset-defense', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
-                            <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100 flex-shrink-0 group-hover:bg-blue-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🛡️</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Asset Defense</h3>
-                                    <span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Secure wealth via wallet protocols and threat avoidance.</p>
-                            </div>
-                        </div>
-
-                        <!-- MOVED: The AI Co-Pilot (Kept Robot Emoji) -->
-                        <div onclick="window.launchCourse('The AI Co-Pilot', 'https://www.allgoodacademy.com/goodblocks/aico-pilot', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                            <div class="w-16 h-16 bg-cyan-50 rounded-full flex items-center justify-center border border-cyan-100 flex-shrink-0 group-hover:bg-cyan-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🤖</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">The AI Co-Pilot</h3>
-                                    <span class="bg-cyan-100 text-cyan-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Integrate AI into your workflow in 15 minutes.</p>
-                            </div>
-                        </div>
-
-                        <div onclick="window.launchCourse('Your Digital Identity', 'https://www.allgoodacademy.com/goodblocks/your-digital-identity', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
-                            <div class="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center border border-purple-100 flex-shrink-0 group-hover:bg-purple-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🧬</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Your Digital Identity</h3>
-                                    <span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Audit your online footprint and secure your personal perimeter.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TAB 2: GAMES & SIMS -->
-                    <div id="tab-games" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
-                        <!-- UPDATED ONCLICK URL AND ID (REMOVED APOSTROPHE FOR SAFE PARSING) -->
+                    <!-- TAB 1: CHALLENGES -->
+                    <div id="tab-challenges" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div onclick="window.launchCourse('Jolenes Lemonade', 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge', this)" 
                              class="mission-file status-ready p-5 flex items-start gap-4 group">
                              <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
@@ -2024,51 +2334,9 @@
                                 <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Make high-stakes choices in simulated online conflict scenarios.</p>
                             </div>
                         </div>
-                        <div onclick="window.launchCourse('Conflict Resolution', 'https://www.allgoodacademy.com/educational-games/conflict-resolution-challenge', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
-                            <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center border border-red-100 flex-shrink-0 group-hover:bg-red-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🌤️</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Conflict Resolution</h3>
-                                    <span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Identify triggers and neutralize tension in high-stress interactions.</p>
-                            </div>
-                        </div>
-                        <div onclick="window.launchCourse('Purposeful Communicator', 'https://www.allgoodacademy.com/educational-games/purposeful-communicator-challenge', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
-                            <div class="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center border border-teal-100 flex-shrink-0 group-hover:bg-teal-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🎙️</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Purposeful Communicator</h3>
-                                    <span class="bg-teal-100 text-teal-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Select precise language to drive outcomes and build consensus.</p>
-                            </div>
-                        </div>
-                        <div onclick="window.launchCourse('Master Your Story', 'https://www.allgoodacademy.com/educational-games/master-your-story-challenge', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
-                            <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center border border-rose-100 flex-shrink-0 group-hover:bg-rose-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">📖</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Master Your Story</h3>
-                                    <span class="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Craft and deliver a compelling personal narrative for business and life.</p>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- TAB 3: SCHOOLHOUSE (FORMERLY COURSES) -->
+                    <!-- TAB 2: JODI'S SCHOOLHOUSE -->
                     <div id="tab-courses" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
                          <!-- Replaced Placeholder 1: Rage Revenue -->
                         <div onclick="window.launchCourse('Rage Revenue', 'https://allgoodacademy.com/jsh/rage-revenue/', this)" 
@@ -2169,24 +2437,6 @@
                                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Founder</span>
                                     </div>
 
-                                    <!-- 6. Identity Guardian -->
-                                    <div id="badge-slot-6" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('identity', this)">
-                                        <div class="badge-token token-locked group-hover:scale-105">
-                                            <i data-lucide="fingerprint" class="badge-content w-8 h-8 text-slate-500"></i>
-                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
-                                        </div>
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Guardian</span>
-                                    </div>
-
-                                    <!-- 7. Asset Defender (NEW) -->
-                                    <div id="badge-slot-7" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('defense', this)">
-                                        <div class="badge-token token-locked group-hover:scale-105">
-                                            <i data-lucide="shield" class="badge-content w-8 h-8 text-slate-500"></i>
-                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
-                                        </div>
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Defender</span>
-                                    </div>
-
                                     <!-- 8. Intel Officer (NEW) -->
                                     <div id="badge-slot-8" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('intel', this)">
                                         <div class="badge-token token-locked group-hover:scale-105">
@@ -2213,41 +2463,6 @@
                                         <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
                                     </div>
 
-                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
-                                        <div class="badge-token token-locked border-dashed border-slate-300">
-                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
-                                        </div>
-                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
-                                    </div>
-
-                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
-                                        <div class="badge-token token-locked border-dashed border-slate-300">
-                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
-                                        </div>
-                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
-                                    </div>
-
-                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
-                                        <div class="badge-token token-locked border-dashed border-slate-300">
-                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
-                                        </div>
-                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
-                                    </div>
-
-                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
-                                        <div class="badge-token token-locked border-dashed border-slate-300">
-                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
-                                        </div>
-                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
-                                    </div>
-
-                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
-                                        <div class="badge-token token-locked border-dashed border-slate-300">
-                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
-                                        </div>
-                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
-                                    </div>
-                                    
                                     <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
                                         <div class="badge-token token-locked border-dashed border-slate-300">
                                             <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
@@ -2292,32 +2507,20 @@
 
                 </div> <!-- End Dashboard Page -->
 
-                <!-- 5. NEW ADMIN PAGE (TASK FORCE MODE) -->
+                <!-- 5. MY CLASSROOM (TEACHER VIEW) -->
                 <div class="page" id="page-admin" style="display:none;">
-                    
-                    <!-- BETA BANNER -->
-                    <div class="bg-indigo-600 text-white px-4 py-3 rounded-lg shadow-md mb-6 flex items-start md:items-center justify-between gap-4 border border-indigo-500">
-                        <div class="flex items-center gap-3">
-                            <i data-lucide="flask-conical" class="w-5 h-5 flex-shrink-0 text-indigo-200"></i>
-                            <p class="text-xs md:text-sm font-bold leading-tight">
-                                <span class="opacity-75 uppercase tracking-wider text-[10px] block md:inline mb-1 md:mb-0 md:mr-2">System Notice:</span>
-                                COMING SOON: This functionality is in development. <a href="#" onclick="window.openMessageModal(); return false;" class="underline decoration-dotted underline-offset-2 hover:text-indigo-200">Send us a message</a> using the chat feature if you're interested in getting this for free as a beta participant.
-                            </p>
-                        </div>
-                        <button onclick="this.parentElement.style.display='none'" class="text-indigo-300 hover:text-white transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
-                    </div>
-                    
+
                     <!-- ADMIN TOP BAR -->
                     <div class="flex items-center justify-between mb-8">
                         <div>
                             <div class="flex items-center gap-3">
-                                <h1 class="text-2xl font-heading font-bold text-allgood-dark uppercase">Task Force Command</h1>
-                                <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-emerald-200">Plan Active</span>
+                                <h1 id="admin-page-title" class="text-2xl font-heading font-bold text-allgood-dark uppercase">My Classroom</h1>
+                                <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-emerald-200">Active</span>
                             </div>
-                            <p class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Reporting Hub: <span class="text-allgood-secondary">4th Period Science Class</span></p>
+                            <p id="admin-page-subtitle" class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Loading classroom...</p>
                         </div>
                         <div class="flex items-center gap-2">
-                             <button onclick="window.closeAdminDashboard()" class="text-slate-500 hover:text-allgood-primary px-4 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2">
+                             <button onclick="window.closeTeacherDashboard()" class="text-slate-500 hover:text-allgood-primary px-4 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2">
                                 <i data-lucide="log-out" class="w-4 h-4"></i> Return to OS
                             </button>
                         </div>
@@ -2328,8 +2531,8 @@
                         <!-- Stat 1 -->
                         <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
                             <div>
-                                <span class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Total Agents</span>
-                                <span class="block text-3xl font-heading font-bold text-slate-700">24</span>
+                                <span id="admin-stat1-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Total Agents</span>
+                                <span id="admin-stat-total" class="block text-3xl font-heading font-bold text-slate-700">24</span>
                             </div>
                             <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                                 <i data-lucide="users" class="w-5 h-5"></i>
@@ -2338,18 +2541,18 @@
                         <!-- Stat 2 -->
                         <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
                             <div>
-                                <span class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Completion Rate</span>
-                                <span class="block text-3xl font-heading font-bold text-emerald-600">78%</span>
+                                <span id="admin-stat2-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Completion Rate</span>
+                                <span id="admin-stat-completion" class="block text-3xl font-heading font-bold text-emerald-600">78%</span>
                             </div>
                             <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
                                 <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
                             </div>
                         </div>
                         <!-- Stat 3 -->
-                        <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all cursor-pointer">
+                        <div id="admin-stat3-card" onclick="window.copyClassroomCode()" class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all cursor-pointer">
                             <div>
-                                <span class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Invite Link</span>
-                                <span class="block text-sm font-bold text-allgood-secondary mt-1 underline decoration-dotted">allgood.ac/tf/8821</span>
+                                <span id="admin-stat3-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Invite Link</span>
+                                <span id="admin-stat-code" class="block text-sm font-bold text-allgood-secondary mt-1 underline decoration-dotted">allgood.ac/tf/8821</span>
                             </div>
                             <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-allgood-primary">
                                 <i data-lucide="copy" class="w-5 h-5"></i>
@@ -2357,130 +2560,45 @@
                         </div>
                     </div>
 
+                    <!-- ASSIGNED MODULES SUMMARY -->
+                    <div class="flex items-center justify-between mb-4 px-1">
+                        <p id="admin-assigned-summary" class="text-xs text-slate-500 font-bold">No modules assigned yet.</p>
+                        <button onclick="window.openAssignmentPicker()" class="px-3 py-1.5 rounded bg-allgood-secondary text-white text-[10px] font-bold uppercase hover:bg-allgood-accent transition-colors shadow-sm flex items-center gap-1">
+                            <i data-lucide="clipboard-list" class="w-3 h-3"></i> Manage Assignments
+                        </button>
+                    </div>
+
                     <!-- ROSTER TABLE (GLASS) -->
                     <div class="bg-white/80 backdrop-blur-md rounded-xl shadow-sm border border-white/60 overflow-hidden flex flex-col h-[60vh]">
                         <!-- Toolbar -->
                         <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-white/50">
                             <h3 class="font-bold text-slate-700 uppercase text-sm tracking-wide flex items-center gap-2">
-                                <i data-lucide="list" class="w-4 h-4 text-slate-400"></i> Agent Roster
+                                <i data-lucide="list" class="w-4 h-4 text-slate-400"></i> <span id="admin-roster-title">Agent Roster</span>
                             </h3>
-                            <div class="flex gap-2">
-                                <button class="px-3 py-1.5 rounded bg-white border border-gray-200 text-[10px] font-bold uppercase text-slate-500 hover:text-allgood-secondary hover:border-allgood-secondary transition-colors">
+                            <div class="flex gap-2 items-center">
+                                <select id="roster-filter-select" onchange="window.renderRosterRows(this.value)" class="px-2 py-1.5 rounded bg-white border border-gray-200 text-[10px] font-bold uppercase text-slate-500">
+                                    <option value="all">All Students</option>
+                                    <option value="completed_all">All Assigned Complete</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="not_started">Not Started</option>
+                                </select>
+                                <button id="admin-export-btn" onclick="window.exportRosterCSV()" class="px-3 py-1.5 rounded bg-white border border-gray-200 text-[10px] font-bold uppercase text-slate-500 hover:text-allgood-secondary hover:border-allgood-secondary transition-colors">
                                     Export CSV
-                                </button>
-                                <button class="px-3 py-1.5 rounded bg-allgood-primary text-white text-[10px] font-bold uppercase hover:bg-allgood-hover transition-colors shadow-sm flex items-center gap-1">
-                                    <i data-lucide="plus" class="w-3 h-3"></i> Add Agent
                                 </button>
                             </div>
                         </div>
 
                         <!-- Table Headers -->
                         <div class="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/50 border-b border-gray-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            <div class="col-span-4">Agent Name</div>
-                            <div class="col-span-2">Status</div>
+                            <div class="col-span-4">Student Name</div>
+                            <div class="col-span-2">Assigned Progress</div>
                             <div class="col-span-2 text-center">Badges</div>
                             <div class="col-span-2 text-center">Last Active</div>
                             <div class="col-span-2 text-right">Actions</div>
                         </div>
 
                         <!-- Table Body (Scrollable) -->
-                        <div class="overflow-y-auto custom-scrollbar flex-grow p-2 space-y-1">
-                            
-                            <!-- Row 1 -->
-                            <div class="grid grid-cols-12 gap-4 px-4 py-3 items-center rounded-lg hover:bg-white hover:shadow-sm transition-all group cursor-pointer border border-transparent hover:border-gray-100">
-                                <div class="col-span-4 flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">JD</div>
-                                    <div>
-                                        <p class="text-xs font-bold text-slate-700">John Doe</p>
-                                        <p class="text-[10px] text-slate-400">john.doe@example.com</p>
-                                    </div>
-                                </div>
-                                <div class="col-span-2">
-                                    <span class="bg-emerald-100 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Active</span>
-                                </div>
-                                <div class="col-span-2 flex justify-center -space-x-2">
-                                    <div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center z-30" title="Cyber Agent"><i data-lucide="shield" class="w-3 h-3 text-allgood-primary"></i></div>
-                                    <div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center z-20" title="Operator"><i data-lucide="zap" class="w-3 h-3 text-yellow-500"></i></div>
-                                    <div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center z-10 text-[9px] font-bold text-slate-400">+2</div>
-                                </div>
-                                <div class="col-span-2 text-center text-[10px] text-slate-500 font-mono">
-                                    2h ago
-                                </div>
-                                <div class="col-span-2 flex justify-end">
-                                    <button class="text-slate-300 hover:text-allgood-secondary transition-colors"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                                </div>
-                            </div>
-
-                            <!-- Row 2 -->
-                            <div class="grid grid-cols-12 gap-4 px-4 py-3 items-center rounded-lg hover:bg-white hover:shadow-sm transition-all group cursor-pointer border border-transparent hover:border-gray-100">
-                                <div class="col-span-4 flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-xs">AS</div>
-                                    <div>
-                                        <p class="text-xs font-bold text-slate-700">Alice Smith</p>
-                                        <p class="text-[10px] text-slate-400">alice.s@example.com</p>
-                                    </div>
-                                </div>
-                                <div class="col-span-2">
-                                    <span class="bg-amber-100 text-amber-700 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Idle</span>
-                                </div>
-                                <div class="col-span-2 flex justify-center -space-x-2">
-                                    <div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center z-30"><i data-lucide="eye" class="w-3 h-3 text-slate-400"></i></div>
-                                </div>
-                                <div class="col-span-2 text-center text-[10px] text-slate-500 font-mono">
-                                    3d ago
-                                </div>
-                                <div class="col-span-2 flex justify-end">
-                                    <button class="text-slate-300 hover:text-allgood-secondary transition-colors"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                                </div>
-                            </div>
-
-                            <!-- Row 3 -->
-                            <div class="grid grid-cols-12 gap-4 px-4 py-3 items-center rounded-lg hover:bg-white hover:shadow-sm transition-all group cursor-pointer border border-transparent hover:border-gray-100">
-                                <div class="col-span-4 flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center font-bold text-xs">MJ</div>
-                                    <div>
-                                        <p class="text-xs font-bold text-slate-700">Marcus Jones</p>
-                                        <p class="text-[10px] text-slate-400">mjones@example.com</p>
-                                    </div>
-                                </div>
-                                <div class="col-span-2">
-                                    <span class="bg-emerald-100 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Active</span>
-                                </div>
-                                <div class="col-span-2 flex justify-center -space-x-2">
-                                    <div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center z-30"><i data-lucide="shield" class="w-3 h-3 text-allgood-primary"></i></div>
-                                    <div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center z-20"><i data-lucide="zap" class="w-3 h-3 text-yellow-500"></i></div>
-                                </div>
-                                <div class="col-span-2 text-center text-[10px] text-slate-500 font-mono">
-                                    12m ago
-                                </div>
-                                <div class="col-span-2 flex justify-end">
-                                    <button class="text-slate-300 hover:text-allgood-secondary transition-colors"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                                </div>
-                            </div>
-
-                             <!-- Row 4 -->
-                             <div class="grid grid-cols-12 gap-4 px-4 py-3 items-center rounded-lg hover:bg-white hover:shadow-sm transition-all group cursor-pointer border border-transparent hover:border-gray-100">
-                                <div class="col-span-4 flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xs">SK</div>
-                                    <div>
-                                        <p class="text-xs font-bold text-slate-700">Sarah Kim</p>
-                                        <p class="text-[10px] text-slate-400">skim@example.com</p>
-                                    </div>
-                                </div>
-                                <div class="col-span-2">
-                                    <span class="bg-red-100 text-red-700 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Behind</span>
-                                </div>
-                                <div class="col-span-2 flex justify-center -space-x-2">
-                                     <div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center z-30 text-[9px] text-slate-300">0</div>
-                                </div>
-                                <div class="col-span-2 text-center text-[10px] text-slate-500 font-mono">
-                                    5d ago
-                                </div>
-                                <div class="col-span-2 flex justify-end">
-                                    <button class="text-slate-300 hover:text-allgood-secondary transition-colors"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                                </div>
-                            </div>
-
+                        <div id="admin-roster-body" class="overflow-y-auto custom-scrollbar flex-grow p-2 space-y-1">
                         </div>
                     </div>
 
@@ -2560,6 +2678,18 @@
                             <div class="bg-white border border-gray-200 rounded p-3 shadow-sm">
                                 <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Clearance Rank</p>
                                 <p class="text-sm font-bold text-allgood-secondary" id="profile-rank-display">FIELD AGENT</p>
+                            </div>
+                        </div>
+
+                        <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup -->
+                        <div class="mt-3 w-full">
+                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Classroom Code?</p>
+                                <div class="flex gap-2">
+                                    <input type="text" id="profile-classroom-input" placeholder="e.g. 2RP878" maxlength="8" class="flex-1 min-w-0 border border-gray-300 rounded p-2 text-xs uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50">
+                                    <button onclick="window.joinClassroom()" class="bg-allgood-secondary text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent shrink-0">Join</button>
+                                </div>
+                                <p id="profile-classroom-status" class="text-[10px] text-gray-400 mt-1"></p>
                             </div>
                         </div>
                     </div>
@@ -2800,37 +2930,6 @@
                 });
             }
             
-            // Startup Screen Listener
-            const startupScreen = document.getElementById('startup-screen');
-        if(startupScreen) {
-            startupScreen.addEventListener('click', () => {
-                if(window.sfx && window.sfx.powerOn) {
-                    window.sfx.powerOn(); 
-                } else if (window.initAudio) {
-                    window.initAudio();
-                }
-                
-                // FORCE VIDEO START REMOVED (Static Mode Active)
-                
-                startupScreen.style.opacity = '0';
-                
-                const storedUID = localStorage.getItem('aa_uid');
-                    const storedName = localStorage.getItem('aa_username');
-                    
-                    if (storedName && storedUID) {
-                        window.restoreSessionState();
-                        window.initDashboard(); 
-                    } else {
-                        const loginModal = document.getElementById('login-modal');
-                        if (loginModal) {
-                            loginModal.classList.remove('hidden-modal');
-                            loginModal.classList.add('visible-modal');
-                        }
-                    }
-                    
-                    setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
-                });
-            }
         });
 
         window.openAboutModal = () => {
