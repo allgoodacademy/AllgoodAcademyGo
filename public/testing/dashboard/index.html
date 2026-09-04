@@ -1,0 +1,2959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Allgood Academy Dashboard</title>
+    <!-- ADDED: Favicon for professional branding -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+
+    <!-- ADDED: Google Analytics (GA4) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EN4M7T3BLQ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-EN4M7T3BLQ');
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, updateProfile, signOut, GoogleAuthProvider, signInWithPopup, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        /* ADDED: limit */
+        import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        setLogLevel('Debug');
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
+            authDomain: "allgood-academy.firebaseapp.com",
+            projectId: "allgood-academy",
+            storageBucket: "allgood-academy.firebasestorage.app",
+            messagingSenderId: "978829044870",
+            appId: "1:978829044870:web:6c780f64230a77ad0ab507",
+            measurementId: "G-EN4M7T3BLQ"
+        };
+        
+        const appId = 'allgood-academy'; 
+        
+        let auth, db;
+
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        (async function initAuth() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch (e) {
+                    console.warn("Auth token failed, falling back", e);
+                }
+            }
+        })();
+
+        window.auth = auth; 
+        window.db = db;
+
+        let launchCount = parseInt(localStorage.getItem('aa_launch_count') || '0');
+        let unsubscribeLaunches = null;
+        let unsubscribeDecisions = null;
+        let unsubscribeIntel = null; // NEW: Intel Listener
+        
+        window.allModuleElements = {};
+        // GLOBAL REGISTRY FOR LIVE SVG ASSETS
+        window.userEarnedBadges = {};
+
+        // --- TEACHER / STUDENT ROLE STATE ---
+        function generateClassroomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
+            let code = '';
+            for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            return code;
+        }
+
+        // --- MODULE REGISTRY ---
+        // Single source of truth for every LIVE module in the library, used by classroom
+        // assignment and generic per-module completion detection. Everything else has been
+        // archived (moved out of public/, no longer hosted) — this registry only lists what's
+        // actually reachable, so a teacher can't accidentally assign a dead link.
+        //
+        // Completion rules below are confirmed against each module's actual Firestore writes,
+        // not guessed: DDC and Jolene's both gate on a finalScore threshold (no fake flags),
+        // the two Jodi's Schoolhouse pieces use an explicit `completed: true` signal.
+        const MODULE_REGISTRY = [
+            { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
+              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 80 },
+            { id: 'jolene', name: "Jolene's Lemonade", category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge',
+              gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800 },
+            { id: 'rage', name: 'Rage Revenue', category: 'lesson', url: 'https://allgoodacademy.com/jsh/rage-revenue/',
+              gameNames: ['Rage Revenue'], isComplete: (d) => d.completed === true },
+            { id: 'finding', name: 'Finding Yourself', category: 'lesson', url: 'https://allgoodacademy.com/jsh/finding-yourself/',
+              gameNames: ["Jodi's Schoolhouse: Finding Yourself"], isComplete: (d) => d.completed === true },
+        ];
+        function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
+
+        // Given one student's fetched game_scores docs, work out their status for a specific
+        // registry module, plus the real badge artifact if one was earned (every module stores
+        // its actual certificate SVG under `badgeArtifact` or `badgeSVG` on the winning doc).
+        function computeModuleStatus(moduleId, scoreDocs) {
+            const mod = getModuleById(moduleId);
+            if (!mod) return { status: 'not_started', badgeSvg: null };
+            let sawAttempt = false;
+            for (const data of scoreDocs) {
+                if (!mod.gameNames.includes(data.gameName)) continue;
+                sawAttempt = true;
+                if (mod.isComplete(data)) {
+                    return { status: 'completed', badgeSvg: data.badgeArtifact || data.badgeSVG || null };
+                }
+            }
+            return { status: sawAttempt ? 'in_progress' : 'not_started', badgeSvg: null };
+        }
+
+        async function writeUserDataToFirestore(user, name, email, isGuest, opts = {}) {
+             const silent = opts.silent === true;
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             
+             if (isGuest && user.displayName !== name) {
+                await updateProfile(user, { displayName: name });
+             }
+
+             // Check if this user already has a role on file (returning user) — never
+             // downgrade an existing teacher back to student on a later login.
+             const existingSnap = await getDoc(userRef);
+             const existingData = existingSnap.exists() ? existingSnap.data() : null;
+
+             let userDoc = {
+                 displayName: name,
+                 email: email || (isGuest ? null : user.email || null),
+                 isGuest: isGuest,
+                 lastLogin: serverTimestamp(),
+                 onboardingComplete: true
+             };
+
+             // Everyone defaults to student. Becoming a teacher is a deliberate, separate
+             // action (see window.upgradeToTeacher) — never a first-touch choice.
+             userDoc.role = (existingData && existingData.role) ? existingData.role : 'student';
+             if (existingData && existingData.classroomCode) userDoc.classroomCode = existingData.classroomCode;
+
+             await setDoc(userRef, userDoc, { merge: true });
+
+             localStorage.setItem('aa_is_guest', isGuest);
+             localStorage.setItem('aa_username', name);
+             localStorage.setItem('aa_uid', user.uid);
+             localStorage.setItem('aa_role', userDoc.role);
+             
+             window.updateUI(name); 
+             document.getElementById('page-dashboard').classList.add('active');
+             document.getElementById('page-dashboard').style.display = 'block'; 
+             
+             // Show navbar
+             document.querySelector('.navbar-content').classList.remove('opacity-0');
+             
+             window.applyRoleUI(userDoc.role);
+             
+             window.startLaunchListener(user.uid);
+             window.startDecisionsStatusListener(user.uid);
+             window.startIntelListener(user.uid); // NEW: Start Intel Check
+
+             if (!silent) {
+                 // This was a real identification (name/email or Google), not the invisible
+                 // power-up sign-in — close the modal, mark them identified, and resume
+                 // whatever course launch triggered this prompt in the first place.
+                 closeLoginModal();
+                 localStorage.setItem('aa_identified', 'true');
+                 window.resumePendingLaunch();
+             }
+        }
+
+        // Called the instant someone powers up with no existing session — creates a real,
+        // trackable identity behind the scenes with zero visible form. Their real name/email
+        // is only asked for later, at the moment they actually launch a course.
+        window.silentSignIn = async () => {
+            try {
+                const userCredential = await signInAnonymously(auth);
+                const user = userCredential.user;
+                await writeUserDataToFirestore(user, 'Agent Learner', null, true, { silent: true });
+            } catch (error) {
+                console.error("Silent sign-in failed:", error);
+                showStatusMessage("Connection failed. Check network or rules.", 'error');
+            }
+        };
+
+        // If a course launch was interrupted to ask "who's launching this?", this resumes
+        // it once that question is answered — so identifying yourself and launching feels
+        // like one motion, not two separate steps.
+        window.resumePendingLaunch = () => {
+            if (window._pendingLaunch) {
+                const { courseName, url, element } = window._pendingLaunch;
+                window._pendingLaunch = null;
+                window.launchCourse(courseName, url, element);
+            }
+        };
+
+        // Updates the classroom menu entry's label based on current role — always visible,
+        // but reads differently depending on whether you're already a teacher.
+        window.applyRoleUI = (role) => {
+            const label = document.getElementById('menu-classroom-label');
+            if (label) label.textContent = role === 'teacher' ? 'My Classroom' : 'Set Up a Classroom';
+        };
+
+        // Smart entry point: teachers land in their existing classroom, everyone else is
+        // offered the (entirely optional) chance to become one.
+        window.openClassroomEntry = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            const role = localStorage.getItem('aa_role');
+            if (!uid) return;
+
+            if (role === 'teacher') {
+                window.openTeacherDashboard();
+            } else {
+                const menu = document.getElementById('menu-modal');
+                if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
+                const modal = document.getElementById('become-teacher-modal');
+                if (modal) { modal.classList.remove('hidden-modal'); modal.classList.add('visible-modal'); }
+            }
+        };
+
+        window.closeBecomeTeacherModal = () => {
+            const modal = document.getElementById('become-teacher-modal');
+            if (modal) { modal.classList.add('hidden-modal'); modal.classList.remove('visible-modal'); }
+        };
+
+        // Deliberate, separate upgrade action — never triggered as part of normal signup.
+        window.upgradeToTeacher = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+            const userRef = doc(db, 'artifacts', appId, 'users', uid);
+
+            try {
+                const userSnap = await getDoc(userRef);
+                const name = (userSnap.exists() && userSnap.data().displayName) || localStorage.getItem('aa_username') || 'Teacher';
+
+                const code = generateClassroomCode();
+                await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), {
+                    teacherUid: uid,
+                    teacherName: name,
+                    createdAt: serverTimestamp()
+                });
+                await setDoc(userRef, { role: 'teacher', classroomCode: code }, { merge: true });
+
+                localStorage.setItem('aa_role', 'teacher');
+                window.applyRoleUI('teacher');
+                window.closeBecomeTeacherModal();
+                showStatusMessage("Classroom created!", 'info');
+                setTimeout(() => window.openTeacherDashboard(), 400);
+            } catch (e) {
+                console.error("Failed to create classroom:", e);
+                showStatusMessage("Couldn't create your classroom — please try again.", 'error');
+            }
+        };
+
+        window.copyClassroomCode = () => {
+            const code = document.getElementById('admin-stat-code')?.textContent;
+            if (code && code !== 'allgood.ac/tf/8821') {
+                navigator.clipboard.writeText(code);
+                showStatusMessage("Classroom code copied!", 'info');
+            }
+        };
+
+        window.handleGuestLogin = async () => {
+            sfx.click();
+            const btn = document.getElementById('btn-guest-login');
+            
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+
+            const finalName = nameInput || "Guest";
+            const finalEmail = emailInput || null;
+            const isGuest = true;
+            
+            btn.innerText = "Connecting...";
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'cursor-wait');
+
+            try {
+                const userCredential = await signInAnonymously(auth);
+                const user = userCredential.user;
+                await writeUserDataToFirestore(user, finalName, finalEmail, isGuest);
+            } catch (error) {
+                console.error("Anonymous Login Error:", error);
+                showStatusMessage("Connection failed. Check network or rules.", 'error'); 
+            } finally {
+                btn.innerText = "Enter Dashboard"; 
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-wait');
+            }
+        };
+
+        window.handleGoogleLogin = async () => {
+            sfx.click();
+            const btnContainer = document.getElementById('google-icon-container');
+            btnContainer.classList.add('opacity-50', 'cursor-wait');
+            
+            const provider = new GoogleAuthProvider();
+            const isGuest = false;
+
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                const finalName = user.displayName || 'Agent';
+                const finalEmail = user.email || null;
+                await writeUserDataToFirestore(user, finalName, finalEmail, isGuest);
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                let message = "Sign-in failed. Please try again.";
+                if (error.code === 'auth/popup-closed-by-user') {
+                    message = "Sign-in canceled. Please try again.";
+                }
+                showStatusMessage(message, 'error');
+            } finally {
+                btnContainer.classList.remove('opacity-50', 'cursor-wait');
+            }
+        };
+
+        window.launchCourse = async (courseName, url, element) => {
+            const isIdentified = localStorage.getItem('aa_identified') === 'true';
+
+            if (!auth.currentUser || !isIdentified) {
+                // Stash what they were trying to do so it resumes automatically once they
+                // answer the "who's launching this?" prompt — feels like one motion, not two.
+                window._pendingLaunch = { courseName, url, element };
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal) {
+                    loginModal.classList.remove('hidden-modal');
+                    loginModal.classList.add('visible-modal');
+                }
+                return;
+            }
+
+            let finalUrl = url;
+            try {
+                const urlObj = new URL(url);
+                urlObj.searchParams.append('dashboard_uid', auth.currentUser.uid);
+                finalUrl = urlObj.toString();
+            } catch (e) { console.log("URL append failed", e); }
+
+            // Option 1: Instant Execution
+            sfx.confirm();
+
+            // ADDED: Track module launch in GA4
+            if (typeof gtag === 'function') {
+                gtag('event', 'launch_module', { 'module_name': courseName });
+            }
+
+            window.open(finalUrl, '_blank');
+            
+            if (auth.currentUser) {
+                addDoc(collection(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'launches'), {
+                    courseName: courseName,
+                    targetUrl: url,
+                    timestamp: serverTimestamp()
+                }).catch(e => console.log("Log failed (Firebase). Continuing navigation."));
+
+                if (element) {
+                    const badge = element.querySelector('span.rounded'); 
+                    if (badge) {
+                        if (badge.id === 'ddc-status-badge') return; 
+
+                        badge.textContent = "LAUNCHED";
+                        badge.className = "bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 animate-pulse";
+                        setTimeout(() => badge.classList.remove('animate-pulse'), 2000);
+                    }
+                }
+            }
+        };
+
+        window.openMessageModal = () => {
+            const menu = document.getElementById('menu-modal');
+            if(menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
+            
+            const modal = document.getElementById('message-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            sfx.click();
+            setTimeout(() => document.getElementById('message-input').focus(), 100);
+        }
+
+        window.closeMessageModal = () => {
+            const modal = document.getElementById('message-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+            sfx.click();
+        }
+
+        window.submitMessage = async () => {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            const btn = document.getElementById('btn-send-message');
+            
+            if (!text) return;
+            
+            const user = auth.currentUser;
+            if (!user) {
+                const originalText = btn.innerHTML;
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = "Please Sign In First";
+                sfx.powerOff();
+                
+                setTimeout(() => {
+                    btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    btn.innerHTML = originalText;
+                    lucide.createIcons();
+                }, 2000);
+                return;
+            }
+
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+
+            try {
+                const targetCollection = collection(db, 'artifacts', appId, 'users', user.uid, 'feedback_inbox');
+                
+                await addDoc(targetCollection, {
+                    senderName: user.displayName || "Guest Agent",
+                    senderEmail: user.email || "Anonymous",
+                    message: text,
+                    timestamp: serverTimestamp(),
+                    isGuest: user.isAnonymous
+                });
+                
+                // NEW: Unlock Intel Badge immediately
+                localStorage.setItem('aa_intel_sent', 'true');
+                window.updateBadges();
+
+                sfx.confirm();
+                input.value = "";
+                
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> Transmission Sent`;
+                lucide.createIcons();
+
+                setTimeout(() => {
+                    closeMessageModal();
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                        btn.innerHTML = originalText;
+                        lucide.createIcons();
+                        
+                        // Show notification of badge unlock if it was just unlocked
+                        // (Optional enhancement, sticking to core logic for now)
+                    }, 500);
+                }, 1500);
+
+            } catch (e) {
+                console.error("Message failed", e);
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = "Transmission Failed";
+                sfx.powerOff();
+
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    btn.innerHTML = originalText;
+                    lucide.createIcons();
+                }, 3000);
+            }
+        }
+
+        window.handleLogout = async () => {
+            sfx.powerOff();
+            localStorage.removeItem('aa_username');
+            localStorage.removeItem('aa_is_guest'); 
+            localStorage.removeItem('aa_launch_count');
+            localStorage.removeItem('aa_uid');
+            localStorage.removeItem('aa_ddc_complete');
+            localStorage.removeItem('aa_jlc_complete');
+            localStorage.removeItem('aa_intel_sent');
+            localStorage.removeItem('aa_finding_complete'); // NEW: Clear Finding status
+
+            launchCount = 0; 
+            
+            if (auth.currentUser) {
+                try { await signOut(auth); } catch(e) { console.log("Signout error", e); }
+            }
+            
+            if (unsubscribeLaunches) {
+                unsubscribeLaunches();
+                unsubscribeLaunches = null;
+            }
+
+            if (unsubscribeDecisions) { 
+                unsubscribeDecisions();
+                unsubscribeDecisions = null;
+            }
+
+            if (unsubscribeIntel) { // NEW: Cleanup Intel Listener
+                unsubscribeIntel();
+                unsubscribeIntel = null;
+            }
+            
+            // Reset badges
+            document.querySelectorAll('.mission-file span.rounded').forEach(badge => {
+                if (badge.textContent === "LAUNCHED") {
+                    badge.textContent = "Ready";
+                    const parent = badge.closest('.mission-file');
+                    if (parent.classList.contains('status-active')) {
+                         badge.className = "bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
+                         badge.textContent = "Active";
+                    } else if (parent.classList.contains('status-ready')) {
+                         badge.className = "bg-gray-100 text-gray-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide"; 
+                         badge.textContent = "Ready";
+                    }
+                }
+            });
+
+            const ddcBadge = document.getElementById('ddc-status-badge');
+            if(ddcBadge) {
+                ddcBadge.textContent = "Active";
+                ddcBadge.className = "bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
+            }
+            
+            window.initModuleElements();
+
+            document.querySelectorAll('.visible-modal').forEach(el => {
+                el.classList.remove('visible-modal');
+                el.classList.add('hidden-modal');
+            });
+
+            const dashboard = document.getElementById('page-dashboard');
+            if (dashboard) {
+                dashboard.classList.remove('active');
+                dashboard.style.display = 'none';
+            }
+            
+            // Hide Navbar
+            document.querySelector('.navbar-content').classList.add('opacity-0');
+            
+            // Hide Admin Panel if open
+            const adminPanel = document.getElementById('page-admin');
+            if(adminPanel) {
+                adminPanel.classList.remove('active');
+                adminPanel.style.display = 'none';
+            }
+            
+            window.updateUI('Agent'); 
+            window.updateBadges(); 
+
+            const startup = document.getElementById('startup-screen');
+            if(startup) {
+                document.getElementById('startup-message').textContent = "CLICK TO POWER UP";
+                startup.style.display = 'flex';
+                setTimeout(() => { startup.style.opacity = '1'; }, 10);
+            }
+        };
+
+        // --- MOVED PROFILE FUNCTIONS TO MODULE SCOPE TO FIX REFERENCE ERROR ---
+        
+        window.openProfileModal = () => {
+            // Close menu if open
+            const menu = document.getElementById('menu-modal');
+            if (menu) {
+                menu.classList.add('hidden-modal');
+                menu.classList.remove('visible-modal');
+            }
+
+            const modal = document.getElementById('profile-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            if(window.sfx) window.sfx.click();
+
+            // Populate Data
+            const user = auth.currentUser;
+            const storedName = localStorage.getItem('aa_username') || "Guest Agent";
+            const storedUID = localStorage.getItem('aa_uid') || "N/A";
+            const launches = localStorage.getItem('aa_launch_count') || "0";
+            
+            // Name
+            const nameDisplay = document.getElementById('profile-name-display');
+            const nameInput = document.getElementById('profile-name-input');
+            if(nameDisplay) nameDisplay.textContent = storedName;
+            if(nameInput) nameInput.value = storedName;
+            
+            // Stats
+            const statLaunches = document.getElementById('profile-stat-launches');
+            if(statLaunches) statLaunches.textContent = launches;
+            
+            // Badges & Rank Calculation
+            let badgeCount = 1; // Observer
+            if (user && !user.isAnonymous) badgeCount++;
+            if (parseInt(launches) > 0) badgeCount++;
+            if (localStorage.getItem('aa_ddc_complete') === 'true') badgeCount++;
+            if (localStorage.getItem('aa_jlc_complete') === 'true') badgeCount++;
+            if (localStorage.getItem('aa_intel_sent') === 'true') badgeCount++;
+            if (localStorage.getItem('aa_finding_complete') === 'true') badgeCount++;
+
+            const statBadges = document.getElementById('profile-stat-badges');
+            if(statBadges) statBadges.textContent = badgeCount;
+
+            // Rank Title Logic
+            let rankTitle = "OBSERVER";
+            if (badgeCount >= 2) rankTitle = "RECRUIT";
+            if (badgeCount >= 3) rankTitle = "FIELD AGENT";
+            if (badgeCount >= 5) rankTitle = "SPECIAL OPERATIVE";
+            if (badgeCount >= 7) rankTitle = "ELITE GUARDIAN";
+            
+            const rankDisplay = document.getElementById('profile-rank-display');
+            if(rankDisplay) rankDisplay.textContent = rankTitle;
+
+            // ID & Meta
+            const idDisplay = document.getElementById('profile-id-display');
+            if(idDisplay) idDisplay.textContent = storedUID.substring(0, 8).toUpperCase() + "...";
+            
+            const dateDisplay = document.getElementById('profile-join-date');
+            if (dateDisplay) {
+                if (user && user.metadata && user.metadata.creationTime) {
+                    const date = new Date(user.metadata.creationTime);
+                    dateDisplay.textContent = date.toLocaleDateString();
+                } else {
+                    dateDisplay.textContent = new Date().toLocaleDateString();
+                }
+            }
+        }
+
+        window.closeProfileModal = () => {
+            const modal = document.getElementById('profile-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+            // Reset Edit Mode
+            window.toggleProfileEdit(false);
+            if(window.sfx) window.sfx.click();
+        }
+
+        window.toggleProfileEdit = (isEditing) => {
+            const viewMode = document.getElementById('profile-view-name');
+            const editMode = document.getElementById('profile-edit-name');
+            
+            if (isEditing) {
+                viewMode.classList.add('hidden');
+                editMode.classList.remove('hidden');
+                const input = document.getElementById('profile-name-input');
+                if(input) input.focus();
+            } else {
+                viewMode.classList.remove('hidden');
+                editMode.classList.add('hidden');
+            }
+        }
+
+        window.saveProfileIdentity = async () => {
+            const input = document.getElementById('profile-name-input');
+            const newName = input.value.trim();
+            
+            if (!newName) return; 
+            
+            if(window.sfx) window.sfx.confirm();
+            
+            // 1. Update UI immediately
+            const nameDisplay = document.getElementById('profile-name-display');
+            if(nameDisplay) nameDisplay.textContent = newName;
+            localStorage.setItem('aa_username', newName);
+            window.updateUI(newName); 
+            
+            // 2. Update Firebase (NOW HAS ACCESS TO IMPORTS)
+            const user = auth.currentUser;
+            if (user) {
+                try {
+                    await updateProfile(user, { displayName: newName });
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
+                        displayName: newName
+                    }, { merge: true });
+                } catch (e) {
+                    console.error("Failed to save identity to cloud", e);
+                }
+            }
+            
+            window.toggleProfileEdit(false);
+        }
+
+        // Lets a student join a classroom anytime from their Profile — no longer forced
+        // into the first-touch login form, since it's genuinely optional.
+        window.joinClassroom = async () => {
+            const input = document.getElementById('profile-classroom-input');
+            const statusEl = document.getElementById('profile-classroom-status');
+            const code = (input?.value || '').trim().toUpperCase();
+            if (!code) return;
+
+            const user = auth.currentUser;
+            if (!user) return;
+
+            try {
+                const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
+                if (!classroomSnap.exists()) {
+                    if (statusEl) { statusEl.textContent = "Code not found — double check with your teacher."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+                    return;
+                }
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
+                if (statusEl) { statusEl.textContent = "Joined! Your teacher can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
+                if (window.sfx) window.sfx.confirm();
+            } catch (e) {
+                console.error("Failed to join classroom:", e);
+                if (statusEl) { statusEl.textContent = "Something went wrong — please try again."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+            }
+        };
+
+        window.initModuleElements = function() {
+            window.allModuleElements = {};
+            const cards = document.querySelectorAll('.mission-file');
+            cards.forEach(card => {
+                const onclickAttr = card.getAttribute('onclick');
+                if (onclickAttr && onclickAttr.includes('launchCourse')) {
+                    const match = onclickAttr.match(/'([^']+)'/);
+                    if (match && match[1]) {
+                        const courseName = match[1];
+                        const badge = card.querySelector('span.rounded');
+                        if (badge) {
+                            window.allModuleElements[courseName] = badge;
+                        }
+                    }
+                }
+            });
+        }
+
+        window.startLaunchListener = function(uid) {
+            if (unsubscribeLaunches) unsubscribeLaunches();
+            
+            if (Object.keys(window.allModuleElements).length === 0) {
+                window.initModuleElements();
+            }
+
+            const launchesCollectionRef = collection(db, 'artifacts', appId, 'users', uid, 'launches');
+            unsubscribeLaunches = onSnapshot(launchesCollectionRef, (snapshot) => {
+                const totalLaunches = snapshot.size;
+                launchCount = totalLaunches; 
+                localStorage.setItem('aa_launch_count', launchCount); 
+                window.updateBadges();
+
+                const statElement = document.getElementById('stat-total-launches');
+                if (statElement) statElement.textContent = totalLaunches;
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const courseName = data.courseName;
+                    const badgeElement = window.allModuleElements[courseName];
+                    
+                    if (badgeElement) {
+                        if (badgeElement.id === 'ddc-status-badge') return;
+                        
+                        // FIX: Do not overwrite if already completed
+                        if (badgeElement.textContent === "MISSION COMPLETE" || badgeElement.textContent === "CERTIFIED") return;
+
+                        if (badgeElement.textContent !== "LAUNCHED") {
+                            badgeElement.textContent = "LAUNCHED";
+                            badgeElement.className = "bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500";
+                        }
+                    }
+                });
+
+            }, (error) => {
+                console.error("Error listening to launches:", error);
+            });
+        }
+
+        // Universal Status Listener (Handles DDC + JLC + All Content Blocks)
+        window.startModuleStatusListener = function(uid) {
+            if (unsubscribeDecisions) unsubscribeDecisions();
+            
+            const scoresRef = collection(db, 'artifacts', appId, 'users', uid, 'game_scores');
+            
+            unsubscribeDecisions = onSnapshot(scoresRef, (snapshot) => {
+                let maxDDCScore = -1;
+                let hasDDCAttempt = false;
+                let isJLCComplete = false;
+                
+                // Set to track which modules are done in this snapshot
+                const completedModules = new Set();
+                
+                // Reset user badges cache on update
+                window.userEarnedBadges = {};
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const gameName = data.gameName;
+
+                    // 1. Digital Decisions Logic (Score based)
+                    if (gameName === "Digital Decisions Challenge" && typeof data.finalScore === 'number') {
+                        hasDDCAttempt = true;
+                        if (data.finalScore > maxDDCScore) maxDDCScore = data.finalScore;
+                        
+                        // Check for SVG Asset
+                        if (data.badgeSVG) {
+                            window.userEarnedBadges['cyber'] = data.badgeSVG;
+                        }
+                    }
+
+                    // 2. Jolene's Lemonade Logic (Explicit completion flag OR Score Safety Net)
+                    if (gameName === "Jolene's Lemonade" || gameName === "Jolenes Lemonade Challenge") {
+                         if (data.complete === true || (typeof data.finalScore === 'number' && data.finalScore >= 800)) {
+                             isJLCComplete = true;
+                         }
+                         
+                         // Check for SVG Asset
+                         if (data.badgeSVG) {
+                             window.userEarnedBadges['entrepreneur'] = data.badgeSVG;
+                         }
+                    }
+
+                    // 3. Generic Completion Logic (Boolean based)
+                    if (data.completed === true && gameName) {
+                        completedModules.add(gameName);
+
+                        // FIX: Normalization for "The AI Co-Pilot"
+                        // Database stores "AI Co-Pilot", but UI expects "The AI Co-Pilot"
+                        if (gameName === "AI Co-Pilot") {
+                            completedModules.add("The AI Co-Pilot");
+                        }
+                        
+                        // FIX: Normalization for "Rage Revenue"
+                        if (gameName === "Rage Revenue") {
+                            completedModules.add("Rage Revenue");
+                        }
+                        
+                        // FIX: Normalization for "Finding Yourself"
+                        if (gameName === "Jodi's Schoolhouse: Finding Yourself") {
+                            completedModules.add("Finding Yourself");
+                        }
+                        
+                        // FIX: Normalization for "Conflict Resolution"
+                        if (gameName === "Conflict Resolution Challenge") {
+                            completedModules.add("Conflict Resolution");
+                        }
+                        
+                        // 3a. Identity Guardian Asset Logic
+                        if (gameName === "Your Digital Identity" && data.badgeSVG) {
+                            window.userEarnedBadges['identity'] = data.badgeSVG;
+                        }
+
+                        // 3b. Digital Asset Defense Logic (NEW)
+                        if (gameName === "Digital Asset Defense" && data.badgeSVG) {
+                            window.userEarnedBadges['defense'] = data.badgeSVG;
+                        }
+
+                        // 3c. Finding Yourself Asset Logic (NEW)
+                        if (gameName === "Jodi's Schoolhouse: Finding Yourself" && data.badgeSVG) {
+                            window.userEarnedBadges['finding'] = data.badgeSVG;
+                        }
+                        
+                        // Future proofing: Generic badge storage logic could go here
+                        if (data.badgeSVG && gameName === "Airport Navigator") {
+                             window.userEarnedBadges['operator'] = data.badgeSVG; // Example mapping
+                        }
+                    }
+                });
+
+                // Update Local Storage for Badges
+                if (hasDDCAttempt && maxDDCScore >= 80) localStorage.setItem('aa_ddc_complete', 'true');
+                else localStorage.removeItem('aa_ddc_complete');
+                
+                // Store JLC Status
+                if (isJLCComplete) localStorage.setItem('aa_jlc_complete', 'true');
+                else localStorage.removeItem('aa_jlc_complete');
+
+                // Store Finding Yourself Status (NEW - Badge 9)
+                if (completedModules.has("Finding Yourself")) localStorage.setItem('aa_finding_complete', 'true');
+                else localStorage.removeItem('aa_finding_complete');
+                
+                // Check specifically for Airport Navigator for the specialized badge slot
+                if (completedModules.has("Airport Navigator")) localStorage.setItem('aa_airport_complete', 'true');
+                else localStorage.removeItem('aa_airport_complete');
+                
+                window.updateBadges();
+
+                // UPDATE UI: Digital Decisions (Special Case)
+                const ddcBadge = document.getElementById('ddc-status-badge');
+                if (ddcBadge) {
+                    if (maxDDCScore >= 80) { 
+                        ddcBadge.textContent = "MISSION COMPLETE";
+                        ddcBadge.className = "bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-emerald-200";
+                    } else if (hasDDCAttempt) {
+                        ddcBadge.textContent = "RETAKE REQUIRED";
+                        ddcBadge.className = "bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-amber-200 animate-pulse";
+                    }
+                }
+
+                // UPDATE UI: All Other Content Blocks
+                for (const [courseName, badgeElement] of Object.entries(window.allModuleElements)) {
+                    if (courseName === "Digital Decisions") continue; // Skip DDC
+
+                    // Check JLC specifically (Key matches the SAFE NAME 'Jolenes Lemonade')
+                    if ((courseName === "Jolenes Lemonade" || courseName === "Jolene's Lemonade") && isJLCComplete) {
+                         if (badgeElement.textContent !== "MISSION COMPLETE") {
+                            badgeElement.textContent = "MISSION COMPLETE";
+                            badgeElement.className = "bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-emerald-200";
+                        }
+                        continue;
+                    }
+
+                    if (completedModules.has(courseName)) {
+                        // Mark as Complete
+                        if (badgeElement.textContent !== "MISSION COMPLETE") {
+                            badgeElement.textContent = "MISSION COMPLETE";
+                            badgeElement.className = "bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-emerald-200";
+                        }
+                    } else if (badgeElement.textContent === "MISSION COMPLETE") {
+                        // Fallback: If it was complete but database says no (e.g. reset), revert to Ready
+                        // Note: startLaunchListener will bump it back to 'LAUNCHED' if applicable
+                        badgeElement.textContent = "Ready";
+                        badgeElement.className = "bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
+                    }
+                }
+
+            }, (error) => {
+                console.log("Status listener silent fail:", error);
+            });
+        }
+
+        // Backwards compatibility alias
+        window.startDecisionsStatusListener = window.startModuleStatusListener;
+
+        window.updateUI = function(name) { 
+            const els = document.querySelectorAll('.user-name-display');
+            els.forEach(el => el.textContent = name);
+            window.updateBadges();
+        }
+        
+        window.updateBadges = function() { 
+            // Logic for Badge Count
+            let badgeCount = 1; // 1. Observer (Always unlocked)
+            
+            const isGuest = localStorage.getItem('aa_is_guest') === 'true';
+            const name = localStorage.getItem('aa_username');
+            const isGenericName = !name || name === 'Guest' || name === 'Learner';
+            const isLoggedIn = !isGuest && name && !isGenericName;
+            
+            if (isLoggedIn) badgeCount++; // 2. Academy Agent
+            
+            launchCount = parseInt(localStorage.getItem('aa_launch_count') || '0');
+            if (launchCount > 0) badgeCount++; // 3. Academy Operator
+            
+            const ddcComplete = localStorage.getItem('aa_ddc_complete') === 'true';
+            if (ddcComplete) badgeCount++; // 4. Cyber Agent
+
+            const jlcComplete = localStorage.getItem('aa_jlc_complete') === 'true';
+            if (jlcComplete) badgeCount++; // 5. Certified Entrepreneur
+
+            const intelSent = localStorage.getItem('aa_intel_sent') === 'true';
+            if (intelSent) badgeCount++; // 6. Intel Officer
+
+            const findingComplete = localStorage.getItem('aa_finding_complete') === 'true';
+            if (findingComplete) badgeCount++; // 7. Origin Scout
+
+            // Update Header Display
+            const badgeCountEl = document.getElementById('badge-count-display');
+            if(badgeCountEl) badgeCountEl.textContent = `BADGES: ${badgeCount}`;
+            
+            // Update Modal UI (if open or pre-render)
+            // Badge 2 (Agent)
+            updateBadgeSlot('badge-slot-2', isLoggedIn);
+            // Badge 3 (Operator)
+            updateBadgeSlot('badge-slot-3', launchCount > 0);
+            // Badge 4 (Cyber)
+            updateBadgeSlot('badge-slot-4', ddcComplete);
+            // Badge 5 (Entrepreneur - JLC)
+            updateBadgeSlot('badge-slot-5', jlcComplete);
+            // Badge 8 (Intel Officer)
+            updateBadgeSlot('badge-slot-8', intelSent);
+            // Badge 9 (Origin Scout)
+            updateBadgeSlot('badge-slot-9', findingComplete);
+
+            const launchStat = document.getElementById('stat-total-launches');
+            if (launchStat) launchStat.textContent = launchCount;
+        }
+
+        function updateBadgeSlot(id, unlocked) {
+            const container = document.getElementById(id);
+            if(!container) return;
+            
+            const token = container.querySelector('.badge-token');
+            const icon = container.querySelector('.badge-content');
+            const lock = container.querySelector('.badge-lock');
+            const label = container.querySelector('span:not(.badge-content)'); // Select label, avoid emoji
+            
+            // Set data-unlocked attribute on the CONTAINER for click handler logic
+            container.dataset.unlocked = unlocked ? "true" : "false";
+            
+            if(unlocked) {
+                // Update Token Visuals
+                if(token) token.className = "badge-token token-unlocked group-hover:scale-105";
+                if(lock) lock.style.display = 'none';
+                
+                // Icon Colors
+                if (icon && !icon.classList.contains('emoji-badge')) {
+                    icon.classList.remove('text-slate-500');
+                    icon.classList.add('text-allgood-primary');
+                } else if (icon) {
+                    icon.classList.remove('grayscale');
+                }
+
+                // Label Text Color
+                if(label) label.className = "text-[10px] font-bold text-allgood-dark uppercase tracking-wide group-hover:text-allgood-primary";
+                
+            } else {
+                // Reset to Locked
+                if(token) token.className = "badge-token token-locked group-hover:scale-105";
+                if(lock) lock.style.display = 'block';
+                
+                if (icon && !icon.classList.contains('emoji-badge')) {
+                    icon.classList.remove('text-allgood-primary');
+                    icon.classList.add('text-slate-500');
+                } else if (icon) {
+                    icon.classList.add('grayscale');
+                }
+                
+                if(label) label.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wide";
+            }
+        }
+        
+        window.showBadgeDetails = (type, element) => {
+            // Update Visual Selection
+            document.querySelectorAll('.badge-token').forEach(el => {
+                el.classList.remove('token-selected');
+            });
+            if(element) {
+                const token = element.querySelector('.badge-token');
+                if(token) token.classList.add('token-selected');
+            }
+
+            // Data Content
+            const detailsPane = document.getElementById('badge-details-pane');
+            const detailsTitle = document.getElementById('badge-details-title');
+            const detailsStatus = document.getElementById('badge-details-status');
+            const detailsDesc = document.getElementById('badge-details-desc');
+            const iconContainer = document.getElementById('detail-icon-container');
+            const actionBtn = document.getElementById('btn-badge-action');
+            const actionText = document.getElementById('badge-action-text');
+            const subtext = document.getElementById('badge-action-subtext');
+            const statusDot = document.getElementById('detail-status-indicator');
+            
+            // Unlocked Check
+            const isUnlocked = element && element.dataset.unlocked === "true";
+            // Fallback for Observer which is always true but might not have ID update logic yet
+            const finalUnlocked = type === 'observer' ? true : isUnlocked;
+
+            let title = "";
+            let desc = "";
+            let largeIconHtml = `<i data-lucide="help-circle" class="w-10 h-10 text-slate-400"></i>`;
+
+            switch(type) {
+                case 'observer': 
+                    title = "Observer Badge";
+                    desc = "Granted to all personnel observing Academy operations. No clearance required.";
+                    largeIconHtml = `<i data-lucide="eye" class="w-12 h-12 text-allgood-primary"></i>`;
+                    break;
+                case 'agent': 
+                    title = "Academy Agent";
+                    desc = "Granted upon verified identity confirmation (SSO Login). Allows persistent progress tracking.";
+                    largeIconHtml = `<i data-lucide="id-card" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
+                    break;
+                case 'operator': 
+                    title = "Academy Operator";
+                    desc = "Granted after successful initialization of first mission module. Demonstrates field readiness.";
+                    largeIconHtml = `<i data-lucide="zap" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
+                    break;
+                case 'cyber': 
+                    title = "Cyber Agent";
+                    desc = "Awarded for demonstrating superior judgment in the Digital Decisions Challenge (Score > 80%).";
+                    largeIconHtml = `<i data-lucide="shield-check" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
+                    break;
+                case 'entrepreneur': 
+                    title = "Certified Entrepreneur";
+                    desc = "Awarded for achieving $800+ profit in Jolene's Lemonade Challenge. Demonstrates business acumen.";
+                    largeIconHtml = `<span class="text-5xl ${finalUnlocked ? '' : 'grayscale opacity-50'}">🍋</span>`;
+                    break;
+                case 'identity': 
+                    title = "Identity Guardian";
+                    desc = "Awarded for completing 'Your Digital Identity'. Signifies mastery of personal perimeter security.";
+                    largeIconHtml = `<i data-lucide="fingerprint" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
+                    break;
+                case 'defense': 
+                    title = "Asset Defender";
+                    desc = "Awarded for completing 'Digital Asset Defense'. Demonstrates mastery of wallet security protocols.";
+                    largeIconHtml = `<i data-lucide="shield" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
+                    break;
+                case 'intel': // NEW CASE 8
+                    title = "Intel Officer";
+                    desc = "Awarded for sharing your voice. Submit a question, feedback, or tip via the message tool to earn this badge.";
+                    largeIconHtml = `<i data-lucide="radio-tower" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
+                    break;
+                case 'finding': // NEW CASE 9
+                    title = "Origin Scout";
+                    desc = "Awarded for completing 'Finding Yourself'. Signifies the courage to explore one's own history to build a stronger future.";
+                    largeIconHtml = `<i data-lucide="compass" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
+                    break;
+                case 'classified': 
+                    title = "Classified Asset";
+                    desc = "This certification slot is reserved for future operations. Clearance unavailable at this time.";
+                    break;
+            }
+            
+            detailsTitle.textContent = title;
+            detailsDesc.textContent = desc;
+            iconContainer.innerHTML = largeIconHtml;
+            lucide.createIcons();
+
+            // LOGIC CHECK FOR ASSET
+            const svgUrl = window.userEarnedBadges && window.userEarnedBadges[type];
+
+            if (finalUnlocked) {
+                // UNLOCKED STATE
+                detailsStatus.textContent = "STATUS: VERIFIED";
+                detailsStatus.className = "text-xs font-bold uppercase tracking-widest text-emerald-600";
+                statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                iconContainer.className = "w-24 h-24 mx-auto mb-6 rounded-full bg-orange-50 border-4 border-orange-100 flex items-center justify-center shadow-md scale-110 transition-all duration-300";
+
+                if (svgUrl) {
+                    // ASSET AVAILABLE
+                    actionBtn.disabled = false;
+                    actionBtn.className = "w-full bg-allgood-secondary hover:bg-allgood-accent text-white font-bold py-4 rounded shadow-md transition-all uppercase text-xs flex items-center justify-center gap-2 transform active:scale-95";
+                    actionText.textContent = "Download Badge";
+                    actionBtn.onclick = () => window.viewOrDownloadBadge(type);
+                    
+                    subtext.style.opacity = "1";
+                    subtext.textContent = "Secure asset available for retrieval.";
+                } else {
+                    // ASSET PENDING
+                    actionBtn.disabled = true;
+                    actionBtn.className = "w-full bg-slate-200 text-slate-400 font-bold py-4 rounded shadow-none transition-all uppercase text-xs flex items-center justify-center gap-2 cursor-not-allowed";
+                    actionText.textContent = "Digital Asset Pending";
+                    actionBtn.onclick = null;
+                    
+                    subtext.style.opacity = "1";
+                    subtext.textContent = "No downloadable asset found.";
+                }
+            } else {
+                // LOCKED STATE
+                detailsStatus.textContent = "STATUS: LOCKED";
+                detailsStatus.className = "text-xs font-bold uppercase tracking-widest text-red-500";
+                statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+                iconContainer.className = "w-24 h-24 mx-auto mb-6 rounded-full bg-slate-100 border-4 border-slate-200 flex items-center justify-center grayscale opacity-70 transition-all duration-300";
+
+                // Disable Button
+                actionBtn.disabled = true;
+                actionBtn.className = "w-full bg-slate-200 text-slate-400 font-bold py-4 rounded shadow-none transition-all uppercase text-xs flex items-center justify-center gap-2 cursor-not-allowed";
+                actionText.textContent = "Asset Locked";
+                actionBtn.onclick = null;
+                
+                subtext.style.opacity = "0";
+            }
+            
+            sfx.click();
+        }
+        
+        window.viewOrDownloadBadge = (type) => {
+            sfx.confirm();
+            
+            const btn = document.getElementById('btn-badge-action');
+            const originalText = document.getElementById('badge-action-text').textContent;
+            // Rename variable for clarity: it might be a URL or Content
+            const assetData = window.userEarnedBadges[type];
+            
+            if(!assetData) {
+                console.error("No asset data found for", type);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Retrieving...`;
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                // Success state
+                btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Asset Retrieved`;
+                lucide.createIcons();
+                
+                // DETECT: Is this a raw SVG string or a URL?
+                // Robust check: look for svg tags anywhere, incase of leading chars/quotes
+                if (typeof assetData === 'string' && assetData.includes('<svg') && assetData.includes('</svg>')) {
+                    
+                    // Cleanup: If the string is accidentally wrapped in quotes from data entry, strip them
+                    let content = assetData.trim();
+                    if (content.startsWith('"') && content.endsWith('"')) {
+                        content = content.slice(1, -1);
+                    }
+
+                    // It is raw code. Convert to a downloadable file blob.
+                    const blob = new Blob([content], { type: 'image/svg+xml' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Create invisible link to force download
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `AllgoodAcademy_${type}_Badge.svg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } else {
+                    // It is a standard URL. Open normally.
+                    window.open(assetData, '_blank');
+                }
+                
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i data-lucide="download" class="w-4 h-4"></i> <span id="badge-action-text">${originalText}</span>`;
+                    lucide.createIcons();
+                }, 2000);
+            }, 1000);
+        }
+        
+        window.openBadgeCollection = () => {
+            window.updateBadges(); // Ensure state is fresh
+            const menu = document.getElementById('menu-modal');
+            if (menu) {
+                menu.classList.add('hidden-modal');
+                menu.classList.remove('visible-modal');
+            }
+            const modal = document.getElementById('badge-collection-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            
+            // Auto-select first badge on open for better UX
+            setTimeout(() => {
+                const firstBadge = document.querySelector('.group.cursor-pointer');
+                if(firstBadge) window.showBadgeDetails('observer', firstBadge);
+            }, 100);
+            
+            sfx.click();
+        }
+        
+        window.closeBadgeCollection = () => {
+            const modal = document.getElementById('badge-collection-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+            sfx.click();
+        }
+
+        window.openAboutModal = () => {
+            const menu = document.getElementById('menu-modal');
+            if (menu) {
+                menu.classList.add('hidden-modal');
+                menu.classList.remove('visible-modal');
+            }
+
+            const modal = document.getElementById('about-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            sfx.click();
+        }
+
+        window.closeAboutModal = () => {
+            const modal = document.getElementById('about-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+            sfx.click();
+        }
+
+        function closeLoginModal() {
+            const modal = document.getElementById('login-modal');
+            if(modal) {
+                modal.classList.add('hidden-modal');
+                modal.classList.remove('visible-modal');
+            }
+        }
+        
+        function showStatusMessage(message, type = 'info') {
+            const modal = document.getElementById('status-modal');
+            const content = document.getElementById('status-content');
+            const icon = document.getElementById('status-icon');
+            const classes = {
+                'info': { bg: 'bg-blue-100', text: 'text-blue-800', icon: 'info' },
+                'error': { bg: 'bg-red-100', text: 'text-red-800', icon: 'alert-triangle' }
+            };
+
+            const style = classes[type] || classes['info'];
+            modal.querySelector('.modal-content-base').className = `modal-content-base rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 ${style.bg} relative`;
+            content.textContent = message;
+            content.className = `text-sm font-body ${style.text}`;
+            icon.setAttribute('data-lucide', style.icon);
+            lucide.createIcons();
+
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            setTimeout(() => {
+                modal.classList.add('hidden-modal');
+                modal.classList.remove('visible-modal');
+            }, 3000);
+        }
+        
+        window.restoreSessionState = function() {
+            const storedName = localStorage.getItem('aa_username');
+            const storedUID = localStorage.getItem('aa_uid');
+            const storedRole = localStorage.getItem('aa_role');
+            const dashboard = document.getElementById('page-dashboard');
+
+            if (storedName && storedUID) {
+                // Migration shim: anyone with a real name already on file predates the
+                // "identified" flag — treat them as identified rather than re-prompting
+                // people who already gave their name under the old flow.
+                if (localStorage.getItem('aa_identified') !== 'true' && storedName !== 'Agent Learner') {
+                    localStorage.setItem('aa_identified', 'true');
+                }
+
+                window.updateUI(storedName);
+                if (dashboard) {
+                    dashboard.classList.add('active');
+                    dashboard.style.display = 'block'; 
+                }
+                // Show Navbar
+                document.querySelector('.navbar-content').classList.remove('opacity-0');
+                if (storedRole) window.applyRoleUI(storedRole);
+                
+                window.startLaunchListener(storedUID);
+                window.startDecisionsStatusListener(storedUID); 
+                window.startIntelListener(storedUID); // NEW: Restore Intel Check
+                return true; 
+            }
+            return false; 
+        }
+
+        window.initDashboard = function() { 
+            window.initModuleElements();
+            
+            onAuthStateChanged(auth, async (user) => {
+                const dashboard = document.getElementById('page-dashboard');
+                if (user) {
+                    if (dashboard.style.display === 'block') {
+                        window.startLaunchListener(user.uid);
+                        window.startDecisionsStatusListener(user.uid); 
+                        window.startIntelListener(user.uid); // NEW: Ensure check runs on reload
+                        return;
+                    }
+                    
+                    const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+                    const docSnap = await getDoc(userRef);
+
+                    let displayName = user.displayName || 'Agent';
+                    let isGuest = true; 
+
+                    if (docSnap.exists()) {
+                        const userData = docSnap.data();
+                        displayName = userData.displayName || user.displayName || 'Agent';
+                        isGuest = userData.isGuest || false;
+                    }
+
+                    localStorage.setItem('aa_username', displayName);
+                    localStorage.setItem('aa_uid', user.uid);
+                    localStorage.setItem('aa_is_guest', isGuest);
+
+                    window.updateUI(displayName);
+                    dashboard.classList.add('active');
+                    dashboard.style.display = 'block'; 
+                    
+                    // Show Navbar
+                    document.querySelector('.navbar-content').classList.remove('opacity-0');
+                    
+                    closeLoginModal(); 
+                    window.startLaunchListener(user.uid);
+                    window.startDecisionsStatusListener(user.uid); 
+                    window.startIntelListener(user.uid); // NEW: Start check on fresh login
+                } else {
+                    if (dashboard.style.display === 'block') {
+                         window.handleLogout(); 
+                    }
+                }
+            });
+        }
+
+        // --- NEW LISTENER FOR INTEL BADGE ---
+        window.startIntelListener = function(uid) {
+            if (unsubscribeIntel) unsubscribeIntel();
+
+            try {
+                const inboxRef = collection(db, 'artifacts', appId, 'users', uid, 'feedback_inbox');
+                // Efficient query: We only need to know if > 0 documents exist
+                const q = query(inboxRef, limit(1));
+
+                unsubscribeIntel = onSnapshot(q, (snapshot) => {
+                    if (!snapshot.empty) {
+                        // If any message exists, they are an Intel Officer
+                        if (localStorage.getItem('aa_intel_sent') !== 'true') {
+                            localStorage.setItem('aa_intel_sent', 'true');
+                            window.updateBadges();
+                        }
+                    }
+                }, (error) => {
+                    console.log("Intel Check Silent Fail", error);
+                });
+            } catch (e) {
+                console.warn("Intel listener setup failed", e);
+            }
+        }
+
+        window.closeTeacherDashboard = () => {
+            sfx.nav();
+            const adminPage = document.getElementById('page-admin');
+            adminPage.style.display = 'none';
+            adminPage.classList.remove('active');
+            
+            // Restore standard dashboard
+            document.getElementById('page-dashboard').style.display = 'block';
+        };
+
+        // --- REAL TEACHER DASHBOARD (reuses the admin page's UI, real data instead of demo rows) ---
+        let _currentRosterFull = [];
+        let _currentAssignedModuleIds = [];
+        let _studentStatusCache = {};
+
+        window.openTeacherDashboard = async () => {
+            const menu = document.getElementById('menu-modal');
+            if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
+
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+
+            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+            const userData = userSnap.exists() ? userSnap.data() : null;
+            const code = userData ? userData.classroomCode : null;
+
+            if (!code) {
+                showStatusMessage("No classroom code on file for this account yet.", 'error');
+                return;
+            }
+
+            sfx.confirm();
+            document.getElementById('page-dashboard').style.display = 'none';
+            const adminPage = document.getElementById('page-admin');
+            adminPage.style.display = 'block';
+            adminPage.classList.add('active');
+
+            document.getElementById('admin-page-title').textContent = 'My Classroom';
+            document.getElementById('admin-page-subtitle').innerHTML = `Classroom Code: <span class="text-allgood-secondary font-mono">${code}</span>`;
+            document.getElementById('admin-stat1-label').textContent = 'Total Students';
+            document.getElementById('admin-stat2-label').textContent = 'Avg. Assigned Completion';
+            document.getElementById('admin-stat3-label').textContent = 'Classroom Code';
+            document.getElementById('admin-stat-code').textContent = code;
+            document.getElementById('admin-roster-title').textContent = 'Student Roster';
+
+            const rosterBody = document.getElementById('admin-roster-body');
+            rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">Loading roster...</p>';
+            lucide.createIcons();
+
+            try {
+                const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
+                const assignedModuleIds = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
+                _currentAssignedModuleIds = assignedModuleIds;
+
+                const assignedLabel = document.getElementById('admin-assigned-summary');
+                if (assignedLabel) {
+                    assignedLabel.textContent = assignedModuleIds.length
+                        ? `${assignedModuleIds.length} module${assignedModuleIds.length === 1 ? '' : 's'} assigned: ${assignedModuleIds.map(id => getModuleById(id)?.name || id).join(', ')}`
+                        : 'No modules assigned yet.';
+                }
+
+                if (assignedModuleIds.length === 0) {
+                    rosterBody.innerHTML = '<div class="p-6 text-center"><p class="text-xs text-gray-400 italic mb-3">No modules assigned yet — students won\'t have anything to work toward until you assign at least one.</p><button onclick="window.openAssignmentPicker()" class="bg-allgood-primary text-white text-[10px] font-bold uppercase px-4 py-2 rounded-full">Assign Modules</button></div>';
+                    document.getElementById('admin-stat-total').textContent = '—';
+                    document.getElementById('admin-stat-completion').textContent = '—';
+                    _currentRosterFull = [];
+                    lucide.createIcons();
+                    return;
+                }
+
+                const studentsQuery = query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', code), where('role', '==', 'student'));
+                const studentsSnap = await getDocs(studentsQuery);
+
+                document.getElementById('admin-stat-total').textContent = studentsSnap.size;
+
+                if (studentsSnap.empty) {
+                    rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">No students have joined this classroom yet. Share your code to get started.</p>';
+                    document.getElementById('admin-stat-completion').textContent = '—';
+                    _currentRosterFull = [];
+                    lucide.createIcons();
+                    return;
+                }
+
+                const rosterFull = [];
+                let totalCompletionPairs = 0;
+                let completedPairs = 0;
+
+                for (const sDoc of studentsSnap.docs) {
+                    const sData = sDoc.data();
+                    let scoreDocs = [];
+                    try {
+                        const scoresSnap = await getDocs(collection(db, 'artifacts', appId, 'users', sDoc.id, 'game_scores'));
+                        scoreDocs = scoresSnap.docs.map(d => d.data());
+                    } catch (e) {
+                        console.error("Couldn't read a student's scores (permissions?) — showing their assigned modules as Not Started.", e);
+                    }
+
+                    const moduleStatuses = {};
+                    assignedModuleIds.forEach(moduleId => {
+                        const result = computeModuleStatus(moduleId, scoreDocs);
+                        moduleStatuses[moduleId] = result;
+                        totalCompletionPairs++;
+                        if (result.status === 'completed') completedPairs++;
+                    });
+
+                    const lastActive = sData.lastLogin && sData.lastLogin.toDate ? sData.lastLogin.toDate().toLocaleDateString() : '—';
+                    rosterFull.push({
+                        uid: sDoc.id,
+                        name: sData.displayName || 'Student',
+                        email: sData.email || '',
+                        lastActive,
+                        moduleStatuses
+                    });
+                }
+
+                document.getElementById('admin-stat-completion').textContent = totalCompletionPairs
+                    ? Math.round((completedPairs / totalCompletionPairs) * 100) + '%'
+                    : '—';
+
+                _currentRosterFull = rosterFull;
+                _studentStatusCache = {};
+                rosterFull.forEach(r => { _studentStatusCache[r.uid] = r; });
+
+                window.renderRosterRows('all');
+            } catch (e) {
+                console.error("Roster fetch failed — check that firestore.rules has been deployed with the teacher-classroom rules.", e);
+                rosterBody.innerHTML = '<p class="text-xs text-red-400 italic p-4">Couldn\'t load roster — this usually means the security rules update hasn\'t been deployed yet.</p>';
+            }
+        };
+
+        // Renders roster rows from the already-fetched _currentRosterFull cache — no refetching,
+        // so the status filter dropdown can re-render instantly.
+        window.renderRosterRows = (filter) => {
+            const rosterBody = document.getElementById('admin-roster-body');
+            const assignedCount = _currentAssignedModuleIds.length;
+
+            const filtered = _currentRosterFull.filter(r => {
+                if (filter === 'all') return true;
+                const statuses = Object.values(r.moduleStatuses).map(m => m.status);
+                if (filter === 'completed_all') return statuses.length > 0 && statuses.every(s => s === 'completed');
+                if (filter === 'in_progress') return statuses.some(s => s === 'in_progress' || s === 'completed') && !statuses.every(s => s === 'completed');
+                if (filter === 'not_started') return statuses.every(s => s === 'not_started');
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">No students match this filter.</p>';
+                return;
+            }
+
+            rosterBody.innerHTML = '';
+            filtered.forEach(r => {
+                const completedCount = Object.values(r.moduleStatuses).filter(m => m.status === 'completed').length;
+                const hasAnyBadge = Object.values(r.moduleStatuses).some(m => m.badgeSvg);
+                const initials = (r.name || 'St').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                const progressLabel = `${completedCount}/${assignedCount} Complete`;
+                const progressClass = completedCount === assignedCount ? 'bg-emerald-100 text-emerald-700' : (completedCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500');
+
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-12 gap-4 px-4 py-3 items-center rounded-lg hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100 cursor-pointer';
+                row.onclick = () => window.openStudentProfile(r.uid);
+                row.innerHTML = `
+                    <div class="col-span-4 flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">${initials}</div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-slate-700 truncate">${r.name}</p>
+                            <p class="text-[10px] text-slate-400 truncate">${r.email}</p>
+                        </div>
+                    </div>
+                    <div class="col-span-2"><span class="${progressClass} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${progressLabel}</span></div>
+                    <div class="col-span-2 flex justify-center">${hasAnyBadge ? '<i data-lucide="shield" class="w-4 h-4 text-allgood-primary"></i>' : '<span class="text-[9px] text-slate-300">—</span>'}</div>
+                    <div class="col-span-2 text-center text-[10px] text-slate-500 font-mono">${r.lastActive}</div>
+                    <div class="col-span-2 flex justify-end"><span class="text-slate-400 text-[9px] font-bold uppercase hover:text-allgood-secondary">View Profile</span></div>
+                `;
+                rosterBody.appendChild(row);
+            });
+            lucide.createIcons();
+        };
+
+        // --- STUDENT PROFILE DRILL-DOWN ---
+        window.openStudentProfile = (studentUid) => {
+            const student = _studentStatusCache[studentUid];
+            if (!student) return;
+
+            document.getElementById('profile-student-name').textContent = student.name;
+            document.getElementById('profile-student-email').textContent = student.email;
+
+            const list = document.getElementById('profile-module-list');
+            const entries = Object.entries(student.moduleStatuses);
+            if (entries.length === 0) {
+                list.innerHTML = '<p class="text-xs text-gray-400 italic">No modules assigned.</p>';
+            } else {
+                list.innerHTML = entries.map(([moduleId, result]) => {
+                    const mod = getModuleById(moduleId);
+                    const { status, badgeSvg } = result;
+                    const statusClass = status === 'completed' ? 'bg-emerald-100 text-emerald-700' : status === 'in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500';
+                    const statusLabel = status === 'completed' ? 'Completed' : status === 'in_progress' ? 'In Progress' : 'Not Started';
+                    // Real earned badge: render the module's own certificate SVG when available,
+                    // rather than a generic icon standing in for it.
+                    const badgeHtml = badgeSvg
+                        ? `<div class="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white p-1"><div class="w-full aspect-[3/2] overflow-hidden">${badgeSvg}</div></div>`
+                        : '';
+                    return `<div class="p-3 bg-slate-50 rounded-lg mb-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-700">${mod ? mod.name : moduleId}</span>
+                            <span class="${statusClass} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${statusLabel}</span>
+                        </div>
+                        ${badgeHtml}
+                    </div>`;
+                }).join('');
+            }
+
+            document.getElementById('student-profile-modal').classList.remove('hidden-modal');
+            document.getElementById('student-profile-modal').classList.add('visible-modal');
+            lucide.createIcons();
+        };
+
+        window.closeStudentProfile = () => {
+            document.getElementById('student-profile-modal').classList.add('hidden-modal');
+            document.getElementById('student-profile-modal').classList.remove('visible-modal');
+        };
+
+        // --- ASSIGNMENT MANAGEMENT ---
+        window.openAssignmentPicker = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+            const code = userSnap.exists() ? userSnap.data().classroomCode : null;
+            if (!code) return;
+
+            const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
+            const assigned = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
+
+            const list = document.getElementById('assignment-picker-list');
+            list.innerHTML = MODULE_REGISTRY.map(m => `
+                <label class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-100">
+                    <input type="checkbox" value="${m.id}" ${assigned.includes(m.id) ? 'checked' : ''} class="assignment-checkbox w-4 h-4 accent-allgood-primary">
+                    <span class="text-xs font-bold text-slate-700">${m.name}</span>
+                    <span class="text-[9px] uppercase text-slate-400 ml-auto">${m.category}</span>
+                </label>
+            `).join('');
+
+            document.getElementById('assignment-picker-modal').classList.remove('hidden-modal');
+            document.getElementById('assignment-picker-modal').classList.add('visible-modal');
+        };
+
+        window.closeAssignmentPicker = () => {
+            document.getElementById('assignment-picker-modal').classList.add('hidden-modal');
+            document.getElementById('assignment-picker-modal').classList.remove('visible-modal');
+        };
+
+        window.saveAssignments = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            if (!uid) return;
+            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+            const code = userSnap.exists() ? userSnap.data().classroomCode : null;
+            if (!code) return;
+
+            const checked = Array.from(document.querySelectorAll('.assignment-checkbox:checked')).map(cb => cb.value);
+            await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), { assignedModules: checked }, { merge: true });
+            showStatusMessage("Assignments updated.", 'info');
+            window.closeAssignmentPicker();
+            window.openTeacherDashboard(); // refresh roster against the new assignment set
+        };
+
+        window.exportRosterCSV = () => {
+            if (!_currentRosterFull.length) { showStatusMessage("No roster data to export yet.", 'info'); return; }
+            const moduleIds = _currentAssignedModuleIds;
+            let csv = 'Name,Email,Last Active,' + moduleIds.map(id => `"${(getModuleById(id)?.name || id)}"`).join(',') + '\n';
+            _currentRosterFull.forEach(r => {
+                const statusCols = moduleIds.map(id => `"${(r.moduleStatuses[id] && r.moduleStatuses[id].status) || 'not_started'}"`).join(',');
+                csv += `"${r.name}","${r.email}","${r.lastActive}",${statusCols}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'classroom-roster.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        const startupScreen = document.getElementById('startup-screen');
+        if(startupScreen) {
+            startupScreen.addEventListener('click', () => {
+                if(window.sfx && window.sfx.powerOn) {
+                    window.sfx.powerOn(); 
+                } else if (window.initAudio) {
+                    window.initAudio();
+                }
+                
+                startupScreen.style.opacity = '0';
+                
+                const storedUID = localStorage.getItem('aa_uid');
+                const storedName = localStorage.getItem('aa_username');
+                
+                if (storedName && storedUID) {
+                    window.restoreSessionState();
+                    window.initDashboard(); 
+                } else {
+                    // New visitor: no form, no interruption — sign in silently and go
+                    // straight to the dashboard. Their real name is asked for later,
+                    // only when they actually launch something.
+                    window.silentSignIn();
+                    window.initDashboard();
+                }
+                
+                setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+            });
+        }
+    </script>
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'allgood-accent': '#2D6473',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        /* =============================================
+           FIXED CHASSIS MANDATE: Industrial Design
+           ============================================= 
+        */
+        body {
+            font-family: Verdana, sans-serif;
+            background-color: #0f172a; /* Deep Space Blue fallback */
+            min-height: 100vh;
+            position: relative;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        /* ORBITAL LINK: Video Background Layer */
+        #bg-video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -50;
+            overflow: hidden;
+        }
+
+        #bg-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 1.0; /* MAX VISIBILITY */
+        }
+
+        /* ORBITAL LINK: Overlay Removed completely */
+
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+
+        /* Neon Glow Effects */
+        .static-neon-glow {
+            text-shadow: 
+                0 0 5px rgba(211, 71, 22, 0.2),
+                0 0 10px rgba(211, 71, 22, 0.4),
+                0 0 20px rgba(211, 71, 22, 0.6);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { text-shadow: 0 0 10px rgba(211, 71, 22, 0.4); transform: scale(1); }
+            50% { text-shadow: 0 0 30px rgba(211, 71, 22, 0.9), 0 0 15px rgba(211, 71, 22, 0.6); transform: scale(1.02); }
+        }
+        .animate-pulse-glow { animation: pulse-glow 2.5s infinite ease-in-out; will-change: transform, text-shadow; }
+
+        @keyframes pulse-glow-badge {
+            0%, 100% { box-shadow: 0 0 0px rgba(211, 71, 22, 0.0); }
+            50% { box-shadow: 0 0 12px rgba(211, 71, 22, 0.7); }
+        }
+        .animate-pulse-glow-badge { animation: pulse-glow-badge 3s infinite ease-in-out; }
+
+        .shadow-badge-locked { box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(255, 255, 255, 0.2); }
+        .shadow-badge-active { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2), 0 0 1px #FFF; }
+
+        /* --- TABLET FRAME (FIXED CHASSIS MANDATE) --- */
+        .tablet-frame {
+            height: 88vh;
+            width: auto;
+            aspect-ratio: 16/10;
+            max-width: min(1700px, 94vw);
+            max-height: 96vh;
+            min-height: 0;
+            min-width: 0;
+            /* Brushed Aluminum & Depth Gradients - FIXED */
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+                radial-gradient(circle at 100% 100%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+                linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px;
+            padding: 12px; 
+            box-shadow: 
+                inset 1px 1px 2px rgba(255,255,255, 0.6), 
+                inset -1px -1px 2px rgba(0,0,0, 0.8), 
+                0 30px 60px -12px rgba(0, 0, 0, 0.8), 
+                0 0 0 1px #111;
+            border: 1px solid #333;
+            position: relative;
+            margin: 20px auto;
+            transition: width 0.3s, height 0.3s, padding 0.3s;
+        }
+
+        .tablet-frame::before {
+            content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+            border-radius: 6px; background: #111; z-index: 0;
+        }
+
+        /* --- SCREEN CONTAINER: EXECUTIVE OS INTERFACE --- */
+        .screen-container {
+            width: 100%; height: 100%;
+            /* NEW: Executive Glass Gradient (Software Layer) */
+            background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            position: relative; z-index: 1; overflow: hidden;
+            display: flex; flex-direction: column; 
+            border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        
+        /* --- MISSION CARD (GLASSMORPHISM) --- */
+        .mission-file {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-left-width: 4px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .mission-file:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Status colors */
+        .status-active { border-left-color: #D34716; } /* Burnt Orange */
+        .status-ready { border-left-color: #357889; } /* Deep Cyan */
+        .status-locked { border-left-color: #757575; opacity: 0.7; cursor: not-allowed; }
+        
+        /* COMMAND RAIL TABS (UPDATED) */
+        .tab-btn {
+            color: #64748b; /* Text Secondary */
+            border: none;
+        }
+        .tab-btn:hover {
+            background-color: rgba(255,255,255,0.5);
+            color: #357889; /* Brand Secondary */
+        }
+        .active-tab {
+            background-color: #D34716 !important; /* Brand Primary */
+            color: white !important;
+            box-shadow: 0 4px 6px -1px rgba(211, 71, 22, 0.3), 0 2px 4px -1px rgba(211, 71, 22, 0.1);
+            transform: translateY(-1px);
+        }
+
+        /* Custom image container for headshot */
+        .headshot-container {
+            width: 64px;
+            height: 64px;
+            overflow: hidden;
+            border-radius: 6px;
+            border: 1px solid rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+        .headshot-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+
+        @media (max-width: 640px) {
+            body {
+                padding: 0;
+                align-items: flex-start;
+                background-image: none;
+                background-color: #f8fafc;
+            }
+            .tablet-frame {
+                width: 100vw !important;
+                height: 100vh !important;
+                max-width: none !important;
+                max-height: none !important;
+                border-radius: 0 !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                background-image: none !important;
+                aspect-ratio: auto !important;
+            }
+            .tablet-frame::before { display: none; }
+            .screen-container {
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                padding-top: env(safe-area-inset-top);
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            main { padding: 0 !important; }
+        }
+
+        /* --- BLUEPRINT MODE --- */
+        .blueprint-mode .screen-container { background: #0f172a; color: #94a3b8; }
+        .blueprint-mode .mission-file { background-color: #1e293b; border-color: #334155; opacity: 1; backdrop-filter: none; }
+        .blueprint-mode h1, .blueprint-mode h2, .blueprint-mode h3, .blueprint-mode strong { color: #38bdf8 !important; }
+
+        /* --- FOCUS MODE --- */
+        .focus-mode .tablet-frame {
+            position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; 
+            width: 100% !important; height: 100% !important;
+            aspect-ratio: auto !important; max-width: none !important; max-height: none !important; 
+            min-height: 0 !important;
+            margin: 0 !important; padding: 0 !important; 
+            background: #f8fafc !important; border: none !important; border-radius: 0 !important; 
+            box-shadow: none !important; z-index: 99999 !important;
+            background-image: none !important;
+        }
+        .focus-mode .tablet-frame::before { display: none; }
+        .focus-mode .screen-container { border-radius: 0; box-shadow: none; height: 100%; }
+
+        /* --- SCROLLBARS --- */
+        .page::-webkit-scrollbar { width: 10px; }
+        .page::-webkit-scrollbar-track { background: transparent; }
+        .page::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 5px; border: 2px solid #f8fafc; }
+        .page::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+        /* --- MODALS --- */
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        /* --- LAYOUT - HEADER (GLASS) --- */
+        /* Updated Navbar for Executive Glass Look */
+        .navbar-content { flex: 0 0 60px; z-index: 30; background: rgba(53, 120, 137, 0.85); backdrop-filter: blur(5px); border-bottom: 1px solid rgba(255,255,255,0.1); color: white; transition: opacity 0.3s; position: relative; }
+        .footer-content { flex: 0 0 50px; z-index: 20; background: white; border-top: 1px solid #e2e8f0; }
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 24px; position: relative; display: none; width: 100%; background: transparent; }
+        .page.active { display: block; }
+        
+        .modal-content-base { background: white; }
+        
+        .tooltip-container { position: relative; display: inline-block; }
+        .tooltip-text {
+            visibility: hidden; width: 250px; background-color: #4C4C4C; color: #fff;
+            text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 10;
+            bottom: 125%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s; font-size: 0.75rem;
+        }
+        .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+        .tooltip-text::after {
+            content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+            border-width: 5px; border-style: solid; border-color: #4C4C4C transparent transparent transparent;
+        }
+
+        /* --- BADGE MODAL GRID --- */
+        .badge-grid-item {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            transition: all 0.2s;
+            position: relative;
+            background: #f8fafc;
+        }
+        .badge-grid-item:hover {
+            transform: scale(1.05);
+        }
+
+        /* NEW: Emoji Badge Styling */
+        .emoji-badge {
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));
+            line-height: 1;
+            display: block;
+        }
+
+        /* --- NEW: BADGE TOKEN STYLES (MINTED LOOK) --- */
+        .badge-token {
+            aspect-ratio: 1;
+            border-radius: 50%; /* Circular Token */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                inset 0 1px 1px rgba(255, 255, 255, 0.6); /* Rim Highlight */
+        }
+        
+        .badge-token:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 
+                0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+                0 4px 6px -2px rgba(0, 0, 0, 0.05),
+                inset 0 1px 1px rgba(255, 255, 255, 0.6);
+            z-index: 10;
+        }
+
+        /* LOCKED STATE: Industrial Zinc */
+        .token-locked {
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            border: 4px solid #cbd5e1;
+        }
+        .token-locked .badge-content {
+            opacity: 0.4;
+            filter: grayscale(100%);
+        }
+
+        /* UNLOCKED STATE: Allgood Bronze/Gold */
+        .token-unlocked {
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); /* Warm Orange-ish base */
+            border: 4px solid #fed7aa; /* Orange-200 ring */
+            box-shadow: 
+                0 4px 6px rgba(211, 71, 22, 0.15),
+                inset 0 2px 4px rgba(255, 255, 255, 0.9);
+        }
+
+        /* ENGRAVED ICON EFFECT */
+        .badge-content {
+            font-size: 1.5rem;
+            filter: drop-shadow(0 1px 1px rgba(255,255,255,0.8));
+        }
+        
+        /* SELECTION RING */
+        .token-selected {
+            box-shadow: 0 0 0 4px #D34716 !important; /* Allgood Primary Ring */
+        }
+
+        /* MODAL LAYOUT OVERRIDES */
+        .executive-split-modal {
+            max-height: 85vh;
+            height: 480px; /* REDUCED HEIGHT */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        @media (min-width: 768px) {
+            .executive-split-modal {
+                flex-direction: row;
+            }
+            .modal-left-pane {
+                width: 60%;
+                border-right: 1px solid #e2e8f0;
+            }
+            .modal-right-pane {
+                width: 40%;
+            }
+        }
+        
+        /* Utility */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body">
+
+    <!-- ORBITAL LINK: Static Feed Injection -->
+    <div id="bg-video-container">
+        <!-- Secure Feed: Earth Night Side (Unsplash Asset) -->
+        <img id="bg-image" src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Orbital View">
+    </div>
+    
+    <!-- Overlay Element Removed -->
+
+    <main class="flex-grow flex items-center justify-center py-8">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[5000] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-slate-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="relative">
+                            <div class="absolute inset-0 bg-allgood-primary/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                            <h2 class="text-xl md:text-2xl font-heading text-slate-400 mb-2 uppercase">WELCOME TO THE</h2>
+                            <h1 class="text-4xl md:text-6xl font-heading font-bold text-allgood-primary tracking-tighter relative z-10 drop-shadow-md static-neon-glow uppercase">ALLGOOD<span class="text-white">ACADEMY</span></h1>
+                        </div>
+                        
+                        <!-- ADDED: Power Icon Flare -->
+                        <div class="mt-8 mb-4 relative transition-transform duration-500 group-hover:scale-110">
+                            <div class="absolute inset-0 bg-allgood-primary/50 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                            <i data-lucide="power" class="w-16 h-16 text-slate-600 group-hover:text-white transition-colors duration-300 relative z-10"></i>
+                        </div>
+
+                        <p id="startup-message" class="text-slate-500 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-allgood-primary transition-colors animate-pulse font-body">CLICK TO POWER UP</p>
+                    </div>
+                </div>
+
+                <!-- 2. LOGIN MODAL -->
+                <div id="login-modal" class="absolute inset-0 z-[4000] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">One Quick Thing</h2>
+                        
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Who's launching this?</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 font-body leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged in real-time to improve the GoodBlock experience. All personal data is kept confidential and never sold.</p>
+                                    <div class="border-t border-gray-700 my-1 pt-1"></div>
+                                    <p class="text-gray-300"><strong>Email (Optional):</strong> Enter to join the Allgood Academy community.</p>
+                                </div>
+                            </button>
+                        </div>
+
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">
+                            Enter Dashboard
+                        </button>
+
+                        <div class="mt-4 flex items-center justify-center space-x-2">
+                             <div class="h-px w-10 bg-gray-200"></div>
+                             <p class="text-xs text-gray-500 uppercase font-bold">OR</p>
+                             <div class="h-px w-10 bg-gray-200"></div>
+                        </div>
+
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" 
+                                class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2.5 STATUS MODAL -->
+                <div id="status-modal" class="hidden-modal absolute top-16 right-4 z-[500] flex items-center justify-center p-4 modal-transition pointer-events-none">
+                    <div class="bg-white rounded-lg shadow-xl p-4 max-w-xs w-full text-left border-l-4 border-blue-500 flex items-center space-x-3 modal-content-base">
+                        <i id="status-icon" data-lucide="info" class="w-5 h-5 text-blue-500 flex-shrink-0"></i>
+                        <p id="status-content" class="text-sm font-body text-blue-800"></p>
+                    </div>
+                </div>
+
+                <!-- BECOME A TEACHER MODAL: deliberate, separate confirmation - never bundled into signup -->
+                <div id="become-teacher-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeBecomeTeacherModal()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeBecomeTeacherModal()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <i data-lucide="graduation-cap" class="w-10 h-10 text-allgood-secondary mx-auto mb-3"></i>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Set Up a Classroom?</h3>
+                        <p class="text-xs text-gray-500 mb-5">This gives you a classroom code to share with students, and a roster where you can see their progress. You can do this anytime — no rush.</p>
+                        <button onclick="window.upgradeToTeacher()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide mb-2">Yes, Set It Up</button>
+                        <button onclick="window.closeBecomeTeacherModal()" class="w-full text-gray-400 hover:text-gray-600 text-xs font-bold uppercase py-2">Not Right Now</button>
+                    </div>
+                </div>
+
+                <!-- ASSIGNMENT PICKER MODAL: teacher chooses which modules apply to their classroom -->
+                <div id="assignment-picker-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeAssignmentPicker()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeAssignmentPicker()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Manage Assignments</h3>
+                        <p class="text-xs text-gray-500 mb-4">Choose which modules apply to your classroom. Students will see these as their assigned work.</p>
+                        <div id="assignment-picker-list" class="max-h-72 overflow-y-auto space-y-1 mb-4 border border-slate-100 rounded-lg p-2"></div>
+                        <button onclick="window.saveAssignments()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide">Save Assignments</button>
+                    </div>
+                </div>
+
+                <!-- STUDENT PROFILE MODAL: per-module status breakdown for one student -->
+                <div id="student-profile-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeStudentProfile()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeStudentProfile()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <div class="mb-4">
+                            <h3 id="profile-student-name" class="text-lg font-heading font-bold text-allgood-dark">Student</h3>
+                            <p id="profile-student-email" class="text-xs text-gray-400"></p>
+                        </div>
+                        <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-2">Assigned Modules</p>
+                        <div id="profile-module-list" class="max-h-72 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- 3. TOP NAVBAR (GLASS) -->
+                <header class="navbar-content flex items-center justify-between px-6 shadow-md relative z-30 opacity-0">
+                    <div class="flex items-center overflow-hidden">
+                        <div class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none uppercase">
+                            ALLGOOD ACADEMY <span class="opacity-60 text-sm font-normal">| DASHBOARD</span>
+                        </div>
+                    </div>
+                    <!-- Control Cluster -->
+                    <div class="flex items-center space-x-1 shrink-0 relative">
+                        <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home (Hold to Reset)">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                        </button>
+                        <div class="h-6 w-px bg-white/20 mx-1"></div>
+                        <button id="btn-blueprint" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                        </button>
+                        <!-- ADDED: hidden on mobile, visible on small screens and up (sm:block) -->
+                        <button id="btn-fullscreen" class="hidden sm:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode">
+                            <i id="icon-fullscreen" data-lucide="maximize" class="w-5 h-5"></i>
+                        </button>
+                        <button id="btn-message" class="text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ" onclick="window.openMessageModal()">
+                            <i data-lucide="message-square" class="w-5 h-5"></i>
+                        </button>
+                        <button id="btn-menu" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Sidebar Menu -->
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-slate-900/50 flex justify-end modal-transition backdrop-blur-sm">
+                    <div class="w-64 h-full bg-white shadow-2xl flex flex-col border-l border-slate-200">
+                        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <span class="font-bold text-slate-700 font-heading uppercase">System Menu</span>
+                            <button id="close-menu" class="text-slate-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        </div>
+                        <div class="p-3 space-y-1">
+                            <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="showStatusMessage('Dashboard Active', 'info')">
+                                <i data-lucide="layout-grid" class="w-4 h-4 mr-3 text-allgood-primary"></i>Dashboard
+                            </button>
+                            <!-- UPDATED: Connected to new Profile Modal -->
+                            <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openProfileModal()">
+                                <i data-lucide="user" class="w-4 h-4 mr-3 text-allgood-secondary"></i>My Profile
+                            </button>
+                            <!-- CLASSROOM ENTRY: always visible. Smart destination - teachers land in their
+                                 classroom, everyone else gets the option to set one up. -->
+                            <button id="menu-btn-classroom" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openClassroomEntry()">
+                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i><span id="menu-classroom-label">Set Up a Classroom</span>
+                            </button>
+                            <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openAboutModal()">
+                                <i data-lucide="info" class="w-4 h-4 mr-3 text-slate-500"></i>About Us
+                            </button>
+                            <div class="border-t border-slate-100 my-2"></div>
+                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 text-red-600 font-bold flex items-center transition-colors uppercase" onclick="window.handleLogout()">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-3"></i>Log Out
+                            </button>
+                        </div>
+                        <div class="mt-auto p-4 bg-slate-50 border-t border-slate-200 text-center">
+                            <p class="text-xs text-slate-500 font-body">Allgood Academy &copy;2026</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. DASHBOARD CONTENT -->
+                <div class="page" id="page-dashboard">
+                    
+                    <!-- Status Bar (Refactored for Mobile Stacking) -->
+                    <div class="flex flex-col md:flex-row items-center justify-between bg-white/60 backdrop-blur-md p-4 rounded-lg shadow-sm border border-white/50 mb-6 text-allgood-dark text-center md:text-left">
+                        <div class="mb-4 md:mb-0 w-full md:w-auto">
+                            <h1 class="text-xl font-heading font-bold text-slate-700 uppercase">Welcome, <span class="user-name-display text-allgood-primary">Agent</span>.</h1>
+                            <!-- BADGE COLLECTION BUTTON -->
+                            <div class="mt-2 flex items-center justify-center md:justify-start">
+                                <button onclick="window.openBadgeCollection()" class="bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-bold text-slate-600 shadow-sm hover:shadow-md hover:text-allgood-primary transition-all flex items-center gap-2 group">
+                                    <i data-lucide="layout-grid" class="w-3 h-3 group-hover:scale-110 transition-transform"></i>
+                                    <span id="badge-count-display">BADGES: 1</span>
+                                    <span class="text-[10px] uppercase text-gray-400 font-normal">| VIEW COLLECTION</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
+                            <div>
+                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">4</span>
+                                <span class="text-[10px] uppercase text-slate-400 font-bold">MODULES</span>
+                            </div>
+                            <div>
+                                <span class="block text-2xl font-bold text-emerald-600 leading-none" id="stat-total-launches">0</span>
+                                <span class="text-[10px] uppercase text-slate-400 font-bold">LAUNCHED</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB NAVIGATION: COMMAND RAIL (Mobile Optimized) -->
+                    <div class="bg-white/40 backdrop-blur-md p-1.5 rounded-xl border border-white/60 shadow-sm flex space-x-2 mb-6 mx-auto max-w-3xl">
+                        <button id="tab-btn-challenges" onclick="switchTab('challenges')" 
+                            class="tab-btn active-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
+                            <i data-lucide="target" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i> 
+                            <span class="hidden sm:inline">Challenges</span>
+                        </button>
+                        <button id="tab-btn-courses" onclick="switchTab('courses')" 
+                            class="tab-btn inactive-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
+                            <i data-lucide="graduation-cap" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i> 
+                            <span class="hidden sm:inline">Jodi's Schoolhouse</span>
+                        </button>
+                    </div>
+
+                    <!-- TAB 1: CHALLENGES -->
+                    <div id="tab-challenges" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div onclick="window.launchCourse('Jolenes Lemonade', 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge', this)" 
+                             class="mission-file status-ready p-5 flex items-start gap-4 group">
+                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
+                            <div class="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center border border-yellow-100 flex-shrink-0 group-hover:bg-yellow-100 transition-colors shadow-sm">
+                                <span class="text-3xl emoji-badge">🍋</span>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Jolene's Lemonade</h3>
+                                    <span class="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Manage supply, demand, and profit margins in a live market.</p>
+                            </div>
+                        </div>
+                        <div onclick="window.launchCourse('Digital Decisions', 'https://www.allgoodacademy.com/educational-games/digital-decisions', this)" 
+                             class="mission-file status-active p-5 flex items-start gap-4 group">
+                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
+                            <div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center border border-indigo-100 flex-shrink-0 group-hover:bg-indigo-100 transition-colors shadow-sm">
+                                <span class="text-3xl emoji-badge">⚖️</span>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Decisions</h3>
+                                    <span id="ddc-status-badge" class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Active</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Make high-stakes choices in simulated online conflict scenarios.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: JODI'S SCHOOLHOUSE -->
+                    <div id="tab-courses" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+                         <!-- Replaced Placeholder 1: Rage Revenue -->
+                        <div onclick="window.launchCourse('Rage Revenue', 'https://allgoodacademy.com/jsh/rage-revenue/', this)" 
+                             class="mission-file status-ready p-5 flex items-start gap-4 group">
+                            <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 flex-shrink-0 group-hover:bg-red-50 transition-colors">
+                                <span class="text-3xl emoji-badge">🔥</span>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Rage Revenue</h3>
+                                    <span class="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Design an ethical social media algorithm that balances profit and user trust.</p>
+                            </div>
+                        </div>
+
+                        <!-- Finding Yourself Module -->
+                        <div onclick="window.launchCourse('Finding Yourself', 'https://allgoodacademy.com/jsh/finding-yourself/', this)" 
+                             class="mission-file status-ready p-5 flex items-start gap-4 group">
+                             <div class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100 flex-shrink-0 group-hover:bg-amber-100 transition-colors shadow-sm">
+                                <span class="text-3xl emoji-badge">🧭</span>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Finding Yourself</h3>
+                                    <span class="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Excavate your personal history to reclaim your authentic self.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-12 mb-6 text-center">
+                        <p class="text-[10px] text-slate-400 font-mono tracking-widest uppercase opacity-80">
+                            ALLGOOD OS <span class="mx-2">•</span> GOODBLOCK™
+                        </p>
+                    </div>
+
+                <!-- BADGE COLLECTION MODAL (UPDATED - OPTION 1 EXECUTIVE SPLIT) -->
+                <div id="badge-collection-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/80 flex items-center justify-center p-4 modal-transition backdrop-blur-sm" onclick="closeBadgeCollection()">
+                    
+                    <!-- Main Container -->
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl executive-split-modal overflow-hidden border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
+                        
+                        <!-- CLOSE BUTTON (Absolute) -->
+                        <button onclick="closeBadgeCollection()" class="absolute top-4 right-4 z-50 text-gray-400 hover:text-red-500 bg-white/50 rounded-full p-1 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+
+                        <!-- LEFT PANE: THE VAULT (Grid) -->
+                        <div class="modal-left-pane bg-slate-50 flex flex-col h-3/5 md:h-full overflow-hidden">
+                            <div class="p-6 border-b border-gray-200 bg-white sticky top-0 z-10">
+                                <h3 class="text-xl font-heading font-bold text-allgood-dark uppercase tracking-tight">Badge Dossier</h3>
+                                <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">Select an asset to inspect</p>
+                            </div>
+                            
+                            <div class="p-6 overflow-y-auto custom-scrollbar">
+                                <div class="grid grid-cols-3 sm:grid-cols-4 gap-6">
+                                    <!-- 1. Observer Badge -->
+                                    <div class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('observer', this)">
+                                        <div class="badge-token token-unlocked group-hover:scale-105" data-unlocked="true">
+                                            <i data-lucide="eye" class="badge-content w-8 h-8 text-allgood-primary"></i>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide group-hover:text-allgood-primary">Observer</span>
+                                    </div>
+                                    
+                                    <!-- 2. Academy Agent -->
+                                    <div id="badge-slot-2" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('agent', this)">
+                                        <div class="badge-token token-locked group-hover:scale-105">
+                                            <i data-lucide="id-card" class="badge-content w-8 h-8 text-slate-500"></i>
+                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Agent</span>
+                                    </div>
+
+                                    <!-- 3. Academy Operator -->
+                                    <div id="badge-slot-3" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('operator', this)">
+                                        <div class="badge-token token-locked group-hover:scale-105">
+                                            <i data-lucide="zap" class="badge-content w-8 h-8 text-slate-500"></i>
+                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Operator</span>
+                                    </div>
+
+                                    <!-- 4. Cyber Agent -->
+                                    <div id="badge-slot-4" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('cyber', this)">
+                                        <div class="badge-token token-locked group-hover:scale-105">
+                                            <i data-lucide="shield-check" class="badge-content w-8 h-8 text-slate-500"></i>
+                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cyber</span>
+                                    </div>
+
+                                    <!-- 5. Certified Entrepreneur -->
+                                    <div id="badge-slot-5" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('entrepreneur', this)">
+                                        <div class="badge-token token-locked group-hover:scale-105">
+                                            <span class="text-2xl badge-content">🍋</span>
+                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Founder</span>
+                                    </div>
+
+                                    <!-- 8. Intel Officer (NEW) -->
+                                    <div id="badge-slot-8" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('intel', this)">
+                                        <div class="badge-token token-locked group-hover:scale-105">
+                                            <i data-lucide="radio-tower" class="badge-content w-8 h-8 text-slate-500"></i>
+                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Intel</span>
+                                    </div>
+                                    
+                                    <!-- 9. Origin Scout (NEW) -->
+                                    <div id="badge-slot-9" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('finding', this)">
+                                        <div class="badge-token token-locked group-hover:scale-105">
+                                            <i data-lucide="compass" class="badge-content w-8 h-8 text-slate-500"></i>
+                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Scout</span>
+                                    </div>
+
+                                    <!-- EXPANDED CAPACITY: Remaining Classified Slots -->
+                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
+                                        <div class="badge-token token-locked border-dashed border-slate-300">
+                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
+                                    </div>
+
+                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
+                                        <div class="badge-token token-locked border-dashed border-slate-300">
+                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT PANE: INSPECTOR (Sticky Details) -->
+                        <div class="modal-right-pane bg-white flex flex-col h-2/5 md:h-full relative z-20 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] md:shadow-none">
+                            <div class="flex-grow flex flex-col justify-center p-8 text-center" id="badge-details-pane">
+                                
+                                <!-- Dynamic Icon Display (Large) -->
+                                <div id="detail-icon-container" class="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-50 border-4 border-slate-100 flex items-center justify-center shadow-inner transition-all duration-300">
+                                    <i data-lucide="scan-line" class="w-10 h-10 text-slate-300"></i>
+                                </div>
+
+                                <h4 id="badge-details-title" class="text-2xl font-heading font-bold text-allgood-dark mb-2">Select Asset</h4>
+                                
+                                <div class="inline-flex items-center justify-center gap-2 mb-6">
+                                    <div id="detail-status-indicator" class="w-2 h-2 rounded-full bg-slate-300"></div>
+                                    <p id="badge-details-status" class="text-xs font-bold uppercase tracking-widest text-slate-400">Waiting for input...</p>
+                                </div>
+
+                                <p id="badge-details-desc" class="text-sm text-slate-500 leading-relaxed max-w-xs mx-auto">Select a badge from the vault to view classification, acquisition date, and download options.</p>
+                            </div>
+
+                            <!-- Action Footer -->
+                            <div class="p-6 border-t border-gray-100 bg-slate-50 mt-auto">
+                                <button id="btn-badge-action" disabled class="w-full bg-slate-200 text-slate-400 font-bold py-4 rounded shadow-sm transition-all uppercase text-xs flex items-center justify-center gap-2 cursor-not-allowed">
+                                    <i data-lucide="lock" class="w-4 h-4"></i>
+                                    <span id="badge-action-text">Asset Locked</span>
+                                </button>
+                                <p id="badge-action-subtext" class="text-[10px] text-center text-slate-400 mt-2 h-4 opacity-0 transition-opacity">Asset verified in secure storage.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                </div> <!-- End Dashboard Page -->
+
+                <!-- 5. MY CLASSROOM (TEACHER VIEW) -->
+                <div class="page" id="page-admin" style="display:none;">
+
+                    <!-- ADMIN TOP BAR -->
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <div class="flex items-center gap-3">
+                                <h1 id="admin-page-title" class="text-2xl font-heading font-bold text-allgood-dark uppercase">My Classroom</h1>
+                                <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-emerald-200">Active</span>
+                            </div>
+                            <p id="admin-page-subtitle" class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Loading classroom...</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                             <button onclick="window.closeTeacherDashboard()" class="text-slate-500 hover:text-allgood-primary px-4 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i> Return to OS
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STATS ROW -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                        <!-- Stat 1 -->
+                        <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
+                            <div>
+                                <span id="admin-stat1-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Total Agents</span>
+                                <span id="admin-stat-total" class="block text-3xl font-heading font-bold text-slate-700">24</span>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                                <i data-lucide="users" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <!-- Stat 2 -->
+                        <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
+                            <div>
+                                <span id="admin-stat2-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Completion Rate</span>
+                                <span id="admin-stat-completion" class="block text-3xl font-heading font-bold text-emerald-600">78%</span>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <!-- Stat 3 -->
+                        <div id="admin-stat3-card" onclick="window.copyClassroomCode()" class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all cursor-pointer">
+                            <div>
+                                <span id="admin-stat3-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Invite Link</span>
+                                <span id="admin-stat-code" class="block text-sm font-bold text-allgood-secondary mt-1 underline decoration-dotted">allgood.ac/tf/8821</span>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-allgood-primary">
+                                <i data-lucide="copy" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ASSIGNED MODULES SUMMARY -->
+                    <div class="flex items-center justify-between mb-4 px-1">
+                        <p id="admin-assigned-summary" class="text-xs text-slate-500 font-bold">No modules assigned yet.</p>
+                        <button onclick="window.openAssignmentPicker()" class="px-3 py-1.5 rounded bg-allgood-secondary text-white text-[10px] font-bold uppercase hover:bg-allgood-accent transition-colors shadow-sm flex items-center gap-1">
+                            <i data-lucide="clipboard-list" class="w-3 h-3"></i> Manage Assignments
+                        </button>
+                    </div>
+
+                    <!-- ROSTER TABLE (GLASS) -->
+                    <div class="bg-white/80 backdrop-blur-md rounded-xl shadow-sm border border-white/60 overflow-hidden flex flex-col h-[60vh]">
+                        <!-- Toolbar -->
+                        <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-white/50">
+                            <h3 class="font-bold text-slate-700 uppercase text-sm tracking-wide flex items-center gap-2">
+                                <i data-lucide="list" class="w-4 h-4 text-slate-400"></i> <span id="admin-roster-title">Agent Roster</span>
+                            </h3>
+                            <div class="flex gap-2 items-center">
+                                <select id="roster-filter-select" onchange="window.renderRosterRows(this.value)" class="px-2 py-1.5 rounded bg-white border border-gray-200 text-[10px] font-bold uppercase text-slate-500">
+                                    <option value="all">All Students</option>
+                                    <option value="completed_all">All Assigned Complete</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="not_started">Not Started</option>
+                                </select>
+                                <button id="admin-export-btn" onclick="window.exportRosterCSV()" class="px-3 py-1.5 rounded bg-white border border-gray-200 text-[10px] font-bold uppercase text-slate-500 hover:text-allgood-secondary hover:border-allgood-secondary transition-colors">
+                                    Export CSV
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Table Headers -->
+                        <div class="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/50 border-b border-gray-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            <div class="col-span-4">Student Name</div>
+                            <div class="col-span-2">Assigned Progress</div>
+                            <div class="col-span-2 text-center">Badges</div>
+                            <div class="col-span-2 text-center">Last Active</div>
+                            <div class="col-span-2 text-right">Actions</div>
+                        </div>
+
+                        <!-- Table Body (Scrollable) -->
+                        <div id="admin-roster-body" class="overflow-y-auto custom-scrollbar flex-grow p-2 space-y-1">
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ABOUT US MODAL -->
+            <div id="about-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="closeAboutModal()">
+                <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
+                    <button onclick="closeAboutModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-2xl font-heading font-bold text-allgood-dark uppercase tracking-tight">Academy Protocol</h3>
+                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">Mission Directive</p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 border-l-4 border-allgood-secondary p-4 rounded shadow-sm text-left hover:bg-white hover:shadow-md transition-all group">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="p-2 bg-white rounded-full text-allgood-secondary shadow-sm group-hover:scale-110 transition-transform">
+                                    <i data-lucide="flask-conical" class="w-5 h-5"></i>
+                                </div>
+                                <h4 class="font-bold text-allgood-dark text-sm uppercase tracking-wide">The Lab</h4>
+                            </div>
+                            <p class="text-gray-600 text-xs leading-relaxed font-body">Allgood Academy is a mission-driven learning hub. We use <span class="font-bold text-allgood-secondary">advanced instructional design</span> principles trusted by top corporations to create immersive, high-impact training.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 border-l-4 border-allgood-primary p-4 rounded shadow-sm text-left hover:bg-white hover:shadow-md transition-all group">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="p-2 bg-white rounded-full text-allgood-primary shadow-sm group-hover:scale-110 transition-transform">
+                                    <i data-lucide="zap" class="w-5 h-5"></i>
+                                </div>
+                                <h4 class="font-bold text-allgood-dark text-sm uppercase tracking-wide">The Result</h4>
+                            </div>
+                            <p class="text-gray-600 text-xs leading-relaxed font-body">We don't just teach; we transform. Our goal is a complete <span class="font-bold text-allgood-primary">mindset shift</span> that moves learners from passive consumption to pragmatic, real-world execution.</p>
+                        </div>
+                    </div>
+                    
+                    <button onclick="closeAboutModal()" class="mt-6 w-full bg-allgood-dark hover:bg-black text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">
+                        <i data-lucide="power-off" class="w-3 h-3"></i> Close Protocol
+                    </button>
+                </div>
+            </div>
+
+            <!-- NEW: PROFILE MODAL (Dossier + Identity Editor + Mission Log) -->
+            <div id="profile-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-4 modal-transition backdrop-blur-sm" onclick="window.closeProfileModal()">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border-t-4 border-allgood-secondary relative flex flex-col md:flex-row" onclick="event.stopPropagation()">
+                    
+                    <!-- Close Button -->
+                    <button onclick="window.closeProfileModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 z-50 p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+
+                    <!-- Left: ID Card Visual -->
+                    <div class="w-full md:w-2/5 bg-slate-50 border-b md:border-b-0 md:border-r border-gray-200 p-6 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 rounded-full bg-white border-4 border-white shadow-md mb-4 overflow-hidden relative group">
+                            <div class="absolute inset-0 bg-allgood-secondary/10 flex items-center justify-center">
+                                <i data-lucide="user" class="w-10 h-10 text-allgood-secondary"></i>
+                            </div>
+                        </div>
+                        
+                        <!-- VIEW MODE: NAME -->
+                        <div id="profile-view-name" class="w-full">
+                            <h3 class="text-xl font-heading font-bold text-slate-800" id="profile-name-display">Agent Name</h3>
+                            <button onclick="window.toggleProfileEdit(true)" class="text-[10px] uppercase font-bold text-allgood-primary hover:text-allgood-hover underline decoration-dotted mt-1">Edit Identity</button>
+                        </div>
+
+                        <!-- EDIT MODE: NAME -->
+                        <div id="profile-edit-name" class="w-full hidden">
+                            <input type="text" id="profile-name-input" class="w-full text-center border border-allgood-secondary rounded p-1 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" placeholder="Enter Alias">
+                            <div class="flex gap-2 justify-center">
+                                <button onclick="window.saveProfileIdentity()" class="bg-allgood-secondary text-white px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent">Save</button>
+                                <button onclick="window.toggleProfileEdit(false)" class="bg-gray-200 text-gray-500 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-gray-300">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 w-full">
+                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm">
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Clearance Rank</p>
+                                <p class="text-sm font-bold text-allgood-secondary" id="profile-rank-display">FIELD AGENT</p>
+                            </div>
+                        </div>
+
+                        <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup -->
+                        <div class="mt-3 w-full">
+                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Classroom Code?</p>
+                                <div class="flex gap-2">
+                                    <input type="text" id="profile-classroom-input" placeholder="e.g. 2RP878" maxlength="8" class="flex-1 min-w-0 border border-gray-300 rounded p-2 text-xs uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50">
+                                    <button onclick="window.joinClassroom()" class="bg-allgood-secondary text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent shrink-0">Join</button>
+                                </div>
+                                <p id="profile-classroom-status" class="text-[10px] text-gray-400 mt-1"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Mission Log & Stats -->
+                    <div class="w-full md:w-3/5 p-6 bg-white">
+                        <div class="mb-6">
+                            <h3 class="text-lg font-heading font-bold text-slate-700 uppercase tracking-tight flex items-center gap-2">
+                                <i data-lucide="clipboard-list" class="w-4 h-4 text-slate-400"></i> Service Record
+                            </h3>
+                            <div class="h-px w-full bg-gray-100 mt-2"></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                                <span class="block text-2xl font-bold text-slate-700" id="profile-stat-launches">0</span>
+                                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Missions Launched</span>
+                            </div>
+                            <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                                <span class="block text-2xl font-bold text-slate-700" id="profile-stat-badges">0</span>
+                                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Badges Earned</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
+                                <span class="text-slate-500 font-bold uppercase">Agent ID</span>
+                                <span class="font-mono text-slate-400 select-all" id="profile-id-display">UNKNOWN</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
+                                <span class="text-slate-500 font-bold uppercase">Account Status</span>
+                                <span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full uppercase text-[10px]">Active</span>
+                            </div>
+                             <div class="flex justify-between items-center text-xs pb-2">
+                                <span class="text-slate-500 font-bold uppercase">Join Date</span>
+                                <span class="font-mono text-slate-400" id="profile-join-date">--/--/----</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 pt-4 border-t border-gray-100 text-center md:text-right">
+                             <button onclick="window.closeProfileModal()" class="text-xs font-bold text-slate-400 hover:text-allgood-primary transition-colors uppercase tracking-wide">
+                                Close Dossier
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- MESSAGE MODAL -->
+            <div id="message-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="closeMessageModal()">
+                <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
+                    <button onclick="closeMessageModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    
+                    <div class="mb-4">
+                        <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="message-circle" class="w-6 h-6 text-allgood-primary"></i>
+                        </div>
+                        <h3 class="text-xl font-heading font-bold text-allgood-dark uppercase">Direct Line</h3>
+                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">To: Allgood Academy HQ</p>
+                    </div>
+                    
+                    <div class="text-left mb-4">
+                        <p class="text-xs text-gray-500 italic mb-2">This is a one-way secure transmission. Use this channel to send feedback, topic requests, or field reports.</p>
+                        <textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50 font-body placeholder-gray-400" placeholder="Type your message here..."></textarea>
+                    </div>
+                    
+                    <button id="btn-send-message" onclick="window.submitMessage()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">
+                        <i data-lucide="send" class="w-3 h-3"></i> Send Transmission
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(e => console.error("Audio resume failed:", e));
+            }
+        }
+
+        function playTone(freq, type, duration, vol = 0.1, attack = 0.01, decay = 0.001) {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, now);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(vol, now + attack);
+            gain.gain.exponentialRampToValueAtTime(decay, now + duration);
+
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        const sfx = {
+            tick: () => {
+                initAudio();
+                playTone(1000, 'sine', 0.01, 0.01);
+            },
+            click: () => {
+                initAudio();
+                playTone(1000, 'sine', 0.01, 0.01);
+            },
+            confirm: () => {
+                initAudio();
+                playTone(150, 'sine', 0.1, 0.1, 0.01, 0.01);
+            },
+            powerOn: () => {
+                initAudio();
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(110, now);
+                osc.frequency.exponentialRampToValueAtTime(220, now + 0.4);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.4, now + 0.1);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            },
+            powerOff: () => {
+                initAudio();
+                playTone(80, 'triangle', 0.2, 0.5, 0.01, 0.001);
+            },
+            nav: () => {
+                initAudio();
+                playTone(200, 'sine', 0.08, 0.1, 0.01, 0.01);
+            },
+        };
+
+        window.sfx = sfx;
+        window.initAudio = initAudio;
+
+        window.switchTab = (tabName) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById('tab-' + tabName);
+            if(target) target.classList.remove('hidden');
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active-tab');
+                btn.classList.add('inactive-tab');
+            });
+            const activeBtn = document.getElementById('tab-btn-' + tabName);
+            if(activeBtn) {
+                activeBtn.classList.remove('inactive-tab');
+                activeBtn.classList.add('active-tab');
+            }
+            sfx.nav(); 
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            
+            const homeBtn = document.getElementById('btn-home');
+            let homePressTimer;
+            let homeIsHold = false;
+            const startHomePress = (e) => {
+                e.preventDefault(); 
+                homeIsHold = false;
+                homePressTimer = setTimeout(() => {
+                    homeIsHold = true;
+                    if(window.handleLogout) { sfx.powerOff(); window.handleLogout(); }
+                }, 2000);
+            };
+            const endHomePress = (e) => {
+                clearTimeout(homePressTimer);
+                if(!homeIsHold) { sfx.tick(); document.getElementById('page-dashboard').scrollTop = 0; }
+            };
+
+            if(homeBtn) {
+                homeBtn.addEventListener('mousedown', startHomePress);
+                homeBtn.addEventListener('touchstart', startHomePress);
+                homeBtn.addEventListener('mouseup', endHomePress);
+                homeBtn.addEventListener('touchend', endHomePress);
+                homeBtn.addEventListener('mouseleave', () => clearTimeout(homePressTimer));
+            }
+
+            const btnBlueprint = document.getElementById('btn-blueprint');
+            if(btnBlueprint) {
+                 btnBlueprint.addEventListener('click', () => {
+                    document.body.classList.toggle('blueprint-mode');
+                    sfx.tick();
+                });
+            }
+
+            const fullscreenBtn = document.getElementById('btn-fullscreen');
+            if(fullscreenBtn) {
+                fullscreenBtn.addEventListener('click', () => {
+                    const body = document.body;
+                    const icon = document.getElementById('icon-fullscreen');
+
+                    if (body.classList.contains('focus-mode')) {
+                        body.classList.remove('focus-mode');
+                        fullscreenBtn.classList.remove('text-green-300', 'bg-white/10');
+                        if(icon) icon.setAttribute('data-lucide', 'maximize');
+                    } else {
+                        body.classList.add('focus-mode');
+                        fullscreenBtn.classList.add('text-green-300', 'bg-white/10');
+                        if(icon) icon.setAttribute('data-lucide', 'minimize');
+                    }
+                    lucide.createIcons();
+                    sfx.tick();
+                });
+            }
+
+            const menuModal = document.getElementById('menu-modal');
+            const btnMenu = document.getElementById('btn-menu');
+            if(btnMenu && menuModal) {
+                 btnMenu.addEventListener('click', () => {
+                    menuModal.classList.remove('hidden-modal');
+                    menuModal.classList.add('visible-modal');
+                    sfx.tick();
+                });
+            }
+
+            const closeMenu = document.getElementById('close-menu');
+            if(closeMenu && menuModal) {
+                closeMenu.addEventListener('click', () => {
+                    menuModal.classList.add('hidden-modal');
+                    menuModal.classList.remove('visible-modal');
+                    sfx.tick();
+                });
+            }
+            
+        });
+
+        window.openAboutModal = () => {
+            const menu = document.getElementById('menu-modal');
+            if (menu) {
+                menu.classList.add('hidden-modal');
+                menu.classList.remove('visible-modal');
+            }
+
+            const modal = document.getElementById('about-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            sfx.click();
+        }
+
+        window.closeAboutModal = () => {
+            const modal = document.getElementById('about-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+            sfx.click();
+        }
+
+        /* REMOVED: Profile Functions from here to avoid ReferenceError */
+
+    </script>
+</body>
+</html>
