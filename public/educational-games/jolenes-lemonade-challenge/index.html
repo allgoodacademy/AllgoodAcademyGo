@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Jolene's Lemonade Challenge - GoodBlock V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- FIREBASE AND AUTHENTICATION SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        // 1. CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
+            authDomain: "allgood-academy.firebaseapp.com",
+            projectId: "allgood-academy",
+            storageBucket: "allgood-academy.firebasestorage.app",
+            messagingSenderId: "978829044870",
+            appId: "1:978829044870:web:6c780f64230a77ad0ab507",
+            measurementId: "G-EN4M7T3BLQ"
+        };
+        
+        // FORCE 'allgood-academy' to ensure data goes to artifacts/allgood-academy/users
+        const appId = 'allgood-academy'; 
+        
+        // 2. INITIALIZE SERVICES
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 3. GLOBAL STATE
+        window.currentUser = null;
+        window.currentUserName = "Anonymous";
+        window.currentUserEmail = "";
+        window.isAuthReady = false;
+        
+        // Define Session ID here to ensure it exists before any logging logic runs
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+        console.log("[System] Session ID generated:", window.sessionId);
+
+        // 4. AUTH HANDLER
+        onAuthStateChanged(auth, async (user) => {
+            window.isAuthReady = true;
+            if (user) {
+                console.log("[Auth] User detected:", user.uid);
+                window.currentUser = user;
+                
+                // Retrieve or Set Display Name
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Agent Learner";
+                
+                // Attempt to fetch from DB for consistency if missing locally
+                if (finalName === "Agent Learner") {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists()) {
+                            finalName = userDoc.data().displayName || finalName;
+                        }
+                    } catch(e) { console.log("Profile fetch skipped", e); }
+                }
+
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                
+                // Update UI
+                window.updateUserDisplay(finalName);
+                
+                // Hide login modal if present (this handles the SSO case)
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                    // Auto-start session log if we just auto-logged in via SSO
+                    if(window.logFinalScoreToFirestore) {
+                        window.logFinalScoreToFirestore({ finalScore: 200, rank: "Session Started", sessionId: window.sessionId });
+                    }
+                }
+            } else {
+                console.log("[Auth] No user signed in.");
+                window.currentUser = null;
+                window.updateUserDisplay("Agent Learner");
+            }
+        });
+
+        // 5. IDENTITY ENGINE
+        async function ensureUserContainer(user, name, email, isGuest) {
+             // Path: artifacts/allgood-academy/users/{uid}
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             
+             try {
+                 await setDoc(userRef, {
+                     displayName: name,
+                     email: email || (isGuest ? null : user.email || null),
+                     isGuest: isGuest,
+                     lastLogin: serverTimestamp(),
+                     lastActiveModule: "Jolenes Lemonade Challenge"
+                 }, { merge: true });
+                 console.log("[Identity] User container verified/created.");
+             } catch (e) {
+                 console.error("[Identity] Failed to create user container:", e);
+             }
+        }
+
+        // 6. DATABASE LOGGING ENGINE
+        
+        // Log Individual Question Attempt
+        window.logScenarioAttempt = async (data) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            // Path: artifacts/allgood-academy/users/{uid}/game_scores/{sessionId}/scenario_attempts/{scenarioIndex}
+            const attemptRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'scenario_attempts', `scenario_${data.scenarioIndex}`);
+            
+            try {
+                await setDoc(attemptRef, {
+                    ...data,
+                    timestamp: serverTimestamp()
+                });
+                console.log(`[DB] Saved Attempt ${data.scenarioIndex}`);
+            } catch (e) { console.error("Attempt log failed", e); }
+        };
+
+        // Log Final Score / Session Start
+        window.logFinalScoreToFirestore = async (scoreData) => {
+            const user = auth.currentUser;
+            if (!user) {
+                console.warn("[DB] Skipping write - No User");
+                return;
+            }
+
+            console.log(`[DB] Writing Session Data...`);
+
+            // Path: artifacts/allgood-academy/users/{uid}/game_scores/{sessionId}
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            
+            try {
+                await setDoc(sessionRef, {
+                    gameName: "Jolenes Lemonade Challenge",
+                    ...scoreData,
+                    lastUpdated: serverTimestamp(),
+                    user: {
+                        uid: user.uid,
+                        displayName: window.currentUserName,
+                        email: window.currentUserEmail
+                    }
+                }, { merge: true });
+                console.log(`[DB] Session Write Success.`);
+            } catch (e) { console.error("[DB] Session Write Failed", e); }
+        }
+
+        // 7. LOGIN FUNCTIONS
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            
+            const originalText = btn.innerText;
+            btn.innerText = "Connecting...";
+            btn.disabled = true;
+
+            try {
+                let user;
+                if (auth.currentUser && auth.currentUser.isAnonymous) {
+                    user = auth.currentUser;
+                } else {
+                    const result = await signInAnonymously(auth);
+                    user = result.user;
+                }
+                
+                const displayName = nameInput || "Agent Learner";
+                await updateProfile(user, { displayName: displayName });
+                
+                // Establish Identity
+                await ensureUserContainer(user, displayName, emailInput, true);
+                
+                window.currentUserName = displayName;
+                window.currentUserEmail = emailInput;
+
+                localStorage.setItem('aa_username', displayName);
+                localStorage.setItem('aa_email', emailInput);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'true');
+                
+                window.updateUserDisplay(displayName);
+                
+                // Start Session Log
+                console.log("[Auth] Guest login successful. UID:", user.uid);
+                window.logFinalScoreToFirestore({ finalScore: 200, rank: "Session Started", sessionId: "init_" + Date.now() });
+
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+
+            } catch (error) {
+                console.error("Login Failed", error);
+                alert("Connection failed. Please try again.");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        window.handleGoogleLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            const btnContainer = document.getElementById('google-icon-container');
+            if(btnContainer) btnContainer.classList.add('opacity-50', 'pointer-events-none');
+
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                
+                const finalName = user.displayName || "Agent";
+                
+                // Establish Identity
+                await ensureUserContainer(user, finalName, user.email, false);
+                
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+
+                localStorage.setItem('aa_username', finalName);
+                localStorage.setItem('aa_email', user.email);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'false');
+                
+                window.updateUserDisplay(finalName);
+                
+                console.log("[Auth] Google login successful. UID:", user.uid);
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+            } catch (error) {
+                console.error("Google Sign-In Error", error);
+                alert("Google Sign-In failed. Please try again.");
+            } finally {
+                 if(btnContainer) btnContainer.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        };
+        
+        // 8. LOGOUT EXPOSURE
+        window.handleAuthSignOut = async () => {
+            try {
+                await signOut(auth);
+                console.log("[Auth] Signed out successfully");
+            } catch (error) {
+                console.error("[Auth] Sign out error", error);
+            }
+        };
+        
+        // Expose for Debugging
+        window.auth = auth;
+        window.db = db;
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body { font-family: Verdana, sans-serif; background-color: #1a1a1a; min-height: 100vh; margin: 0; padding: 0; }
+        h1, h2, h3, h4 { font-family: Georgia, serif; }
+
+        .tablet-frame {
+            /* Compact Cap Fix */
+            height: min(80vh, 750px);
+            max-width: 95vw;
+            width: auto;
+            aspect-ratio: 16/10;
+            
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
+            margin: 0 auto; /* Center alignment safety */
+        }
+        .tablet-frame::before {
+            content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+            border-radius: 6px; background: #111; z-index: 0;
+        }
+        .screen-container {
+            width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1;
+            overflow: hidden; display: flex; flex-direction: column; border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .page::-webkit-scrollbar { width: 14px; }
+        .page::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        .page::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
+
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        .choice-btn { background-color: #FFFFFF; border: 2px solid #E5E7EB; transition: all 0.2s ease; }
+        .choice-btn:hover:not(:disabled) { border-color: #357889; background-color: #F9FAFB; }
+        .choice-correct { background-color: #D1FAE5 !important; border-color: #10B981 !important; font-weight: bold; }
+        .choice-less-effective { background-color: #FFFBEB !important; border-color: #FBBF24 !important; font-weight: 600; }
+        .choice-least-effective { background-color: #FEE2E2 !important; border-color: #F87171 !important; font-weight: 500; opacity: 0.7; }
+        
+        .feedback-box { background-color: #F9FAFB; border-left: 5px solid #357889; }
+        .feedback-correct { border-left-color: #10B981 !important; }
+        .feedback-less { border-left-color: #FBBF24 !important; }
+        .feedback-least { border-left-color: #F87171 !important; }
+
+        .navbar-content { flex: 0 0 60px; z-index: 20; }
+        .footer-content { flex: 0 0 60px; z-index: 20; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
+        .page.active { display: block; }
+
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        .blueprint-mode .choice-btn { background-color: #1e293b !important; border-color: #334155 !important; }
+        
+        @media (max-width: 768px) {
+            .tablet-frame { width: 100% !important; height: 100% !important; border: none; border-radius: 0; background-image: none; box-shadow: none; margin: 0; padding: 0; }
+            .tablet-frame::before { display: none; }
+            .screen-container { border-radius: 0; }
+            html, body, main { height: 100%; overflow: hidden; padding: 0; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-8">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-slate-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative">
+                                <div class="absolute inset-0 bg-white/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <h2 class="text-xl md:text-3xl font-heading font-bold text-white mb-1 relative z-10">Allgood Academy</h2>
+                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-allgood-primary tracking-tighter relative z-10 drop-shadow-md">GoodBlock</h1>
+                                <p class="mt-2 text-white/80 relative z-10 font-body text-sm font-semibold">Jolene's Lemonade Challenge</p>
+                            </div>
+                            <p class="mt-12 text-white/80 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-white transition-colors animate-pulse font-body">Click to Power Up</p>
+                        </div>
+                        <div class="absolute bottom-10 w-full text-center">
+                            <p class="text-white/40 text-xs font-body tracking-wide">Powered by the <span class="text-white/60 font-bold">Allgood Academy</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. LOGIN MODAL -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 font-body leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged in real-time to improve the GoodBlock experience. All personal data is kept confidential and never sold.</p>
+                                    <div class="border-t border-gray-700 my-1 pt-1"></div>
+                                    <p class="text-gray-300"><strong>Email (Optional):</strong> Enter to join the Allgood Academy community.</p>
+                                </div>
+                            </button>
+                        </div>
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Start Challenge</button>
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. HEADER -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-2 select-none">Jolene's Lemonade Challenge</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm mr-2">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 19</span>
+                            </div>
+                            <!-- NEW: BANK BALANCE TICKER -->
+                            <div id="bank-display" class="hidden sm:flex items-center bg-green-900/40 rounded-full px-3 py-1 border border-green-400/30">
+                                <i data-lucide="dollar-sign" class="w-3 h-3 text-green-400 mr-1"></i>
+                                <span id="bank-balance" class="text-xs font-bold text-green-100 font-body tabular-nums">$200</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <button id="fullscreen-toggle" class="text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- 4. MODALS -->
+                <div id="scenario-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-4 modal-transition" onclick="window.closeScenarioModal(false)">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center relative border-t-4 border-allgood-secondary" onclick="event.stopPropagation()">
+                        <div id="scenario-icon" class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl transition-colors"></div>
+                        <h3 id="scenario-title" class="text-xl font-heading font-bold text-allgood-dark mb-2"></h3>
+                        <div id="scenario-feedback" class="text-sm text-gray-600 font-body mb-6 leading-relaxed text-left"></div>
+                        <button id="scenario-modal-next-btn" class="bg-allgood-dark text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-allgood-primary transition-colors shadow-md">Next Scenario</button>
+                    </div>
+                </div>
+
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4"><i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">Select an option to proceed.</p>
+                        <div class="space-y-3">
+                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out
+                            </button>
+                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard
+                            </button>
+                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Table of Contents</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                    </div>
+                </div>
+
+                <!-- --- PAGES --- -->
+                <div class="page active" id="page-1">
+                    <!-- FIXED: Added min-h-full and pb-24 for scroll space -->
+                    <div class="flex flex-col items-center justify-start min-h-full text-center px-2 pt-12 pb-24">
+                        <img src="https://i.ibb.co/NXzn2NZ/New-Transparent-Logo.png" alt="Allgood Academy" class="w-32 mb-6 mx-auto">
+                        <div class="mb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-6 leading-tight tracking-tight">Jolene's <span class="text-allgood-primary">Lemonade</span> Challenge</h1>
+                        <p class="text-lg text-gray-600 mb-8 max-w-md mx-auto">Navigate tough decisions and master the art of turning a challenge into an opportunity.</p>
+                        
+                        <!-- EXACT HOW-TO-USE SECTION -->
+                        <div class="w-full max-w-lg text-left mx-auto">
+                            <div class="w-full bg-allgood-secondary/10 border-2 border-allgood-secondary p-6 rounded-xl shadow-lg mb-8 flex items-center justify-center space-x-4">
+                                <i data-lucide="trending-up" class="w-10 h-10 text-allgood-secondary"></i>
+                                <i data-lucide="dollar-sign" class="w-10 h-10 text-allgood-primary"></i>
+                                <i data-lucide="users" class="w-10 h-10 text-allgood-secondary"></i>
+                            </div>
+                            <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                <i data-lucide="chevron-down" class="accordion-icon w-5 h-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary"></i>
+                            </button>
+                            <!-- UPDATED ACCORDION CONTENT TO MATCH MASTER TEMPLATE -->
+                            <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
+                                <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600 shrink-0"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                    <div class="hidden md:flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600 shrink-0"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark shrink-0"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 2: Mission Briefing -->
+                <div class="page" id="page-2">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark mb-2">From Stand to Empire</h2></section>
+                    <div class="bg-white p-6 rounded border border-gray-200 shadow-sm leading-relaxed text-gray-700 text-lg">
+                        <p class="mb-6"><strong>A lesson in grit.</strong> The journey to empire is full of setbacks. This game is your chance to learn from them.</p>
+                        <div class="bg-gray-100 p-4 rounded border-l-4 border-allgood-primary shadow-sm mb-6">
+                            <h3 class="font-bold text-allgood-dark text-lg mb-2">The Goal</h3>
+                            <p class="text-sm">Grow your startup capital of <strong>$200</strong> into a thriving business. Earn a profit on every decision.</p>
+                            <p class="text-sm mt-2"><strong>Target:</strong> Reach <strong>$800</strong> to earn the "Certified Entrepreneur" badge.</p>
+                        </div>
+                        <p class="mt-6 font-bold text-allgood-secondary">Let's get to work.</p>
+                    </div>
+                </div>
+
+                <!-- Dynamic Scenario Pages (3-17) -->
+                <div class="page" id="page-3" data-scenario-index="1"></div>
+                <div class="page" id="page-4" data-scenario-index="2"></div>
+                <div class="page" id="page-5" data-scenario-index="3"></div>
+                <div class="page" id="page-6" data-scenario-index="4"></div>
+                <div class="page" id="page-7" data-scenario-index="5"></div>
+                <div class="page" id="page-8" data-scenario-index="6"></div>
+                <div class="page" id="page-9" data-scenario-index="7"></div>
+                <div class="page" id="page-10" data-scenario-index="8"></div>
+                <div class="page" id="page-11" data-scenario-index="9"></div>
+                <div class="page" id="page-12" data-scenario-index="10"></div>
+                <div class="page" id="page-13" data-scenario-index="11"></div>
+                <div class="page" id="page-14" data-scenario-index="12"></div>
+                <div class="page" id="page-15" data-scenario-index="13"></div>
+                <div class="page" id="page-16" data-scenario-index="14"></div>
+                <div class="page" id="page-17" data-scenario-index="15"></div>
+
+                <!-- Page 18: Final Score -->
+                <div class="page" id="page-18">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark mb-2">Final Readiness Assessment</h2><p class="text-xs font-bold text-allgood-primary uppercase tracking-widest">Entrepreneurial Scorecard</p></section>
+                    <div id="final-score-content">
+                        <div class="text-center py-8">
+                            <div class="w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-lg shadow-inner border border-gray-200 mb-8">
+                                <p class="text-sm font-semibold text-gray-500 mb-1">Final Bank Balance</p>
+                                <p id="final-score-value" class="text-5xl font-extrabold text-allgood-dark font-heading">$200</p>
+                                <p id="final-score-percent" class="text-xs text-gray-400 mt-1">(Target: $800)</p>
+                            </div>
+                            <h3 id="final-rank-heading" class="text-xl font-heading font-bold text-allgood-dark mb-2">Aspiring Entrepreneur</h3>
+                            <p id="final-rank-message" class="text-sm text-gray-600 max-w-md mx-auto">Good start. Reread the feedback and try again.</p>
+                            <div id="certification-section" class="w-full max-w-md mx-auto bg-gradient-to-br from-allgood-secondary to-allgood-accent p-1 rounded-lg shadow-xl mt-12 transform transition-all duration-700">
+                                <div class="bg-white p-6 rounded-md text-center">
+                                    <div class="mb-4 relative inline-block"><i id="badge-icon" data-lucide="award" class="relative w-16 h-16 text-allgood-primary mx-auto"></i></div>
+                                    <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Entrepreneur Certification</h3>
+                                    <p id="cert-req-text" class="text-sm text-gray-600 mb-6">You need <strong>$800</strong> to achieve this certification.</p>
+                                    <button id="download-badge-btn" onclick="window.downloadBadge()" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300">
+                                        <i data-lucide="lock" class="w-4 h-4 mr-2"></i><span id="btn-text">Certification Locked</span>
+                                    </button>
+                                    <button id="retake-challenge-btn" onclick="window.performHardReset()" class="w-full bg-gray-100 text-allgood-dark font-bold py-2 rounded shadow-sm mt-4 hover:bg-gray-200 transition-colors">Retake Challenge</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 19: Credits -->
+                <div class="page" id="page-19">
+                    <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-8">
+                        <div class="mb-8"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2><p class="text-xs text-gray-400 font-bold tracking-widest uppercase mt-2">Pragmatic Action</p></div>
+                        <div id="feedback-container" class="w-full max-w-md bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8 text-left relative">
+                            <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this Challenge</h3>
+                            <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                            </div>
+                            <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback sharpens our tools.</label>
+                            <textarea id="feedback-text" rows="3" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary outline-none resize-none bg-gray-50" placeholder="Share your thoughts..."></textarea>
+                            <button onclick="window.submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm">Send Feedback</button>
+                        </div>
+                        <div id="feedback-success" class="hidden w-full max-w-md bg-green-50 p-6 rounded-lg shadow-inner border border-green-200 mb-8 text-center">
+                            <i data-lucide="check-circle" class="w-12 h-12 text-green-600 mx-auto mb-2"></i>
+                            <h3 class="font-bold text-green-800">Feedback Received.</h3>
+                            <p class="text-xs text-green-700 mt-1">Thank you.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <footer class="footer-content flex items-center justify-between px-6">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Back</button>
+                    <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a> <span id="current-year"></span></p>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body"><span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></button>
+                </footer>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Main Logic -->
+    <script>
+        // --- AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume().catch(e => console.error("Audio resume failed:", e));
+        }
+
+        function playTone(freq, type, duration, vol = 0.1, attack = 0.01, decay = 0.001) {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, now);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(vol, now + attack);
+            gain.gain.exponentialRampToValueAtTime(decay, now + duration);
+            osc.start(now); osc.stop(now + duration);
+        }
+
+        const sfx = {
+            powerOn: () => { initAudio(); const now = audioCtx.currentTime; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.type = 'triangle'; osc.frequency.setValueAtTime(110, now); osc.frequency.exponentialRampToValueAtTime(220, now + 0.4); gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.4, now + 0.1); gain.gain.linearRampToValueAtTime(0, now + 0.4); osc.start(now); osc.stop(now + 0.4); },
+            powerOff: () => { initAudio(); playTone(80, 'triangle', 0.2, 0.5, 0.01, 0.001); },
+            nav: () => { initAudio(); playTone(150, 'sine', 0.1, 0.1, 0.01, 0.01); },
+            tick: () => { initAudio(); playTone(1000, 'sine', 0.01, 0.01); }
+        };
+        window.sfx = sfx;
+        window.initAudio = initAudio;
+
+        // --- GLOBAL APP VARIABLES ---
+        let currentUserName = "Anonymous";
+        let currentPageIndex = 0; 
+        const TOTAL_PAGES = 19; 
+        const TOTAL_SCENARIOS = 15;
+        const MAX_SCORE = 950; // $200 + (15 * 50)
+        const BADGE_THRESHOLD = 800; // $800 to win
+        let totalChallengeScore = 200; // Starting Capital
+        let answeredScenarioScores = {};
+
+        function sanitizeText(text) {
+            if (!text) return "";
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
+        }
+
+        // --- JOLENE'S DATA ---
+        const SCENARIO_DATA = [
+            { image: "https://i.ibb.co/fzj1FLhq/jolene1.png", title: "Jolene sets up her first lemonade stand. She gets a mix of feedback: some neighbors love the lemonade, but others find it too sour. Question: How should Jolene handle this feedback to improve her business?", icon: "message-circle", choices: [ { text: "Ignore the negative feedback and focus on the customers who liked the lemonade.", score: 1, effectiveness: "less-effective", feedback: "Jolene smiles and thanks the happy customers, but she doesn't change a thing. Soon, she realizes she's losing repeat customers who were just being polite. She missed a key opportunity to make her product better." }, { text: "Ask for specific feedback on what they would like to taste, like more sugar or more lemon.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Maggy, Jolene's neighbor, comes to buy a cup of lemonade. Jolene asks Maggy, 'how does this taste? Do you prefer it more sweet or less sweet?' Jolene asks multiple customers this same question and notices most customers prefer less sugar. The power of active listening in business helps Jolene craft the optimal recipe." }, { text: "Offer a refund to anyone who didn't like the lemonade.", score: 0, effectiveness: "least-effective", feedback: "While this seems like a nice gesture, it shows a lack of confidence in her product. Jolene's friends tell her she's just giving away money without learning anything. This choice doesn't help her grow or improve." } ] },
+            { image: "https://i.ibb.co/C3znrFw9/jolene2.png", title: "After a long week, Jolene is exhausted and goes to count her earnings. To her surprise, she's spent more money on supplies and advertising than she's made. She's in the red. Question: What's the most effective way for Jolene to get her finances back on track?", icon: "trending-down", choices: [ { text: "She ignores her finances and just tries to sell more next week.", score: 0, effectiveness: "least-effective", feedback: "Jolene ignores the problem and just tries to sell more the following week. She quickly runs out of cash for supplies and has to shut down for a day. Ignoring financial problems just makes them worse." }, { text: "She creates a strict budget for the next week and tracks every expense and sale to find where the money is leaking.", score: 3, effectiveness: "most-effective", feedback: "This is the way to go. Jolene takes all her receipts and enters them into a simple spreadsheet. She discovers her biggest expense is sugar. She then calls Frank's Food Supply, a local restaurant supply company, and arranges to buy a large, 25-pound bag in bulk. This one simple action cuts her cost by half and puts her back in the green." }, { text: "She asks a friend or family member for a loan to get her through the week.", score: 1, effectiveness: "less-effective", feedback: "While it's okay to ask for help, this choice only provides a temporary solution. It doesn't teach Jolene how to manage her money on her own, and she soon finds herself in the same difficult financial spot." } ] },
+            { image: "https://i.ibb.co/WvYh4375/jolene3.png", title: "A surprise heat wave hits town, and Jolene runs out of lemons and sugar faster than she expected. Her usual neighborhood store is also sold out. Question: How can Jolene find the supplies she needs to meet the sudden, high demand?", icon: "sun", choices: [ { text: "She closes her stand for the day, hoping the store will have new supplies tomorrow.", score: 0, effectiveness: "least-effective", feedback: "Jolene closes her stand early, missing a prime opportunity to make sales on a hot day. The next day, the store still has low stock, and she's not prepared." }, { text: "She reaches out to a local bakery owner and asks if they can share a bulk order from a restaurant supplier, which lowers her cost.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene doesn't panic. Instead, she finds a creative solution and forges a valuable business relationship with Mrs. Gable, a local bakery owner. She gets the supplies she needs at a great price and has a new partnership for the future." }, { text: "She buys a few bags of expensive organic lemons from a small specialty shop.", score: 1, effectiveness: "less-effective", feedback: "While Jolene gets the lemons she needs, they are very expensive. This cuts her profit margin so low that she makes almost no money for the day. She learns that not all suppliers are created equal." } ] },
+            { image: "https://i.ibb.co/93sqcdN3/Jolene4.png", title: "Jolene sees that she's selling a lot of lemonade but still isn't making as much profit as she hoped. She's been charging the same low price she started with. Question: How should Jolene adjust her pricing to ensure her business is profitable?", icon: "tag", choices: [ { text: "She raises her prices to match the most expensive lemonade stand she can find, without checking her costs.", score: 0, effectiveness: "least-effective", feedback: "Jolene raises her price significantly. Her loyal customers are surprised, and new customers walk right by her stand. She realizes she has priced herself out of the market." }, { text: "She calculates all her costs (lemons, sugar, cups, etc.) and sets a price that gives her a healthy profit margin.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene writes down every single cost. She learns what her real expenses are and sets a new price that ensures every cup of lemonade makes a profit. She feels confident that her hard work is paying off." }, { text: "She keeps her prices the same, hoping that selling more volume will eventually increase her profit.", score: 1, effectiveness: "less-effective", feedback: "Jolene sells a lot of lemonade, but she's constantly busy and exhausted, and her profits are still low. She realizes that without a profitable price, she's just doing a lot of work for very little reward." } ] },
+            { image: "https://i.ibb.co/rf1pR6Dr/jolene5-2.png", title: "Jolene wants more customers but her little sign isn't working. She realizes she needs to get the word out to people beyond her immediate neighborhood. Question: What's the best way for Jolene to market her business for the first time?", icon: "megaphone", choices: [ { text: "She spends her entire profit from the last week on a flyer in the local newspaper.", score: 0, effectiveness: "least-effective", feedback: "The flyer comes out on a rainy day, and almost no one sees it. Jolene realizes she spent too much money on a risky marketing strategy that didn't pay off." }, { text: "She posts pictures and a fun message on her neighborhood's community Facebook page and creates a small offer for new customers.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene opens her computer and posts to the 'Meadow Creek Neighbors' Facebook page. The message reads: 'Hey everyone! It's Jolene from the lemonade stand on Maple Street! Swing by for a refreshing cup of classic lemonade. Mention this post and get a second one for a friend on me!' Within an hour, she gets five new comments and her first two online orders for pickup. She learns that digital marketing is a powerful tool for her business." }, { text: "She prints a few hundred flyers and puts them on every car in the parking lot of the local grocery store.", score: 1, effectiveness: "less-effective", feedback: "Jolene puts flyers on cars, but most people just throw them away. She realizes that this is a time-consuming and inefficient way to reach people, and many find it annoying." } ] },
+            { image: "https://i.ibb.co/HfVRHWcb/jolene6.png", title: "A new lemonade stand, 'Zesty Zips,' opens up down the street. They're selling a very similar product at a slightly lower price. Question: How should Jolene respond to the new competition?", icon: "users", choices: [ { text: "She lowers her price to match theirs, even if it cuts into her profit.", score: 0, effectiveness: "least-effective", feedback: "Jolene lowers her price, and it works, but she realizes she's barely making any money. She finds herself in a 'price war' that she can't win in the long run." }, { text: "She creates a loyalty program for her regular customers and introduces a special 'secret menu' flavor.", score: 3, effectiveness: "most-effective", feedback: "This is a fantastic strategy. Instead of focusing on her competition, she's focusing on her strengths. She's building customer loyalty and creating unique value that sets her apart." }, { text: "She goes home for the day and complains about the new competition.", score: 1, effectiveness: "less-effective", feedback: "Jolene sits at home and complains. She realizes that her competition has a full week of sales and has attracted new customers, while she has lost momentum. This shows she's not a resilient entrepreneur." } ] },
+            { image: "https://i.ibb.co/QvP46Qm1/jolene7.png", title: "Jolene is ready to create a new flavor, but she's not sure what her customers would like. Question: What's the most effective way for Jolene to ensure her new flavor will be a hit?", icon: "flask-conical", choices: [ { text: "She goes with her favorite flavor and starts selling it immediately, without asking anyone.", score: 0, effectiveness: "least-effective", feedback: "Jolene launches her new flavor, but it's not popular, and she has to throw a lot of it away. She learns that what she likes isn't always what the customer wants." }, { text: "She creates several small batches of different flavors and holds a tasting event, asking customers to vote.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene creates a tasting event, which gets customers excited. She collects data on what people actually want and uses it to make a smart, data-driven decision. This is true market research." }, { text: "She asks her family and friends what they would like.", score: 1, effectiveness: "less-effective", feedback: "Jolene's family and friends give her some ideas, but they're all very different, and she's confused. She realizes their opinions are biased and don't represent what the public wants." } ] },
+            { image: "https://i.ibb.co/spFT5zkq/jolene8.png", title: "Jolene's lemonade is so popular that she's spending hours each night squeezing lemons by hand. She needs to be more efficient. Question: How should she handle the increased demand?", icon: "clock", choices: [ { text: "She continues squeezing lemons by hand; it's part of her original recipe.", score: 0, effectiveness: "least-effective", feedback: "While it's great to be loyal to her original recipe, this approach doesn't scale. Jolene quickly burns out and can't meet her growing demand. She realizes she needs to make a big change if she wants to continue to grow." }, { text: "She limits her hours at the stand so she has more time for preparation.", score: 1, effectiveness: "less-effective", feedback: "While this solves her immediate problem, it's not the most effective choice. Limiting her hours means limiting her sales. A good entrepreneur would look for ways to increase efficiency to meet demand." }, { text: "She invests in a commercial-grade juicer and a better bottling system.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. By investing in a machine, Jolene is scaling her business by increasing her production capacity. This allows her to meet the growing demand without working extra hours." } ] },
+            { image: "https://i.ibb.co/DP1Vx3gJ/Jolene9.png", title: "Jolene gets her products into a store owned by a family friend, who promised to promote it. But the owner complains to customers and is slow to pay. Question: What should Jolene do?", icon: "handshake", choices: [ { text: "She is patient and waits, as she doesn't want to damage their friendship.", score: 0, effectiveness: "least-effective", feedback: "Jolene waits, but her friend never pays up. The friendship becomes strained, and Jolene takes a loss. She learned that good business and good friendship sometimes don't mix." }, { text: "She politely and professionally addresses the issue directly, and if it doesn't improve, she ends the partnership.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene schedules a private meeting to discuss the issues. When the friend becomes defensive, Jolene calmly explains that she must end the partnership. This shows she is a professional who puts her business first." }, { text: "She posts about the negative experience on social media to warn others.", score: 1, effectiveness: "less-effective", feedback: "Jolene posts a frustrated message. While it feels good, it doesn't get her paid. Other store owners see the post and decide not to work with her, damaging her reputation." } ] },
+            { image: "https://i.ibb.co/4wsJVhpp/jolene10.png", title: "Jolene's business is growing, but she's working nonstop and feels lonely and exhausted. A friend suggests she hire a part-time assistant. Question: How does Jolene handle her growing feelings of burnout?", icon: "battery-warning", choices: [ { text: "She pushes through it and works even harder, believing this is what it takes to be successful.", score: 0, effectiveness: "least-effective", feedback: "Jolene continues to work long hours. Her energy runs low, and she starts making small mistakes. Her exhaustion causes her to be short with a customer. By ignoring her burnout, she put her business at risk." }, { text: "She hires an assistant to help with daily tasks, freeing up time for her to rest and focus on big-picture strategy.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene hires Ben to handle tasks like bottling. By delegating, she not only protects her well-being but also gains time to focus on strategic thinking for the future." }, { text: "She limits the number of hours she works per day, even if it means losing out on sales.", score: 1, effectiveness: "less-effective", feedback: "Jolene decides to work less. This helps her feel less exhausted, but she can't keep up with demand. Orders pile up, and she has to turn away customers, losing sales and momentum." } ] },
+            { image: "https://i.ibb.co/jvnJtxJr/jolene11.png", title: "Jolene's dehydrated mixes are a success, but a customer emails about a broken packet and another complains on social media about packaging quality. Question: How should Jolene respond?", icon: "package-x", choices: [ { text: "She tells her customers that mistakes happen and that she can't control shipping.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. A good entrepreneur takes ownership of problems. This choice erodes trust and shows a lack of accountability." }, { text: "She issues a public apology, contacts the customer to make it right, and investigates her packaging for a durable solution.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. By taking responsibility and actively solving the problem, Jolene demonstrates her commitment to customer satisfaction and quality. This shows grit and empathy." }, { text: "She sends the unhappy customer a new package, but doesn't change her packaging process.", score: 1, effectiveness: "less-effective", feedback: "While this is a good first step, it's less-effective. It solves the problem for one customer but doesn't address the root cause, which could lead to more problems." } ] },
+            { image: "https://i.ibb.co/hJmQ1DhL/jolene12.png", title: "Jolene gets a meeting with a buyer for a large national store. The buyer loves her lemonade but wants her to change the recipe to make it cheaper, even if it affects the taste. Question: How should Jolene handle this?", icon: "briefcase", choices: [ { text: "She agrees immediately, believing getting into the store is worth any cost.", score: 0, effectiveness: "least-effective", feedback: "Jolene agrees and changes her recipe. The lemonade tastes different, and customers complain. She loses the trust of her loyal fan base, and sales are lower than expected." }, { text: "She proposes a compromise: she will work to lower production costs, but will not change the core recipe.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene stands her ground. She tells the buyer her recipe is the core of her brand and offers to find other ways to make the deal work. She shows confidence, and the buyer is impressed." }, { text: "She walks away from the deal, believing the demands are unreasonable.", score: 1, effectiveness: "less-effective", feedback: "Jolene walks away, thinking the deal is bad. She misses a huge opportunity to grow her brand. She learns that negotiation is a part of business and she gave up too soon." } ] },
+            { image: "https://i.ibb.co/qYFKLdzc/jolene13.png", title: "Jolene's business is so big she can't manage it all. She needs to hire a full team but doesn't have the money for salaries. She needs outside funding. Question: What is the best way to raise money?", icon: "coins", choices: [ { text: "She takes a small personal loan from a friend that will only cover one employee.", score: 0, effectiveness: "least-effective", feedback: "Jolene takes a small loan, but it only pays for one person. She quickly realizes one person isn't enough and she's still exhausted. Her short-term solution was not a good one." }, { text: "She tries to find a venture capitalist who will give her a large sum of money.", score: 1, effectiveness: "less-effective", feedback: "Jolene meets with VCs, but they ask for a huge share of her business. She realizes that she would have to give up too much ownership to get the deal done." }, { text: "She raises money through crowdfunding, allowing customers to invest in her brand.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene uses crowdfunding to raise money from her most loyal customers. This brings her the money she needs without giving up a large share of her company, creating a powerful community." } ] },
+            { image: "https://i.ibb.co/4R7vkv59/jolene14.png", title: "Jolene is a national brand, but her newest lemon supplier suddenly goes out of business, leaving a massive gap in her production line. Question: How does Jolene handle this supply chain failure?", icon: "truck", choices: [ { text: "She tries to buy lemons from as many different small suppliers as possible, without checking their quality.", score: 0, effectiveness: "least-effective", feedback: "Jolene tries to buy lemons from anywhere, but ends up with inconsistent quality. This results in an unsellable product and customer complaints." }, { text: "She calls the national store and asks to delay the order, explaining the situation.", score: 1, effectiveness: "less-effective", feedback: "The national store's buyer is disappointed. They are a large business with many options and decide to go with a more reliable supplier instead. Jolene learned that relying on goodwill is a big risk." }, { text: "She immediately reaches out to other, larger suppliers and offers to pay a premium to secure a reliable new source.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene takes a financial hit, but she ensures the quality and quantity of her product are not affected. She prioritizes her reputation and reliability." } ] },
+            { image: "https://i.ibb.co/mrQnFmhs/jolene15.png", title: "Jolene sees a growing trend of customers wanting healthier, sugar-free options. Her classic lemonade is full of sugar. Question: How should Jolene approach this opportunity?", icon: "heart", choices: [ { text: "She ignores the trend, believing her loyal customers will always buy her original lemonade.", score: 0, effectiveness: "least-effective", feedback: "Jolene ignores the trend. Over the next year, sales begin to slow as more competitors launch healthier products. She learns that successful brands adapt to what the market wants." }, { text: "She immediately replaces her original lemonade with a new, sugar-free version.", score: 1, effectiveness: "less-effective", feedback: "Jolene launches a new, sugar-free version, but her loyal customers are angry she has changed her famous recipe. They stop buying, and she realizes she should have offered it as a choice, not a replacement." }, { text: "She launches a new, sugar-free 'Jolene's Light' product line while continuing to sell her classic lemonade.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. Jolene sees the trend as an opportunity. She launches a new product line that expands her brand and attracts new customers while keeping her loyal fan base happy." } ] }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- RANDOMIZATION ENGINE ---
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+            // Shuffle choices on load so "Option B" isn't always correct
+            SCENARIO_DATA.forEach(scenario => {
+                shuffle(scenario.choices);
+            });
+
+            const pages = document.querySelectorAll('.page');
+            const nextButton = document.getElementById('next-button');
+            const backButton = document.getElementById('back-button');
+            const progressBar = document.getElementById('flex-progress-fill');
+            const startupScreen = document.getElementById('startup-screen');
+            const loginModal = document.getElementById('login-modal');
+
+            // --- MENU FUNCTIONS ---
+            window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); sfx.tick(); }
+            window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); sfx.tick(); }
+            window.closeLoginModal = () => { loginModal.classList.add('hidden-modal'); loginModal.classList.remove('visible-modal'); }
+            
+            // --- SYSTEM MENU FUNCTIONS ---
+            window.closeSystemMenu = () => { document.getElementById('system-menu-modal').classList.add('hidden-modal'); document.getElementById('system-menu-modal').classList.remove('visible-modal'); }
+            window.handleSystemExit = () => { window.location.href = "https://www.allgoodacademy.com"; }
+            window.handleLogOut = async () => {
+                 // Use existing hard reset logic which handles auth signout and storage clearing
+                 await window.performHardReset();
+                 window.closeSystemMenu();
+            }
+
+            window.updateUserDisplay = (name) => {
+                currentUserName = name;
+                document.getElementById('header-welcome-text').textContent = `Welcome, ${name}`;
+            }
+
+            function updateProgress() {
+                const progress = ((currentPageIndex + 1) / TOTAL_PAGES);	
+                if (progressBar) progressBar.style.width = `${progress * 100}%`;
+                document.getElementById('header-page-indicator').textContent = `${currentPageIndex + 1} / ${TOTAL_PAGES}`;
+            }
+
+            // --- PAGE NAVIGATION ---
+            window.showPage = function(index) {
+                if (index < 0 || index >= TOTAL_PAGES) return;
+                
+                // Final Score Check
+                if (index === TOTAL_PAGES - 2 && Object.keys(answeredScenarioScores).length < TOTAL_SCENARIOS) {
+                    window.showScenarioOutcome('challenge-incomplete'); return;
+                }
+
+                // PLAY NAV SOUND
+                if(window.sfx && window.sfx.nav) window.sfx.nav();
+
+                pages.forEach(p => p.classList.remove('active'));
+                pages[index].classList.add('active');
+                currentPageIndex = index;
+                pages[index].scrollTop = 0;
+
+                backButton.disabled = (index === 0);
+                backButton.classList.toggle('opacity-0', index === 0);
+
+                const nextSpan = nextButton.querySelector('span');
+                if (index === 0) nextSpan.textContent = 'Start Challenge';
+                else if (index === TOTAL_PAGES - 2) { 
+                    window.updateFinalScorePage(); 
+                    nextSpan.textContent = 'Credits'; 
+                } else if (index === TOTAL_PAGES - 1) nextSpan.textContent = 'Reset';
+                else if (index >= 2) {
+                    const isDone = Object.keys(answeredScenarioScores).length === TOTAL_SCENARIOS;
+                    nextSpan.textContent = isDone ? 'View Score' : 'Next';
+                } else {
+                    nextSpan.textContent = 'Next';
+                }
+                
+                updateProgress();
+                lucide.createIcons();
+            }
+
+            // --- STARTUP LOGIC ---
+            if (startupScreen) {
+                const warmUp = () => { if(window.initAudio) window.initAudio(); };
+                startupScreen.addEventListener('mousedown', warmUp, { once: true });
+                startupScreen.addEventListener('touchstart', warmUp, { once: true });
+                
+                startupScreen.addEventListener('click', () => {
+                    if(window.sfx) window.sfx.powerOn();
+                    
+                    if (window.currentUser) {
+                        // User exists (SSO/Auth)
+                        window.logFinalScoreToFirestore({ finalScore: 200, rank: "Session Started", sessionId: window.sessionId });
+                        window.showPage(0);
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    } else {
+                        // No user
+                        loginModal.classList.remove('hidden-modal');
+                        loginModal.classList.add('visible-modal');
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    }
+                });
+            }
+
+            // --- SCENARIO LOGIC ---
+            function renderScenarioPage(pageElement, scenarioIndex) {
+                try {
+                    const data = SCENARIO_DATA[scenarioIndex - 1];
+                    if (!data) return; // Guard clause
+
+                    const isAnswered = answeredScenarioScores[scenarioIndex];
+                    
+                    // Parse Title
+                    const titleParts = data.title.split('Question:');
+                    const prompt = titleParts[0];
+                    // SAFETY FIX: Default question string if parsing fails
+                    const question = (titleParts[1] && titleParts[1].trim()) ? titleParts[1].trim() : "What should Jolene do?";
+
+                    // Generate Choices HTML
+                    let choicesHtml = data.choices.map((choice, index) => {
+                        let btnClass = 'choice-btn group relative w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 hover:shadow-md';
+                        let disabled = '';
+                        
+                        // Default Styling (Unanswered)
+                        if (!isAnswered) {
+                            btnClass += ' bg-white border-gray-100 text-gray-600 hover:border-allgood-secondary hover:text-allgood-secondary';
+                        } else {
+                            // Answered Styling
+                            if (choice.score === 3) btnClass += ' choice-correct bg-green-50 border-green-200 text-green-800';
+                            else if (choice.score === 1) btnClass += ' choice-less-effective bg-yellow-50 border-yellow-200 text-yellow-800';
+                            else btnClass += ' choice-least-effective bg-red-50 border-red-200 text-red-800 opacity-60';
+                            
+                            if (answeredScenarioScores[scenarioIndex] !== choice.score) {
+                                disabled = 'disabled'; 
+                                btnClass += ' opacity-40 grayscale';
+                            } else {
+                                btnClass += ' ring-2 ring-offset-1 ring-current font-bold';
+                            }
+                        }
+
+                        return `
+                        <button class="${btnClass}" onclick="window.selectScenarioChoice(${scenarioIndex}, ${index})" ${disabled}>
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-bold mr-3 group-hover:bg-allgood-secondary group-hover:text-white transition-colors">${String.fromCharCode(65 + index)}</div>
+                                <span class="leading-snug">${sanitizeText(choice.text)}</span>
+                            </div>
+                        </button>`;
+                    }).join('');
+
+                    // Feedback HTML
+                    let feedbackHtml = '';
+                    if (isAnswered) {
+                        const chosen = data.choices.find(c => c.score === answeredScenarioScores[scenarioIndex]);
+                        let fbClass = chosen.score === 3 ? 'feedback-correct bg-green-50 border-l-4 border-green-500' : (chosen.score === 1 ? 'feedback-less bg-yellow-50 border-l-4 border-yellow-500' : 'feedback-least bg-red-50 border-l-4 border-red-500');
+                        
+                        let impactText = "";
+                        if (chosen.score === 3) impactText = "<span class='text-green-700 font-extrabold'>+$50 Profit</span>";
+                        else if (chosen.score === 1) impactText = "<span class='text-yellow-700 font-extrabold'>$0 Break Even</span>";
+                        else impactText = "<span class='text-red-700 font-extrabold'>-$30 Loss</span>";
+
+                        feedbackHtml = `
+                        <div class="mt-6 animate-fade-in-up">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <div class="h-px bg-gray-200 flex-grow"></div>
+                                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Result</span>
+                                <div class="h-px bg-gray-200 flex-grow"></div>
+                            </div>
+                            <div class="${fbClass} p-4 rounded-r-lg shadow-sm">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="font-bold text-xs uppercase tracking-wide text-gray-500">Mentor Feedback</span>
+                                    <span class="text-sm">${impactText}</span>
+                                </div>
+                                <p class="text-sm text-gray-800 leading-relaxed">${sanitizeText(chosen.feedback)}</p>
+                            </div>
+                        </div>`;
+                    }
+
+                    // Render Chat Interface (Natural Flow Layout - No Fixed Heights)
+                    pageElement.innerHTML = `
+                    <div class="max-w-2xl mx-auto pb-20">
+                        
+                        <!-- 1. The Message Stream (Context) -->
+                        <div class="mb-6">
+                            
+                            <!-- Date Stamp -->
+                            <div class="text-center mb-6">
+                                <span class="bg-gray-100 text-gray-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">Scenario ${scenarioIndex}</span>
+                            </div>
+
+                            <!-- Jolene's Message -->
+                            <div class="flex items-end mb-2 group">
+                                <!-- Avatar -->
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-allgood-primary to-orange-600 flex items-center justify-center text-white font-heading font-bold text-sm mr-3 flex-shrink-0 shadow-md border-2 border-white relative z-10">JL</div>
+                                
+                                <div class="flex flex-col space-y-1 max-w-[90%]">
+                                    <span class="text-[10px] font-bold text-gray-400 ml-1 mb-0.5">Jolene • <span class="font-normal">Just now</span></span>
+                                    
+                                    <!-- Attachment (Image) -->
+                                    ${data.image ? `
+                                    <div class="rounded-2xl rounded-bl-none overflow-hidden shadow-sm border border-gray-100 bg-white p-1 mb-1">
+                                        <img src="${data.image}" class="w-full h-auto rounded-xl block" alt="Context Image">
+                                    </div>` : ''}
+                                    
+                                    <!-- Bubble -->
+                                    <div class="bg-white p-4 rounded-2xl rounded-bl-none text-sm text-gray-700 shadow-md border border-gray-100 leading-relaxed relative">
+                                        ${prompt}
+                                        <div class="absolute -bottom-[6px] -left-[6px] w-4 h-4 bg-white border-b border-l border-gray-100 transform rotate-45 -z-10"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. The Interaction Area -->
+                        <div class="mt-2 pt-4 border-t border-dashed border-gray-200">
+                            <!-- System Notification -->
+                            <div class="text-center mb-4">
+                                <div class="inline-flex items-center justify-center px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-100 animate-pulse">
+                                    <i data-lucide="bell" class="w-3 h-3 mr-1"></i> Decision Required
+                                </div>
+                                <h4 class="font-heading font-bold text-allgood-dark mt-3 text-lg leading-tight">${question}</h4>
+                            </div>
+
+                            <!-- Choices Stack -->
+                            <div class="space-y-3">
+                                ${choicesHtml}
+                            </div>
+
+                            <!-- Feedback Area -->
+                            ${feedbackHtml}
+                        </div>
+                    </div>`;
+                    
+                    lucide.createIcons();
+                } catch(e) {
+                    console.error("Render failed for scenario " + scenarioIndex, e);
+                }
+            }
+
+            window.selectScenarioChoice = function(sIdx, cIdx) {
+                const data = SCENARIO_DATA[sIdx - 1];
+                const chosen = data.choices[cIdx];
+                if (!answeredScenarioScores[sIdx]) {
+                    
+                    // CASH FLOW LOGIC
+                    let cashImpact = 0;
+                    if (chosen.score === 3) cashImpact = 50;
+                    else if (chosen.score === 1) cashImpact = 0;
+                    else cashImpact = -30;
+
+                    totalChallengeScore += cashImpact;
+                    answeredScenarioScores[sIdx] = chosen.score;
+                    
+                    // Update Header
+                    const bankEl = document.getElementById('bank-balance');
+                    if(bankEl) bankEl.textContent = `$${totalChallengeScore}`;
+                    
+                    // Log attempt to Firestore
+                    window.logScenarioAttempt({
+                        scenarioIndex: sIdx,
+                        choiceIndex: cIdx,
+                        score: chosen.score,
+                        cashImpact: cashImpact,
+                        currentBalance: totalChallengeScore,
+                        effectiveness: chosen.effectiveness,
+                        question: data.title
+                    });
+                }
+                window.showPage(currentPageIndex); // Re-render to show feedback inline
+                
+                let iconClass = chosen.score === 3 ? 'bg-green-100 text-green-600' : (chosen.score === 1 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600');
+                let iconInner = chosen.score === 3 ? '<i data-lucide="check-circle" class="w-8 h-8"></i>' : (chosen.score === 1 ? '<i data-lucide="alert-triangle" class="w-8 h-8"></i>' : '<i data-lucide="x-circle" class="w-8 h-8"></i>');
+                
+                let impactTitle = "";
+                if (chosen.score === 3) impactTitle = "+$50 PROFIT";
+                else if (chosen.score === 1) impactTitle = "$0 BREAK EVEN";
+                else impactTitle = "-$30 LOSS";
+
+                window.showScenarioOutcome('scenario-completed', {
+                    title: `${impactTitle}`,
+                    text: chosen.feedback,
+                    iconClass: iconClass,
+                    iconInner: iconInner
+                });
+            }
+
+            window.closeScenarioModal = (advance) => {
+                document.getElementById('scenario-modal').classList.remove('visible-modal');
+                document.getElementById('scenario-modal').classList.add('hidden-modal');
+                sfx.nav();
+                if (advance && currentPageIndex < TOTAL_PAGES - 2) window.showPage(currentPageIndex + 1);
+            }
+
+            window.showScenarioOutcome = (type, data) => {
+                const modal = document.getElementById('scenario-modal');
+                const title = document.getElementById('scenario-title');
+                const fb = document.getElementById('scenario-feedback');
+                const icon = document.getElementById('scenario-icon');
+                const btn = document.getElementById('scenario-modal-next-btn');
+
+                if (type === 'challenge-incomplete') {
+                    title.textContent = "Incomplete";
+                    fb.textContent = "Please answer all questions.";
+                    icon.className = "mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl bg-red-100 text-red-600";
+                    icon.innerHTML = '<i data-lucide="alert-triangle" class="w-8 h-8"></i>';
+                    btn.onclick = () => window.closeScenarioModal(false);
+                } else {
+                    title.textContent = data.title;
+                    fb.innerHTML = sanitizeText(data.text);
+                    icon.className = `mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl ${data.iconClass}`;
+                    icon.innerHTML = data.iconInner;
+                    btn.onclick = () => window.closeScenarioModal(true);
+                }
+                modal.classList.remove('hidden-modal');
+                modal.classList.add('visible-modal');
+                sfx.tick();
+                lucide.createIcons();
+            }
+
+            window.updateFinalScorePage = function() {
+                const scoreValue = document.getElementById('final-score-value');
+                const scorePercent = document.getElementById('final-score-percent');
+                const rankHeading = document.getElementById('final-rank-heading');
+                const rankMessage = document.getElementById('final-rank-message');
+                const badgeBtn = document.getElementById('download-badge-btn');
+                const certReqText = document.getElementById('cert-req-text'); 
+
+                const currentScore = totalChallengeScore;
+                // Percentage based on max possible gain from 200 start
+                const percentage = Math.round((currentScore / MAX_SCORE) * 100);
+
+                let rank = "";
+                let rankColor = "";
+                let message = "";
+                let isCertified = false;
+                let isComplete = false;
+                
+                if (currentScore >= BADGE_THRESHOLD) { // $800+
+                    rank = "Certified Entrepreneur";
+                    rankColor = "text-green-600";
+                    message = "Exceptional! You have the grit and vision to build an empire.";
+                    isCertified = true;
+                    isComplete = true;
+                } else if (currentScore >= 600) {
+                    rank = "Business Strategist";
+                    rankColor = "text-yellow-600";
+                    message = "Solid performance. Review your financial decisions to reach the top.";
+                } else {
+                    rank = "Aspiring Entrepreneur";
+                    rankColor = "text-red-600";
+                    message = "Good start. Focus on customer feedback and try again.";
+                }
+
+                scoreValue.textContent = `$${currentScore}`;
+                scoreValue.className = `text-5xl font-extrabold font-heading ${rankColor}`;
+                scorePercent.textContent = `(Target: $${BADGE_THRESHOLD})`;
+                rankHeading.textContent = rank;
+                rankHeading.className = `text-xl font-heading font-bold mb-2 ${rankColor}`;
+                rankMessage.textContent = message;
+                certReqText.innerHTML = sanitizeText(certReqText.innerHTML);
+
+                if (currentScore >= BADGE_THRESHOLD) {
+                    badgeBtn.disabled = false;
+                    badgeBtn.classList.remove('bg-gray-300', 'cursor-not-allowed', 'shadow-none');
+                    badgeBtn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg');
+                    badgeBtn.innerHTML = '<i data-lucide="download" class="w-4 h-4 mr-2"></i>Download Your Badge';
+                } else {
+                    badgeBtn.disabled = true;
+                    badgeBtn.classList.add('bg-gray-300', 'cursor-not-allowed', 'shadow-none');
+                    badgeBtn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg');
+                    badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Certification Locked';
+                }
+                
+                window.logFinalScoreToFirestore({ 
+                    finalScore: currentScore, 
+                    maxScore: MAX_SCORE, 
+                    percentage: percentage, 
+                    rank: rank, 
+                    isCertified: isCertified, 
+                    complete: isComplete, 
+                    earnedBadge: isCertified ? "Certified Entrepreneur" : null, // Added Badge Field
+                    sessionId: window.sessionId 
+                });
+                lucide.createIcons();
+            }
+
+            // --- TOC LOGIC ---
+            function updateTOC() {
+                const tocList = document.getElementById('toc-list');
+                tocList.innerHTML = '';
+                
+                const addLink = (text, idx, bold=false, colorClass='') => {
+                    const btn = document.createElement('button');
+                    btn.className = `menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 text-sm ${bold?'font-bold':''} ${colorClass}`;
+                    btn.textContent = text;
+                    btn.onclick = () => { window.showPage(idx); window.closeMenuModal(); };
+                    tocList.appendChild(btn);
+                }
+
+                addLink("1. Cover Page", 0, true);
+                addLink("2. Mission Briefing", 1, true);
+                
+                const divider = document.createElement('div');
+                divider.className = "px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2";
+                divider.textContent = "The 15 Scenarios";
+                tocList.appendChild(divider);
+
+                for (let i = 1; i <= TOTAL_SCENARIOS; i++) {
+                    const data = SCENARIO_DATA[i - 1];
+                    const pageIndex = i + 1;
+                    const shortTitle = data.title.split('Question:')[0].substring(0, 30) + "...";
+                    addLink(`${pageIndex}. ${shortTitle}`, pageIndex);
+                }
+
+                addLink(`${TOTAL_PAGES-1}. Final Score`, TOTAL_PAGES-2, true, "text-allgood-secondary");
+                addLink(`${TOTAL_PAGES}. Feedback`, TOTAL_PAGES-1);
+            }
+
+            // --- INIT PAGES ---
+            pages.forEach(p => {
+                const idx = parseInt(p.getAttribute('data-scenario-index'));
+                if(idx) renderScenarioPage(p, idx);
+            });
+
+            // --- NAV LISTENERS ---
+            if(nextButton) nextButton.addEventListener('click', () => {
+                if (currentPageIndex < TOTAL_PAGES - 1) window.showPage(currentPageIndex + 1);
+                else window.performHardReset();
+            });
+            if(backButton) backButton.addEventListener('click', () => { if(currentPageIndex > 0) window.showPage(currentPageIndex - 1); });
+            document.getElementById('menu-toggle').addEventListener('click', window.openMenuModal);
+            document.getElementById('close-menu').addEventListener('click', window.closeMenuModal);
+            
+            // --- HEADER LISTENERS ---
+            const homeButton = document.getElementById('home-button');
+            let pressTimer = null;
+            if(homeButton) {
+                const startLongPress = (e) => {
+                    // Prevent default to avoid context menus on mobile
+                    // e.preventDefault(); 
+                    pressTimer = setTimeout(() => { 
+                        document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                        document.getElementById('system-menu-modal').classList.add('visible-modal');
+                        sfx.nav(); 
+                        pressTimer = null; 
+                    }, 2000);
+                }
+                const cancelLongPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+                const endLongPress = () => {
+                    if (pressTimer) { 
+                        clearTimeout(pressTimer); 
+                        pressTimer = null; 
+                        // Normal Click Behavior: Go to Page 0
+                        if (currentPageIndex !== 0) { window.showPage(0); sfx.nav(); } 
+                    }
+                }
+                homeButton.addEventListener('mousedown', startLongPress);
+                homeButton.addEventListener('mouseleave', cancelLongPress);
+                homeButton.addEventListener('mouseup', endLongPress);
+                homeButton.addEventListener('touchstart', startLongPress, {passive: true});
+                homeButton.addEventListener('touchend', endLongPress);
+            }
+
+            document.getElementById('blueprint-toggle').addEventListener('click', () => {
+                document.getElementById('screen').classList.toggle('blueprint-mode');
+                document.getElementById('blueprint-toggle').classList.toggle('text-cyan-300');
+                sfx.tick();
+            });
+
+            document.getElementById('fullscreen-toggle').addEventListener('click', () => {
+                const frame = document.querySelector('.tablet-frame');
+                frame.classList.toggle('focus-mode');
+                const isFocus = frame.classList.contains('focus-mode');
+                if (isFocus) { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }
+                else { if (document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }
+                document.getElementById('fullscreen-toggle').classList.toggle('text-green-300');
+                sfx.tick();
+            });
+
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            
+            // Accordion Logic
+            document.querySelectorAll('.accordion-toggle').forEach(acc => {
+                acc.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    const icon = this.querySelector('.accordion-icon');
+                    content.classList.toggle('hidden');
+                    if(icon) icon.classList.toggle('rotate-180');
+                    sfx.tick();
+                });
+            });
+
+            // Initial Render
+            window.showPage(0);
+            updateTOC();
+            
+            // HARD RESET
+            window.performHardReset = async () => {
+                try {
+                    // Call the exposed module function
+                    if(window.handleAuthSignOut) {
+                        await window.handleAuthSignOut();
+                    } else {
+                        console.warn("[Auth] Sign out function not found.");
+                    }
+                    
+                    // Clear Local Storage to prevent auto-fill on next login
+                    localStorage.removeItem('aa_username');
+                    localStorage.removeItem('aa_email');
+                    localStorage.removeItem('aa_uid');
+                    localStorage.removeItem('aa_is_guest');
+                    
+                    console.log("[Auth] User signed out and storage cleared via Hard Reset.");
+                } catch (e) {
+                    console.error("[Auth] Sign out failed", e);
+                }
+
+                totalChallengeScore = 200; // Reset to 200 Start
+                answeredScenarioScores = {};
+                // Update Bank Display Reset
+                const bankEl = document.getElementById('bank-balance');
+                if(bankEl) bankEl.textContent = `$200`;
+                
+                pages.forEach(p => { const idx = parseInt(p.getAttribute('data-scenario-index')); if(idx) renderScenarioPage(p, idx); });
+                const startup = document.getElementById('startup-screen');
+                startup.style.display = 'flex';
+                setTimeout(() => startup.style.opacity = '1', 10);
+                window.showPage(0);
+                sfx.powerOff();
+            }
+            
+            // --- BADGE DOWNLOAD LOGIC ---
+            window.downloadBadge = function() {
+                if (totalChallengeScore < BADGE_THRESHOLD) return;
+
+                const nameText = (typeof currentUserName !== 'undefined' && currentUserName) ? currentUserName.toUpperCase() : "ENTREPRENEUR";
+                const dateText = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).toUpperCase();
+                const scoreText = `$${totalChallengeScore}`;
+
+                // Dynamic Font Sizing for Long Names
+                let nameFontSize = 40;
+                if (nameText.length > 20) nameFontSize = 28;
+                else if (nameText.length > 15) nameFontSize = 34;
+
+                const badgeSVG = `
+                <svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <!-- RISING GRAPH WATERMARK PATTERN -->
+                        <pattern id="graphPattern" width="100" height="100" patternUnits="userSpaceOnUse">
+                            <path d="M0 100 L20 80 L40 90 L60 60 L80 70 L100 40" fill="none" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+                        </pattern>
+                    </defs>
+                    
+                    <!-- Background -->
+                    <rect width="100%" height="100%" fill="#F9FAFB"/>
+                    <rect width="100%" height="100%" fill="url(#graphPattern)"/>
+                    
+                    <!-- Certificate Border -->
+                    <rect x="40" y="40" width="1120" height="720" rx="4" ry="4" fill="none" stroke="#357889" stroke-width="20"/>
+                    <rect x="70" y="70" width="1060" height="660" rx="2" ry="2" fill="none" stroke="#D34716" stroke-width="2"/>
+
+                    <!-- Header -->
+                    <text x="600" y="160" font-family="Georgia, serif" font-weight="bold" font-size="48" fill="#357889" text-anchor="middle" letter-spacing="4">ALLGOOD ACADEMY</text>
+                    <text x="600" y="210" font-family="Verdana, sans-serif" font-size="16" fill="#757575" text-anchor="middle" letter-spacing="6" text-transform="uppercase">Pragmatic Action Certification</text>
+                    
+                    <!-- Divider -->
+                    <line x1="400" y1="240" x2="800" y2="240" stroke="#D34716" stroke-width="2"/>
+
+                    <!-- Main Content -->
+                    <text x="600" y="320" font-family="Verdana, sans-serif" font-size="14" fill="#757575" text-anchor="middle">THIS CERTIFIES THAT</text>
+                    
+                    <!-- Dynamic Name -->
+                    <text x="600" y="380" font-family="Georgia, serif" font-weight="bold" font-size="${nameFontSize}" fill="#357889" text-anchor="middle" letter-spacing="1" text-decoration="underline">${nameText}</text>
+                    
+                    <text x="600" y="440" font-family="Verdana, sans-serif" font-size="14" fill="#757575" text-anchor="middle">HAS SUCCESSFULLY COMPLETED THE MODULE</text>
+                    <text x="600" y="480" font-family="Georgia, serif" font-size="28" fill="#4C4C4C" text-anchor="middle">Jolene's Lemonade Challenge</text>
+
+                    <!-- Seal and Details -->
+                    <g transform="translate(600, 600)">
+                        <!-- Left Block -->
+                        <text x="-250" y="-20" font-family="Verdana, sans-serif" font-size="12" fill="#757575" text-anchor="end" font-weight="bold">AWARDED DATE</text>
+                        <text x="-250" y="10" font-family="Courier New, monospace" font-size="18" fill="#357889" text-anchor="end">${dateText}</text>
+                        
+                        <!-- Right Block -->
+                        <text x="250" y="-20" font-family="Verdana, sans-serif" font-size="12" fill="#757575" text-anchor="start" font-weight="bold">FINAL CAPITAL</text>
+                        <text x="250" y="10" font-family="Courier New, monospace" font-size="18" fill="#D34716" text-anchor="start" font-weight="bold">${scoreText}</text>
+
+                        <!-- Center Seal -->
+                        <circle cx="0" cy="0" r="70" fill="none" stroke="#D34716" stroke-width="3" stroke-dasharray="5,5"/>
+                        <circle cx="0" cy="0" r="60" fill="#357889"/>
+                        <!-- Lemon Icon White -->
+                        <g transform="scale(2.5) translate(-12, -12)">
+                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="#FFFFFF"/>
+                             <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="#FFFFFF"/>
+                        </g>
+                        <text x="0" y="95" font-family="Verdana, sans-serif" font-size="10" fill="#357889" text-anchor="middle" font-weight="bold" letter-spacing="2">OFFICIAL SEAL</text>
+                    </g>
+
+                    <text x="600" y="750" font-family="Georgia, serif" font-style="italic" font-size="16" fill="#D34716" text-anchor="middle">"Turning lemons into a legacy."</text>
+                </svg>`;
+                
+                const blob = new Blob([badgeSVG], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Allgood-Entrepreneur-Badge-${nameText}.svg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                sfx.nav();
+
+                const downloadBtn = document.getElementById('download-badge-btn');
+                if(downloadBtn) {
+                    downloadBtn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    downloadBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    downloadBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4 mr-2"></i>Certificate Saved';
+                    lucide.createIcons();
+                }
+            }
+            
+            // FEEDBACK LOGIC
+            window.setRating = function(n) {
+                for (let i = 1; i <= 5; i++) {
+                    const star = document.getElementById(`star-${i}`);
+                    if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                    else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
+                }
+                sfx.tick();
+            }
+            window.submitFeedback = function() {
+                const feedbackText = document.getElementById('feedback-text').value;
+                window.logFinalScoreToFirestore({ feedback: feedbackText, rank: "Feedback", sessionId: window.sessionId });
+                document.getElementById('feedback-container').classList.add('hidden');
+                document.getElementById('feedback-success').classList.remove('hidden');
+                sfx.nav(); 
+            }
+
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
