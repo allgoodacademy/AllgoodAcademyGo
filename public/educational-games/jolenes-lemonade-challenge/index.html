@@ -542,7 +542,7 @@
                                     <div class="mb-4 relative inline-block"><i id="badge-icon" data-lucide="award" class="relative w-16 h-16 text-allgood-primary mx-auto"></i></div>
                                     <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Entrepreneur Certification</h3>
                                     <p id="cert-req-text" class="text-sm text-gray-600 mb-6">You need <strong>$800</strong> to achieve this certification.</p>
-                                    <button id="download-badge-btn" onclick="window.downloadBadge()" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300">
+                                    <button id="download-badge-btn" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300">
                                         <i data-lucide="lock" class="w-4 h-4 mr-2"></i><span id="btn-text">Certification Locked</span>
                                     </button>
                                     <button id="retake-challenge-btn" onclick="window.performHardReset()" class="w-full bg-gray-100 text-allgood-dark font-bold py-2 rounded shadow-sm mt-4 hover:bg-gray-200 transition-colors">Retake Challenge</button>
@@ -1020,10 +1020,10 @@
                 certReqText.innerHTML = sanitizeText(certReqText.innerHTML);
 
                 if (currentScore >= BADGE_THRESHOLD) {
-                    badgeBtn.disabled = false;
+                    badgeBtn.disabled = true;
                     badgeBtn.classList.remove('bg-gray-300', 'cursor-not-allowed', 'shadow-none');
-                    badgeBtn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg');
-                    badgeBtn.innerHTML = '<i data-lucide="download" class="w-4 h-4 mr-2"></i>Download Your Badge';
+                    badgeBtn.classList.add('bg-emerald-100', 'text-emerald-700', 'border', 'border-emerald-200', 'cursor-default');
+                    badgeBtn.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4 mr-2"></i>Certification Unlocked';
                 } else {
                     badgeBtn.disabled = true;
                     badgeBtn.classList.add('bg-gray-300', 'cursor-not-allowed', 'shadow-none');
@@ -1187,96 +1187,6 @@
                 setTimeout(() => startup.style.opacity = '1', 10);
                 window.showPage(0);
                 sfx.powerOff();
-            }
-            
-            // --- BADGE DOWNLOAD LOGIC ---
-            window.downloadBadge = function() {
-                if (totalChallengeScore < BADGE_THRESHOLD) return;
-
-                const nameText = (typeof currentUserName !== 'undefined' && currentUserName) ? currentUserName.toUpperCase() : "ENTREPRENEUR";
-                const dateText = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).toUpperCase();
-                const scoreText = `$${totalChallengeScore}`;
-
-                // Dynamic Font Sizing for Long Names
-                let nameFontSize = 40;
-                if (nameText.length > 20) nameFontSize = 28;
-                else if (nameText.length > 15) nameFontSize = 34;
-
-                const badgeSVG = `
-                <svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <!-- RISING GRAPH WATERMARK PATTERN -->
-                        <pattern id="graphPattern" width="100" height="100" patternUnits="userSpaceOnUse">
-                            <path d="M0 100 L20 80 L40 90 L60 60 L80 70 L100 40" fill="none" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
-                        </pattern>
-                    </defs>
-                    
-                    <!-- Background -->
-                    <rect width="100%" height="100%" fill="#F9FAFB"/>
-                    <rect width="100%" height="100%" fill="url(#graphPattern)"/>
-                    
-                    <!-- Certificate Border -->
-                    <rect x="40" y="40" width="1120" height="720" rx="4" ry="4" fill="none" stroke="#357889" stroke-width="20"/>
-                    <rect x="70" y="70" width="1060" height="660" rx="2" ry="2" fill="none" stroke="#D34716" stroke-width="2"/>
-
-                    <!-- Header -->
-                    <text x="600" y="160" font-family="Georgia, serif" font-weight="bold" font-size="48" fill="#357889" text-anchor="middle" letter-spacing="4">ALLGOOD ACADEMY</text>
-                    <text x="600" y="210" font-family="Verdana, sans-serif" font-size="16" fill="#757575" text-anchor="middle" letter-spacing="6" text-transform="uppercase">Pragmatic Action Certification</text>
-                    
-                    <!-- Divider -->
-                    <line x1="400" y1="240" x2="800" y2="240" stroke="#D34716" stroke-width="2"/>
-
-                    <!-- Main Content -->
-                    <text x="600" y="320" font-family="Verdana, sans-serif" font-size="14" fill="#757575" text-anchor="middle">THIS CERTIFIES THAT</text>
-                    
-                    <!-- Dynamic Name -->
-                    <text x="600" y="380" font-family="Georgia, serif" font-weight="bold" font-size="${nameFontSize}" fill="#357889" text-anchor="middle" letter-spacing="1" text-decoration="underline">${nameText}</text>
-                    
-                    <text x="600" y="440" font-family="Verdana, sans-serif" font-size="14" fill="#757575" text-anchor="middle">HAS SUCCESSFULLY COMPLETED THE MODULE</text>
-                    <text x="600" y="480" font-family="Georgia, serif" font-size="28" fill="#4C4C4C" text-anchor="middle">Jolene's Lemonade Challenge</text>
-
-                    <!-- Seal and Details -->
-                    <g transform="translate(600, 600)">
-                        <!-- Left Block -->
-                        <text x="-250" y="-20" font-family="Verdana, sans-serif" font-size="12" fill="#757575" text-anchor="end" font-weight="bold">AWARDED DATE</text>
-                        <text x="-250" y="10" font-family="Courier New, monospace" font-size="18" fill="#357889" text-anchor="end">${dateText}</text>
-                        
-                        <!-- Right Block -->
-                        <text x="250" y="-20" font-family="Verdana, sans-serif" font-size="12" fill="#757575" text-anchor="start" font-weight="bold">FINAL CAPITAL</text>
-                        <text x="250" y="10" font-family="Courier New, monospace" font-size="18" fill="#D34716" text-anchor="start" font-weight="bold">${scoreText}</text>
-
-                        <!-- Center Seal -->
-                        <circle cx="0" cy="0" r="70" fill="none" stroke="#D34716" stroke-width="3" stroke-dasharray="5,5"/>
-                        <circle cx="0" cy="0" r="60" fill="#357889"/>
-                        <!-- Lemon Icon White -->
-                        <g transform="scale(2.5) translate(-12, -12)">
-                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="#FFFFFF"/>
-                             <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="#FFFFFF"/>
-                        </g>
-                        <text x="0" y="95" font-family="Verdana, sans-serif" font-size="10" fill="#357889" text-anchor="middle" font-weight="bold" letter-spacing="2">OFFICIAL SEAL</text>
-                    </g>
-
-                    <text x="600" y="750" font-family="Georgia, serif" font-style="italic" font-size="16" fill="#D34716" text-anchor="middle">"Turning lemons into a legacy."</text>
-                </svg>`;
-                
-                const blob = new Blob([badgeSVG], {type: 'image/svg+xml'});
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `Allgood-Entrepreneur-Badge-${nameText}.svg`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                sfx.nav();
-
-                const downloadBtn = document.getElementById('download-badge-btn');
-                if(downloadBtn) {
-                    downloadBtn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
-                    downloadBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-                    downloadBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4 mr-2"></i>Certificate Saved';
-                    lucide.createIcons();
-                }
             }
             
             // FEEDBACK LOGIC

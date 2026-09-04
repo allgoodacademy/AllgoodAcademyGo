@@ -88,7 +88,6 @@
             };
             
             if (payload.completed) sessionData.completed = true;
-            if (payload.badgeArtifact) sessionData.badgeArtifact = payload.badgeArtifact;
 
             try {
                 await setDoc(sessionRef, sessionData, { merge: true });
@@ -848,7 +847,7 @@
                                     </div>
                                     <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-1">Architect of Self</h2>
                                     <p class="text-xs text-gray-500 mb-4">You have completed the Archeology of Identity.</p>
-                                    <button onclick="window.downloadBadge()" id="download-badge-btn" disabled class="bg-gray-300 text-white px-8 py-3 rounded-full font-bold shadow-none flex items-center cursor-not-allowed transition-all">
+                                    <button id="download-badge-btn" disabled class="bg-gray-300 text-white px-8 py-3 rounded-full font-bold shadow-none flex items-center cursor-not-allowed transition-all">
                                         <i data-lucide="lock" class="mr-2 w-4 h-4"></i> Badge Locked
                                     </button>
                                 </div>
@@ -1783,75 +1782,15 @@
 
             const badgeBtn = document.getElementById('download-badge-btn');
             if(badgeBtn) {
-                badgeBtn.disabled = false;
-                badgeBtn.innerHTML = '<i data-lucide="download" class="mr-2 w-4 h-4"></i> Download Badge';
+                badgeBtn.disabled = true;
+                badgeBtn.innerHTML = '<i data-lucide="check-circle" class="mr-2 w-4 h-4"></i> Certification Unlocked';
                 badgeBtn.classList.remove('bg-gray-300', 'cursor-not-allowed');
-                badgeBtn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg', 'animate-pulse');
+                badgeBtn.classList.add('bg-emerald-100', 'text-emerald-700', 'border', 'border-emerald-200', 'cursor-default');
             }
             
             if(window.lucide) window.lucide.createIcons();
             if(window.sfx) window.sfx.success(); 
         }
-
-        window.getBadgeSVG = (nameText, dateText) => {
-            return `
-            <svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-                <defs><pattern id="smallGrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E0E0E0" stroke-width="2"/></pattern></defs>
-                <rect width="100%" height="100%" fill="#F7F7F7"/>
-                <rect width="100%" height="100%" fill="url(#smallGrid)"/>
-                <rect x="30" y="30" width="1140" height="740" rx="20" ry="20" fill="none" stroke="#D34716" stroke-width="12"/>
-                <text x="600" y="120" font-family="Georgia, serif" font-weight="bold" font-size="48" fill="#357889" text-anchor="middle" letter-spacing="2">ALLGOOD ACADEMY</text>
-                <text x="600" y="170" font-family="Verdana, sans-serif" font-size="20" fill="#4C4C4C" text-anchor="middle" letter-spacing="6">ARCHITECT OF SELF</text>
-                <line x1="300" y1="200" x2="900" y2="200" stroke="#D34716" stroke-width="4"/>
-                <g transform="translate(600, 420)">
-                    <circle cx="0" cy="0" r="160" fill="white" stroke="#357889" stroke-width="6"/>
-                    <g transform="scale(3.5) translate(-12, -12)" stroke="#D34716" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-                        <circle cx="12" cy="12" r="10" />
-                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-                    </g>
-                </g>
-                <g transform="translate(600, 680)">
-                    <text x="0" y="0" font-family="Verdana, sans-serif" font-size="24" fill="#357889" text-anchor="middle" font-weight="bold">${nameText}</text>
-                    <text x="0" y="40" font-family="Verdana, sans-serif" font-size="18" fill="#757575" text-anchor="middle">CERTIFIED: ${dateText}</text>
-                </g>
-                <text x="600" y="760" font-family="Georgia, serif" font-style="italic" font-size="16" fill="#4C4C4C" text-anchor="middle">"Life begins when you stop running from yourself."</text>
-            </svg>`;
-        };
-
-        window.downloadBadge = function() {
-            if (currentPage < totalPages - 1) { alert("You must complete the entire module to unlock this badge."); return; }
-
-            const nameText = (window.currentUserName || "LEARNER").toUpperCase();
-            const dateText = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).toUpperCase();
-            const badgeSVG = window.getBadgeSVG(nameText, dateText);
-
-            if(window.SessionManager) {
-                window.SessionManager.log('Mission_Complete', 'Badge_Downloaded', { 
-                    completed: true,
-                    badgeArtifact: badgeSVG,
-                    progress: 100 
-                });
-            }
-
-            const blob = new Blob([badgeSVG], {type: 'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Allgood-ArchitectOfSelf-${nameText}.svg`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            const btn = document.getElementById('download-badge-btn');
-            if(btn) {
-                btn.innerHTML = '<i data-lucide="check" class="mr-2 w-4 h-4"></i> Badge Saved';
-                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover', 'animate-pulse');
-                btn.classList.add('bg-green-600', 'hover:bg-green-700');
-                if(window.lucide) window.lucide.createIcons();
-            }
-            if(window.sfx) window.sfx.success();
-        };
 
         // --- PAGE 19: TOOLKIT LOGIC ---
         const toolData = {

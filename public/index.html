@@ -67,8 +67,6 @@
         let unsubscribeIntel = null; // NEW: Intel Listener
         
         window.allModuleElements = {};
-        // GLOBAL REGISTRY FOR LIVE SVG ASSETS
-        window.userEarnedBadges = {};
 
         // --- TEACHER / STUDENT ROLE STATE ---
         function generateClassroomCode() {
@@ -100,17 +98,16 @@
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
 
         // Given one student's fetched game_scores docs, work out their status for a specific
-        // registry module, plus the real badge artifact if one was earned (every module stores
-        // its actual certificate SVG under `badgeArtifact` or `badgeSVG` on the winning doc).
+        // registry module.
         function computeModuleStatus(moduleId, scoreDocs) {
             const mod = getModuleById(moduleId);
-            if (!mod) return { status: 'not_started', badgeSvg: null };
+            if (!mod) return { status: 'not_started' };
             let sawAttempt = false;
             for (const data of scoreDocs) {
                 if (!mod.gameNames.includes(data.gameName)) continue;
                 sawAttempt = true;
                 if (mod.isComplete(data)) {
-                    return { status: 'completed', badgeSvg: data.badgeArtifact || data.badgeSVG || null };
+                    return { status: 'completed' };
                 }
             }
             return { status: sawAttempt ? 'in_progress' : 'not_started', badgeSvg: null };
@@ -776,9 +773,6 @@
                 
                 // Set to track which modules are done in this snapshot
                 const completedModules = new Set();
-                
-                // Reset user badges cache on update
-                window.userEarnedBadges = {};
 
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -788,22 +782,12 @@
                     if (gameName === "Digital Decisions Challenge" && typeof data.finalScore === 'number') {
                         hasDDCAttempt = true;
                         if (data.finalScore > maxDDCScore) maxDDCScore = data.finalScore;
-                        
-                        // Check for SVG Asset
-                        if (data.badgeSVG) {
-                            window.userEarnedBadges['cyber'] = data.badgeSVG;
-                        }
                     }
 
                     // 2. Jolene's Lemonade Logic (Explicit completion flag OR Score Safety Net)
                     if (gameName === "Jolene's Lemonade" || gameName === "Jolenes Lemonade Challenge") {
                          if (data.complete === true || (typeof data.finalScore === 'number' && data.finalScore >= 800)) {
                              isJLCComplete = true;
-                         }
-                         
-                         // Check for SVG Asset
-                         if (data.badgeSVG) {
-                             window.userEarnedBadges['entrepreneur'] = data.badgeSVG;
                          }
                     }
 
@@ -816,40 +800,20 @@
                         if (gameName === "AI Co-Pilot") {
                             completedModules.add("The AI Co-Pilot");
                         }
-                        
+
                         // FIX: Normalization for "Rage Revenue"
                         if (gameName === "Rage Revenue") {
                             completedModules.add("Rage Revenue");
                         }
-                        
+
                         // FIX: Normalization for "Finding Yourself"
                         if (gameName === "Jodi's Schoolhouse: Finding Yourself") {
                             completedModules.add("Finding Yourself");
                         }
-                        
+
                         // FIX: Normalization for "Conflict Resolution"
                         if (gameName === "Conflict Resolution Challenge") {
                             completedModules.add("Conflict Resolution");
-                        }
-                        
-                        // 3a. Identity Guardian Asset Logic
-                        if (gameName === "Your Digital Identity" && data.badgeSVG) {
-                            window.userEarnedBadges['identity'] = data.badgeSVG;
-                        }
-
-                        // 3b. Digital Asset Defense Logic (NEW)
-                        if (gameName === "Digital Asset Defense" && data.badgeSVG) {
-                            window.userEarnedBadges['defense'] = data.badgeSVG;
-                        }
-
-                        // 3c. Finding Yourself Asset Logic (NEW)
-                        if (gameName === "Jodi's Schoolhouse: Finding Yourself" && data.badgeSVG) {
-                            window.userEarnedBadges['finding'] = data.badgeSVG;
-                        }
-                        
-                        // Future proofing: Generic badge storage logic could go here
-                        if (data.badgeSVG && gameName === "Airport Navigator") {
-                             window.userEarnedBadges['operator'] = data.badgeSVG; // Example mapping
                         }
                     }
                 });
@@ -1104,9 +1068,6 @@
             iconContainer.innerHTML = largeIconHtml;
             lucide.createIcons();
 
-            // LOGIC CHECK FOR ASSET
-            const svgUrl = window.userEarnedBadges && window.userEarnedBadges[type];
-
             if (finalUnlocked) {
                 // UNLOCKED STATE
                 detailsStatus.textContent = "STATUS: VERIFIED";
@@ -1114,25 +1075,13 @@
                 statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
                 iconContainer.className = "w-24 h-24 mx-auto mb-6 rounded-full bg-orange-50 border-4 border-orange-100 flex items-center justify-center shadow-md scale-110 transition-all duration-300";
 
-                if (svgUrl) {
-                    // ASSET AVAILABLE
-                    actionBtn.disabled = false;
-                    actionBtn.className = "w-full bg-allgood-secondary hover:bg-allgood-accent text-white font-bold py-4 rounded shadow-md transition-all uppercase text-xs flex items-center justify-center gap-2 transform active:scale-95";
-                    actionText.textContent = "Download Badge";
-                    actionBtn.onclick = () => window.viewOrDownloadBadge(type);
-                    
-                    subtext.style.opacity = "1";
-                    subtext.textContent = "Secure asset available for retrieval.";
-                } else {
-                    // ASSET PENDING
-                    actionBtn.disabled = true;
-                    actionBtn.className = "w-full bg-slate-200 text-slate-400 font-bold py-4 rounded shadow-none transition-all uppercase text-xs flex items-center justify-center gap-2 cursor-not-allowed";
-                    actionText.textContent = "Digital Asset Pending";
-                    actionBtn.onclick = null;
-                    
-                    subtext.style.opacity = "1";
-                    subtext.textContent = "No downloadable asset found.";
-                }
+                actionBtn.disabled = true;
+                actionBtn.className = "w-full bg-emerald-100 text-emerald-700 font-bold py-4 rounded shadow-none transition-all uppercase text-xs flex items-center justify-center gap-2 cursor-default border border-emerald-200";
+                actionText.textContent = "Badge Earned";
+                actionBtn.onclick = null;
+
+                subtext.style.opacity = "1";
+                subtext.textContent = "This badge is in your dossier.";
             } else {
                 // LOCKED STATE
                 detailsStatus.textContent = "STATUS: LOCKED";
@@ -1150,63 +1099,6 @@
             }
             
             sfx.click();
-        }
-        
-        window.viewOrDownloadBadge = (type) => {
-            sfx.confirm();
-            
-            const btn = document.getElementById('btn-badge-action');
-            const originalText = document.getElementById('badge-action-text').textContent;
-            // Rename variable for clarity: it might be a URL or Content
-            const assetData = window.userEarnedBadges[type];
-            
-            if(!assetData) {
-                console.error("No asset data found for", type);
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Retrieving...`;
-            lucide.createIcons();
-            
-            setTimeout(() => {
-                // Success state
-                btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Asset Retrieved`;
-                lucide.createIcons();
-                
-                // DETECT: Is this a raw SVG string or a URL?
-                // Robust check: look for svg tags anywhere, incase of leading chars/quotes
-                if (typeof assetData === 'string' && assetData.includes('<svg') && assetData.includes('</svg>')) {
-                    
-                    // Cleanup: If the string is accidentally wrapped in quotes from data entry, strip them
-                    let content = assetData.trim();
-                    if (content.startsWith('"') && content.endsWith('"')) {
-                        content = content.slice(1, -1);
-                    }
-
-                    // It is raw code. Convert to a downloadable file blob.
-                    const blob = new Blob([content], { type: 'image/svg+xml' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    // Create invisible link to force download
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `AllgoodAcademy_${type}_Badge.svg`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                } else {
-                    // It is a standard URL. Open normally.
-                    window.open(assetData, '_blank');
-                }
-                
-                setTimeout(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = `<i data-lucide="download" class="w-4 h-4"></i> <span id="badge-action-text">${originalText}</span>`;
-                    lucide.createIcons();
-                }, 2000);
-            }, 1000);
         }
         
         window.openBadgeCollection = () => {
@@ -1545,7 +1437,7 @@
             rosterBody.innerHTML = '';
             filtered.forEach(r => {
                 const completedCount = Object.values(r.moduleStatuses).filter(m => m.status === 'completed').length;
-                const hasAnyBadge = Object.values(r.moduleStatuses).some(m => m.badgeSvg);
+                const hasAnyBadge = Object.values(r.moduleStatuses).some(m => m.status === 'completed');
                 const initials = (r.name || 'St').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
                 const progressLabel = `${completedCount}/${assignedCount} Complete`;
                 const progressClass = completedCount === assignedCount ? 'bg-emerald-100 text-emerald-700' : (completedCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500');

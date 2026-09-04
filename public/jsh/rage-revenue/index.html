@@ -120,23 +120,22 @@
             } catch (e) { console.error("DB Error", e); }
         };
 
-        window.logModuleCompletion = async (badgeSVGString) => {
+        window.logModuleCompletion = async () => {
             const user = auth.currentUser;
             if (!user) return;
-            
+
             console.log("[DB] Logging Completion Signal");
 
             const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
-            
+
             // Option 3: Full Audit Payload
             // We assume middleware choices and reflection have been logged incrementally.
             // This final call seals the "Completed" status.
             await setDoc(sessionRef, {
-                gameName: "Rage Revenue", 
+                gameName: "Rage Revenue",
                 completed: true,  // Explicit Signal
-                finalScore: 100, 
+                finalScore: 100,
                 rank: "Middleware Architect",
-                badgeArtifact: badgeSVGString, 
                 lastUpdated: serverTimestamp(),
                 user: { uid: user.uid, displayName: window.currentUserName }
             }, { merge: true });
@@ -973,7 +972,7 @@
                                     <div id="badge-display" class="w-48 h-48 mb-4 transition-transform hover:scale-105 cursor-pointer"></div>
                                     <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-1">Middleware Architect</h2>
                                     <p class="text-xs text-gray-500 mb-4">You have designed a sustainable alternative to the rage economy.</p>
-                                    <button onclick="window.downloadBadge()" id="download-badge-btn" disabled class="bg-gray-300 text-white px-8 py-3 rounded-full font-bold shadow-none flex items-center cursor-not-allowed transition-all">
+                                    <button onclick="window.claimCertification()" id="download-badge-btn" disabled class="bg-gray-300 text-white px-8 py-3 rounded-full font-bold shadow-none flex items-center cursor-not-allowed transition-all">
                                         <i data-lucide="lock" class="mr-2 w-4 h-4"></i> Badge Locked
                                     </button>
                                 </div>
@@ -1712,79 +1711,19 @@
             }
         }
 
-        window.downloadBadge = function() {
-            const nameText = (window.currentUserName || "LEARNER").toUpperCase();
-            const dateText = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).toUpperCase();
+        window.claimCertification = function() {
+            // Seals completion in Firestore (no downloadable artifact anymore).
+            window.logModuleCompletion();
 
-            // SVG Badge Code
-            const badgeSVG = `
-            <svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <pattern id="smallGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E0E0E0" stroke-width="2"/>
-                    </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="#F7F7F7"/>
-                <rect width="100%" height="100%" fill="url(#smallGrid)"/>
-                
-                <!-- Main Border -->
-                <rect x="30" y="30" width="1140" height="740" rx="20" ry="20" fill="none" stroke="#D34716" stroke-width="12"/>
-                
-                <!-- Academy Title -->
-                <text x="600" y="120" font-family="Georgia, serif" font-weight="bold" font-size="48" fill="#357889" text-anchor="middle" letter-spacing="2">ALLGOOD ACADEMY</text>
-                <text x="600" y="170" font-family="Verdana, sans-serif" font-size="20" fill="#4C4C4C" text-anchor="middle" letter-spacing="6">MIDDLEWARE ARCHITECT</text>
-                
-                <line x1="300" y1="200" x2="900" y2="200" stroke="#D34716" stroke-width="4"/>
-
-                <!-- Main Icon / Graphic -->
-                <g transform="translate(600, 420)">
-                    <circle cx="0" cy="0" r="160" fill="white" stroke="#357889" stroke-width="6"/>
-                    <!-- Server / Filter Icon -->
-                    <g transform="scale(6) translate(-12, -12)" stroke="#D34716" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-                        <line x1="6" y1="6" x2="6.01" y2="6" />
-                        <line x1="6" y1="18" x2="6.01" y2="18" />
-                    </g>
-                </g>
-
-                <!-- Certification Details -->
-                <g transform="translate(600, 680)">
-                    <text x="0" y="0" font-family="Verdana, sans-serif" font-size="24" fill="#357889" text-anchor="middle" font-weight="bold">${nameText}</text>
-                    <text x="0" y="40" font-family="Verdana, sans-serif" font-size="18" fill="#757575" text-anchor="middle">CERTIFIED: ${dateText}</text>
-                </g>
-                
-                <!-- Footer Quote -->
-                <text x="600" y="760" font-family="Georgia, serif" font-style="italic" font-size="16" fill="#4C4C4C" text-anchor="middle">"Building the filter to find the signal."</text>
-            </svg>`;
-
-            // Render to Display (Preview)
-            const badgeDisplay = document.getElementById('badge-display');
-            if(badgeDisplay) badgeDisplay.innerHTML = badgeSVG;
-
-            // Save artifact to Firestore
-            window.logModuleCompletion(badgeSVG);
-
-            // Trigger File Download
-            const blob = new Blob([badgeSVG], {type: 'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Allgood-MiddlewareArchitect-${nameText}.svg`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            // Update Button State
             const btn = document.getElementById('download-badge-btn');
             if(btn) {
-                btn.innerHTML = '<i data-lucide="check" class="mr-2 w-4 h-4"></i> Badge Saved';
-                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
-                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                btn.disabled = true;
+                btn.innerHTML = '<i data-lucide="check-circle" class="mr-2 w-4 h-4"></i> Certification Unlocked';
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover', 'animate-pulse');
+                btn.classList.add('bg-emerald-100', 'text-emerald-700', 'border', 'border-emerald-200', 'cursor-default');
                 if(window.lucide) window.lucide.createIcons();
             }
-            
+
             if(window.sfx && window.sfx.success) window.sfx.success();
         }
         
@@ -1830,7 +1769,7 @@
             const badgeBtn = document.getElementById('download-badge-btn');
             if(badgeBtn) {
                 badgeBtn.disabled = false;
-                badgeBtn.innerHTML = '<i data-lucide="download" class="mr-2 w-4 h-4"></i> Download Badge';
+                badgeBtn.innerHTML = '<i data-lucide="award" class="mr-2 w-4 h-4"></i> Claim Certification';
                 badgeBtn.classList.remove('bg-gray-300', 'cursor-not-allowed');
                 badgeBtn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg', 'animate-pulse');
             }
