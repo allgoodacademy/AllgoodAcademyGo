@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Conflict Resolution Challenge GoodBlock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- FIREBASE AND AUTHENTICATION SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        // 1. CONFIGURATION
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
+            authDomain: "allgood-academy.firebaseapp.com",
+            projectId: "allgood-academy",
+            storageBucket: "allgood-academy.firebasestorage.app",
+            messagingSenderId: "978829044870",
+            appId: "1:978829044870:web:6c780f64230a77ad0ab507"
+        };
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'allgood-academy'; 
+        
+        // 2. INITIALIZE SERVICES
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Expose signOut for Log Out function
+        window.authSignOut = () => signOut(auth);
+
+        // 3. GLOBAL STATE
+        window.currentUser = null;
+        window.currentUserName = "Anonymous";
+        window.currentUserEmail = "";
+        window.isAuthReady = false;
+        
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+        console.log("[System] Session ID generated:", window.sessionId);
+
+        // 4. AUTH HANDLER
+        onAuthStateChanged(auth, async (user) => {
+            window.isAuthReady = true;
+            if (user) {
+                console.log("[Auth] User detected:", user.uid);
+                window.currentUser = user;
+                
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Agent Learner";
+                
+                if (finalName === "Agent Learner") {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists()) {
+                            finalName = userDoc.data().displayName || finalName;
+                        }
+                    } catch(e) { console.log("Profile fetch skipped", e); }
+                }
+
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                
+                window.updateUserDisplay(finalName);
+                
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                    if(window.logFinalScoreToFirestore) {
+                        window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+                    }
+                }
+            } else {
+                console.log("[Auth] No user signed in.");
+                window.currentUser = null;
+                window.updateUserDisplay("Agent Learner");
+            }
+        });
+
+        // 5. IDENTITY ENGINE
+        async function ensureUserContainer(user, name, email, isGuest) {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             try {
+                 await setDoc(userRef, {
+                     displayName: name,
+                     email: email || (isGuest ? null : user.email || null),
+                     isGuest: isGuest,
+                     lastLogin: serverTimestamp(),
+                     lastActiveModule: "Conflict Resolution Challenge"
+                 }, { merge: true });
+                 console.log("[Identity] User container verified/created.");
+             } catch (e) {
+                 console.error("[Identity] Failed to create user container:", e);
+             }
+        }
+
+        // 6. DATABASE LOGGING ENGINE
+        window.logScenarioAttempt = async (data) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            const attemptRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'scenario_attempts', `scenario_${data.scenarioIndex}`);
+            try {
+                await setDoc(attemptRef, {
+                    ...data,
+                    timestamp: serverTimestamp()
+                });
+                console.log(`[DB] Saved Attempt ${data.scenarioIndex}`);
+            } catch (e) { console.error("Attempt log failed", e); }
+        };
+
+        window.logFinalScoreToFirestore = async (scoreData) => {
+            const user = auth.currentUser;
+            if (!user) {
+                console.warn("[DB] Skipping write - No User");
+                return;
+            }
+            console.log(`[DB] Writing Session Data...`);
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            try {
+                await setDoc(sessionRef, {
+                    gameName: "Conflict Resolution Challenge",
+                    ...scoreData,
+                    lastUpdated: serverTimestamp(),
+                    user: {
+                        uid: user.uid,
+                        displayName: window.currentUserName,
+                        email: window.currentUserEmail
+                    }
+                }, { merge: true });
+                console.log(`[DB] Session Write Success.`);
+            } catch (e) { console.error("[DB] Session Write Failed", e); }
+        }
+
+        // 7. LOGIN FUNCTIONS
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            
+            const originalText = btn.innerText;
+            btn.innerText = "Connecting...";
+            btn.disabled = true;
+
+            try {
+                let user;
+                if (auth.currentUser && auth.currentUser.isAnonymous) {
+                    user = auth.currentUser;
+                } else if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                    user = auth.currentUser;
+                } else {
+                    const result = await signInAnonymously(auth);
+                    user = result.user;
+                }
+                
+                const displayName = nameInput || "Agent Learner";
+                await updateProfile(user, { displayName: displayName });
+                await ensureUserContainer(user, displayName, emailInput, true);
+                
+                window.currentUserName = displayName;
+                window.currentUserEmail = emailInput;
+
+                localStorage.setItem('aa_username', displayName);
+                localStorage.setItem('aa_email', emailInput);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'true');
+                
+                window.updateUserDisplay(displayName);
+                window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+
+            } catch (error) {
+                console.error("Login Failed", error);
+                alert("Connection failed. Please try again.");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        window.handleGoogleLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            const btnContainer = document.getElementById('google-icon-container');
+            if(btnContainer) btnContainer.classList.add('opacity-50', 'pointer-events-none');
+
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                const finalName = user.displayName || "Agent";
+                
+                await ensureUserContainer(user, finalName, user.email, false);
+                
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+
+                localStorage.setItem('aa_username', finalName);
+                localStorage.setItem('aa_email', user.email);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'false');
+                
+                window.updateUserDisplay(finalName);
+                
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+            } catch (error) {
+                console.error("Google Sign-In Error", error);
+                alert("Google Sign-In failed. Please try again.");
+            } finally {
+                 if(btnContainer) btnContainer.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        };
+        
+        window.auth = auth;
+        window.db = db;
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                        'mono': ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body { 
+            font-family: Verdana, sans-serif; 
+            background-color: #1a1a1a; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 0;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        input, textarea {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        h1, h2, h3, h4 { font-family: Georgia, serif; }
+
+        .tablet-frame {
+            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
+        }
+        .tablet-frame::before {
+            content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+            border-radius: 6px; background: #111; z-index: 0;
+        }
+        .screen-container {
+            width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1;
+            overflow: hidden; display: flex; flex-direction: column; border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .page::-webkit-scrollbar { width: 14px; }
+        .page::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        .page::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
+
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        .choice-btn { background-color: #FFFFFF; border: 2px solid #E5E7EB; transition: all 0.2s ease; }
+        .choice-btn:hover:not(:disabled) { border-color: #357889; background-color: #F9FAFB; }
+        
+        .navbar-content { flex: 0 0 60px; z-index: 50; }
+        .footer-content { flex: 0 0 60px; z-index: 50; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
+        .page.active { display: block; }
+
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        
+        /* EXPANDED MODE */
+        .tablet-frame.expanded-mode {
+            position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            max-width: none !important; max-height: none !important; aspect-ratio: unset !important;
+            margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important;
+            z-index: 9999 !important; background: #F7F7F7 !important; box-shadow: none !important;
+        }
+        .tablet-frame.expanded-mode::before { display: none !important; }
+        .tablet-frame.expanded-mode .screen-container { border-radius: 0 !important; }
+
+        @media (max-width: 768px) {
+            html, body { position: fixed; width: 100%; height: 100dvh; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            main { padding: 0 !important; height: 100dvh !important; width: 100% !important; display: block; position: fixed; top: 0; left: 0; }
+            .tablet-frame {
+                position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100% !important; height: 100% !important;
+                max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important;
+                border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #F7F7F7 !important;
+                aspect-ratio: unset !important; transform: none !important;
+            }
+            .tablet-frame::before { display: none !important; }
+            .screen-container {
+                width: 100%; height: 100%; border-radius: 0 !important; box-shadow: none !important;
+                display: flex; flex-direction: column; background: #F7F7F7; overflow: hidden; position: relative;
+            }
+            header.navbar-content { padding-top: max(env(safe-area-inset-top), 12px); height: auto; min-height: 60px; padding-bottom: 12px; }
+            footer.footer-content {
+                position: absolute; bottom: 0; left: 0; width: 100%; padding-bottom: max(env(safe-area-inset-bottom), 20px);
+                padding-top: 12px; height: auto; min-height: 80px; z-index: 100; background-color: white; border-top: 1px solid #e5e7eb;
+            }
+            .page { padding-bottom: 120px !important; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-0 md:py-8 h-[100dvh] w-full">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-slate-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative">
+                                <div class="absolute inset-0 bg-white/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <h2 class="text-xl md:text-3xl font-heading font-bold text-white mb-1 relative z-10">Allgood Academy</h2>
+                                <h1 class="text-3xl md:text-5xl font-heading font-bold text-allgood-primary tracking-tighter relative z-10 drop-shadow-md">Conflict Resolution</h1>
+                                <p class="mt-2 text-white/80 relative z-10 font-body text-sm font-semibold">Interactive Challenge</p>
+                            </div>
+                            <p class="mt-12 text-white/80 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-white transition-colors animate-pulse font-body">Click to Power Up</p>
+                        </div>
+                        <div class="absolute bottom-10 w-full text-center">
+                            <p class="text-white/40 text-xs font-body tracking-wide">Powered by the <span class="text-white/60 font-bold">Allgood Academy</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. LOGIN MODAL -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 font-body leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged in real-time to improve the GoodBlock experience. All personal data is kept confidential and never sold.</p>
+                                    <div class="border-t border-gray-700 my-1 pt-1"></div>
+                                    <p class="text-gray-300"><strong>Email (Optional):</strong> Enter to join the Allgood Academy community.</p>
+                                </div>
+                            </button>
+                        </div>
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Start Challenge</button>
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. HEADER -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Conflict Resolution</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 33</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <!-- UPDATED: Visible only on MD+ screens (768px) to match Frame visibility -->
+                            <button id="fullscreen-toggle" class="hidden md:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- 4. MODALS -->
+                <div id="scenario-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-4 modal-transition" onclick="window.closeScenarioModal(false)">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center relative border-t-4 border-allgood-secondary" onclick="event.stopPropagation()">
+                        <div id="scenario-icon" class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl transition-colors"></div>
+                        <h3 id="scenario-title" class="text-xl font-heading font-bold text-allgood-dark mb-2"></h3>
+                        <div id="scenario-feedback" class="text-sm text-gray-600 font-body mb-6 leading-relaxed text-left"></div>
+                        <button id="scenario-modal-next-btn" class="bg-allgood-dark text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-allgood-primary transition-colors shadow-md">Next Scenario</button>
+                    </div>
+                </div>
+
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Table of Contents</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                    </div>
+                </div>
+
+                <!-- 5. System Menu Modal -->
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4">
+                            <i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i>
+                        </div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">Select an option to proceed.</p>
+                        
+                        <div class="space-y-3">
+                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out
+                            </button>
+                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard
+                            </button>
+                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --- PAGES --- -->
+                <div class="page active" id="page-1">
+                    <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-12">
+                        <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">The <span class="text-allgood-primary">Conflict Resolution</span> Challenge</h1>
+                        <div class="w-full max-w-lg text-left mx-auto">
+                            <div class="w-full bg-allgood-secondary/10 border-2 border-allgood-secondary p-6 rounded-xl shadow-lg mb-8 flex items-center justify-center space-x-4">
+                                <i data-lucide="shield" class="w-12 h-12 text-allgood-secondary"></i>
+                                <i data-lucide="heart-handshake" class="w-12 h-12 text-allgood-primary"></i>
+                                <i data-lucide="users" class="w-12 h-12 text-allgood-secondary"></i>
+                            </div>
+                            <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                <i data-lucide="chevron-down" class="accordion-icon w-5 h-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary"></i>
+                            </button>
+                            <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
+                                <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600 shrink-0"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                    <!-- UPDATED: Hidden on Mobile to match button visibility -->
+                                    <div class="hidden md:flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600 shrink-0"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark shrink-0"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 2: Welcome -->
+                <div class="page" id="page-2">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark mb-2">Welcome & Mission Briefing</h2></section>
+                    <div class="bg-white p-6 rounded border border-gray-200 shadow-sm leading-relaxed text-gray-700 text-lg" id="welcome-content">
+                        <p class="mb-6">Welcome to the <strong>Conflict Resolution Challenge</strong>. This challenge helps you practice handling disagreements and difficult situations with empathy and purpose. Learn to turn conflict into collaboration.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-center text-sm">
+                            <div class="p-3 border rounded-lg bg-gray-50 border-gray-200"><i data-lucide="handshake" class="w-6 h-6 mx-auto text-allgood-secondary mb-2"></i><strong class="text-allgood-dark">Purposeful Action</strong><p class="text-xs text-gray-500">Move from passive reaction to active resolution.</p></div>
+                            <div class="p-3 border rounded-lg bg-gray-50 border-gray-200"><i data-lucide="shield-check" class="w-6 h-6 mx-auto text-allgood-primary mb-2"></i><strong class="text-allgood-dark">Pragmatic Leadership</strong><p class="text-xs text-gray-500">Solve the real problem, not just the drama.</p></div>
+                        </div>
+                        <div class="bg-gray-100 p-4 rounded border-l-4 border-allgood-primary shadow-sm mb-6">
+                            <h3 class="font-bold text-allgood-dark text-lg mb-2">Challenge Rules</h3>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>The challenge consists of <strong>30 Scenarios</strong>.</li>
+                                <li>You earn <strong>3 points</strong> for the <strong>MOST-EFFECTIVE</strong> choice.</li>
+                                <li><strong>Badge Requirement:</strong> Score <strong>80 points or higher</strong>.</li>
+                            </ul>
+                        </div>
+                        <p class="mt-6 font-bold text-allgood-secondary">Ready to test your judgment? Let's begin.</p>
+                    </div>
+                </div>
+
+                <!-- Dynamic Scenario Pages (3-32) -->
+                <div class="page" id="page-3" data-scenario-index="1"></div>
+                <div class="page" id="page-4" data-scenario-index="2"></div>
+                <div class="page" id="page-5" data-scenario-index="3"></div>
+                <div class="page" id="page-6" data-scenario-index="4"></div>
+                <div class="page" id="page-7" data-scenario-index="5"></div>
+                <div class="page" id="page-8" data-scenario-index="6"></div>
+                <div class="page" id="page-9" data-scenario-index="7"></div>
+                <div class="page" id="page-10" data-scenario-index="8"></div>
+                <div class="page" id="page-11" data-scenario-index="9"></div>
+                <div class="page" id="page-12" data-scenario-index="10"></div>
+                <div class="page" id="page-13" data-scenario-index="11"></div>
+                <div class="page" id="page-14" data-scenario-index="12"></div>
+                <div class="page" id="page-15" data-scenario-index="13"></div>
+                <div class="page" id="page-16" data-scenario-index="14"></div>
+                <div class="page" id="page-17" data-scenario-index="15"></div>
+                <div class="page" id="page-18" data-scenario-index="16"></div>
+                <div class="page" id="page-19" data-scenario-index="17"></div>
+                <div class="page" id="page-20" data-scenario-index="18"></div>
+                <div class="page" id="page-21" data-scenario-index="19"></div>
+                <div class="page" id="page-22" data-scenario-index="20"></div>
+                <div class="page" id="page-23" data-scenario-index="21"></div>
+                <div class="page" id="page-24" data-scenario-index="22"></div>
+                <div class="page" id="page-25" data-scenario-index="23"></div>
+                <div class="page" id="page-26" data-scenario-index="24"></div>
+                <div class="page" id="page-27" data-scenario-index="25"></div>
+                <div class="page" id="page-28" data-scenario-index="26"></div>
+                <div class="page" id="page-29" data-scenario-index="27"></div>
+                <div class="page" id="page-30" data-scenario-index="28"></div>
+                <div class="page" id="page-31" data-scenario-index="29"></div>
+                <div class="page" id="page-32" data-scenario-index="30"></div>
+
+                <!-- Page 33: Final Score -->
+                <div class="page" id="page-33">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark mb-2">Final Readiness Assessment</h2><p class="text-xs font-bold text-allgood-primary uppercase tracking-widest">Your Conflict Resolution Score</p></section>
+                    <div id="final-score-content">
+                        <div class="text-center py-8">
+                            <div class="w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-lg shadow-inner border border-gray-200 mb-8">
+                                <p class="text-sm font-semibold text-gray-500 mb-1">Total Score</p>
+                                <p id="final-score-value" class="text-5xl font-extrabold text-allgood-dark font-heading">0 / 90</p>
+                                <p id="final-score-percent" class="text-xs text-gray-400 mt-1">(0% Effectiveness)</p>
+                            </div>
+                            <h3 id="final-rank-heading" class="text-xl font-heading font-bold text-allgood-dark mb-2">Learner</h3>
+                            <p id="final-rank-message" class="text-sm text-gray-600 max-w-md mx-auto mb-16">Good start. Reread the feedback and try again.</p>
+                            
+                            <p class="text-sm font-bold text-allgood-primary mb-3">Your score is final. Now, let us know how we did.</p>
+
+                            <!-- FEEDBACK SECTION -->
+                            <div id="feedback-container" class="w-full max-w-md mx-auto bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-12 text-left relative">
+                                <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this GoodBlock</h3>
+                                <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                    <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                </div>
+                                <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback sharpens our tools. What worked? What didn't?</label>
+                                <textarea id="feedback-text" rows="3" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50" placeholder="Optional: Share your thoughts..."></textarea>
+                                <button onclick="window.submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm">Send Feedback</button>
+                            </div>
+                            <div id="feedback-success" class="hidden w-full max-w-md mx-auto bg-green-50 p-6 rounded-lg shadow-inner border border-green-200 mb-12 text-center">
+                                <i data-lucide="check-circle" class="w-12 h-12 text-green-600 mx-auto mb-2"></i>
+                                <h3 class="font-bold text-green-800">Feedback Received.</h3>
+                                <p class="text-xs text-green-700 mt-1">Thank you for helping us improve.</p>
+                            </div>
+
+                            <div id="certification-section" class="w-full max-w-md mx-auto bg-gradient-to-br from-allgood-secondary to-allgood-accent p-1 rounded-lg shadow-xl transform transition-all duration-700">
+                                <div class="bg-white p-6 rounded-md text-center">
+                                    <div class="mb-4 relative inline-block"><i id="badge-icon" data-lucide="award" class="relative w-16 h-16 text-allgood-primary mx-auto"></i></div>
+                                    <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Conflict Resolution Champion</h3>
+                                    <p id="cert-req-text" class="text-sm text-gray-600 mb-6">You need 80 points to achieve this certification.</p>
+                                    <button id="download-badge-btn" onclick="window.downloadBadge()" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300">
+                                        <i id="btn-icon" data-lucide="lock" class="w-4 h-4 mr-2"></i><span id="btn-text">Certification Locked</span>
+                                    </button>
+                                    <button id="retake-challenge-btn" onclick="window.performHardReset()" class="w-full bg-gray-100 text-allgood-dark font-bold py-2 rounded shadow-sm mt-4 hover:bg-gray-200 transition-colors">Retake Challenge</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <footer class="footer-content flex items-center justify-between px-4 sm:px-6 shrink-0 z-50 bg-white">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body p-2">
+                        <i data-lucide="chevron-left" class="w-6 h-6 sm:h-4 sm:w-4 sm:mr-1"></i>
+                        <span class="hidden sm:inline">Back</span>
+                    </button>
+                    
+                    <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a> <span id="current-year"></span></p>
+                    
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-4 sm:px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body">
+                        <span class="hidden sm:inline">Next</span>
+                        <i data-lucide="chevron-right" class="w-6 h-6 sm:h-4 sm:w-4 ml-0 sm:ml-1"></i>
+                    </button>
+                </footer>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Main Logic -->
+    <script>
+        // --- AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume().catch(e => console.error("Audio resume failed:", e));
+        }
+
+        function playTone(freq, type, duration, vol = 0.1, attack = 0.01, decay = 0.001) {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, now);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(vol, now + attack);
+            gain.gain.exponentialRampToValueAtTime(decay, now + duration);
+            osc.start(now); osc.stop(now + duration);
+        }
+
+        const sfx = {
+            powerOn: () => { initAudio(); const now = audioCtx.currentTime; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.type = 'triangle'; osc.frequency.setValueAtTime(110, now); osc.frequency.exponentialRampToValueAtTime(220, now + 0.4); gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.4, now + 0.1); gain.gain.linearRampToValueAtTime(0, now + 0.4); osc.start(now); osc.stop(now + 0.4); },
+            powerOff: () => { initAudio(); playTone(80, 'triangle', 0.2, 0.5, 0.01, 0.001); },
+            nav: () => { initAudio(); playTone(150, 'sine', 0.1, 0.1, 0.01, 0.01); },
+            tick: () => { initAudio(); playTone(1000, 'sine', 0.01, 0.01); }
+        };
+        window.sfx = sfx;
+        window.initAudio = initAudio;
+
+        // --- GLOBAL APP VARIABLES ---
+        let currentUserName = "Anonymous";
+        let currentPageIndex = 0; 
+        const TOTAL_PAGES = 33; 
+        const TOTAL_SCENARIOS = 30;
+        const MAX_SCORE = 90; 
+        const BADGE_THRESHOLD = 80;
+        let totalChallengeScore = 0;
+        let answeredScenarioScores = {};
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        function sanitizeText(text) {
+            if (!text) return "";
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
+        }
+
+        // NEW: Fisher-Yates shuffle algorithm (for answers)
+        function shuffleArray(array) {
+            let newArray = [...array]; // Work on a copy
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // --- HELPER FOR TABS ---
+        window.switchTab = function(btn, tabIndex, scenarioIndex) {
+            // Find the specific container for this scenario
+            // We use the ID because we generate unique IDs per scenario now
+            const container = document.getElementById(`scenario-container-${scenarioIndex}`);
+            if (!container) return;
+
+            const tab1 = document.getElementById(`tab-content-0-${scenarioIndex}`);
+            const tab2 = document.getElementById(`tab-content-1-${scenarioIndex}`);
+            const btn1 = document.getElementById(`tab-btn-0-${scenarioIndex}`);
+            const btn2 = document.getElementById(`tab-btn-1-${scenarioIndex}`);
+
+            if (tabIndex === 0) {
+                tab1.classList.remove('hidden');
+                tab2.classList.add('hidden');
+                
+                btn1.classList.add('text-allgood-primary', 'bg-white', 'border-b-2', 'border-allgood-primary');
+                btn1.classList.remove('text-slate-600', 'border-b', 'border-transparent');
+                
+                btn2.classList.remove('text-allgood-primary', 'bg-white', 'border-b-2', 'border-allgood-primary');
+                btn2.classList.add('text-slate-600', 'border-b', 'border-transparent');
+            } else {
+                tab1.classList.add('hidden');
+                tab2.classList.remove('hidden');
+                
+                btn1.classList.remove('text-allgood-primary', 'bg-white', 'border-b-2', 'border-allgood-primary');
+                btn1.classList.add('text-slate-600', 'border-b', 'border-transparent');
+                
+                btn2.classList.add('text-allgood-primary', 'bg-white', 'border-b-2', 'border-allgood-primary');
+                btn2.classList.remove('text-slate-600', 'border-b', 'border-transparent');
+            }
+            sfx.tick();
+        };
+
+        const SCENARIO_DATA = [
+            {
+                title: "You, Alex, and Jordan are in a shared Google Doc for a history project due tomorrow. You've all been working, but Alex keeps posting memes in the group chat and is behind on their section. Jordan is getting stressed and is blowing up the class Discord channel with messages like, 'Is anyone going to tell Alex to get a move on?!' Question: What's the most pragmatic way to get the project finished and keep the peace?",
+                icon: "message-square",
+                choices: [
+                    { text: "Privately message Alex: 'Hey, I see you're online. Everything okay? Let me know if you need help with your section.' Then message Jordan: 'Chill, I'm talking to them now. We'll get it sorted.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You're a proactive problem-solver. You addressed the real issue without embarrassing Alex and calmed Jordan down. People respond better when problems are handled privately." },
+                    { text: "Publicly @-mention Alex in the Discord channel, saying, 'Dude, stop posting memes and do your part! The project is due tomorrow!'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Public call-outs make people defensive, which usually makes them dig in harder. It might feel satisfying in the moment, but it's a guaranteed way to make the problem bigger." },
+                    { text: "Message Jordan back and say, 'I know, right? Alex is so lazy.' Then mute the channel.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. You've picked sides, which adds drama. Muting the chat avoids the stress for you, but it doesn't solve the project problem. You miss the opportunity to practice real-world conflict resolution." }
+                ]
+            },
+            {
+                title: "Your friend Maya posts a sarcastic Tik Tok about 'people who act like they're so busy.' Liam, another friend, comments, 'Sounds like someone didn't get invited.' A public argument starts in the comments, and their followers are getting involved. Question: How do you handle the public drama to get them to stop?",
+                icon: "users",
+                choices: [
+                    { text: "Privately DM both Maya and Liam: 'Hey, I saw the comments. Maybe you guys can talk this out one-on-one? It's not worth the public drama.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You acted like a purposeful mentor and used a private channel to suggest a solution. You didn't take sides, and you helped them save face by encouraging a private resolution." },
+                    { text: "Leave a comment on the Tik Tok with a popcorn emoji to let everyone know you're watching.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Your comment contributes to the public spectacle and endorses the drama. You are prioritizing entertainment over friendship." },
+                    { text: "Create your own Tik Tok saying, 'It's crazy how people can't just talk things out.'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While your message is positive, a 'sub-tweet' can feel passive-aggressive and add to the confusion. A more direct approach is always better." }
+                ]
+            },
+            {
+                title: "You're in a ranked team-based game. After a bad round, Sam starts shouting into the voice chat, 'Chris, why did you go left? You threw the whole game! I'm so sick of this!' Question: What do you do to prevent the argument from ruining the rest of the game?",
+                icon: "gamepad-2",
+                choices: [
+                    { text: "In a calm voice, say, 'Hey, let's calm down. It was just one play. Let's focus on the next round and try a different strategy.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You immediately took on a leadership role and de-escalated the situation. You're a pragmatic communicator who can focus on the solution (a new strategy) instead of the problem (blaming)." },
+                    { text: "Yell back at Sam, 'Dude, it's just a game! You're the one being a sore loser!'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. You've now made yourself part of the problem. This will escalate the argument and could lead to someone rage-quitting the game." },
+                    { text: "Send a private text to Chris saying, 'Don't worry about Sam. He's just being a jerk.'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While your intent is supportive, you're creating a side conversation and taking a side. This can create a deeper rift between teammates and make it harder to communicate." }
+                ]
+            },
+            {
+                title: "You hear a rumor that your friend, Jordan, is talking badly about their best friend, Sam, on a secret Snapchat story. Sam is clearly upset and asks you if you know anything. Question: What do you do to handle the rumor and help your friends?",
+                icon: "message-square-off",
+                choices: [
+                    { text: "Tell Sam, 'I've heard stuff, but I don't know what's true. Let's go talk to Jordan together and figure this out.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You're being a true ally. You didn't spread the rumor, and you're promoting direct communication instead of gossip. This helps everyone get to the truth." },
+                    { text: "Tell Sam, 'Yeah, I heard that too. It's messed up.'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While it seems like you're being honest, you're confirming a rumor without knowing if it's true. This just adds fuel to the fire." },
+                    { text: "Say, 'I don't get involved in drama,' and walk away.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Ignoring the problem might feel safe, but it leaves your friend feeling isolated. Being a good friend sometimes means helping them navigate tough situations." }
+                ]
+            },
+            {
+                title: "You posted a picture on Instagram from a party. A friend who wasn't invited comments, 'Oh, cool. Wish I knew about that.' The comment is getting likes and other people are asking why they weren't there. Question: How do you address the comment without making things worse?",
+                icon: "camera-off",
+                choices: [
+                    { text: "Delete the comment and DM your friend: 'Hey, I'm so sorry you saw that. It was a last-minute thing. Let's hang out this week!'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You took the conversation private, which is the right move. You acknowledged their feelings, explained the situation without being defensive, and made a plan to connect." },
+                    { text: "Reply to the comment: 'It wasn't a big deal, you didn't miss anything.'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. This can sound dismissive of your friend's feelings. It minimizes their sense of being left out and can make you seem like you don't care." },
+                    { text: "Ignore the comment and hope it goes away.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Ignoring the comment can be seen as a confirmation that you intentionally excluded them. It allows the public speculation to continue and damages the friendship." }
+                ]
+            },
+            {
+                title: "In a science class group chat, one member, Taylor, keeps shooting down everyone's ideas for the project poster without offering any suggestions of their own. The mood is getting tense. Question: How do you get the group back on track?",
+                icon: "message-square",
+                choices: [
+                    { text: "Say, 'Taylor, you've got a good eye for what doesn't work. What kind of design do you think would be strong for this topic?'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You validated their contribution (being critical) but then immediately pivoted them into a constructive role. This is a leadership move that turns a critic into a collaborator." },
+                    { text: "Post in the chat, 'Well, does anyone have any ideas that Taylor WILL approve of?'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. This is passive-aggressive and puts Taylor on the spot in a negative way. It will likely make them defensive and less willing to cooperate." },
+                    { text: "Privately message another group member to complain about how difficult Taylor is being.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This creates a subgroup and contributes to drama instead of solving the actual problem. The project still needs to get done, and this doesn't help." }
+                ]
+            },
+            {
+                title: "A friend texts you a screenshot of a private conversation they had with someone else. The screenshot is being used to prove a point in an argument, but you feel uncomfortable seeing it. Question: What's the right way to respond?",
+                icon: "phone-off",
+                choices: [
+                    { text: "Say, 'Hey, I'm not really comfortable being in the middle of this or seeing private chats. Can we talk about something else?'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You clearly and respectfully stated your boundary. This shows maturity and that you're not interested in participating in gossip or drama." },
+                    { text: "Ask, 'Who else have you shown this to?'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. This question implies you're interested in the drama and how far it has spread. It doesn't address the core issue that sharing private conversations is a breach of trust." },
+                    { text: "Say nothing and change the subject.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. By not saying anything, you're silently condoning your friend's behavior. This can lead them to believe you're okay with this kind of thing in the future." }
+                ]
+            },
+            {
+                title: "You're at lunch, and a friend starts making jokes about another student's clothes. A few people are laughing nervously, but the student can clearly hear them and looks embarrassed. Question: What is the most helpful thing to do?",
+                icon: "users",
+                choices: [
+                    { text: "Pull the friend aside later and say, 'Hey, I know you were just trying to be funny, but those jokes were kind of harsh. That person looked really hurt.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You addressed the behavior privately, which prevents your friend from getting defensive. You focused on the impact of their actions, which is more effective than just calling them a jerk." },
+                    { text: "Loudly say, 'That's not cool, man. Lay off.'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While your intentions are good, a public confrontation can escalate the situation. Your friend might double down to save face, and it could turn into a bigger scene." },
+                    { text: "Say nothing, but make a point to go and talk to the student who was made fun of later.", score: 1, effectiveness: "less-effective", feedback: "This is also a good choice, but less effective at solving the root cause. Supporting the victim is important, but it doesn't address the friend's behavior. The best approach combines support with addressing the issue." }
+                ]
+            },
+            {
+                title: "You and a friend are working on a coding project together. They accidentally delete a huge chunk of your work. They start apologizing profusely, clearly panicking. Question: How do you handle the situation?",
+                icon: "bug",
+                choices: [
+                    { text: "Say, 'It's okay, take a deep breath. Let's look at the version history and see if we can restore it. It happens.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You immediately de-escalated their panic and focused on a pragmatic solution. This shows you're a collaborative and forgiving partner." },
+                    { text: "Shout, 'Are you serious?! I spent hours on that!'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Yelling will only increase their panic and won't solve the problem. It damages your relationship and makes it harder to work together." },
+                    { text: "Say, 'Just leave it, I'll fix it myself,' in an annoyed tone.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While you're taking charge, your tone shows your anger and shuts them out. It creates resentment and doesn't teach them how to fix the problem themselves in the future." }
+                ]
+            },
+            {
+                title: "A friend group has a running inside joke that you don't find funny anymore; in fact, it kind of targets you. You've been laughing along, but it's starting to bother you. Question: How do you tell them to stop without seeming overly sensitive?",
+                icon: "users",
+                choices: [
+                    { text: "The next time it happens, say in a calm, serious tone, 'Hey guys, I know you don't mean anything by it, but can we retire that joke? It's getting kind of old for me.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's direct, honest, and doesn't place blame. By saying 'I know you don't mean anything by it,' you give them the benefit of the doubt and make it easier for them to hear you." },
+                    { text: "Start making a similar joke about someone else in the group to see how they like it.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Trying to give them a 'taste of their own medicine' just creates more negativity and can easily escalate into a real conflict." },
+                    { text: "Just stop laughing and get quiet whenever they make the joke, hoping they'll get the hint.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While being passive might work eventually, it's not clear communication. Your friends might just think you're in a bad mood and not understand the real issue." }
+                ]
+            },
+            {
+                title: "You see a classmate's post on a social media forum asking for advice on a personal problem. The comments are a mix of helpful and really mean, unhelpful responses. Question: What's the best way to intervene?",
+                icon: "globe",
+                choices: [
+                    { text: "DM the classmate directly with a supportive message and maybe a link to a helpful, reliable resource.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It provides genuine support without getting into a public fight with the negative commenters. It's a purposeful and empathetic action." },
+                    { text: "Reply to the meanest comments and tell them off for being jerks.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Arguing with trolls online rarely changes their minds. It just amplifies the negativity and clogs up the post with more conflict." },
+                    { text: "Post a generic supportive comment like 'Hope things get better!'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While the sentiment is nice, it's not as impactful as a private, personal message. It's a low-effort response that doesn't provide much real help." }
+                ]
+            },
+            {
+                title: "Your roommate keeps leaving their dirty dishes in the sink for days. You've mentioned it once before, but nothing has changed. It's starting to really bother you. Question: How do you bring it up again without starting a huge fight?",
+                icon: "message-square",
+                choices: [
+                    { text: "Say, 'Hey, can we talk about the dishes for a sec? When they pile up in the sink, it makes it hard for me to cook. Can we agree to wash them within 24 hours?'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You used an 'I-statement' ('it makes it hard for me'), focused on the problem (the dishes), and proposed a specific, reasonable solution." },
+                    { text: "Start piling their dirty dishes on their bed.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is a passive-aggressive and antagonistic move that will definitely start a fight. It turns a simple problem into a personal attack." },
+                    { text: "Just start washing their dishes for them but be really loud and sigh a lot so they know you're annoyed.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. This is also passive-aggressive. It doesn't solve the long-term problem and builds resentment on both sides. Clear communication is always better." }
+                ]
+            },
+            {
+                title: "A friend excitedly shows you a new song they wrote, but you honestly don't think it's very good. They ask, 'So, what do you think? Is it a hit?' Question: How do you give feedback without crushing their spirit?",
+                icon: "message-square",
+                choices: [
+                    { text: "Say, 'It's a really cool start! I love the vibe of the chorus. Have you thought about maybe trying a different chord progression in the verse? It might make the chorus pop even more.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You used the 'feedback sandwich'-a positive, a constructive critique, and another positive. It shows you listened and are offering a helpful suggestion, not just a harsh opinion." },
+                    { text: "Say, 'Um, it's okay. Maybe don't quit your day job.'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is needlessly cruel and dismissive. It offers no constructive value and will likely damage your friendship." },
+                    { text: "Lie and say, 'Wow, this is amazing! It's totally a hit!'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While it spares their feelings in the short term, it's not actually helpful. A true friend offers gentle honesty that can help them improve." }
+                ]
+            },
+            {
+                title: "You're in a club, and two members are constantly arguing during meetings, making it impossible to get anything done. The club leader doesn't seem to know how to handle it. Question: What can you do to help the situation?",
+                icon: "users",
+                choices: [
+                    { text: "After the meeting, suggest to the leader, 'Maybe we could try using a talking stick or setting a timer for comments to make sure everyone gets heard without interruptions.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You're supporting the leader by offering a concrete, tactical solution rather than just complaining about the problem. It shows initiative and a focus on group success." },
+                    { text: "During the next argument, interrupt and say, 'Can you two please take this outside? The rest of us are trying to have a meeting.'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. Publicly calling them out can embarrass them and the leader, potentially making the conflict worse. It's better to address things more tactfully." },
+                    { text: "Start a group chat with other members to talk about how annoying the two arguers are.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This creates factions within the club and undermines the leader. It's a form of gossip that avoids solving the actual problem." }
+                ]
+            },
+            {
+                title: "Your parents read a text conversation on your phone between you and a friend and are upset about the language you used. They confront you, saying, 'We're very disappointed in how you speak.' Question: How do you respond to their concern without escalating the argument?",
+                icon: "phone-off",
+                choices: [
+                    { text: "Say, 'I understand why you're upset. That was a private conversation, and I talk differently with my friends. I'll be more mindful, but I also need to feel like I have some privacy.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You acknowledged their feelings, explained your perspective calmly, and stated your own need for privacy. It opens the door for a real conversation." },
+                    { text: "Yell, 'Why are you going through my phone?! You have no right!'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. While your feelings about privacy are valid, yelling will put them on the defensive and turn the conversation into a fight about the phone, not the underlying issues." },
+                    { text: "Say nothing, go to your room, and slam the door.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. Shutting down communication solves nothing. It leaves your parents feeling disrespected and the core issues of trust and communication unresolved." }
+                ]
+            },
+            {
+                title: "You loaned a friend your favorite hoodie. It's been two weeks, and they still haven't returned it. You see them wearing it in their latest Instagram post. Question: What's the best way to ask for it back?",
+                icon: "camera-off",
+                choices: [
+                    { text: "Text them: 'Hey! Glad you're enjoying the hoodie, it looks good on you! Could I grab it back from you sometime this week? I was hoping to wear it.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's friendly, non-accusatory, and gives them a clear, low-pressure timeline. The compliment makes the request feel less demanding." },
+                    { text: "Comment on their Instagram post: 'That's my hoodie!'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is a public call-out that can be embarrassing for your friend. It turns a simple request into a public spectacle." },
+                    { text: "Don't say anything and just hope they remember to give it back, even though you know they probably won't.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. Your friend may have honestly forgotten. By not speaking up, you risk either never getting your hoodie back or building up resentment over something that could be easily solved." }
+                ]
+            },
+            {
+                title: "You're in a Discord server for a hobby you love. A new person joins and starts asking very basic questions. An older member replies, 'Just read the FAQ, noob.' Question: How can you make the community more welcoming?",
+                icon: "message-square",
+                choices: [
+                    { text: "Publicly reply to the new person with a friendly answer to their question and say, 'Welcome to the server! Also, here's a link to the FAQ, it has tons of great info.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You were helpful, modeled a positive tone for the community, and gently corrected the other member's rudeness without starting a direct fight." },
+                    { text: "DM the rude member and tell them they're being a gatekeeper.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. Directly confronting them, even in private, might start an unnecessary argument. Your public action is more powerful because it sets a standard for the whole community." },
+                    { text: "DM the new person and say, 'Sorry about that person, some people here are jerks.'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This creates a negative first impression of the whole community. It's better to show them the community is good rather than just telling them some of it is bad." }
+                ]
+            },
+            {
+                title: "Your friend is in a new relationship and they've started canceling plans with you at the last minute to hang out with their new partner. This is the third time it's happened. Question: How do you express your feelings without making them feel guilty?",
+                icon: "message-square",
+                choices: [
+                    { text: "Say, 'Hey, I'm really happy for you and your new relationship. I also feel a little hurt when our plans get canceled last minute. Could we try to schedule something that we can stick to?'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You started with a positive, used 'I-statements' to express your feelings without blaming, and suggested a collaborative solution." },
+                    { text: "Next time they ask to hang out, say 'I don't know, are you just going to cancel on me again?'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is a passive-aggressive and guilt-inducing response that will likely start an argument instead of solving the problem." },
+                    { text: "Just stop asking them to hang out.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. This 'silent treatment' approach lets resentment build and can cause the friendship to fade away without ever addressing the actual issue." }
+                ]
+            },
+            {
+                title: "You're sharing your screen on a video call for a class presentation, and a personal or embarrassing notification pops up on your screen for everyone to see. Question: What's the best way to handle the moment?",
+                icon: "tv",
+                choices: [
+                    { text: "Briefly laugh it off and say, 'Whoops, sorry about that!' and immediately turn on your 'Do Not Disturb' mode. Then, move on with your presentation.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You acknowledged it, owned it with a bit of humor, showed you were fixing the issue, and quickly refocused. This shows confidence and professionalism." },
+                    { text: "Stop your presentation, get visibly flustered, and say 'Oh my god, I am so, so sorry, I can't believe that happened,' and apologize repeatedly.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Over-apologizing draws more attention to the notification and makes the situation more awkward for everyone. It derails the presentation completely." },
+                    { text: "Pretend nothing happened and just keep going, hoping no one noticed.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. People almost certainly noticed. Ignoring it can make the situation feel more tense or awkward. A quick, calm acknowledgment is usually the best policy." }
+                ]
+            },
+            {
+                title: "A friend keeps making 'suggestions' about your appearance (e.g., 'You should try this style,' or 'That color doesn't really work for you'). You know they mean well, but it's starting to hurt your self-confidence. Question: How do you ask them to stop?",
+                icon: "message-square",
+                choices: [
+                    { text: "Say, 'I appreciate that you're trying to help, but I'm actually happy with my style. The constant suggestions are starting to make me feel self-conscious, so I'd appreciate it if we could stop.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's polite, direct, and clearly explains the impact their words are having on you using an 'I-statement'." },
+                    { text: "Start giving them unsolicited advice about their appearance in return.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This tit-for-tat approach will only create resentment and turn a one-sided issue into a two-sided conflict." },
+                    { text: "Just start avoiding them or changing the subject whenever they bring up style.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. Avoidance is not a solution. It allows the behavior to continue unchecked and doesn't give your friend a chance to understand and change." }
+                ]
+            },
+            {
+                title: "You're in a study group, and one person is doing most of the talking, not letting anyone else contribute. They're not being mean, just overly dominant in the conversation. Question: How do you create space for others to speak?",
+                icon: "users",
+                choices: [
+                    { text: "Wait for them to pause, then say, 'That's a great point, Chris. I'm curious what Maria thinks about that,' and turn to another group member.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You validated the speaker, then skillfully redirected the conversation to someone else. It's a smooth, non-confrontational way to include others." },
+                    { text: "Interrupt them and say, 'Dude, can you let someone else talk for a second?'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is abrupt and rude. It will likely make the person feel embarrassed and defensive, killing the collaborative vibe of the group." },
+                    { text: "Just stay quiet and let them dominate the conversation, since it's easier than confronting them.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. The purpose of a study group is collaboration. By staying silent, you're letting the group fail its primary mission. It's a missed opportunity for everyone." }
+                ]
+            },
+            {
+                title: "Your teacher makes a clear mistake while explaining a concept in class. You're sure you're right, but you don't want to embarrass them. Question: How do you correct the information respectfully?",
+                icon: "users",
+                choices: [
+                    { text: "Raise your hand and frame it as a question: 'I'm a little confused. I thought I read somewhere that [the correct information]. Could you help me understand the difference?'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. This approach allows the teacher to correct themselves without feeling attacked. It's framed as your own confusion, which is a respectful and humble way to point out the error." },
+                    { text: "Shout out, 'That's wrong! It's actually [the correct information].'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. A blunt, public correction is likely to embarrass the teacher and may come across as arrogant. This can damage your relationship with them." },
+                    { text: "Say nothing in class, but go up to the teacher after class to point out the mistake privately.", score: 1, effectiveness: "less-effective", feedback: "This is also a very good option. However, correcting it in the moment (respectfully) helps the entire class learn the correct information right away." }
+                ]
+            },
+            {
+                title: "A friend is constantly texting you while you're trying to study for a big exam. You've told them you're busy, but the notifications keep coming. Question: What's the best course of action?",
+                icon: "message-square",
+                choices: [
+                    { text: "Send one final text: 'Hey, I really need to focus now. I'm putting my phone on silent and will hit you up after the exam. Good luck with your studying too!' Then, turn off notifications.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's clear, friendly, sets a firm boundary, and then you follow through by taking control of your own device. It solves the problem without any drama." },
+                    { text: "Text back, 'Can you please stop texting me? You're so annoying.'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is unnecessarily harsh and will likely start an argument, which is the opposite of what you want when you're trying to focus." },
+                    { text: "Just ignore the texts and hope they get the hint, even though the notifications are distracting you.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. Hope is not a strategy. This allows the distraction to continue, hurting your study session and building your own frustration." }
+                ]
+            },
+            {
+                title: "You've been added to a massive group chat for an event, and the notifications are constant. People are having multiple side conversations, and it's blowing up your phone. Question: How do you handle the notification overload?",
+                icon: "message-square",
+                choices: [
+                    { text: "Mute the chat. Check it once or twice a day to catch up on any important information.", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's a simple, pragmatic solution that uses the tool's features to solve the problem. You're taking control of your notifications without needing to make a scene." },
+                    { text: "Post in the chat: 'OMG can you guys SHUT UP?! Some of us are trying to live our lives.'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is rude and will likely start a massive argument in the chat, creating even more notifications and drama." },
+                    { text: "Leave the group chat without saying anything.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While it solves your notification problem, you might miss crucial information about the event. Muting is a better first step." }
+                ]
+            },
+            {
+                title: "You see someone you know from school post something on social media that is factually incorrect and potentially harmful (e.g., misinformation about health or a current event). Question: What is the most responsible way to react?",
+                icon: "share-2",
+                choices: [
+                    { text: "Privately message them with a link from a reliable source and say, 'Hey, I saw your post. I think this article has some different information that you might find interesting.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's non-confrontational and gives them a chance to correct themselves without being publicly shamed. It focuses on sharing good information, not on winning an argument." },
+                    { text: "Write a long comment on their post explaining, with sources, exactly why they are wrong and why what they posted is dangerous.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While your intentions are good, a public takedown can make someone defensive and more likely to double down on their incorrect belief. A private approach is often more persuasive." },
+                    { text: "Report the post and move on.", score: 0, effectiveness: "least-effective", feedback: "This can be a valid step, especially if the misinformation is dangerous, but it does little to help the person who posted it learn. A gentle, private correction attempt is a more educational first step." }
+                ]
+            },
+            {
+                title: "Your sports team just lost a big game. The mood in the locker room is terrible. The team captain starts blaming the goalie for the loss in front of everyone. Question: What's the best thing a teammate can do?",
+                icon: "users",
+                choices: [
+                    { text: "Step in and say, 'Hey, we win as a team and we lose as a team. One person isn't to blame. Let's talk about what we can all do better for the next game.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You're showing leadership by redirecting blame into a conversation about collective responsibility and future improvement." },
+                    { text: "Join the captain in criticizing the goalie, pointing out a specific mistake they made.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. Ganging up on a teammate is toxic and destroys team morale. It creates a culture of blame that will only lead to more losses." },
+                    { text: "Stay silent but go comfort the goalie privately after the captain is done.", score: 1, effectiveness: "less-effective", feedback: "This is a good, supportive action, but it's less effective than addressing the team dynamic in the moment. The best leaders do both: support individuals and correct a negative team culture." }
+                ]
+            },
+            {
+                title: "You're trying to organize a weekend trip with a group of friends. Everyone keeps saying they're 'down for whatever,' but no one will make a decision about where to go or what to do. Question: How do you get the group to actually make a plan?",
+                icon: "map",
+                choices: [
+                    { text: "Propose two specific, concrete options. 'Okay, how about this: Option A is hiking at Red Top Mountain on Saturday, or Option B is going to the BeltLine and getting food. We'll vote in the next hour.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You broke the decision paralysis by providing clear, limited choices and a deadline. This is a classic leadership technique to move a group from talk to action." },
+                    { text: "Get frustrated and say in the group chat, 'If no one can make a decision, I'm just going to do my own thing.'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This ultimatum comes off as passive-aggressive and can make your friends feel pressured or annoyed. It doesn't help the group come together." },
+                    { text: "Just wait for someone else to finally make a decision.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. This passive approach often leads to nothing happening at all. Sometimes a group needs one person to step up and provide a little structure." }
+                ]
+            },
+            {
+                title: "You accidentally overhear your friend telling a white lie to their parents on the phone about where they are. After they hang up, they look at you with a 'don't say anything' expression. Question: How do you handle this uncomfortable situation?",
+                icon: "users",
+                choices: [
+                    { text: "Later, in private, say, 'Hey, that seemed like a stressful conversation earlier. I'm not going to say anything, but I'm here if you want to talk about it.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. You're respecting their privacy and not judging them, while also making it clear you're a safe person to talk to. It shows you're a trustworthy and supportive friend." },
+                    { text: "Immediately say, 'Wow, I can't believe you just lied to your parents like that.'", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This is a judgmental and confrontational statement that will immediately put your friend on the defensive. It's not your place to police their relationship with their parents." },
+                    { text: "Pretend you didn't hear anything and immediately change the subject to something random.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. While it avoids immediate conflict, it also creates an awkward tension. Acknowledging it gently (as in the best choice) can actually strengthen the friendship by showing you can handle difficult moments." }
+                ]
+            },
+            {
+                title: "A friend asks to borrow money from you for lunch. You're happy to help, but they have a history of 'forgetting' to pay people back. Question: What's the most pragmatic way to handle the request?",
+                icon: "wallet",
+                choices: [
+                    { text: "Say, 'I can cover you, but can you Venmo me back tonight when you get home? Just trying to keep track of my budget.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's helpful but also sets a clear, immediate expectation for repayment. Framing it around your budget makes it less of a personal accusation and more of a practical matter." },
+                    { text: "Just give them the money and silently hope they remember to pay you back, even though you doubt they will.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. This sets you up for resentment when they inevitably don't pay you back. It's better to address the issue upfront than to let it damage the friendship later." },
+                    { text: "Say, 'Sorry, I don't have any cash on me,' even if you do.", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. A white lie avoids the immediate conflict, but it doesn't solve the recurring problem. It's a form of avoidance that prevents you from practicing clear, honest communication." }
+                ]
+            },
+            {
+                title: "You're in a movie theater, and the person behind you is talking loudly on their phone. It's been several minutes and they're ruining the movie for you. Question: How do you address the situation?",
+                icon: "users",
+                choices: [
+                    { text: "Turn around and politely but firmly whisper, 'Excuse me, could you please take your call outside? We're trying to watch the movie.'", score: 3, effectiveness: "most-effective", feedback: "This is the most effective choice. It's a direct, respectful request that clearly states the problem and the desired solution. It's the most likely way to solve the problem without unnecessary escalation." },
+                    { text: "Turn around and loudly say, 'SHHH! Some people are trying to watch a movie!'", score: 1, effectiveness: "less-effective", feedback: "This is a less effective choice. A loud, shaming 'shush' can feel aggressive and might provoke an angry response from the other person, escalating the situation for everyone." },
+                    { text: "Don't say anything, but stew in anger for the rest of the movie and complain to your friends about it afterward.", score: 0, effectiveness: "least-effective", feedback: "This is the least effective choice. You're allowing someone else's behavior to ruin your experience, and the problem never gets solved. A moment of courage to speak up politely is often all it takes." }
+                ]
+            }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const pages = document.querySelectorAll('.page');
+            const nextButton = document.getElementById('next-button');
+            const backButton = document.getElementById('back-button');
+            const progressBar = document.getElementById('flex-progress-fill');
+            const startupScreen = document.getElementById('startup-screen');
+            const loginModal = document.getElementById('login-modal');
+
+            window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); sfx.tick(); }
+            window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); sfx.tick(); }
+            window.closeLoginModal = () => { loginModal.classList.add('hidden-modal'); loginModal.classList.remove('visible-modal'); }
+            
+            window.updateUserDisplay = (name) => {
+                currentUserName = name;
+                document.getElementById('header-welcome-text').textContent = `Welcome, ${name}`;
+            }
+
+            function updateProgress() {
+                const progress = ((currentPageIndex + 1) / TOTAL_PAGES);	
+                if (progressBar) progressBar.style.width = `${progress * 100}%`;
+                document.getElementById('header-page-indicator').textContent = `${currentPageIndex + 1} / ${TOTAL_PAGES}`;
+            }
+
+            window.showPage = function(index) {
+                if (index < 0 || index >= TOTAL_PAGES) return;
+                
+                if (index === 32 && Object.keys(answeredScenarioScores).length < TOTAL_SCENARIOS) {
+                    window.showScenarioOutcome('challenge-incomplete'); return;
+                }
+
+                if(window.sfx && window.sfx.nav) window.sfx.nav();
+
+                pages.forEach(p => p.classList.remove('active'));
+                pages[index].classList.add('active');
+                currentPageIndex = index;
+                pages[index].scrollTop = 0;
+
+                backButton.disabled = (index === 0);
+                backButton.classList.toggle('opacity-0', index === 0);
+
+                const startSpan = nextButton.querySelector('.hidden.sm\\:inline'); 
+
+                let btnText = 'Next';
+                if (index === 0) {
+                    btnText = 'Start Challenge';
+                } else if (index === 32) {
+                    btnText = 'Reset';
+                    if(window.updateFinalScorePage) window.updateFinalScorePage();
+                } else if (index >= 2) {
+                    const isDone = Object.keys(answeredScenarioScores).length === 30;
+                    btnText = isDone ? 'View Score' : 'Next';
+                }
+
+                if(startSpan) startSpan.textContent = btnText;
+                
+                updateProgress();
+                lucide.createIcons();
+            }
+
+            if (startupScreen) {
+                const warmUp = () => { if(window.initAudio) window.initAudio(); };
+                startupScreen.addEventListener('mousedown', warmUp, { once: true });
+                startupScreen.addEventListener('touchstart', warmUp, { once: true });
+                
+                startupScreen.addEventListener('click', () => {
+                    if(window.sfx) window.sfx.powerOn();
+                    
+                    if (window.currentUser) {
+                        window.logFinalScoreToFirestore({ 
+                            finalScore: 0, 
+                            rank: "Session Started", 
+                            sessionId: window.sessionId 
+                        });
+                        window.showPage(0);
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    } else {
+                        loginModal.classList.remove('hidden-modal');
+                        loginModal.classList.add('visible-modal');
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    }
+                });
+            }
+
+            function getScenarioTemplate(type, title, icon, choicesHtml, feedbackHtml, isAnswered, scenarioIndex) {
+                const cleanText = title.split(" Question:")[0];
+                const questionText = title.split(" Question:")[1] || "What do you do?";
+                const feedbackWrapper = feedbackHtml || '';
+                
+                // --- ROBUST TABBED INTERFACE ---
+                // We use flex-1 and h-auto to let the card grow as needed. 
+                // We do NOT use fixed height or overflow-hidden on the body to allow full page scrolling if content is long.
+                
+                // Initial State: If answered, show Tab 1 (Response), else Tab 0 (Situation)
+                const showSituation = !isAnswered;
+                
+                return `
+                <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col h-auto min-h-[500px] mb-8 relative" id="scenario-container-${scenarioIndex}">
+                    
+                    <!-- Header -->
+                    <div class="bg-slate-800 text-white px-4 py-3 flex justify-between items-center shrink-0 rounded-t-2xl">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                            <span class="text-[10px] font-mono tracking-widest uppercase text-slate-300">Tactical Command</span>
+                        </div>
+                        <i data-lucide="${icon}" class="w-4 h-4 text-slate-400"></i>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="flex bg-slate-100 border-b border-slate-200 shrink-0">
+                        <button id="tab-btn-0-${scenarioIndex}" onclick="window.switchTab(this, 0, ${scenarioIndex})" 
+                            class="flex-1 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-widest border-r border-slate-200 transition-colors ${showSituation ? 'text-allgood-primary bg-white border-b-2 border-allgood-primary' : 'text-slate-600 border-b border-transparent'}">
+                            <i class="fas fa-file-alt mr-2 opacity-50"></i> Situation
+                        </button>
+                        <button id="tab-btn-1-${scenarioIndex}" onclick="window.switchTab(this, 1, ${scenarioIndex})" 
+                            class="flex-1 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors ${!showSituation ? 'text-allgood-primary bg-white border-b-2 border-allgood-primary' : 'text-slate-600 border-b border-transparent'}">
+                            <i class="fas fa-crosshairs mr-2 opacity-50"></i> Response
+                        </button>
+                    </div>
+
+                    <!-- Content Area (Grows naturally) -->
+                    <div class="p-6 sm:p-8 bg-slate-50 flex-1">
+                        
+                        <!-- TAB 1: SITUATION (Intel) -->
+                        <div id="tab-content-0-${scenarioIndex}" class="${showSituation ? 'block' : 'hidden'} animate-fade-in">
+                            <div class="mb-6">
+                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3 border-b border-slate-200 pb-1">Intel Brief</h3>
+                                <p class="text-base sm:text-lg text-slate-800 leading-relaxed font-body">
+                                    ${cleanText}
+                                </p>
+                            </div>
+                            <button onclick="window.switchTab(this, 1, ${scenarioIndex})" class="w-full py-3 bg-allgood-primary hover:bg-allgood-hover text-white rounded-lg font-bold text-sm shadow-md transition-transform active:scale-95 flex items-center justify-center">
+                                Proceed to Decision <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                            </button>
+                        </div>
+
+                        <!-- TAB 2: RESPONSE (Action) -->
+                        <div id="tab-content-1-${scenarioIndex}" class="${!showSituation ? 'block' : 'hidden'} animate-fade-in">
+                            <div class="mb-6">
+                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3 border-b border-slate-200 pb-1">Required Action</h3>
+                                <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm mb-6">
+                                    <p class="text-sm sm:text-base text-slate-700 italic border-l-4 border-allgood-secondary pl-3">
+                                        "${questionText}"
+                                    </p>
+                                </div>
+                                <div class="space-y-3">
+                                    ${choicesHtml}
+                                </div>
+                            </div>
+                            ${feedbackWrapper}
+                        </div>
+
+                    </div>
+                </div>
+                `;
+            }
+
+            function renderScenarioPage(pageElement, scenarioIndex) {
+                const data = SCENARIO_DATA[scenarioIndex - 1];
+                const isAnswered = answeredScenarioScores[scenarioIndex] !== undefined;
+                const icon = data.icon;
+                
+                // NEW: Shuffle the choices array before rendering
+                const shuffledChoices = shuffleArray(data.choices);
+
+                let choicesHtml = shuffledChoices.map((choice, index) => {
+                    let btnClass = 'w-full text-left p-4 rounded-lg text-sm font-medium transition-all shadow-sm mb-3 border flex items-center justify-between group';
+                    let statusIcon = '';
+
+                    if (isAnswered) {
+                        if (choice.score === 3) {
+                            btnClass += ' bg-emerald-50 border-emerald-200 text-emerald-900 ring-1 ring-emerald-300';
+                            statusIcon = '<i data-lucide="check" class="w-5 h-5 text-emerald-600"></i>';
+                        } else if (answeredScenarioScores[scenarioIndex] === choice.score) {
+                             btnClass += choice.score === 1 
+                                ? ' bg-amber-50 border-amber-200 text-amber-900 ring-1 ring-amber-300' 
+                                : ' bg-rose-50 border-rose-200 text-rose-900 ring-1 ring-rose-300';
+                             statusIcon = choice.score === 1 
+                                ? '<i data-lucide="minus" class="w-5 h-5 text-amber-600"></i>' 
+                                : '<i data-lucide="x" class="w-5 h-5 text-rose-600"></i>';
+                        } else {
+                            btnClass += ' bg-slate-50 border-slate-100 text-slate-400 opacity-60';
+                        }
+                    } else {
+                        btnClass += ' bg-white border-slate-200 text-slate-700 hover:border-allgood-primary hover:bg-slate-50 hover:text-allgood-primary cursor-pointer active:scale-[0.99]';
+                        statusIcon = '<i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-allgood-primary transition-colors"></i>';
+                    }
+                    
+                    const disabledAttr = isAnswered ? 'disabled' : '';
+                    
+                    return `<button class="${btnClass}" onclick="window.selectScenarioChoice(${scenarioIndex}, ${choice.score})" ${disabledAttr}>
+                        <div class="flex items-start pr-3">
+                            <span class="font-bold font-mono mr-3 opacity-50 text-xs uppercase mt-0.5 text-slate-500">${String.fromCharCode(65 + index)}</span>
+                            <span class="leading-snug">${sanitizeText(choice.text)}</span>
+                        </div>
+                        <div class="shrink-0 ml-2">
+                            ${statusIcon}
+                        </div>
+                    </button>`;
+                }).join('');
+
+                let feedbackHtml = '';
+                if (isAnswered) {
+                    const chosen = data.choices.find(c => c.score === answeredScenarioScores[scenarioIndex]);
+                    
+                    let bgClass = chosen.score === 3 ? 'bg-emerald-50 border-emerald-200' : (chosen.score === 1 ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200');
+                    let textClass = chosen.score === 3 ? 'text-emerald-900' : (chosen.score === 1 ? 'text-amber-900' : 'text-rose-900');
+                    let iconName = chosen.score === 3 ? 'check-circle' : 'alert-triangle';
+                    
+                    feedbackHtml = `
+                    <div class="${bgClass} border rounded-lg p-4 mt-6 flex items-start gap-4 shadow-sm animate-fade-in relative overflow-hidden">
+                         <div class="absolute top-0 left-0 w-1 h-full ${chosen.score === 3 ? 'bg-emerald-500' : (chosen.score === 1 ? 'bg-amber-500' : 'bg-rose-500')}"></div>
+                         <i data-lucide="${iconName}" class="w-6 h-6 ${textClass} flex-shrink-0 mt-0.5"></i>
+                         <div>
+                             <p class="text-[10px] font-bold uppercase tracking-wider ${textClass} mb-1 opacity-70">
+                                Tactical Analysis: ${chosen.effectiveness.replace('-', ' ')}
+                             </p>
+                             <p class="text-sm ${textClass} leading-relaxed font-medium">
+                                ${sanitizeText(chosen.feedback)}
+                             </p>
+                         </div>
+                    </div>`;
+                }
+
+                // Pass null for type since we use one unified template now
+                const visualHtml = getScenarioTemplate(null, data.title, icon, choicesHtml, feedbackHtml, isAnswered, scenarioIndex);
+
+                pageElement.innerHTML = `
+                    <!-- No outer header needed for this full-bleed style -->
+                    <div class="flex justify-center w-full px-4 pt-4 pb-20">
+                        ${visualHtml}
+                    </div>
+                `;
+            }
+
+            window.selectScenarioChoice = function(sIdx, score) { // UPDATED: Accept score directly, not cIdx
+                const data = SCENARIO_DATA[sIdx - 1];
+                const chosen = data.choices.find(c => c.score === score); // Find the original choice based on score
+                
+                if (answeredScenarioScores[sIdx] === undefined) {
+                    totalChallengeScore += score;
+                    answeredScenarioScores[sIdx] = score;
+                    
+                    window.logScenarioAttempt({
+                        scenarioIndex: sIdx,
+                        choiceIndex: data.choices.indexOf(chosen), // Log original index for clarity
+                        score: score,
+                        effectiveness: chosen.effectiveness,
+                        question: data.title
+                    });
+
+                    window.logFinalScoreToFirestore({ 
+                        finalScore: totalChallengeScore, 
+                        sessionId: window.sessionId 
+                    });
+                }
+                window.showPage(currentPageIndex); 
+                
+                let iconClass = chosen.score === 3 ? 'bg-emerald-100 text-emerald-600' : (chosen.score === 1 ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600');
+                let iconInner = chosen.score === 3 ? '<i data-lucide="check-circle" class="w-8 h-8"></i>' : (chosen.score === 1 ? '<i data-lucide="alert-triangle" class="w-8 h-8"></i>' : '<i data-lucide="x-circle" class="w-8 h-8"></i>');
+                
+                window.showScenarioOutcome('scenario-completed', {
+                    title: `${chosen.effectiveness.toUpperCase().replace('-', ' ')} (${chosen.score} / 3 pts)`,
+                    text: chosen.feedback,
+                    iconClass: iconClass,
+                    iconInner: iconInner
+                });
+            }
+
+            window.closeScenarioModal = (advance) => {
+                document.getElementById('scenario-modal').classList.remove('visible-modal');
+                document.getElementById('scenario-modal').classList.add('hidden-modal');
+                sfx.nav();
+                if (advance && currentPageIndex < 32) window.showPage(currentPageIndex + 1);
+            }
+
+            window.showScenarioOutcome = (type, data) => {
+                const modal = document.getElementById('scenario-modal');
+                const title = document.getElementById('scenario-title');
+                const fb = document.getElementById('scenario-feedback');
+                const icon = document.getElementById('scenario-icon');
+                const btn = document.getElementById('scenario-modal-next-btn');
+
+                if (type === 'challenge-incomplete') {
+                    title.textContent = "Incomplete";
+                    fb.textContent = "Please answer all questions.";
+                    icon.className = "mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl bg-red-100 text-red-600";
+                    icon.innerHTML = '<i data-lucide="alert-triangle" class="w-8 h-8"></i>';
+                    btn.onclick = () => window.closeScenarioModal(false);
+                } else {
+                    title.textContent = data.title;
+                    fb.innerHTML = sanitizeText(data.text);
+                    icon.className = `mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl ${data.iconClass}`;
+                    icon.innerHTML = data.iconInner;
+                    btn.onclick = () => window.closeScenarioModal(true);
+                }
+                modal.classList.remove('hidden-modal');
+                modal.classList.add('visible-modal');
+                sfx.tick();
+                lucide.createIcons();
+            }
+
+            window.updateFinalScorePage = function() {
+                const scoreValue = document.getElementById('final-score-value');
+                const scorePercent = document.getElementById('final-score-percent');
+                const rankHeading = document.getElementById('final-rank-heading');
+                const rankMessage = document.getElementById('final-rank-message');
+                const badgeBtn = document.getElementById('download-badge-btn');
+                const certReqText = document.getElementById('cert-req-text'); 
+
+                let currentScore = 0;
+                try {
+                    const scores = Object.values(answeredScenarioScores);
+                    if (scores.length > 0) {
+                        currentScore = scores.reduce((acc, val) => acc + (Number(val) || 0), 0);
+                    }
+                } catch(e) { console.error("Score calc error", e); }
+
+                if (currentScore === 0 && totalChallengeScore > 0) {
+                    currentScore = totalChallengeScore;
+                }
+
+                const percentage = Math.round((currentScore / MAX_SCORE) * 100);
+
+                let rank = "";
+                let rankColor = "";
+                let message = "";
+                let isCertified = false;
+                
+                if (percentage >= 89) { // 80 points
+                    rank = "Conflict Resolution Champion";
+                    rankColor = "text-green-600";
+                    message = "Exceptional! You consistently demonstrated empathy and pragmatic problem-solving.";
+                    isCertified = true;
+                } else if (percentage >= 70) {
+                    rank = "Conflict Manager";
+                    rankColor = "text-yellow-600";
+                    message = "Solid performance. Review your 'less-effective' choices.";
+                } else {
+                    rank = "Learner";
+                    rankColor = "text-red-600";
+                    message = "Good start. Reread the feedback and try again.";
+                }
+
+                scoreValue.textContent = `${currentScore} / ${MAX_SCORE}`;
+                scoreValue.className = `text-5xl font-extrabold font-heading ${rankColor}`;
+                scorePercent.textContent = `(${percentage}% Effectiveness)`;
+                rankHeading.textContent = rank;
+                rankHeading.className = `text-xl font-heading font-bold mb-2 ${rankColor}`;
+                rankMessage.textContent = message;
+                certReqText.innerHTML = sanitizeText(certReqText.innerHTML);
+
+                if (currentScore >= BADGE_THRESHOLD) {
+                    badgeBtn.disabled = false;
+                    badgeBtn.classList.remove('bg-gray-300', 'cursor-not-allowed', 'shadow-none');
+                    badgeBtn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg');
+                    badgeBtn.innerHTML = '<i data-lucide="download" class="w-4 h-4 mr-2"></i>Download Your Badge';
+                } else {
+                    badgeBtn.disabled = true;
+                    badgeBtn.classList.add('bg-gray-300', 'cursor-not-allowed', 'shadow-none');
+                    badgeBtn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg');
+                    badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Certification Locked';
+                }
+                
+                window.logFinalScoreToFirestore({ 
+                    finalScore: currentScore, 
+                    maxScore: MAX_SCORE, 
+                    percentage: percentage, 
+                    rank: rank, 
+                    completed: true, 
+                    isCertified: isCertified, 
+                    sessionId: window.sessionId 
+                });
+                
+                lucide.createIcons();
+            }
+
+            function updateTOC() {
+                const tocList = document.getElementById('toc-list');
+                tocList.innerHTML = '';
+                
+                const addLink = (text, idx, bold=false, colorClass='') => {
+                    const btn = document.createElement('button');
+                    btn.className = `menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 text-sm ${bold?'font-bold':''} ${colorClass}`;
+                    btn.textContent = text;
+                    btn.onclick = () => { window.showPage(idx); window.closeMenuModal(); };
+                    tocList.appendChild(btn);
+                }
+
+                addLink("1. Cover Page", 0, true);
+                addLink("2. Welcome & Rules", 1, true);
+                
+                const divider = document.createElement('div');
+                divider.className = "px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2";
+                divider.textContent = "The 30 Scenarios";
+                tocList.appendChild(divider);
+
+                for (let i = 1; i <= TOTAL_SCENARIOS; i++) {
+                    const data = SCENARIO_DATA[i - 1];
+                    const pageIndex = i + 1;
+                    const shortTitle = data.title.split('. Question:')[0].substring(0, 30) + "...";
+                    addLink(`${pageIndex}. ${shortTitle}`, pageIndex);
+                }
+
+                addLink("33. Score, Feedback & Badge", 32, true, "text-allgood-secondary");
+            }
+
+            pages.forEach(p => {
+                const idx = parseInt(p.getAttribute('data-scenario-index'));
+                if(idx) renderScenarioPage(p, idx);
+            });
+
+            if(nextButton) nextButton.addEventListener('click', () => {
+                if (currentPageIndex < (TOTAL_PAGES - 1)) window.showPage(currentPageIndex + 1);
+                else window.performHardReset();
+            });
+            if(backButton) backButton.addEventListener('click', () => { if(currentPageIndex > 0) window.showPage(currentPageIndex - 1); });
+            document.getElementById('menu-toggle').addEventListener('click', window.openMenuModal);
+            document.getElementById('close-menu').addEventListener('click', window.closeMenuModal);
+            
+            const homeButton = document.getElementById('home-button');
+            let pressTimer = null;
+            let isLongPress = false;
+            
+            if(homeButton) {
+                const startLongPress = (e) => {
+                    isLongPress = false; 
+                    pressTimer = setTimeout(() => {
+                        isLongPress = true; 
+                        document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                        document.getElementById('system-menu-modal').classList.add('visible-modal');
+                        if(window.lucide) window.lucide.createIcons(); 
+                        if(window.sfx) window.sfx.nav();
+                        pressTimer = null; 
+                    }, 2000);
+                }
+
+                const endPress = (e) => {
+                    if (pressTimer) { 
+                        clearTimeout(pressTimer); 
+                        pressTimer = null; 
+                    }
+                }
+
+                homeButton.addEventListener('mousedown', startLongPress);
+                homeButton.addEventListener('mouseup', endPress);
+                homeButton.addEventListener('mouseleave', endPress);
+
+                homeButton.addEventListener('touchstart', (e) => {
+                    startLongPress();
+                }, { passive: true });
+                
+                homeButton.addEventListener('touchend', endPress);
+                homeButton.addEventListener('touchcancel', endPress);
+
+                homeButton.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                });
+
+                homeButton.addEventListener('click', (e) => {
+                    if(isLongPress) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        isLongPress = false; 
+                    } else {
+                        if (currentPageIndex !== 0) { 
+                            window.showPage(0); 
+                            sfx.nav(); 
+                        }
+                    }
+                });
+            }
+
+            window.closeSystemMenu = () => {
+                 document.getElementById('system-menu-modal').classList.add('hidden-modal');
+                 document.getElementById('system-menu-modal').classList.remove('visible-modal');
+            };
+
+            window.handleLogOut = async () => {
+                if (window.authSignOut) await window.authSignOut();
+                localStorage.removeItem('aa_username');
+                localStorage.removeItem('aa_email');
+                localStorage.removeItem('aa_uid');
+                localStorage.removeItem('aa_is_guest');
+                
+                totalChallengeScore = 0;
+                answeredScenarioScores = {};
+                window.currentUser = null;
+                window.currentUserName = "Anonymous";
+                
+                window.closeSystemMenu();
+                
+                const startup = document.getElementById('startup-screen');
+                startup.style.display = 'flex';
+                setTimeout(() => startup.style.opacity = '1', 10);
+                
+                window.showPage(0);
+                sfx.powerOff();
+            };
+
+            window.handleSystemExit = () => {
+                window.location.href = "https://www.allgoodacademy.com";
+            };
+
+            document.getElementById('blueprint-toggle').addEventListener('click', () => {
+                document.getElementById('screen').classList.toggle('blueprint-mode');
+                document.getElementById('blueprint-toggle').classList.toggle('text-cyan-300');
+                sfx.tick();
+            });
+
+            document.getElementById('fullscreen-toggle').addEventListener('click', () => {
+                const frame = document.querySelector('.tablet-frame');
+                frame.classList.toggle('expanded-mode');
+                const btn = document.getElementById('fullscreen-toggle');
+                btn.classList.toggle('text-green-300');
+                btn.classList.toggle('text-gray-200');
+                sfx.tick();
+            });
+
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            
+            document.querySelectorAll('.accordion-toggle').forEach(acc => {
+                acc.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    const icon = this.querySelector('.accordion-icon');
+                    content.classList.toggle('hidden');
+                    if(icon) icon.classList.toggle('rotate-180');
+                    sfx.tick();
+                });
+            });
+
+            window.showPage(0);
+            updateTOC();
+            
+            window.performHardReset = () => {
+                totalChallengeScore = 0;
+                answeredScenarioScores = {};
+                pages.forEach(p => { const idx = parseInt(p.getAttribute('data-scenario-index')); if(idx) renderScenarioPage(p, idx); });
+                const startup = document.getElementById('startup-screen');
+                startup.style.display = 'flex';
+                setTimeout(() => startup.style.opacity = '1', 10);
+                window.showPage(0);
+                sfx.powerOff();
+            }
+            
+            window.downloadBadge = function() {
+                if (totalChallengeScore < BADGE_THRESHOLD) return;
+
+                const nameText = (typeof currentUserName !== 'undefined' && currentUserName) ? currentUserName.toUpperCase() : "CHAMPION";
+                const dateText = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).toUpperCase();
+                const scoreText = `${totalChallengeScore} / ${MAX_SCORE}`;
+
+                const badgeSVG = `
+                <svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <pattern id="smallGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E0E0E0" stroke-width="2"/>
+                        </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="#F7F7F7"/>
+                    <rect width="100%" height="100%" fill="url(#smallGrid)"/>
+                    <rect x="30" y="30" width="1140" height="740" rx="20" ry="20" fill="none" stroke="#357889" stroke-width="8"/>
+                    <text x="600" y="100" font-family="Georgia, serif" font-weight="bold" font-size="42" fill="#357889" text-anchor="middle" letter-spacing="2">ALLGOOD ACADEMY</text>
+                    <text x="600" y="140" font-family="Verdana, sans-serif" font-size="16" fill="#4C4C4C" text-anchor="middle" letter-spacing="4">PRAGMATIC ACTION CERTIFICATION</text>
+                    <line x1="400" y1="160" x2="800" y2="160" stroke="#D34716" stroke-width="3"/>
+                    <g transform="translate(300, 400)">
+                        <circle cx="0" cy="0" r="140" fill="white" stroke="#357889" stroke-width="5"/>
+                        <g transform="scale(5) translate(-12, -15)" fill="#D34716">
+                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="#D34716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                             <path d="M9 12l2 2 4-4" fill="none" stroke="#D34716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </g>
+                        <circle cx="100" cy="-100" r="25" fill="#357889" stroke="white" stroke-width="2"/>
+                        <path transform="translate(90, -110) scale(1)" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/>
+                        <circle cx="-100" cy="100" r="25" fill="#357889" stroke="white" stroke-width="2"/>
+                         <rect x="-108" y="98" width="16" height="12" rx="2" fill="white"/> 
+                         <path d="M-105 98 V 94 A 5 5 0 0 1 -95 94 V 98" stroke="white" stroke-width="2" fill="none"/>
+                    </g>
+                    <g transform="translate(600, 280)">
+                        <text x="0" y="0" font-family="Verdana, sans-serif" font-size="14" fill="#757575" font-weight="bold">CERTIFIED AGENT:</text>
+                        <text x="0" y="50" font-family="Georgia, serif" font-size="28" fill="#357889" font-weight="bold" letter-spacing="1">${nameText}</text>
+                        <text x="0" y="100" font-family="Verdana, sans-serif" font-size="24" fill="#4C4C4C" font-weight="bold" letter-spacing="2">CONFLICT RESOLUTION</text>
+                        <rect x="0" y="140" width="500" height="220" rx="10" fill="#F7F7F7" stroke="#E5E7EB" stroke-width="3"/>
+                        <g transform="translate(30, 190)" font-family="Courier New, monospace" font-size="22" fill="#357889">
+                            <text x="0" y="0" font-weight="bold">MODULE:</text><text x="160" y="0" fill="#4C4C4C" font-size="18">Conflict Resolution</text>
+                            <text x="0" y="50" font-weight="bold">STATUS:</text><text x="160" y="50" fill="#D34716" font-weight="bold">VERIFIED</text>
+                            <text x="0" y="100" font-weight="bold">DATE:</text><text x="160" y="100" fill="#4C4C4C">${dateText}</text>
+                            <text x="0" y="150" font-weight="bold">FINAL SCORE:</text><text x="160" y="150" fill="#357889" font-weight="bold">${scoreText}</text>
+                        </g>
+                    </g>
+                    <text x="600" y="750" font-family="Georgia, serif" font-style="italic" font-size="18" fill="#757575" text-anchor="middle">"Move from passive reaction to active resolution."</text>
+                </svg>`;
+                
+                window.logFinalScoreToFirestore({ badgeSVG: badgeSVG });
+
+                const blob = new Blob([badgeSVG], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Allgood-ConflictResolution-Badge-${nameText}.svg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                sfx.nav();
+
+                const downloadBtn = document.getElementById('download-badge-btn');
+                if(downloadBtn) {
+                    downloadBtn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    downloadBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    downloadBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4 mr-2"></i>Certificate Saved';
+                    lucide.createIcons();
+                }
+            }
+            
+            window.setRating = function(n) {
+                for (let i = 1; i <= 5; i++) {
+                    const star = document.getElementById(`star-${i}`);
+                    if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                    else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
+                }
+                sfx.tick();
+            }
+            window.submitFeedback = function() {
+                const feedbackText = document.getElementById('feedback-text').value;
+                window.logFinalScoreToFirestore({ feedback: feedbackText, rank: "Feedback", sessionId: window.sessionId });
+                document.getElementById('feedback-container').classList.add('hidden');
+                document.getElementById('feedback-success').classList.remove('hidden');
+                sfx.nav(); 
+            }
+
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>

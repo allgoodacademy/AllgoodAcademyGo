@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Purposeful Communicator Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- FIREBASE AND AUTHENTICATION SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko", authDomain: "allgood-academy.firebaseapp.com", projectId: "allgood-academy" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'allgood-academy';
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.authSignOut = () => signOut(auth);
+        window.currentUser = null;
+        window.currentUserName = "Anonymous";
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        window.updateUserDisplay = (name) => {
+            const el = document.getElementById('header-welcome-text');
+            if (el) el.textContent = `Welcome: ${name}`;
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                window.currentUser = user;
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Learner";
+                if (finalName === "Learner") {
+                    try { const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid)); if (userDoc.exists()) finalName = userDoc.data().displayName || finalName; } catch(e) {}
+                }
+                window.currentUserName = finalName;
+                window.updateUserDisplay(finalName);
+                
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                    if (window.logFinalScoreToFirestore) {
+                        window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+                    }
+                }
+            } else {
+                window.currentUser = null;
+                window.updateUserDisplay("Learner");
+            }
+        });
+
+        async function ensureUserContainer(user, name, email, isGuest) {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             try { await setDoc(userRef, { displayName: name, email: email || (isGuest ? null : user.email || null), isGuest: isGuest, lastLogin: serverTimestamp(), lastActiveModule: "Purposeful Communicator" }, { merge: true }); } catch (e) { console.error(e); }
+        }
+
+        window.logScenarioAttempt = async (data) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const attemptRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'scenario_attempts', `scenario_${data.scenarioIndex}`);
+            try { await setDoc(attemptRef, { ...data, timestamp: serverTimestamp() }); } catch (e) {}
+        };
+
+        window.logFinalScoreToFirestore = async (scoreData) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            try { await setDoc(sessionRef, { gameName: "Purposeful Communicator", ...scoreData, lastUpdated: serverTimestamp(), user: { uid: user.uid, displayName: window.currentUserName } }, { merge: true }); } catch (e) {}
+        }
+
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            const ot = btn.innerText; btn.innerText = "Connecting..."; btn.disabled = true;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token); else if (!auth.currentUser) await signInAnonymously(auth);
+                const user = auth.currentUser;
+                const displayName = nameInput || "Learner";
+                await updateProfile(user, { displayName: displayName });
+                await ensureUserContainer(user, displayName, emailInput, true);
+                window.currentUserName = displayName;
+                window.updateUserDisplay(displayName);
+                window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+            } catch (error) { alert("Connection failed."); } finally { btn.innerText = ot; btn.disabled = false; }
+        };
+
+        window.handleGoogleLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                const finalName = user.displayName || "Learner";
+                await ensureUserContainer(user, finalName, user.email, false);
+                window.currentUserName = finalName;
+                window.updateUserDisplay(finalName);
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+            } catch (error) { alert("Google Sign-In failed."); }
+        };
+        
+        window.auth = auth; window.db = db;
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'journal-paper': '#fdfbf7',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                        'hand': ['Courier New', 'monospace'], // Fallback for handwritten feel
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body { 
+            font-family: Verdana, sans-serif; 
+            background-color: #1a1a1a; 
+            min-height: 100vh; 
+            margin: 0; padding: 0;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        h1, h2, h3, h4 { font-family: Georgia, serif; }
+
+        /* TABLET FRAME */
+        .tablet-frame {
+            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
+            transition: width 0.3s, height 0.3s;
+        }
+        .tablet-frame::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border-radius: 6px; background: #111; z-index: 0; }
+        .screen-container { width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1; overflow: hidden; display: flex; flex-direction: column; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .page::-webkit-scrollbar { width: 14px; }
+        .page::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        .page::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
+
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        /* UI ELEMENTS */
+        .choice-btn { background-color: #FFFFFF; border: 1px solid #D6D3D1; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .choice-btn:hover:not(:disabled) { border-color: #D34716; background-color: #FFF5F0; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .choice-correct { background-color: #D1FAE5 !important; border-color: #10B981 !important; font-weight: bold; }
+        .choice-less-effective { background-color: #FFFBEB !important; border-color: #FBBF24 !important; font-weight: 600; }
+        .choice-least-effective { background-color: #FEE2E2 !important; border-color: #F87171 !important; font-weight: 500; opacity: 0.7; }
+        
+        /* THEME: FIELD JOURNAL */
+        .journal-bg {
+            background-color: #fdfbf7;
+            background-image: linear-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 100% 2rem; /* Lined paper effect */
+        }
+        
+        .interaction-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+            max-width: 650px;
+            margin: 0 auto;
+        }
+        
+        .scenario-header {
+            background-color: #357889;
+            color: white;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .navbar-content { flex: 0 0 60px; z-index: 50; }
+        .footer-content { flex: 0 0 60px; z-index: 50; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
+        .page.active { display: block; }
+
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        .blueprint-mode .choice-btn { background-color: #1e293b !important; border-color: #334155 !important; }
+
+        .tablet-frame.expanded-mode { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; aspect-ratio: unset !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; z-index: 9999 !important; background: #F7F7F7 !important; box-shadow: none !important; }
+        .tablet-frame.expanded-mode::before { display: none !important; }
+        .tablet-frame.expanded-mode .screen-container { border-radius: 0 !important; }
+
+        @media (max-width: 768px) {
+            html, body { position: fixed; width: 100%; height: 100dvh; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            main { padding: 0 !important; height: 100dvh !important; width: 100% !important; display: block; position: fixed; top: 0; left: 0; }
+            .tablet-frame { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #F7F7F7 !important; aspect-ratio: unset !important; transform: none !important; }
+            .tablet-frame::before { display: none !important; }
+            .screen-container { width: 100%; height: 100%; border-radius: 0 !important; box-shadow: none !important; display: flex; flex-direction: column; background: #F7F7F7; overflow: hidden; position: relative; }
+            header.navbar-content { padding-top: max(env(safe-area-inset-top), 12px); min-height: 60px; padding-bottom: 12px; z-index: 50; background-color: #357889; }
+            footer.footer-content { position: absolute; bottom: 0; left: 0; width: 100%; padding-bottom: max(env(safe-area-inset-bottom), 20px); padding-top: 12px; min-height: 80px; z-index: 100; background-color: white; border-top: 1px solid #e5e7eb; }
+            .page { padding-bottom: 120px !important; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-0 md:py-8 h-[100dvh] w-full">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN (Theme: The Field Guide) -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-[#2e2e2e]">
+                    <!-- Table Texture -->
+                    <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(#555 1px, transparent 1px); background-size: 4px 4px;"></div>
+                    
+                    <!-- The Journal -->
+                    <div class="relative group perspective-1000 transform transition-transform duration-500 hover:scale-105">
+                        <!-- Book Shadow -->
+                        <div class="absolute top-4 left-4 w-[280px] h-[380px] bg-black/40 rounded-r-lg blur-md"></div>
+                        
+                        <!-- Book Cover -->
+                        <div class="relative w-[280px] h-[380px] bg-[#357889] rounded-r-md rounded-l-sm shadow-xl flex flex-col items-center justify-center border-l-8 border-[#265a66]">
+                            <!-- Spine detail -->
+                            <div class="absolute left-0 top-0 bottom-0 w-4 bg-black/10"></div>
+                            
+                            <!-- Title Box -->
+                            <div class="border-2 border-yellow-500/50 p-6 m-6 text-center">
+                                <h1 class="font-heading text-2xl font-bold text-white mb-2 leading-tight tracking-wide">THE<br>PURPOSEFUL<br>COMMUNICATOR</h1>
+                                <div class="w-12 h-1 bg-yellow-500 mx-auto my-3"></div>
+                                <p class="font-body text-xs text-yellow-100 uppercase tracking-widest">Field Guide to<br>Human Connection</p>
+                            </div>
+                            
+                            <!-- Icon -->
+                            <div class="absolute bottom-8 text-white/20">
+                                <i class="fas fa-hand-holding-heart text-4xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="mt-10 text-white/60 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-white transition-colors animate-pulse font-body z-10 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">Open Field Guide</p>
+                </div>
+
+                <!-- 2. LOGIN MODAL -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 font-body border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged to improve the experience.</p>
+                                </div>
+                            </button>
+                        </div>
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary outline-none transition-all font-body">
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] font-body uppercase">Start Challenge</button>
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        <button onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. HEADER -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Welcome: Learner</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 34</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <button id="fullscreen-toggle" class="hidden md:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- 4. MODALS (Scenario Feedback & Menu) -->
+                <div id="scenario-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-4 modal-transition" onclick="window.closeScenarioModal(false)">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center relative border-t-4 border-allgood-secondary" onclick="event.stopPropagation()">
+                        <div id="scenario-icon" class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl transition-colors"></div>
+                        <h3 id="scenario-title" class="text-xl font-heading font-bold text-allgood-dark mb-2"></h3>
+                        <div id="scenario-feedback" class="text-sm text-gray-600 font-body mb-6 leading-relaxed text-left"></div>
+                        <button id="scenario-modal-next-btn" class="bg-allgood-dark text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-allgood-primary transition-colors shadow-md">Next Scenario</button>
+                    </div>
+                </div>
+
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Table of Contents</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                    </div>
+                </div>
+
+                <!-- 5. System Menu Modal -->
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4"><i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
+                        <div class="space-y-3">
+                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center"><i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out</button>
+                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center"><i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard</button>
+                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAGES -->
+                <!-- Page 1: Cover -->
+                <div class="page active" id="page-1">
+                    <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-12">
+                        <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">Purposeful<br><span class="text-allgood-primary">Communicator</span><br>Challenge</h1>
+                        <div class="w-full max-w-lg text-left mx-auto">
+                            <!-- RESTORED ACCORDION -->
+                            <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                <i data-lucide="chevron-down" class="accordion-icon w-5 h-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary"></i>
+                            </button>
+                            <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
+                                <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600 shrink-0"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                    <div class="hidden md:flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600 shrink-0"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark shrink-0"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white border border-gray-200 p-6 rounded-lg shadow-md mt-6">
+                                <h3 class="font-bold text-allgood-dark text-lg mb-2"><i class="fas fa-list-check mr-2 text-allgood-primary"></i>Mission Rules</h3>
+                                <ul class="text-sm text-gray-600 space-y-2 list-disc list-inside">
+                                    <li><strong>30 Scenarios:</strong> Focused on initiating, listening, and asking.</li>
+                                    <li><strong>Modules:</strong> Choose your path through 3 key skill areas.</li>
+                                    <li><strong>Scoring:</strong> Most Effective (3pts), Less Effective (1pt), Least Effective (0pts).</li>
+                                    <li><strong>Goal:</strong> Score <strong>81+</strong> to earn the Certified Communicator badge.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 2: Module Selection -->
+                <div class="page" id="page-2">
+                    <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-2xl font-heading font-bold text-allgood-secondary">Choose a Module</h2></section>
+                    
+                    <!-- Moved: Adan Intro -->
+                    <div class="mb-6 text-center">
+                        <div class="w-full max-w-md mx-auto bg-blue-50 border-l-4 border-allgood-secondary p-4 rounded-r-lg flex items-center shadow-sm">
+                            <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 mr-4">
+                                <img src="https://i.ibb.co/67tby0Zw/Gemini-Generated-Image-s99f52s99f52s99f.png" alt="Adan" class="w-full h-full object-cover">
+                            </div>
+                            <p class="text-sm text-gray-700 text-left"><strong>Meet Adan.</strong> Guide him through these daily interactions to help him build meaningful relationships.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 max-w-lg mx-auto">
+                        <button onclick="window.startModule(1)" class="w-full bg-white p-6 rounded-lg shadow-md border border-gray-200 hover:border-allgood-primary transition-all text-left flex items-start group">
+                            <div class="bg-orange-100 p-3 rounded-full text-allgood-primary mr-4 group-hover:bg-allgood-primary group-hover:text-white transition-colors"><i class="fas fa-handshake text-xl"></i></div>
+                            <div>
+                                <h3 class="font-bold text-allgood-dark text-lg group-hover:text-allgood-primary">Initiating Conversations</h3>
+                                <p class="text-sm text-gray-500 mt-1">Practice approaching new people and building connections. (Scenarios 1-10)</p>
+                            </div>
+                        </button>
+                        <button onclick="window.startModule(2)" class="w-full bg-white p-6 rounded-lg shadow-md border border-gray-200 hover:border-green-600 transition-all text-left flex items-start group">
+                            <div class="bg-green-100 p-3 rounded-full text-green-600 mr-4 group-hover:bg-green-600 group-hover:text-white transition-colors"><i class="fas fa-heart text-xl"></i></div>
+                            <div>
+                                <h3 class="font-bold text-allgood-dark text-lg group-hover:text-green-600">Active Listening & Empathy</h3>
+                                <p class="text-sm text-gray-500 mt-1">Respond to feelings and de-escalate emotional situations. (Scenarios 11-20)</p>
+                            </div>
+                        </button>
+                        <button onclick="window.startModule(3)" class="w-full bg-white p-6 rounded-lg shadow-md border border-gray-200 hover:border-blue-600 transition-all text-left flex items-start group">
+                            <div class="bg-blue-100 p-3 rounded-full text-blue-600 mr-4 group-hover:bg-blue-600 group-hover:text-white transition-colors"><i class="fas fa-question-circle text-xl"></i></div>
+                            <div>
+                                <h3 class="font-bold text-allgood-dark text-lg group-hover:text-blue-600">Asking for Help</h3>
+                                <p class="text-sm text-gray-500 mt-1">Approach others for assistance, support, or guidance. (Scenarios 21-30)</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dynamic Scenarios (3-32) -->
+                <!-- Module 1 -->
+                <div class="page" id="page-3" data-scenario-index="1"></div>
+                <div class="page" id="page-4" data-scenario-index="2"></div>
+                <div class="page" id="page-5" data-scenario-index="3"></div>
+                <div class="page" id="page-6" data-scenario-index="4"></div>
+                <div class="page" id="page-7" data-scenario-index="5"></div>
+                <div class="page" id="page-8" data-scenario-index="6"></div>
+                <div class="page" id="page-9" data-scenario-index="7"></div>
+                <div class="page" id="page-10" data-scenario-index="8"></div>
+                <div class="page" id="page-11" data-scenario-index="9"></div>
+                <div class="page" id="page-12" data-scenario-index="10"></div>
+                
+                <!-- Module 2 -->
+                <div class="page" id="page-13" data-scenario-index="11"></div>
+                <div class="page" id="page-14" data-scenario-index="12"></div>
+                <div class="page" id="page-15" data-scenario-index="13"></div>
+                <div class="page" id="page-16" data-scenario-index="14"></div>
+                <div class="page" id="page-17" data-scenario-index="15"></div>
+                <div class="page" id="page-18" data-scenario-index="16"></div>
+                <div class="page" id="page-19" data-scenario-index="17"></div>
+                <div class="page" id="page-20" data-scenario-index="18"></div>
+                <div class="page" id="page-21" data-scenario-index="19"></div>
+                <div class="page" id="page-22" data-scenario-index="20"></div>
+
+                <!-- Module 3 -->
+                <div class="page" id="page-23" data-scenario-index="21"></div>
+                <div class="page" id="page-24" data-scenario-index="22"></div>
+                <div class="page" id="page-25" data-scenario-index="23"></div>
+                <div class="page" id="page-26" data-scenario-index="24"></div>
+                <div class="page" id="page-27" data-scenario-index="25"></div>
+                <div class="page" id="page-28" data-scenario-index="26"></div>
+                <div class="page" id="page-29" data-scenario-index="27"></div>
+                <div class="page" id="page-30" data-scenario-index="28"></div>
+                <div class="page" id="page-31" data-scenario-index="29"></div>
+                <div class="page" id="page-32" data-scenario-index="30"></div>
+
+                <!-- Page 33: Conclusion (Replaced with Master Template Ending) -->
+                <div class="page" id="page-33">
+                    <div class="flex flex-col items-center justify-start min-h-full py-10 text-center px-6">
+                        <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-8">Congratulations!</h2>
+
+                        <!-- FEEDBACK SECTION -->
+                        <div id="feedback-container" class="w-full max-w-md mx-auto bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-12 text-left relative">
+                            <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this GoodBlock</h3>
+                            <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                            </div>
+                            <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback sharpens our tools. What worked? What didn't?</label>
+                            <textarea id="feedback-text" rows="3" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50" placeholder="Optional: Share your thoughts..."></textarea>
+                            <button onclick="window.submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm">Send Feedback</button>
+                        </div>
+                        <div id="feedback-success" class="hidden w-full max-w-md mx-auto bg-green-50 p-6 rounded-lg shadow-inner border border-green-200 mb-12 text-center">
+                            <i data-lucide="check-circle" class="w-12 h-12 text-green-600 mx-auto mb-2"></i>
+                            <h3 class="font-bold text-green-800">Feedback Received.</h3>
+                            <p class="text-xs text-green-700 mt-1">Thank you for helping us improve.</p>
+                        </div>
+
+                        <div class="mb-8 transform scale-90 sm:scale-100 transition-transform" id="badge-container"></div>
+                        
+                        <!-- Dynamic Badge Download Button -->
+                        <a id="download-badge-btn" href="#" download="Allgood_Badge.svg" class="w-full max-w-xs bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all transform active:scale-95 flex items-center justify-center mb-12 group">
+                            <i data-lucide="download" class="w-5 h-5 mr-2 group-hover:animate-bounce"></i><span>Download Badge</span>
+                        </a>
+
+                        <button onclick="window.performHardReset()" class="text-allgood-secondary font-bold text-sm hover:underline mt-4">Retake Challenge</button>
+                    </div>
+                </div>
+
+                <!-- FOOTER -->
+                <footer class="footer-content flex items-center justify-between px-4 sm:px-6 shrink-0 z-50 bg-white">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body p-2"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i><span class="hidden sm:inline">Back</span></button>
+                    <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold no-underline">Allgood Academy</a></p>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-4 sm:px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body"><span class="hidden sm:inline">Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></button>
+                </footer>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume().catch(e => console.error(e)); }
+        function playTone(f,t,d,v=0.1) { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=t; o.frequency.setValueAtTime(f,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(v,audioCtx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+d); }
+        const sfx = {
+            powerOn: () => { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type='triangle'; o.frequency.setValueAtTime(110,audioCtx.currentTime); o.frequency.exponentialRampToValueAtTime(220,audioCtx.currentTime+0.4); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(0.4,audioCtx.currentTime+0.1); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+0.4); },
+            powerOff: () => playTone(80, 'triangle', 0.2, 0.5), nav: () => playTone(150, 'sine', 0.1, 0.1), tick: () => playTone(1000, 'sine', 0.01, 0.01)
+        };
+        window.sfx = sfx; window.initAudio = initAudio;
+
+        // --- GLOBAL STATE ---
+        let currentPageIndex = 0; 
+        const TOTAL_PAGES = 33; 
+        const TOTAL_SCENARIOS = 30;
+        const MAX_SCORE = 90; 
+        const BADGE_THRESHOLD = 81; // 90%
+        let totalChallengeScore = 0;
+        let answeredScenarioScores = {};
+
+        // Helper: Shuffle Array (Fisher-Yates)
+        function shuffleArray(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        // --- SCENARIO DATA (MIGRATED FROM OLD FILE) ---
+        const SCENARIO_DATA = [
+            // Initiating Conversations (1-10)
+            { type: 'scene', icon: 'fas fa-utensils', context: "Adan is eating lunch in the cafeteria and notices a new student sitting alone, looking down at their phone. They don't seem to know anyone, and Adan wants to be friendly and invite them to his table.", question: "What is the most effective way for Adan to approach and start a conversation?", choices: [ { text: "Walk over, smile, and say, 'Hi, I'm Adan. Welcome to our school. We've got an open spot at our table if you want to join us.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You took purposeful action. By extending a direct, warm invitation, you make the other person feel welcomed and valued." }, { text: "Shout across the room, 'Hey, new kid! Come sit with us!' and wave enthusiastically until they notice.", score: 1, effectiveness: "Less Effective", feedback: "Wanting to be friendly is a great impulse. However, shouting across a room puts the new student on the spot, which can make them feel anxious instead of welcomed." }, { text: "Say nothing, but send them a random, anonymous DM on Instagram saying, 'You look lonely.'", score: 0, effectiveness: "Least Effective", feedback: "It's natural to hesitate in person, but an anonymous message is more likely to cause confusion than create a connection. Clear, direct communication is more effective." } ] },
+            { type: 'scene', icon: 'fas fa-music', context: "While walking to class, Adan sees a student he doesn't know well wearing a t-shirt promoting a niche indie band that Adan loves. It feels like a perfect, rare opportunity to connect.", question: "What is the best way for Adan to leverage this shared interest to initiate a connection?", choices: [ { text: "Walk up during a casual moment and say, 'Cool shirt! That's my favorite band. Have you heard their new single, 'Midnight Run'?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You used a specific observation to establish an immediate connection. Starting with a genuine compliment and an open question is smooth and respectful." }, { text: "Stare intently at the shirt until they look up, then nod and walk away to show you're cool and mysterious.", score: 1, effectiveness: "Less Effective", feedback: "It's good to be knowledgeable, but this response shows a lack of social awareness. The goal is to connect emotionally, not to prove you're the smartest person there." }, { text: "Interrupt their conversation with a group of friends, point at the shirt, and loudly exclaim, 'Wow, you actually listen to that?'", score: 0, effectiveness: "Least Effective", feedback: "It's exciting to find a shared interest, but interrupting a group and questioning someone's taste will feel intrusive and rude." } ] },
+            { type: 'scene', icon: 'fab fa-discord', context: "Adan found a small private Discord server for digital art. After joining, Adan sees the four members are deep in a technical discussion. Adan hesitates, feeling like an outsider.", question: "How should Adan introduce himself and join the ongoing conversation effectively?", choices: [ { text: "Read a few messages to understand the topic, then send a message relating directly to their current discussion.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. By listening first, you can enter the conversation smoothly. This shows you understand the group's purpose and are ready to contribute value." }, { text: "Post a generic, unrelated 'Hi, I'm new, please be nice' message.", score: 1, effectiveness: "Less Effective", feedback: "It's normal to want to introduce yourself. However, a generic message shifts the focus to you without engaging in the group's current goal." }, { text: "Post several high-resolution images of his finished work without any introduction or context, demanding feedback.", score: 0, effectiveness: "Least Effective", feedback: "It's great to be proud of your work, but a self-centered action that ignores the group's current conversation will be seen as arrogant." } ] },
+            { type: 'scene', icon: 'fas fa-tree', context: "Adan is waiting for the bus. Another student is nearby. Suddenly, a squirrel misses a branch and drops its acorn with a plop. Adan and the other student both laugh.", question: "How can Adan build on this shared, momentary connection to start a conversation?", choices: [ { text: "Turn to them and remark playfully, 'Well, that nut definitely won that round,' followed by a low-risk, open-ended question.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You used a shared experience to build a quick, positive connection. Following up with a simple introduction creates a repeatable strategy." }, { text: "Keep chuckling to himself and mutter, 'That was hilarious,' hoping they engage first.", score: 1, effectiveness: "Less Effective", feedback: "It's tempting to wait for the other person to make the first move. However, hope is not a strategy. This passive approach misses the opportunity to practice acting with confidence." }, { text: "Immediately start explaining the evolutionary reasons why squirrels sometimes misjudge leaps.", score: 0, effectiveness: "Least Effective", feedback: "It's good to be knowledgeable, but this response shows a lack of social awareness. The goal is to connect emotionally, not to prove you're the smartest person there." } ] },
+            { type: 'scene', icon: 'fas fa-basketball-ball', context: "Adan sees a small group of three students talking excitedly about a basketball game in the student lounge. Adan wants to join the conversation.", question: "What is the best strategy for Adan to enter the group smoothly?", choices: [ { text: "Stand near the group for a moment, listen to understand the topic, then make a short, relevant comment.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You showed social awareness by observing and listening before entering. This careful approach allows you to join with purpose." }, { text: "Walk straight up and ask, 'What are you guys talking about?'", score: 1, effectiveness: "Less Effective", feedback: "While being direct is often good, this approach forces the group to stop their conversation to catch you up. This can feel intrusive." }, { text: "Start tapping his foot loudly and sighing until they break their conversation.", score: 0, effectiveness: "Least Effective", feedback: "When you feel left out, it's easy to get frustrated. However, using negative behavior to force attention shows a lack of good manners." } ] },
+            { type: 'scene', icon: 'fas fa-laptop-house', context: "In Adan's virtual study group, roles for a history presentation are being claimed. No one has mentioned the speaking role, which Adan excels at.", question: "How should Adan assert his interest in the speaking role without sounding demanding?", choices: [ { text: "Send a message stating his strength and offering to fill the need: 'I really enjoy presenting... I can take the main speaking slot if no one else wants it.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You were assertive without being aggressive. You framed your preference as a contribution to the team's success." }, { text: "Say, 'I hate doing slides, so I guess I'll just present.'", score: 1, effectiveness: "Less Effective", feedback: "This phrasing sounds negative and uncooperative. By focusing on what you don't want to do, you can hurt the team's good mood." }, { text: "Wait until the last minute before the presentation, then announce that he will be the one speaking.", score: 0, effectiveness: "Least Effective", feedback: "This is a self-serving move that shows a lack of respect for your teammates. It will create chaos and damage trust." } ] },
+            { type: 'scene', icon: 'fab fa-tiktok', context: "A student Adan admires posts an amazing, original short film on TikTok. Adan wants to congratulate them and build a real connection.", question: "What is the most effective way for Adan to reach out?", choices: [ { text: "Comment specifically on the film's best part: 'That camera work was brilliant! I make short films too—DM me if you ever need a second opinion.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You used a specific observation to establish an immediate connection. Starting with a genuine compliment and an open question is smooth and respectful." }, { text: "Send a brief DM saying, 'Your video is cool. I want to be friends now.'", score: 1, effectiveness: "Less Effective", feedback: "The request for friendship feels abrupt and doesn't give the other person a compelling reason to connect with you." }, { text: "Repost their video with the caption: 'Finally, someone at this school is talented. Everyone else is boring.'", score: 0, effectiveness: "Least Effective", feedback: "Giving a compliment is good, but turning it into a criticism of everyone else creates bad feelings and will likely sabotage your chance to connect." } ] },
+            { type: 'scene', icon: 'fas fa-skating', context: "Adan and a friend are going skateboarding. Adan sees a peer who is usually alone packing their backpack and wants to invite them.", question: "What is the most inviting and low-pressure way for Adan to extend the invitation?", choices: [ { text: "Approach them and say, 'We're heading to the skate park. Want to come join us? No pressure if you have other plans.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You were purposeful and sensitive. You clearly stated the activity and managed the fear of rejection by including 'No pressure.'" }, { text: "Have the friend handle the invitation to avoid direct rejection.", score: 1, effectiveness: "Less Effective", feedback: "Delegating the invitation creates an unclear message. It reflects a lack of confidence and makes it harder for the other person to respond positively." }, { text: "Say loudly, within their earshot, 'I hope that kid doesn't try to tag along with us.'", score: 0, effectiveness: "Least Effective", feedback: "This is an aggressive and hurtful statement. It's a form of bullying that sabotages any possibility of a positive connection." } ] },
+            { type: 'scene', icon: 'fas fa-file-alt', context: "Adan was added late to a group project. Opening the shared Google Doc, he sees the other members are already editing frantically.", question: "How should Adan enter the workflow without causing disruption?", choices: [ { text: "Post a quick, specific comment: 'Hey everyone! Just joined. I see you've covered the first section; I can start on the next section.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You're showing purposeful and confident teamwork. By observing progress and proposing a clear action, you engage productively." }, { text: "Start working immediately on a random section, hoping they notice.", score: 1, effectiveness: "Less Effective", feedback: "By not communicating your plan, you risk doing work that's already assigned or making a mistake. A purposeful collaborator asks for direction first." }, { text: "Leave the document and text a friend: 'The group is ignoring me.'", score: 0, effectiveness: "Least Effective", feedback: "This is a self-defeating response that gives away your power. Problems left alone usually get worse." } ] },
+            { type: 'scene', icon: 'fas fa-users', context: "In a two-person project, Adan's partner, Jordan, keeps dominating the task, finishing everything immediately without consulting Adan.", question: "How should Adan assertively ask Jordan to share responsibility?", choices: [ { text: "Use non-blaming language: 'I appreciate you getting so much done, but I need to pull my weight. Can we split the next section?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. It balances stating your need ('I need to contribute') with appreciation. This moves toward a win-win model." }, { text: "Try to secretly undo some of Jordan's work so there is something to fix.", score: 1, effectiveness: "Less Effective", feedback: "Secretly undoing work avoids the real issue and could damage trust, making it even harder to collaborate." }, { text: "Accuse Jordan of being a selfish control freak.", score: 0, effectiveness: "Least Effective", feedback: "Starting a conversation with an accusation will immediately put Jordan on the defensive. The focus will shift from the project to a personal fight." } ] },
+
+            // Active Listening (11-20)
+            { type: 'scene', icon: 'fas fa-heart-broken', context: "Adan's friend slumps down after failing a math quiz. I'm just totally stupid, they say. I'm going to fail everything.", question: "How should Adan respond to their friend's feelings while constructively challenging their negative belief?", choices: [ { text: "Acknowledge their feeling without judgment, then gently challenge the idea: 'It sounds like you feel really frustrated. But you got an A in English. This doesn't mean you're worthless.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You used empathy to validate their distress, then gently challenged their negative belief with evidence." }, { text: "Immediately offer a list of things they are good at: 'No you're not! You're smart!'", score: 1, effectiveness: "Less Effective", feedback: "Immediately rejecting their feelings can feel dismissive. People often need to feel heard before they can accept a new perspective." }, { text: "Agree with them: 'Yeah, that quiz grade was rough. You probably will have a hard time.'", score: 0, effectiveness: "Least Effective", feedback: "This actually reinforces a destructive, negative belief. This can push your friend further toward helplessness." } ] },
+            { type: 'scene', icon: 'fas fa-angry', context: "Adan's friend is furious because their older sibling went into their room without permission. The friend is threatening to break something.", question: "How should Adan respond to calm down their friend's anger?", choices: [ { text: "Calmly acknowledge the root feeling and suggest a strategy: 'I get why you are furious. But before you break anything, let's use the 'Stoplight' steps.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You acknowledged the feeling and then introduced a cognitive skill to manage the emotional impulse." }, { text: "Tell them to calm down and just try to forget about it.", score: 1, effectiveness: "Less Effective", feedback: "Telling an angry person to 'calm down' often makes them angrier because it dismisses their feelings." }, { text: "Agree enthusiastically: 'Yeah, they totally deserve it! Go do it right now!'", score: 0, effectiveness: "Least Effective", feedback: "This encourages the immediate, destructive impulse to take over. This fails to provide a positive, long-term solution." } ] },
+            { type: 'scene', icon: 'fab fa-snapchat-ghost', context: "A friend posts a cryptic message on their private Snapchat story: Everything is pointless. I wish I could just disappear.", question: "What is the most empathetic and supportive action for Adan to take?", choices: [ { text: "Immediately message them privately: 'I saw your story... I'm here to listen. Can we talk about what's making you feel this way?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You took direct, private action that shows empathy and caring." }, { text: "Text them, 'Don't be sad! Everyone feels that way sometimes,' and send a funny meme.", score: 1, effectiveness: "Less Effective", feedback: "This response can feel like you're minimizing their feelings. It risks creating emotional distance." }, { text: "Comment publicly on their story, 'You're just trying to get attention.'", score: 0, effectiveness: "Least Effective", feedback: "Adding public shame to someone's private distress is an ineffective and unkind response." } ] },
+            { type: 'scene', icon: 'fas fa-pencil-alt', context: "During a project, one team member goes silent, avoids eye contact, and starts doodling. When asked, they just shrug.", question: "How can Adan use empathy to understand the underlying issue?", choices: [ { text: "Approach them privately and non-judgmentally: 'It seems like you might be frustrated with this task. Is there a part you'd rather take over?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You read their body language and recognized distress. By presenting an alternative, you offer a solution." }, { text: "Tell the rest of the group to ignore the silent member until they decide to contribute.", score: 1, effectiveness: "Less Effective", feedback: "This passive response fails to address the situation. It lets the problem grow and can harm the team." }, { text: "Publicly accuse them of being lazy.", score: 0, effectiveness: "Least Effective", feedback: "A personal attack shows an ignorance of the feelings it will trigger. This creates emotional distance." } ] },
+            { type: 'scene', icon: 'fas fa-microphone-alt', context: "Adan's friend struggles with public speaking and has a big presentation next week. They keep saying, I know I'm going to choke.", question: "How can Adan provide support and reframe their friend's anxiety?", choices: [ { text: "Acknowledge their anxiety, then help them re-channel it: 'It's normal to be nervous... Let's practice together.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You provided structure ('practice together') and focused on an achievable outcome." }, { text: "Suggest that they bottle up all that nervous energy until the moment of the presentation.", score: 1, effectiveness: "Less Effective", feedback: "Telling someone to 'stop thinking about it' is usually ineffective. You miss the chance to help them handle it constructively." }, { text: "Say, 'Yeah, I remember last time you messed up, so let's hope you get through it fast.'", score: 0, effectiveness: "Least Effective", feedback: "This reinforces their negative explanation for failure and increases their distress." } ] },
+            { type: 'scene', icon: 'fas fa-user-shield', context: "In the hallway, Adan sees a younger student being teased by an older student. The younger student looks distressed.", question: "How can Adan step in effectively using empathy and assertion?", choices: [ { text: "Walk up calmly and engage the teaser directly by changing the subject: 'Hey, didn't you have soccer practice right now?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You used distraction to redirect the teaser's focus, allowing the victim to leave." }, { text: "Immediately yell at the older student, calling them a 'bully' and demanding they stop.", score: 1, effectiveness: "Less Effective", feedback: "Yelling is an aggressive response that escalates the conflict. It risks making the teaser angry and defensive." }, { text: "Ignore the situation, feeling too anxious or afraid to intervene.", score: 0, effectiveness: "Least Effective", feedback: "This passive choice means you miss the opportunity to act as an ally for someone being treated unfairly." } ] },
+            { type: 'scene', icon: 'fas fa-comments', context: "Adan's friend is complaining bitterly about a situation at home. They clearly feel misunderstood and overwhelmed.", question: "How can Adan ensure their friend feels truly heard?", choices: [ { text: "Pause them gently and paraphrase: 'So, if I hear you right, you feel completely overwhelmed because...?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. This strategy uses empathy. By mirroring their feeling, you ensure your friend feels understood." }, { text: "Let the friend vent completely without saying much.", score: 1, effectiveness: "Less Effective", feedback: "This is not truly active listening. It doesn't demonstrate a genuine effort to understand their feelings." }, { text: "Interrupt to offer a specific solution: 'You should just tell your parents X and Y.'", score: 0, effectiveness: "Least Effective", feedback: "Pushing a solution too early can make them more frustrated. Feeling heard is often what they need first." } ] },
+            { type: 'scene', icon: 'fas fa-eye', context: "Adan's friend, Maya, says she is fine, but her voice is trembling and she avoids eye contact.", question: "How should Adan respond, focusing on the difference between Maya's words and body language?", choices: [ { text: "Gently point out the body language: 'You said you're fine, but I notice your voice is shaking. What's making you nervous?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. The emotional truth is often in HOW something is said, not just what is said." }, { text: "Change the subject abruptly, reasoning that if Maya wanted to talk, she would have.", score: 1, effectiveness: "Less Effective", feedback: "When someone's body language disagrees with what they're saying, ignoring the distress means you're missing the real emotional signal." }, { text: "Mock her behavior: 'Whoa, look at your hands shaking!'", score: 0, effectiveness: "Least Effective", feedback: "Mockery breaks down your connection. This insensitive comment will make her defensive." } ] },
+            { type: 'scene', icon: 'fas fa-sad-tear', context: "Adan comes across a peer sitting alone in the hallway, silently crying after receiving a text message.", question: "How can Adan show support without being pushy?", choices: [ { text: "Sit down quietly nearby, offer a tissue, and gently ask: 'Are you okay? Do you want to talk, or just have some quiet company?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You demonstrate empathy and patience, giving them control over the situation." }, { text: "Ask, 'What happened? Who sent you that text?' repeatedly until they say.", score: 1, effectiveness: "Less Effective", feedback: "Pressing repeatedly for details is pushy and prioritizes your curiosity over their need for support." }, { text: "Take a picture of them crying to show other friends what happened.", score: 0, effectiveness: "Least Effective", feedback: "This action is aggressively harmful and shows a stunning lack of empathy." } ] },
+            { type: 'scene', icon: 'fas fa-theater-masks', context: "Adan's friend tried out for the school play but didn't get the lead role. They feel like giving up on theater entirely.", question: "How should Adan give feedback that encourages them not to give up?", choices: [ { text: "That stinks, I know you wanted the lead. But think about this smaller part as a chance to focus on specific skills—you can still grow.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. It offers hope and encourages a focus on mastery." }, { text: "You should just quit the play entirely if you aren't going to get the lead.", score: 1, effectiveness: "Less Effective", feedback: "Encouraging them to quit reinforces a negative mindset. You miss the opportunity to help them practice resilience." }, { text: "Well, at least you got a part. Why are you so dramatic about this?", score: 0, effectiveness: "Least Effective", feedback: "This comment minimizes their sadness and is emotionally tone-dead." } ] },
+
+            // Asking for Help (21-30)
+            { type: 'scene', icon: 'fas fa-chalkboard-teacher', context: "Adan missed a crucial instruction for a major essay due tomorrow. The teacher is packing up quickly after class.", question: "What is the most respectful and efficient way for Adan to approach the teacher?", choices: [ { text: "Walk up and say, 'Excuse me, I know you're busy. Could you please clarify one quick thing about the essay requirements?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. By showing you are polite and respect the teacher's time, you build a positive connection." }, { text: "Wait by the door and try to make eye contact.", score: 1, effectiveness: "Less Effective", feedback: "This passive approach fails to assert your needs. You risk missing the opportunity to get help." }, { text: "Say nothing and leave, assuming he'll figure it out later.", score: 0, effectiveness: "Least Effective", feedback: "By failing to ask for help, you allow uncertainty to feed anxiety." } ] },
+            { type: 'scene', icon: 'fas fa-video', context: "A peer of Adan's is highly skilled at creating advanced video edits. Adan wants to improve his own skills.", question: "How should Adan ask them to be a mentor?", choices: [ { text: "Praise their skill specifically, then ask: 'Your edits are incredible. Would you be willing to show me a few tips? I could grab you a coffee in return.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. It uses specific praise and offers a fair trade." }, { text: "Send them a DM asking if they can mentor Adan and teach him all their secrets whenever they have free time.", score: 1, effectiveness: "Less Effective", feedback: "This approach fails to acknowledge their time or skill and feels like you're demanding free work." }, { text: "Wait until they are busy working, look over their shoulder, and interrupt them frequently.", score: 0, effectiveness: "Least Effective", feedback: "This action is intrusive and rude, demonstrating a lack of respect for their focus." } ] },
+            { type: 'scene', icon: 'fas fa-exclamation-triangle', context: "At a party, Adan saw a close friend drinking alcohol heavily and taking unnecessary risks. Adan is very worried.", question: "Who is the right person for Adan to approach for help?", choices: [ { text: "Approach a trusted, responsible adult privately and state the facts: 'I saw [Friend] drinking heavily, and I'm concerned for their safety.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice when safety is at risk. Seeking help from a dependable adult increases the likelihood of getting real assistance." }, { text: "Confront the friend the next day and tell them how stupid they were.", score: 1, effectiveness: "Less Effective", feedback: "Confronting them with anger is unlikely to work. Guilt is a poor method for long-term change." }, { text: "Post an anonymous rumor about the friend's behavior on social media to shame them.", score: 0, effectiveness: "Least Effective", feedback: "Shaming people is an ineffective strategy. This action is dishonest and will likely make the situation much worse." } ] },
+            { type: 'scene', icon: 'fas fa-clock', context: "Adan has consistently missed several assignment deadlines because of a struggle with planning and getting started.", question: "Who should Adan ask for help, and how?", choices: [ { text: "Schedule a brief, private meeting with a teacher or counselor: 'I struggle with self-control when starting big projects.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. Recognizing a specific weakness and seeking help is a sign of a mature learner." }, { text: "Blame the school schedule and the teachers for giving too much work.", score: 1, effectiveness: "Less Effective", feedback: "Blaming external factors limits the chance for real change because it places the problem outside of your control." }, { text: "Just wait until the deadlines are missed, then panic and lie.", score: 0, effectiveness: "Least Effective", feedback: "Lying is a self-defeating emotional impulse that damages trust." } ] },
+            { type: 'scene', icon: 'fas fa-brain', context: "Adan's anxiety about school has been rising, making it hard to concentrate and sleep. Adan decides to talk to the school counselor.", question: "What should Adan focus on when describing his mental state?", choices: [ { text: "Describe the physical and thinking symptoms (e.g., racing heart, inability to focus) and explain how they interfere with schoolwork.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. Specifics help the counselor understand the problem's real-world impact." }, { text: "Start crying immediately and say, 'I just feel awful, but I don't know why.'", score: 1, effectiveness: "Less Effective", feedback: "It's okay to be emotional, but being unable to clarify feelings makes the issue difficult to manage." }, { text: "Tell the counselor he needs medication immediately because of what he saw online.", score: 0, effectiveness: "Least Effective", feedback: "Seeking a predetermined fix rather than describing the problem is not effective help-seeking behavior." } ] },
+            { type: 'scene', icon: 'fas fa-headset', context: "Adan is stuck on an urgent question in his homework, but a parent is deeply immersed in an important work call.", question: "How should Adan signal the urgent need for help without disrupting them?", choices: [ { text: "Write a brief, specific note (e.g., 'Urgent science Q. Can you spare 5 mins when you hang up?') and place it near them.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. It respects the parent's deep focus while clearly communicating your need." }, { text: "Stand next to them in silence until they finally finish their call, looking impatient.", score: 1, effectiveness: "Less Effective", feedback: "This demonstrates a lack of politeness and risks making your parent annoyed." }, { text: "Tap their arm repeatedly and whisper, 'I need help now!'", score: 0, effectiveness: "Least Effective", feedback: "This impulsive action is highly disruptive and will likely cause a negative reaction." } ] },
+            { type: 'scene', icon: 'fas fa-file-contract', context: "Adan receives a paper back covered in harsh, critical red marks. He feels helpless and wants to give up.", question: "How should Adan replantear mentalmente la situación para pedir ayuda al maestro de manera efectiva?", choices: [ { text: "Dispute the pessimistic thought by asking: 'Can you help me identify the top three areas I can change for the next assignment?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. By defining the failure as something that can be changed, you adopt an optimistic outlook." }, { text: "Tear the paper up immediately and say, 'This class is impossible.'", score: 1, effectiveness: "Less Effective", feedback: "This impulsive action avoids confronting the problem and reinforces helplessness." }, { text: "Send an angry email accusing the teacher of grading unfairly.", score: 0, effectiveness: "Least Effective", feedback: "Using defensiveness closes the door on communication and prevents you from receiving useful feedback." } ] },
+            { type: 'scene', icon: 'fas fa-flask', context: "Adan is struggling to understand a complex science lab report. He needs an adult to clarify the method.", question: "How should Adan phrase the question to show he has already applied problem-solving skills?", choices: [ { text: "Approach the teacher: 'We followed steps 1-3 and identified the problem here. We thought about doing X, but we're stuck. Could you guide us?'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. Showing you've made an effort makes the teacher more likely to respect your request." }, { text: "Tell the teacher that the instructions aren't clear and ask for the answer.", score: 1, effectiveness: "Less Effective", feedback: "This vague appeal suggests a lack of initial effort." }, { text: "Start debating loudly with his partner until the teacher intervenes.", score: 0, effectiveness: "Least Effective", feedback: "This emotional behavior is an ineffective strategy that distracts others." } ] },
+            { type: 'scene', icon: 'fas fa-code', context: "Adan's parent is helping with a coding project but keeps interrupting with harsh criticisms like, You're always making mistakes.", question: "How should Adan assertively ask them to change their feedback style?", choices: [ { text: "Use the 'XYZ' formula: 'When you say I'm always making mistakes, I feel anxious. I wish you would tell me specifically where the error is instead.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. It offers a clear, actionable solution without being a personal attack." }, { text: "Silently close the laptop and walk away.", score: 1, effectiveness: "Less Effective", feedback: "Walking away is a passive move that doesn't resolve the underlying issue." }, { text: "Yell back, 'Stop attacking me! You're making me hate coding!'", score: 0, effectiveness: "Least Effective", feedback: "Escalating the issue by yelling turns a helper into an opponent." } ] },
+            { type: 'scene', icon: 'fas fa-book-reader', context: "Adan needs help studying for a tough history test. A classmate mentioned studying alone.", question: "How should Adan ask for help while respecting their time?", choices: [ { text: "Approach them after class: 'I noticed you mentioned studying history. Would you be willing to study together? We could quiz each other.'", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You stated the request clearly and offered a way to work together." }, { text: "Text them immediately: 'Help me study! I'm totally failing and you're the only one who can help me.'", score: 1, effectiveness: "Less Effective", feedback: "Using strong, pessimistic language puts too much pressure on the other person." }, { text: "Say nothing, but show up where they study and sit silently next to them.", score: 0, effectiveness: "Least Effective", feedback: "This passive approach is socially awkward and puts the other person in an uncomfortable position." } ] }
+        ];
+
+        // --- APP LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+
+            const pages = document.querySelectorAll('.page');
+            const nextButton = document.getElementById('next-button');
+            const backButton = document.getElementById('back-button');
+            const progressBar = document.getElementById('flex-progress-fill');
+            const startupScreen = document.getElementById('startup-screen');
+            const loginModal = document.getElementById('login-modal');
+
+            // --- MENU LOGIC ---
+            function updateTOC() {
+                const tocList = document.getElementById('toc-list');
+                tocList.innerHTML = '';
+                const addLink = (text, idx, bold=false) => {
+                    const btn = document.createElement('button');
+                    const isCompleted = answeredScenarioScores[idx - 1] !== undefined;
+                    
+                    btn.className = `w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 rounded transition-colors flex justify-between items-center ${bold ? 'font-bold' : ''}`;
+                    btn.onclick = () => {
+                        window.showPage(idx);
+                        window.closeMenuModal();
+                    };
+                    
+                    let content = `<span>${text}</span>`;
+                    if (isCompleted) {
+                        content += `<i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i>`;
+                    } else if (idx >= 2 && idx <= 31) {
+                        content += `<i data-lucide="circle-dot" class="w-3 h-3 text-gray-400"></i>`;
+                    }
+                    
+                    btn.innerHTML = content;
+                    tocList.appendChild(btn);
+                };
+
+                addLink("1. Field Guide Cover", 0, true);
+                addLink("2. Choose a Module", 1, true);
+                
+                let moduleHeader = document.createElement('div');
+                moduleHeader.className = "px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2";
+                
+                SCENARIO_DATA.forEach((s, i) => {
+                    const scenarioIndex = i + 1; // 1 to 30
+                    const pageIndex = i + 2; // 2 to 31 (Global Page Index)
+                    
+                    let moduleName = '';
+                    if (scenarioIndex === 1) moduleName = 'Module 1: Initiating Conversations';
+                    else if (scenarioIndex === 11) moduleName = 'Module 2: Active Listening';
+                    else if (scenarioIndex === 21) moduleName = 'Module 3: Asking for Help';
+                    
+                    if (moduleName) {
+                        moduleHeader = document.createElement('div');
+                        moduleHeader.className = "px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2";
+                        moduleHeader.textContent = moduleName;
+                        tocList.appendChild(moduleHeader);
+                    }
+                    
+                    // Scenario links use their page index (2 through 31)
+                    addLink(`Scenario ${scenarioIndex}:`, pageIndex);
+                });
+                
+                addLink("33. Conclusion & Badge", 32, true);
+                lucide.createIcons(); // Re-render icons after DOM manipulation
+            }
+
+            // Navigation
+            window.showPage = function(index) {
+                if (index < 0 || index >= TOTAL_PAGES) return;
+                
+                // Check completion before allowing entry to Page 33 (Index 32)
+                if (index === 32 && Object.keys(answeredScenarioScores).length < TOTAL_SCENARIOS) {
+                    window.showScenarioOutcome('challenge-incomplete'); return;
+                }
+
+                if(window.sfx) window.sfx.nav();
+                pages.forEach(p => p.classList.remove('active'));
+                pages[index].classList.add('active');
+                currentPageIndex = index;
+                pages[index].scrollTop = 0;
+                
+                backButton.disabled = (index === 0);
+                backButton.classList.toggle('opacity-0', index === 0);
+                
+                const nextSpan = nextButton.querySelector('span');
+                const startSpan = nextButton.querySelector('.hidden.sm\\:inline');
+                let btnText = 'Next';
+                
+                if (index === 0) btnText = 'Start Challenge';
+                else if (index === 1) btnText = 'Choose Module'; // Placeholder, actual buttons on page handle nav
+                else if (index === 32) { 
+                    nextButton.style.display = 'none';
+                    window.generateBadge();
+                    window.logFinalScoreToFirestore({ finalScore: totalChallengeScore, rank: "Completed", completed: true, sessionId: window.sessionId });
+                } else {
+                    nextButton.style.display = 'flex'; 
+                }
+
+                if (index >= 2 && index < 32) { 
+                    btnText = Object.keys(answeredScenarioScores).length === 30 ? 'View Score' : 'Next'; 
+                }
+                
+                if(startSpan) startSpan.textContent = btnText;
+                
+                // Disable Next button on module selection page (Page 2, index 1)
+                if (index === 1) {
+                    nextButton.style.visibility = 'hidden';
+                } else if (index !== 32) {
+                    nextButton.style.visibility = 'visible';
+                }
+                
+                progressBar.style.width = `${((index + 1) / TOTAL_PAGES) * 100}%`;
+                document.getElementById('header-page-indicator').textContent = `${index + 1} / ${TOTAL_PAGES}`;
+                
+                updateTOC(); // Update TOC status on page change
+            }
+            
+            // Custom Jump Function for Modules
+            window.startModule = (moduleNum) => {
+                if (moduleNum === 1) window.showPage(2);
+                if (moduleNum === 2) window.showPage(12);
+                if (moduleNum === 3) window.showPage(22);
+            }
+
+            // Scenario Renderer - The Engine
+            function getScenarioTemplate(type, context, choicesHtml, feedbackHtml, displayNum) {
+                
+                // Common Choices/Feedback Wrapper
+                const interactionWrapper = `
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <p class="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-2">Your Response:</p>
+                        <div class="space-y-2">${choicesHtml}</div>
+                        ${feedbackHtml ? `<div class="mt-3 animate-fade-in">${feedbackHtml}</div>` : ''}
+                    </div>`;
+
+                // The "Interaction Card" Template
+                return `
+                <div class="interaction-card">
+                    <!-- Header -->
+                    <div class="scenario-header">
+                        <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white">
+                            <i class="${type === 'scene' ? 'fas fa-user-friends' : 'fas fa-comment-dots'}"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold uppercase tracking-wide opacity-90">Interaction #${displayNum}</h3>
+                            <p class="text-xs opacity-75">Social Scenario</p>
+                        </div>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="p-6 md:p-8 bg-journal-paper relative">
+                        <!-- Context Icon -->
+                        <div class="absolute top-6 right-6 text-gray-200 text-6xl opacity-20">
+                            <i class="${type === 'scene' ? 'fas fa-map-marker-alt' : 'fas fa-wifi'}"></i>
+                        </div>
+                        
+                        <div class="relative z-10">
+                            <p class="text-gray-700 text-lg leading-relaxed font-body mb-6">
+                                ${context}
+                            </p>
+                            
+                            ${interactionWrapper}
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            function renderScenarioPage(pageElement, scenarioIndex) {
+                const data = SCENARIO_DATA[scenarioIndex - 1];
+                const isAnswered = answeredScenarioScores[scenarioIndex] !== undefined;
+                
+                // Calculate display number (1-10) based on module
+                const displayNum = (scenarioIndex - 1) % 10 + 1;
+
+                // Shuffle logic
+                let choicesToRender = data.choices.map((c, i) => ({...c, originalIndex: i}));
+                if (!isAnswered) {
+                    choicesToRender.sort((a, b) => {
+                        let seed = (a.text.length + scenarioIndex) % 3;
+                        if (seed === 0) return 1;
+                        if (seed === 1) return -1;
+                        return 0;
+                    });
+                }
+                
+                let choicesHtml = choicesToRender.map((choice, i) => {
+                    let btnClass = 'w-full text-left p-4 rounded-lg text-sm font-medium transition-all shadow-sm choice-btn flex items-start gap-3';
+                    if (isAnswered) {
+                        if (choice.score === 3) btnClass += ' choice-correct';
+                        else if (answeredScenarioScores[scenarioIndex] === choice.score) btnClass += choice.score === 1 ? ' choice-less-effective' : ' choice-least-effective';
+                        else btnClass += ' opacity-50 bg-gray-50';
+                    }
+                    const disabledAttr = isAnswered ? 'disabled' : '';
+                    
+                    return `<button class="${btnClass}" onclick="window.selectScenarioChoice(${scenarioIndex}, ${choice.originalIndex})" ${disabledAttr}>
+                        <div class="mt-0.5 w-5 h-5 rounded-full border border-gray-300 flex-shrink-0 flex items-center justify-center text-xs text-gray-400 font-bold">
+                            ${String.fromCharCode(65 + i)}
+                        </div>
+                        <span>${choice.text}</span>
+                    </button>`;
+                }).join('');
+
+                let feedbackHtml = '';
+                if (isAnswered) {
+                    const chosen = data.choices.find(c => c.score === answeredScenarioScores[scenarioIndex]);
+                    let bgClass = chosen.score === 3 ? 'bg-emerald-50 border-emerald-100' : (chosen.score === 1 ? 'bg-amber-50 border-amber-100' : 'bg-rose-50 border-rose-100');
+                    let textClass = chosen.score === 3 ? 'text-emerald-800' : (chosen.score === 1 ? 'text-amber-800' : 'text-rose-800');
+                    feedbackHtml = `
+                    <div class="${bgClass} border rounded p-4 text-sm ${textClass}">
+                        <strong class="block mb-1 uppercase tracking-wide text-xs font-bold">${chosen.effectiveness}</strong>
+                        ${chosen.feedback}
+                    </div>`;
+                }
+
+                // Render
+                const visualHtml = getScenarioTemplate(data.type, data.context, choicesHtml, feedbackHtml, displayNum);
+
+                pageElement.innerHTML = `
+                    <div class="h-full flex flex-col justify-center">
+                        <!-- Module Header -->
+                        <div class="text-center mb-4">
+                            <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                ${scenarioIndex <= 10 ? 'Initiating Conversations' : (scenarioIndex <= 20 ? 'Active Listening' : 'Asking for Help')}
+                            </span>
+                        </div>
+                        <div class="flex-1 overflow-y-auto px-2 sm:px-4 pb-20 pt-2">
+                            ${visualHtml}
+                        </div>
+                    </div>`;
+            }
+
+            window.selectScenarioChoice = function(sIdx, cIdx) {
+                const data = SCENARIO_DATA[sIdx - 1];
+                const chosen = data.choices[cIdx];
+                if (answeredScenarioScores[sIdx] === undefined) {
+                    totalChallengeScore += chosen.score;
+                    answeredScenarioScores[sIdx] = chosen.score;
+                    window.logScenarioAttempt({ scenarioIndex: sIdx, score: chosen.score, effectiveness: chosen.effectiveness });
+                    window.logFinalScoreToFirestore({ finalScore: totalChallengeScore, sessionId: window.sessionId });
+                }
+                window.showPage(currentPageIndex);
+                let iconClass = chosen.score === 3 ? 'text-green-600 bg-green-100' : (chosen.score === 1 ? 'text-yellow-600 bg-yellow-100' : 'text-red-600 bg-red-100');
+                let iconInner = chosen.score === 3 ? '<i class="fas fa-check-circle"></i>' : (chosen.score === 1 ? '<i class="fas fa-exclamation-circle"></i>' : '<i class="fas fa-times-circle"></i>');
+                window.showScenarioOutcome(chosen.effectiveness, chosen.feedback, iconClass, iconInner);
+            }
+
+            window.showScenarioOutcome = (title, text, iconClass, iconInner) => {
+                if (title === 'challenge-incomplete') {
+                    document.getElementById('scenario-title').textContent = "Incomplete";
+                    document.getElementById('scenario-feedback').textContent = "Please answer all questions.";
+                    document.getElementById('scenario-icon').className = "mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl bg-red-100 text-red-600";
+                    document.getElementById('scenario-icon').innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                    document.getElementById('scenario-modal-next-btn').onclick = () => window.closeScenarioModal(false);
+                } else {
+                    document.getElementById('scenario-title').textContent = title;
+                    document.getElementById('scenario-feedback').innerHTML = text; 
+                    document.getElementById('scenario-icon').className = `mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl ${iconClass}`;
+                    document.getElementById('scenario-icon').innerHTML = iconInner;
+                    document.getElementById('scenario-modal-next-btn').onclick = () => window.closeScenarioModal(true);
+                }
+                document.getElementById('scenario-modal').classList.remove('hidden-modal');
+                document.getElementById('scenario-modal').classList.add('visible-modal');
+                if(window.sfx) sfx.tick();
+            }
+
+            window.closeScenarioModal = (advance) => {
+                document.getElementById('scenario-modal').classList.remove('visible-modal');
+                document.getElementById('scenario-modal').classList.add('hidden-modal');
+                if (advance && currentPageIndex < 32) window.showPage(currentPageIndex + 1);
+            }
+
+            // --- BADGE LOGIC ---
+            window.generateBadge = function() {
+                const name = (window.currentUserName || "Learner");
+                const score = totalChallengeScore;
+                
+                // Badge Logic
+                let title = "Learner";
+                let badgeColor = "#357889";
+                if (score >= BADGE_THRESHOLD) { 
+                    title = "Certified Communicator"; 
+                    badgeColor = "#D34716"; 
+                } else if (score >= 60) {
+                    title = "Skilled Practitioner";
+                    badgeColor = "#EAB308";
+                }
+                
+                document.querySelector('#page-33 h2').textContent = `Congratulations, ${name}!`;
+                
+                // SVG Badge: Corrected for Purposeful Communicator Challenge
+                const dateText = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                const scoreText = `${score} / ${MAX_SCORE}`;
+                const nameText = name.toUpperCase();
+
+                const svgBadge = `
+                <svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <pattern id="smallGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E0E0E0" stroke-width="2"/>
+                        </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="#F7F7F7"/>
+                    <rect width="100%" height="100%" fill="url(#smallGrid)"/>
+                    <rect x="30" y="30" width="1140" height="740" rx="20" ry="20" fill="none" stroke="#357889" stroke-width="8"/>
+                    <text x="600" y="100" font-family="Georgia, serif" font-weight="bold" font-size="42" fill="#357889" text-anchor="middle" letter-spacing="2">ALLGOOD ACADEMY</text>
+                    <text x="600" y="140" font-family="Verdana, sans-serif" font-size="16" fill="#4C4C4C" text-anchor="middle" letter-spacing="4">PRAGMATIC ACTION CERTIFICATION</text>
+                    <line x1="400" y1="160" x2="800" y2="160" stroke="#D34716" stroke-width="3"/>
+                    <g transform="translate(300, 400)">
+                        <circle cx="0" cy="0" r="140" fill="white" stroke="#357889" stroke-width="5"/>
+                        <!-- Updated Icon: Purposeful Communication (Speech Bubble + Upward Trend) -->
+                        <g transform="translate(0, 0)">
+                             <!-- Simplified Speech Bubble -->
+                             <path d="M -80 -40 Q -80 40 0 80 Q 80 40 80 -40 C 80 -60 60 -80 40 -80 H -40 C -60 -80 -80 -60 -80 -40 Z" fill="#D34716" transform="scale(1.2)" />
+                             <!-- Checkmark/Action Indicator (Arrow) -->
+                             <path d="M -30 20 L 0 -40 L 30 20 L 10 0 L 10 70 L -10 70 L -10 0 Z" fill="white" transform="translate(0, -30) scale(0.6)" />
+                        </g>
+                        <!-- Decorative Circles -->
+                        <circle cx="100" cy="-100" r="25" fill="#357889" stroke="white" stroke-width="2"/>
+                        <path transform="translate(90, -110) scale(1)" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/>
+                        <circle cx="-100" cy="100" r="25" fill="#357889" stroke="white" stroke-width="2"/>
+                         <rect x="-108" y="98" width="16" height="12" rx="2" fill="white"/> 
+                         <path d="M-105 98 V 94 A 5 5 0 0 1 -95 94 V 98" stroke="white" stroke-width="2" fill="none"/>
+                    </g>
+                    <g transform="translate(600, 280)">
+                        <text x="0" y="0" font-family="Verdana, sans-serif" font-size="14" fill="#757575" font-weight="bold">CERTIFIED AGENT:</text>
+                        <text x="0" y="50" font-family="Georgia, serif" font-size="28" fill="#357889" font-weight="bold" letter-spacing="1">${nameText}</text>
+                        <text x="0" y="100" font-family="Verdana, sans-serif" font-size="24" fill="#4C4C4C" font-weight="bold" letter-spacing="2">PURPOSEFUL COMMUNICATOR</text>
+                        <rect x="0" y="140" width="500" height="220" rx="10" fill="#F7F7F7" stroke="#E5E7EB" stroke-width="3"/>
+                        <g transform="translate(30, 190)" font-family="Courier New, monospace" font-size="22" fill="#357889">
+                            <text x="0" y="0" font-weight="bold">MODULE:</text><text x="160" y="0" fill="#4C4C4C" font-size="18">Purposeful Communicator Challenge</text>
+                            <text x="0" y="50" font-weight="bold">STATUS:</text><text x="160" y="50" fill="#D34716" font-weight="bold">VERIFIED</text>
+                            <text x="0" y="100" font-weight="bold">DATE:</text><text x="160" y="100" fill="#4C4C4C">${dateText}</text>
+                            <text x="0" y="150" font-weight="bold">FINAL SCORE:</text><text x="160" y="150" fill="#357889" font-weight="bold">${scoreText}</text>
+                        </g>
+                    </g>
+                    <text x="600" y="750" font-family="Georgia, serif" font-style="italic" font-size="18" fill="#757575" text-anchor="middle">"Move from passive consumption to purposeful action."</text>
+                </svg>`;
+                
+                document.getElementById('badge-container').innerHTML = svgBadge;
+                
+                // Setup Download
+                const blob = new Blob([svgBadge], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const dlBtn = document.getElementById('download-badge-btn');
+                if(dlBtn) dlBtn.href = url;
+
+                // Log to Database if Unlocked
+                if (score >= BADGE_THRESHOLD) {
+                    window.logFinalScoreToFirestore({ 
+                        finalScore: totalChallengeScore, 
+                        rank: title, 
+                        completed: true, 
+                        badgeSVG: svgBadge,
+                        sessionId: window.sessionId 
+                    });
+                }
+            }
+
+            window.setRating = function(n) {
+                for (let i = 1; i <= 5; i++) {
+                    const star = document.getElementById(`star-${i}`);
+                    if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                    else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
+                }
+                sfx.tick();
+            }
+            
+            window.submitFeedback = function() {
+                const feedbackText = document.getElementById('feedback-text').value;
+                window.logFinalScoreToFirestore({ feedback: feedbackText, rank: "Feedback", sessionId: window.sessionId });
+                document.getElementById('feedback-container').classList.add('hidden');
+                document.getElementById('feedback-success').classList.remove('hidden');
+                sfx.nav(); 
+            }
+
+            window.performHardReset = () => {
+                totalChallengeScore = 0;
+                answeredScenarioScores = {};
+                pages.forEach(p => { 
+                    const idx = parseInt(p.getAttribute('data-scenario-index')); 
+                    if(idx) renderScenarioPage(p, idx); 
+                });
+                
+                document.getElementById('feedback-container').classList.remove('hidden');
+                document.getElementById('feedback-success').classList.add('hidden');
+                document.getElementById('feedback-text').value = '';
+                window.setRating(0);
+                
+                startupScreen.style.display = 'flex';
+                setTimeout(() => startupScreen.style.opacity = '1', 10);
+                window.showPage(0);
+                sfx.powerOff();
+            }
+
+            // Init
+            pages.forEach(p => { const idx = parseInt(p.getAttribute('data-scenario-index')); if(idx) renderScenarioPage(p, idx); });
+            updateTOC();
+            
+            // Listeners
+            if(nextButton) nextButton.addEventListener('click', () => { if (currentPageIndex < (TOTAL_PAGES - 1)) window.showPage(currentPageIndex + 1); else window.performHardReset(); });
+            if(backButton) backButton.addEventListener('click', () => { if(currentPageIndex > 0) window.showPage(currentPageIndex - 1); });
+            
+            // Startup
+            if (startupScreen) {
+                const warmUp = () => { if(window.initAudio) window.initAudio(); };
+                startupScreen.addEventListener('mousedown', warmUp, { once: true });
+                startupScreen.addEventListener('click', () => {
+                    if(window.sfx) window.sfx.powerOn();
+                    if (window.currentUser) {
+                        window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+                        window.showPage(0);
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    } else {
+                        loginModal.classList.remove('hidden-modal');
+                        loginModal.classList.add('visible-modal');
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    }
+                });
+            }
+            
+            // Accordion Logic
+            document.querySelectorAll('.accordion-toggle').forEach(acc => {
+                acc.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    const icon = this.querySelector('.accordion-icon');
+                    content.classList.toggle('hidden');
+                    if(icon) icon.classList.toggle('rotate-180');
+                    if(window.sfx) window.sfx.tick();
+                });
+            });
+
+            // System Menu
+            window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); };
+            window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); };
+            window.closeSystemMenu = () => { document.getElementById('system-menu-modal').classList.add('hidden-modal'); document.getElementById('system-menu-modal').classList.remove('visible-modal'); };
+            window.handleLogOut = async () => { if (window.authSignOut) await window.authSignOut(); window.performHardReset(); window.closeSystemMenu(); };
+            window.handleSystemExit = () => { window.location.href = "https://www.allgoodacademy.com"; };
+            
+            document.getElementById('menu-toggle').addEventListener('click', window.openMenuModal);
+            document.getElementById('close-menu').addEventListener('click', window.closeMenuModal);
+            
+            // Home Long Press
+            const hBtn = document.getElementById('home-button');
+            let pressTimer;
+            const startPress = () => { pressTimer = setTimeout(() => { 
+                document.getElementById('system-menu-modal').classList.remove('hidden-modal'); 
+                document.getElementById('system-menu-modal').classList.add('visible-modal'); 
+                if(window.sfx) window.sfx.nav(); 
+            }, 2000); };
+            const endPress = () => clearTimeout(pressTimer);
+            
+            hBtn.addEventListener('mousedown', startPress);
+            hBtn.addEventListener('touchstart', (e) => { startPress(); }, {passive: true});
+            hBtn.addEventListener('mouseup', endPress);
+            hBtn.addEventListener('mouseleave', endPress);
+            hBtn.addEventListener('touchend', endPress);
+            hBtn.addEventListener('click', () => { if(currentPageIndex !== 0) window.showPage(0); });
+
+            document.getElementById('fullscreen-toggle').addEventListener('click', () => { document.querySelector('.tablet-frame').classList.toggle('expanded-mode'); document.getElementById('fullscreen-toggle').classList.toggle('text-green-300'); });
+            
+            document.getElementById('blueprint-toggle').addEventListener('click', () => {
+                document.getElementById('screen').classList.toggle('blueprint-mode');
+                document.getElementById('blueprint-toggle').classList.toggle('text-cyan-300');
+                if(window.sfx) window.sfx.tick();
+            });
+
+            window.showPage(0);
+        });
+    </script>
+</body>
+</html>

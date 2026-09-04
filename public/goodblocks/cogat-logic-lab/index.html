@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Allgood Academy: CogAT Logic Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    
+    <!-- FIREBASE SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, updateProfile, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko", authDomain: "allgood-academy.firebaseapp.com", projectId: "allgood-academy" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'allgood-academy';
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.auth = auth;
+        window.db = db;
+        window.authSignOut = () => signOut(auth);
+
+        window.currentUser = null;
+        window.currentUserName = "Detective";
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                window.currentUser = user;
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Detective";
+                if (finalName === "Detective") {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists() && userDoc.data().displayName) finalName = userDoc.data().displayName;
+                    } catch(e) {}
+                }
+                window.currentUserName = finalName;
+                document.getElementById('header-welcome-text').textContent = `Welcome: ${finalName}`;
+                
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                }
+            }
+        });
+
+        window.ensureUserContainer = async (user, name, email) => {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             try { await setDoc(userRef, { displayName: name, email: email || null, lastLogin: serverTimestamp(), lastActiveModule: document.title }, { merge: true }); } catch (e) {}
+        }
+
+        // UPDATED: Robust Session Logging
+        window.logFinalScoreToFirestore = async (data) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            try { 
+                await setDoc(sessionRef, { 
+                    gameName: document.title, 
+                    ...data, 
+                    lastUpdated: serverTimestamp(), 
+                    user: { uid: user.uid, displayName: window.currentUserName } 
+                }, { merge: true }); 
+                console.log("[DB] Session Data Updated:", data);
+            } catch (e) { console.error("Session Log Failed", e); }
+        }
+
+        // NEW: Event Logging for Granular Tracking (Personas, Clicks)
+        window.logEvent = async (action, detail, payload = {}) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'logs');
+            try {
+                await addDoc(logsRef, {
+                    action: action,
+                    detail: detail,
+                    payload: payload,
+                    timestamp: serverTimestamp()
+                });
+                console.log(`[DB] Event Logged: ${action} - ${detail}`);
+            } catch (e) { console.error("Event Log Failed", e); }
+        }
+
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            btn.innerText = "Accessing Lab..."; btn.disabled = true;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                else if (!auth.currentUser) await signInAnonymously(auth);
+                
+                const user = auth.currentUser;
+                const displayName = nameInput || "Detective";
+                if (user) {
+                    await updateProfile(user, { displayName: displayName });
+                    await window.ensureUserContainer(user, displayName, null);
+                    window.currentUserName = displayName;
+                    localStorage.setItem('aa_username', displayName);
+                    document.getElementById('header-welcome-text').textContent = `Welcome: ${displayName}`;
+                    document.getElementById('login-modal').classList.add('hidden-modal');
+                    document.getElementById('login-modal').classList.remove('visible-modal');
+                    if(window.showPage) window.showPage(0);
+                    if(window.sfx) window.sfx.nav();
+                    
+                    // Log Session Start
+                    window.logFinalScoreToFirestore({ rank: "Session Started", module: "CogAT Logic Lab" });
+                }
+            } catch (error) { alert("Connection failed."); } finally { btn.innerText = "Enter Lab"; btn.disabled = false; }
+        };
+
+        window.handleGoogleLogin = async () => {
+            try {
+                const result = await signInWithPopup(auth, new GoogleAuthProvider());
+                const user = result.user;
+                const finalName = user.displayName || "Detective";
+                await window.ensureUserContainer(user, finalName, user.email);
+                window.currentUserName = finalName;
+                localStorage.setItem('aa_username', finalName);
+                document.getElementById('header-welcome-text').textContent = `Welcome: ${finalName}`;
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                if(window.showPage) window.showPage(0);
+                if(window.sfx) window.sfx.nav();
+                
+                // Log Session Start
+                window.logFinalScoreToFirestore({ rank: "Session Started", module: "CogAT Logic Lab" });
+            } catch (error) { alert("Google Sign-In failed."); }
+        };
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                    animation: {
+                        'grow-graph': 'growGraph 1.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        growGraph: {
+                            '0%': { height: '10%' },
+                            '100%': { height: '80%' }
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: Verdana, sans-serif;
+            background-color: #1a1a1a;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-attachment: fixed;
+            min-height: 100vh;
+            margin: 0; padding: 0;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+
+        .tablet-frame {
+            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative; margin: 20px auto;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
+            transition: width 0.3s, height 0.3s;
+        }
+        .tablet-frame::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border-radius: 6px; background: #111; z-index: 0; }
+
+        .screen-container {
+            width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1;
+            overflow: hidden; display: flex; flex-direction: column; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        #main-scroll-view::-webkit-scrollbar { width: 14px; }
+        #main-scroll-view::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        #main-scroll-view::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .glass-panel { background-color: rgba(30, 41, 59, 0.8) !important; border: 1px solid #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        .blueprint-mode #mentor-bar { background-color: #1e293b !important; border-bottom-color: #334155 !important; }
+        .blueprint-mode #mentor-text { color: #94a3b8 !important; }
+
+        @media (max-width: 768px) {
+            html, body { position: fixed; width: 100%; height: 100dvh; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            main { padding: 0 !important; height: 100dvh !important; width: 100% !important; display: block; position: fixed; top: 0; left: 0; }
+            .tablet-frame {
+                position: absolute !important; top: 0; left: 0; right: 0; bottom: 0;
+                width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important;
+                margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important;
+                box-shadow: none !important; background: #F7F7F7 !important; aspect-ratio: unset !important;
+            }
+            .tablet-frame::before { display: none !important; }
+            .screen-container { border-radius: 0 !important; box-shadow: none !important; }
+            header.navbar-content { padding-top: max(env(safe-area-inset-top), 12px); height: auto; min-height: 60px; padding-bottom: 12px; }
+            footer.footer-content {
+                position: absolute; bottom: 0; left: 0; width: 100%;
+                padding-bottom: max(env(safe-area-inset-bottom), 20px); padding-top: 12px; height: auto; min-height: 80px;
+                z-index: 100; background-color: white; border-top: 1px solid #e5e7eb;
+            }
+            .page { padding-bottom: 200px !important; } 
+        }
+
+        .tablet-frame.focus-mode { 
+            position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            max-width: none !important; max-height: none !important; aspect-ratio: unset !important;
+            margin: 0 !important; padding: 0 !important; z-index: 99999 !important;
+            border-radius: 0 !important; background: #F7F7F7 !important;
+        }
+        .tablet-frame.focus-mode::before { display: none; }
+        
+        .navbar-content { flex: 0 0 60px; z-index: 50; }
+        .page { width: 100%; height: auto; padding: 20px; position: relative; display: none; }
+        .page.active { display: block; }
+        .footer-content { flex: 0 0 60px; z-index: 50; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+
+        /* --- VISUAL UPGRADE: TACTILE BLUEPRINT --- */
+        .tactile-grid {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 0.75rem; /* rounded-xl */
+        }
+        .btn-tactile {
+            transition: all 0.1s ease-out;
+        }
+        .btn-tactile:active {
+            transform: scale(0.97);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Custom UI */
+        .flip-card { background-color: transparent; width: 100%; height: 220px; perspective: 1000px; cursor: pointer; }
+        .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        .flip-card-front { background-color: white; }
+        .flip-card-back { background-color: #357889; color: white; transform: rotateY(180deg); border: none; }
+        
+        .test-shape { width: 80px; height: 80px; background-color: #357889; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); margin: 0 auto; border-radius: 8px; }
+        
+        .bridge-word { padding: 10px 20px; border: 2px solid #e5e7eb; border-radius: 99px; cursor: pointer; transition: all 0.2s; font-weight: bold; background: white; color: #4C4C4C; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .bridge-word:hover { border-color: #D34716; color: #D34716; transform: translateY(-1px); }
+        .bridge-word.selected { background-color: #D34716; color: white; border-color: #D34716; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .reality-game-container {
+            background-color: #F0FFF4;
+            border: 1px solid #48BB78;
+            color: #2F855A;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            border-radius: 0.5rem;
+            animation: slideUp 0.5s ease-out;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-8">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative">
+                                <div class="absolute inset-0 bg-white/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <i data-lucide="brain-circuit" class="w-20 h-20 text-white mb-6 relative z-10 drop-shadow-md"></i>
+                                <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-[0.2em] uppercase">Allgood Academy</h2>
+                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm">Logic Lab</h1>
+                                <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">CogAT Edition</p>
+                            </div>
+                            <p class="mt-16 text-white/50 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">TAP TO INITIALIZE</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. HEADER -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center shrink-0">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Welcome: Detective</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 16</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <button id="fullscreen-toggle" class="hidden md:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- MODALS -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 visible-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Identity Verification</h2>
+                        
+                        <!-- Tooltip Container -->
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <i data-lucide="help-circle" class="w-4 h-4 mr-1"></i>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <!-- Hover Content -->
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 font-body leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged in real-time to improve the GoodBlock experience. All personal data is kept confidential and never sold.</p>
+                                    <div class="border-t border-gray-700 my-1 pt-1"></div>
+                                    <p class="text-gray-300"><strong>Email (Optional):</strong> Enter to join the Allgood Academy community.</p>
+                                </div>
+                            </button>
+                        </div>
+                        
+                        <input type="text" id="user-name-input" placeholder="Detective Name" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Enter Lab</button>
+                        
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Lab Manual</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                        <!-- New Log Out Footer -->
+                        <div class="p-4 border-t border-gray-200 bg-gray-50">
+                            <button onclick="window.handleLogOut()" class="w-full text-red-600 font-bold text-sm flex items-center justify-center py-2 hover:bg-red-50 rounded transition-colors btn-tactile">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4"><i data-lucide="compass" class="w-12 h-12 mx-auto text-gray-400"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Navigation</h2>
+                        <div class="space-y-3">
+                            <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded border border-transparent shadow-sm transition-colors flex items-center justify-center btn-tactile">
+                                <i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Return to Dashboard
+                            </button>
+                            <button onclick="window.restartModule()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center btn-tactile">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart GoodBlock
+                            </button>
+                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW: Next Steps Modal -->
+                <div id="next-steps-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-4"><i data-lucide="map" class="w-12 h-12 mx-auto text-allgood-primary"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">What's Next?</h2>
+                        <p class="text-sm text-gray-600 mb-6">Continue your training or return to base.</p>
+                        <div class="space-y-3">
+                            <button onclick="window.location.href='https://www.allgoodacademy.com/goodblocks/cogat-verbal-practice'" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body flex items-center justify-center btn-tactile">
+                                <i data-lucide="play-circle" class="w-4 h-4 mr-2"></i> Start Verbal Practice
+                            </button>
+                            <button onclick="window.location.href='https://www.allgoodacademy.com'" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center btn-tactile">
+                                <i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Dashboard
+                            </button>
+                            <button onclick="document.getElementById('next-steps-modal').classList.add('hidden-modal'); document.getElementById('next-steps-modal').classList.remove('visible-modal');" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Stay Here</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SCROLLABLE CONTENT AREA (UPDATED PADDING + TACTILE GRID) -->
+                <div id="main-scroll-view" class="flex-1 min-h-0 overflow-y-auto w-full relative bg-[#F7F7F7] tactile-grid flex flex-col pb-20 md:pb-0">
+                    
+                    <!-- MENTOR BAR -->
+                    <div id="mentor-bar" class="w-full bg-white/90 backdrop-blur-sm border-b border-blue-100 px-6 py-4 flex items-start gap-4 sticky top-0 z-30 shadow-sm transition-colors duration-300">
+                        <div class="mt-0.5 shrink-0 bg-white p-1.5 rounded-full shadow-sm">
+                            <i data-lucide="message-circle" class="w-5 h-5 text-allgood-primary"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p id="mentor-text" class="text-sm font-medium text-gray-700 leading-relaxed font-body">Initializing Logic Lab...</p>
+                        </div>
+                    </div>
+
+                    <!-- PAGES -->
+                    
+                    <!-- Page 1: Cover -->
+                    <div class="page active" id="page-1">
+                        <div class="flex flex-col items-center justify-start min-h-full py-10 text-center px-6">
+                            <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                            <h1 class="text-4xl sm:text-5xl font-heading font-bold text-allgood-dark mb-4 leading-tight">The Logic Lab<br><span class="text-allgood-primary">CogAT Edition</span></h1>
+                            <div class="inline-block bg-allgood-secondary text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4 shadow-sm border border-white/20">Module: Strategic Reasoning</div>
+                            <p class="text-lg text-gray-600 mb-8 max-w-md font-body">The CogAT isn't about what you know. It's about how you think. Stop guessing and start decoding.</p>
+                            <p class="text-sm text-allgood-primary font-bold mb-12 animate-pulse">Click Next to Initialize.</p>
+                            
+                            <div class="w-full max-w-lg text-left mx-auto space-y-3">
+                                <!-- ABOUT ACCORDION -->
+                                <div class="glass-panel overflow-hidden">
+                                    <button class="accordion-toggle w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-100/50 transition-colors">
+                                        <div class="flex items-center">
+                                            <i data-lucide="info" class="w-5 h-5 text-allgood-primary mr-3"></i>
+                                            <span class="font-bold text-allgood-dark text-sm">About this GoodBlock</span>
+                                        </div>
+                                        <i data-lucide="chevron-down" class="accordion-icon w-4 h-4 text-gray-400 transition-transform"></i>
+                                    </button>
+                                    <div class="accordion-content hidden p-4 text-sm text-gray-600 border-t border-gray-200 leading-relaxed font-body bg-white/50">
+                                        <p class="mb-4">This module breaks down the three main batteries of the Cognitive Abilities Test (CogAT). You will learn to identify rules, rotate shapes in your mind, and build logical bridges.</p>
+                                        <ul class="list-disc ml-4 space-y-1">
+                                            <li><strong>Non-Verbal:</strong> Figure Matrices (The Blueprint)</li>
+                                            <li><strong>Verbal:</strong> Analogies (The Bridge)</li>
+                                            <li><strong>Quantitative:</strong> Number Series (The Rhythm)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <!-- HOW TO USE ACCORDION -->
+                                <div class="glass-panel overflow-hidden">
+                                    <button class="accordion-toggle w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-100/50 transition-colors">
+                                        <div class="flex items-center">
+                                            <i data-lucide="mouse-pointer-2" class="w-5 h-5 text-allgood-primary mr-3"></i>
+                                            <span class="font-bold text-allgood-dark text-sm">How to use</span>
+                                        </div>
+                                        <i data-lucide="chevron-down" class="accordion-icon w-4 h-4 text-gray-400 transition-transform"></i>
+                                    </button>
+                                    <div class="accordion-content hidden p-4 text-sm text-gray-600 border-t border-gray-200 leading-relaxed font-body bg-white/50">
+                                        <p class="mb-4">Use the Control Cluster in the top right to customize your workspace.</p>
+                                        <div class="grid grid-cols-1 gap-2">
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click for navigation options.</span></div></div>
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600 shrink-0"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                            <div class="hidden md:flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600 shrink-0"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark shrink-0"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 2: Mindset -->
+                    <div class="page" id="page-2">
+                        <section class="mb-8 text-center border-b border-gray-200 pb-4">
+                            <h2 class="text-2xl font-heading font-bold text-allgood-dark">The Detective Mindset</h2>
+                        </section>
+                        
+                        <div class="relative w-full h-[300px] glass-panel overflow-hidden group cursor-pointer" onclick="this.classList.toggle('active'); sfx.tick();">
+                            <!-- Myth (Top Layer) -->
+                            <div class="absolute inset-0 bg-gray-100 flex flex-col items-center justify-center p-8 text-center transition-transform duration-500 ease-in-out group-[.active]:-translate-x-full z-20">
+                                <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4"><i data-lucide="x" class="w-8 h-8 text-gray-400"></i></div>
+                                <h3 class="text-xl font-bold text-gray-500 mb-2">The Student</h3>
+                                <p class="text-sm text-gray-500">"I have to memorize the answers. If I don't know it instantly, I'm stuck."</p>
+                                <div class="mt-6 px-4 py-2 bg-white rounded-full text-xs font-bold text-gray-400 shadow-sm uppercase tracking-wider">Tap to Shift Mindset</div>
+                            </div>
+                            
+                            <!-- Reality (Bottom Layer) -->
+                            <div class="absolute inset-0 bg-allgood-secondary flex flex-col items-center justify-center p-8 text-center text-white z-10">
+                                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm"><i data-lucide="search" class="w-8 h-8 text-white"></i></div>
+                                <h3 class="text-xl font-bold mb-2">The Detective</h3>
+                                <p class="text-sm text-white/90">"I don't guess. I find the clues. Every question has a hidden rule waiting to be found."</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 3: The Paradigm -->
+                    <div class="page" id="page-3">
+                        <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The 3 Codes</h2></section>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="flip-card" onclick="this.classList.toggle('flipped'); sfx.tick();">
+                                <div class="flip-card-inner">
+                                    <div class="flip-card-front"><i data-lucide="message-square" class="w-10 h-10 text-allgood-primary mb-4"></i><h3 class="font-bold text-allgood-dark text-lg">Verbal</h3><p class="text-xs text-gray-500 mt-2">Words & Concepts</p></div>
+                                    <div class="flip-card-back bg-allgood-primary"><h3 class="font-bold mb-2 text-lg">Relationship Logic</h3><p class="text-xs px-4 leading-relaxed">"A is to B as C is to D." Used by Lawyers and writers to build arguments.</p></div>
+                                </div>
+                            </div>
+                            <div class="flip-card" onclick="this.classList.toggle('flipped'); sfx.tick();">
+                                <div class="flip-card-inner">
+                                    <div class="flip-card-front"><i data-lucide="hash" class="w-10 h-10 text-allgood-secondary mb-4"></i><h3 class="font-bold text-allgood-dark text-lg">Quantitative</h3><p class="text-xs text-gray-500 mt-2">Numbers & Equations</p></div>
+                                    <div class="flip-card-back bg-allgood-secondary"><h3 class="font-bold mb-2 text-lg">Pattern Logic</h3><p class="text-xs px-4 leading-relaxed">Finding the hidden rhythm. Used by investors to predict market trends.</p></div>
+                                </div>
+                            </div>
+                            <div class="flip-card" onclick="this.classList.toggle('flipped'); sfx.tick();">
+                                <div class="flip-card-inner">
+                                    <div class="flip-card-front"><i data-lucide="shapes" class="w-10 h-10 text-green-600 mb-4"></i><h3 class="font-bold text-allgood-dark text-lg">Non-Verbal</h3><p class="text-xs text-gray-500 mt-2">Shapes & Figures</p></div>
+                                    <div class="flip-card-back bg-green-600"><h3 class="font-bold mb-2 text-lg">Spatial Logic</h3><p class="text-xs px-4 leading-relaxed">Rotating and folding shapes. Used by architects and engineers.</p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 4: Verbal Concept -->
+                    <div class="page" id="page-4">
+                        <div class="reality-link">
+                            <h4 class="text-xs font-bold text-allgood-hover uppercase tracking-widest mb-1">Reality Link: Law & Coding</h4>
+                            <p class="text-sm font-light italic">"This isn't just vocabulary. Lawyers use analogies to argue 'precedent' (this case is like that case). Coders use it to recognize bug patterns."</p>
+                        </div>
+                        
+                        <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-4">Code 1: The Bridge</h2>
+                        <div class="glass-panel p-6">
+                            <p class="text-gray-600 mb-4 text-sm leading-relaxed">Don't look at the words in isolation. Build a sentence <strong>bridge</strong> that connects them.</p>
+                            <div class="bg-gray-50 p-4 rounded border border-gray-200 text-center">
+                                <div class="text-xl font-bold text-allgood-dark mb-2">Finger : Ring</div>
+                                <i data-lucide="arrow-down" class="w-6 h-6 mx-auto text-gray-300 mb-2"></i>
+                                <p class="text-sm font-bold text-allgood-secondary">"A finger WEARS a ring."</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 5: Verbal Interactive (UPDATED) -->
+                    <div class="page" id="page-5">
+                        <section class="mb-6 border-b border-gray-200 pb-4 text-center">
+                            <h2 class="text-xl font-heading font-bold text-allgood-dark">Build the Bridge</h2>
+                        </section>
+                        
+                        <!-- STEP 1: DECONSTRUCT (Visible) -->
+                        <div id="verbal-phase-1" class="text-center transition-all duration-500">
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Phase 1: Analyze the Pattern</p>
+                            <div class="text-3xl font-heading font-bold mb-6 text-gray-800">LEATHER <span class="text-gray-300">::</span> SHOE</div>
+                            
+                            <p class="text-sm text-gray-600 mb-4">How does Leather connect to Shoe?</p>
+                            <div class="flex flex-wrap justify-center gap-3 mb-4">
+                                <button class="bridge-word btn-tactile" onclick="selectBridge(this, false)">Is a type of</button>
+                                <button class="bridge-word btn-tactile" onclick="selectBridge(this, true)">Is used to make</button>
+                                <button class="bridge-word btn-tactile" onclick="selectBridge(this, false)">Is smaller than</button>
+                            </div>
+                            <div id="phase-1-feedback" class="h-4 text-xs font-bold text-red-500 opacity-0 transition-opacity"></div>
+                        </div>
+
+                        <!-- STEP 2: RECONSTRUCT (Hidden) -->
+                        <div id="verbal-phase-2" class="hidden opacity-0 transform translate-y-4 transition-all duration-700 text-center border-t border-gray-200 pt-8 mt-4">
+                            <div class="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold mb-6 uppercase tracking-wide shadow-sm">Rule Identified: Material → Product</div>
+                            
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Phase 2: Apply the Rule</p>
+                            <div class="text-3xl font-heading font-bold mb-6 text-gray-800">WOOL <span class="text-gray-300">::</span> <span id="verbal-target" class="text-allgood-primary underline decoration-dotted">?</span></div>
+                            
+                            <p class="text-sm text-gray-600 mb-4">Wool is used to make...</p>
+                            <div class="flex flex-wrap justify-center gap-3">
+                                <button class="bridge-word btn-tactile" onclick="solveVerbal(this, false)">SHEEP</button>
+                                <button class="bridge-word btn-tactile" onclick="solveVerbal(this, true)">SWEATER</button>
+                                <button class="bridge-word btn-tactile" onclick="solveVerbal(this, false)">SOFT</button>
+                            </div>
+                            
+                            <!-- REALITY GAME: VERBAL -->
+                            <div id="verbal-reality-container" class="hidden reality-game-container">
+                                <h3 class="font-bold text-sm uppercase tracking-wide mb-3 flex items-center justify-center"><i data-lucide="briefcase" class="w-4 h-4 mr-2"></i>Reality Protocol: The Professional Lens</h3>
+                                <p class="text-sm mb-4">This same logic is used by professionals every day. Choose a role to see it in action:</p>
+                                <div class="grid grid-cols-2 gap-4" id="verbal-roles">
+                                    <button onclick="playLawyer()" class="bg-white hover:bg-green-50 border border-green-200 p-4 rounded shadow-sm hover:shadow-md transition-all btn-tactile">
+                                        <i data-lucide="scale" class="w-8 h-8 mx-auto text-green-600 mb-2"></i>
+                                        <div class="font-bold text-green-800 text-sm">Lawyer</div>
+                                        <div class="text-xs text-green-600">Apply Precedent</div>
+                                    </button>
+                                    <button onclick="playCoder()" class="bg-white hover:bg-green-50 border border-green-200 p-4 rounded shadow-sm hover:shadow-md transition-all btn-tactile">
+                                        <i data-lucide="code" class="w-8 h-8 mx-auto text-green-600 mb-2"></i>
+                                        <div class="font-bold text-green-800 text-sm">Coder</div>
+                                        <div class="text-xs text-green-600">Pattern Match</div>
+                                    </button>
+                                </div>
+                                <div id="verbal-game-area" class="mt-4 hidden bg-white p-4 rounded border border-green-200 text-left"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 6: Verbal Field Test -->
+                    <div class="page" id="page-6">
+                        <div class="bg-gray-100 p-3 rounded-t-lg border-b border-gray-200 flex justify-between items-center">
+                            <span class="text-xs font-bold text-gray-500 uppercase">Field Test: Analogies</span>
+                            <i data-lucide="clipboard-list" class="w-4 h-4 text-gray-400"></i>
+                        </div>
+                        <div class="glass-panel p-6 rounded-t-none border-t-0 space-y-8">
+                            <!-- Q1 -->
+                            <div>
+                                <p class="font-bold text-allgood-dark mb-3">1. Apple : Fruit :: Carrot : ?</p>
+                                <div class="grid grid-cols-1 gap-2">
+                                    <button onclick="checkFieldTest(this, true, 'q1-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">A) Vegetable</button>
+                                    <button onclick="checkFieldTest(this, false, 'q1-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">B) Orange</button>
+                                    <button onclick="checkFieldTest(this, false, 'q1-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">C) Garden</button>
+                                </div>
+                                <div id="q1-fb" class="hidden mt-2 text-xs font-bold"></div>
+                            </div>
+                            <!-- Q2 -->
+                            <div>
+                                <p class="font-bold text-allgood-dark mb-3">2. Composer : Symphony :: Author : ?</p>
+                                <div class="grid grid-cols-1 gap-2">
+                                    <button onclick="checkFieldTest(this, false, 'q2-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">A) Pen</button>
+                                    <button onclick="checkFieldTest(this, true, 'q2-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">B) Novel</button>
+                                    <button onclick="checkFieldTest(this, false, 'q2-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">C) Reader</button>
+                                </div>
+                                <div id="q2-fb" class="hidden mt-2 text-xs font-bold"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 7: Quant Concept -->
+                    <div class="page" id="page-7">
+                        <div class="reality-link">
+                            <h4 class="text-xs font-bold text-allgood-hover uppercase tracking-widest mb-1">Reality Link: Finance</h4>
+                            <p class="text-sm font-light italic">"Stock markets and revenue models are just number series. If you can see the rhythm +2, x3, -1... you can predict where the money is going."</p>
+                        </div>
+                        <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-4">Code 2: The Rhythm</h2>
+                        <div class="glass-panel p-6">
+                            <p class="text-sm text-gray-600 mb-4">Numbers don't lie. They move in a rhythm. Your job is to find the beat.</p>
+                            <ul class="space-y-3">
+                                <li class="flex items-center p-3 bg-gray-50 rounded border border-gray-100"><span class="font-bold mr-3 text-allgood-primary bg-white px-2 py-1 rounded shadow-sm">+2</span> <span class="text-gray-600 text-sm">2, 4, 6, 8 (Simple Addition)</span></li>
+                                <li class="flex items-center p-3 bg-gray-50 rounded border border-gray-100"><span class="font-bold mr-3 text-allgood-primary bg-white px-2 py-1 rounded shadow-sm">x2</span> <span class="text-gray-600 text-sm">2, 4, 8, 16 (Multiplication)</span></li>
+                                <li class="flex items-center p-3 bg-gray-50 rounded border border-gray-100"><span class="font-bold mr-3 text-allgood-primary bg-white px-2 py-1 rounded shadow-sm">-1</span> <span class="text-gray-600 text-sm">10, 9, 8, 7 (Subtraction)</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Page 8: Quant Interactive -->
+                    <div class="page" id="page-8">
+                        <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-xl font-heading font-bold text-allgood-dark">The Pattern Slider</h2></section>
+                        <div class="bg-gray-800 p-8 rounded-xl shadow-inner text-center mb-8 border border-gray-700">
+                            <div class="flex justify-center items-center gap-2 sm:gap-6 text-white font-mono text-xl sm:text-3xl">
+                                <span>2</span>
+                                <i data-lucide="arrow-right" class="w-4 h-4 text-gray-500"></i>
+                                <span>4</span>
+                                <i data-lucide="arrow-right" class="w-4 h-4 text-gray-500"></i>
+                                <span>8</span>
+                                <i data-lucide="arrow-right" class="w-4 h-4 text-gray-500"></i>
+                                <span id="quant-slot" class="text-allgood-primary border-b-2 border-allgood-primary px-3 animate-pulse">?</span>
+                            </div>
+                        </div>
+                        <p class="text-center text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Select the Operator</p>
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <button onclick="checkQuant('+2')" class="p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm hover:border-gray-400 hover:shadow-md transition-all font-bold text-xl text-gray-700 btn-tactile">+2</button>
+                            <button onclick="checkQuant('x2')" class="p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm hover:border-allgood-primary hover:text-allgood-primary hover:shadow-md transition-all font-bold text-xl text-gray-700 btn-tactile">x2</button>
+                            <button onclick="checkQuant('+4')" class="p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm hover:border-gray-400 hover:shadow-md transition-all font-bold text-xl text-gray-700 btn-tactile">+4</button>
+                        </div>
+                        <div id="quant-feedback" class="text-center text-sm font-bold min-h-[20px] transition-all"></div>
+                        
+                        <!-- REALITY GAME: QUANT -->
+                        <div id="quant-reality-container" class="hidden reality-game-container">
+                            <h3 class="font-bold text-sm uppercase tracking-wide mb-3 flex items-center justify-center"><i data-lucide="trending-up" class="w-4 h-4 mr-2"></i>Reality Protocol: The Market Maker</h3>
+                            <p class="text-sm mb-4">Stock markets are just massive number series. Can you spot the trend?</p>
+                            <div class="bg-white p-4 rounded border border-green-200 flex items-end h-32 space-x-2 mb-4">
+                                <div class="w-1/5 bg-gray-200 h-[10%] rounded-t"></div>
+                                <div class="w-1/5 bg-gray-200 h-[20%] rounded-t"></div>
+                                <div class="w-1/5 bg-gray-200 h-[40%] rounded-t"></div>
+                                <div class="w-1/5 bg-gray-200 h-[80%] rounded-t animate-pulse bg-green-200"></div>
+                                <div id="market-bar" class="w-1/5 bg-green-500 h-0 transition-all duration-1000 rounded-t"></div>
+                            </div>
+                            <div class="flex justify-center space-x-4">
+                                <button onclick="playMarket(false)" class="px-4 py-2 bg-red-100 text-red-700 font-bold rounded hover:bg-red-200 btn-tactile">SELL</button>
+                                <button onclick="playMarket(true)" class="px-4 py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 shadow-md btn-tactile">BUY (x2 Growth)</button>
+                            </div>
+                            <div id="quant-game-feedback" class="mt-2 text-center font-bold text-sm min-h-[20px]"></div>
+                        </div>
+                    </div>
+
+                    <!-- Page 9: Quant Field Test -->
+                    <div class="page" id="page-9">
+                        <div class="bg-gray-100 p-3 rounded-t-lg border-b border-gray-200 flex justify-between items-center">
+                            <span class="text-xs font-bold text-gray-500 uppercase">Field Test: Number Logic</span>
+                            <i data-lucide="calculator" class="w-4 h-4 text-gray-400"></i>
+                        </div>
+                        <div class="glass-panel p-6 rounded-t-none border-t-0">
+                            <p class="font-bold text-allgood-dark mb-4 text-lg">If x + y = 10 and x - y = 2, what is the value of x?</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button onclick="checkFieldTest(this, false, 'q3-fb')" class="text-center p-4 border rounded hover:bg-gray-50 font-mono font-bold btn-tactile">4</button>
+                                <button onclick="checkFieldTest(this, false, 'q3-fb')" class="text-center p-4 border rounded hover:bg-gray-50 font-mono font-bold btn-tactile">5</button>
+                                <button onclick="checkFieldTest(this, true, 'q3-fb')" class="text-center p-4 border rounded hover:bg-gray-50 font-mono font-bold btn-tactile">6</button>
+                                <button onclick="checkFieldTest(this, false, 'q3-fb')" class="text-center p-4 border rounded hover:bg-gray-50 font-mono font-bold btn-tactile">8</button>
+                            </div>
+                            <div id="q3-fb" class="hidden mt-4 text-sm font-bold text-center"></div>
+                        </div>
+                    </div>
+
+                    <!-- Page 10: Non-Verbal Concept -->
+                    <div class="page" id="page-10">
+                        <div class="reality-link">
+                            <h4 class="text-xs font-bold text-allgood-hover uppercase tracking-widest mb-1">Reality Link: Engineering</h4>
+                            <p class="text-sm font-light italic">"Engineers and architects have to rotate 3D objects in their heads before they build them. This isn't just shapes; it's spatial intelligence."</p>
+                        </div>
+                        <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-4">Code 3: The Blueprint</h2>
+                        <div class="glass-panel p-6">
+                            <p class="text-sm text-gray-600 mb-6">Shapes change according to strict rules. You need to identify if the shape is <strong>Rotating</strong> or <strong>Changing</strong>.</p>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center p-6 bg-gray-50 rounded border border-gray-200">
+                                    <i data-lucide="refresh-cw" class="w-10 h-10 mx-auto text-allgood-primary mb-3"></i>
+                                    <h4 class="font-bold text-sm">Rotation</h4>
+                                    <p class="text-xs text-gray-500 mt-1">Spinning like a clock.</p>
+                                </div>
+                                <div class="text-center p-6 bg-gray-50 rounded border border-gray-200">
+                                    <i data-lucide="scissors" class="w-10 h-10 mx-auto text-allgood-primary mb-3"></i>
+                                    <h4 class="font-bold text-sm">Subtraction</h4>
+                                    <p class="text-xs text-gray-500 mt-1">Losing a piece.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 11: Non-Verbal Interactive -->
+                    <div class="page" id="page-11">
+                        <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-xl font-heading font-bold text-allgood-dark">The Shape Shifter</h2></section>
+                        <div class="flex flex-col items-center">
+                            <div class="mb-2 text-xs font-bold text-gray-400 uppercase tracking-widest">Target: White Diamond</div>
+                            <div class="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center mb-8 border border-gray-200 relative overflow-hidden shadow-inner">
+                                <div id="test-shape" class="test-shape shadow-lg"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 w-full max-w-sm mb-4">
+                                <button onclick="manipulateShape('rotate')" class="p-3 bg-white border border-gray-300 rounded shadow-sm font-bold text-xs hover:border-allgood-primary hover:text-allgood-primary transition-colors uppercase tracking-wide btn-tactile">Apply: Rotate 45°</button>
+                                <button onclick="manipulateShape('color')" class="p-3 bg-white border border-gray-300 rounded shadow-sm font-bold text-xs hover:border-allgood-primary hover:text-allgood-primary transition-colors uppercase tracking-wide btn-tactile">Apply: Color Flip</button>
+                                <button onclick="manipulateShape('radius')" class="p-3 bg-white border border-gray-300 rounded shadow-sm font-bold text-xs hover:border-allgood-primary hover:text-allgood-primary transition-colors uppercase tracking-wide btn-tactile">Apply: Round Corners</button>
+                                <button onclick="resetShape()" class="p-3 bg-gray-200 border border-gray-300 rounded shadow-sm font-bold text-xs text-gray-600 hover:bg-gray-300 uppercase tracking-wide btn-tactile">Reset Shape</button>
+                            </div>
+                            <div id="shape-feedback" class="mt-2 text-sm font-bold text-allgood-primary transition-opacity"></div>
+                            
+                            <!-- REALITY GAME: SPATIAL -->
+                            <div id="spatial-reality-container" class="hidden reality-game-container w-full max-w-md">
+                                <h3 class="font-bold text-sm uppercase tracking-wide mb-3 flex items-center justify-center"><i data-lucide="compass" class="w-4 h-4 mr-2"></i>Reality Protocol: The Engineer</h3>
+                                <p class="text-sm mb-4">Engineers visualize rotation to fit parts together. Fit the keystone to build the bridge.</p>
+                                <div class="bg-white p-4 rounded border border-green-200 flex flex-col items-center justify-center h-32 mb-4 relative overflow-hidden">
+                                    <!-- Bridge SVG -->
+                                    <svg viewBox="0 0 200 100" class="w-full h-full absolute bottom-0">
+                                        <path d="M0,100 L60,100 L60,50 L80,50 L80,100 L120,100 L120,50 L140,50 L140,100 L200,100" fill="#CBD5E0"/>
+                                        <rect x="80" y="50" width="40" height="10" fill="#A0AEC0"/>
+                                    </svg>
+                                    <!-- Keystone -->
+                                    <div id="keystone" class="w-10 h-10 bg-allgood-primary absolute top-4 transition-transform duration-500 flex items-center justify-center text-white text-xs font-bold shadow-lg" style="transform: rotate(45deg);">TOP</div>
+                                </div>
+                                <button onclick="playEngineer()" class="w-full px-4 py-3 bg-allgood-secondary text-white font-bold rounded hover:bg-allgood-accent shadow-md btn-tactile">Rotate & Drop</button>
+                                <div id="spatial-game-feedback" class="mt-2 text-center font-bold text-sm min-h-[20px]"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 12: Non-Verbal Field Test -->
+                    <div class="page" id="page-12">
+                        <div class="bg-gray-100 p-3 rounded-t-lg border-b border-gray-200 flex justify-between items-center">
+                            <span class="text-xs font-bold text-gray-500 uppercase">Field Test: Classification</span>
+                            <i data-lucide="layers" class="w-4 h-4 text-gray-400"></i>
+                        </div>
+                        <div class="glass-panel p-6 rounded-t-none border-t-0">
+                            <p class="font-bold text-allgood-dark mb-4">Which of these belongs in this group?</p>
+                            <div class="flex gap-2 mb-6 justify-center">
+                                <span class="bg-gray-100 px-3 py-1 rounded font-bold text-gray-700">Eagle</span>
+                                <span class="bg-gray-100 px-3 py-1 rounded font-bold text-gray-700">Hawk</span>
+                                <span class="bg-gray-100 px-3 py-1 rounded font-bold text-gray-700">Falcon</span>
+                            </div>
+                            <div class="grid grid-cols-1 gap-2">
+                                <button onclick="checkFieldTest(this, false, 'q4-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">A) Penguin (Bird, but flightless)</button>
+                                <button onclick="checkFieldTest(this, true, 'q4-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">B) Owl (Bird of Prey)</button>
+                                <button onclick="checkFieldTest(this, false, 'q4-fb')" class="text-left p-3 border rounded hover:bg-gray-50 text-sm btn-tactile">C) Plane (Flies, not bird)</button>
+                            </div>
+                            <div id="q4-fb" class="hidden mt-4 text-xs font-bold"></div>
+                        </div>
+                    </div>
+
+                    <!-- Page 13: The Gauntlet -->
+                    <div class="page" id="page-13">
+                        <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-6 rounded-r-lg">
+                            <h2 class="text-xl font-bold text-red-700 mb-1"><i data-lucide="flame" class="inline w-6 h-6 mr-2"></i> The Gauntlet</h2>
+                            <p class="text-sm text-red-600">3 Questions. Mixed Battery. You've trained for this. Decode.</p>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3 mb-8 overflow-hidden">
+                            <div id="gauntlet-timer" class="bg-red-500 h-full w-full rounded-full transition-all duration-[60000ms] ease-linear"></div>
+                        </div>
+                        
+                        <div id="gauntlet-q1" class="gauntlet-q">
+                            <p class="text-sm font-bold mb-4 bg-white p-4 border rounded shadow-sm">1. PUPPY : DOG :: KITTEN : ?</p>
+                            <div class="space-y-3">
+                                <button onclick="handleGauntletAnswer(1, false)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">A. Fur</button>
+                                <button onclick="handleGauntletAnswer(1, true)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">B. Cat</button>
+                                <button onclick="handleGauntletAnswer(1, false)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">C. Meow</button>
+                            </div>
+                        </div>
+                        <div id="gauntlet-q2" class="gauntlet-q hidden">
+                            <p class="text-sm font-bold mb-4 bg-white p-4 border rounded shadow-sm">2. 10, 13, 16, 19, ?</p>
+                            <div class="space-y-3">
+                                <button onclick="handleGauntletAnswer(2, false)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">A. 21</button>
+                                <button onclick="handleGauntletAnswer(2, true)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">B. 22</button>
+                                <button onclick="handleGauntletAnswer(2, false)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">C. 23</button>
+                            </div>
+                        </div>
+                        <div id="gauntlet-q3" class="gauntlet-q hidden">
+                            <p class="text-sm font-bold mb-4 bg-white p-4 border rounded shadow-sm">3. If all BLOOPS are ZORPS, and Tim is a BLOOP...</p>
+                            <div class="space-y-3">
+                                <button onclick="handleGauntletAnswer(3, true)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">A. Tim is a ZORP</button>
+                                <button onclick="handleGauntletAnswer(3, false)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">B. Tim is not a ZORP</button>
+                                <button onclick="handleGauntletAnswer(3, false)" class="w-full text-left p-4 border border-gray-300 rounded bg-white hover:border-allgood-primary hover:shadow-md transition-all font-bold text-gray-600 btn-tactile">C. ZORPS are BLOOPS</button>
+                            </div>
+                        </div>
+                        <div id="gauntlet-done" class="hidden text-center py-12">
+                            <div class="inline-block p-6 bg-green-50 rounded-full mb-4 animate-bounce">
+                                <i data-lucide="check-circle" class="w-16 h-16 text-green-500"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-800">Gauntlet Complete</h3>
+                            <p class="text-gray-500 mt-2">Initializing analysis...</p>
+                        </div>
+                    </div>
+
+                    <!-- Page 14: Review -->
+                    <div class="page" id="page-14">
+                        <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Logic Review</h2></section>
+                        <div class="space-y-4">
+                            <div class="glass-panel p-5 border-l-4 border-l-allgood-primary">
+                                <h4 class="font-bold text-sm text-gray-800 uppercase tracking-wide mb-1">Q1: The Bridge</h4>
+                                <p class="text-sm text-gray-600">"Puppy is a baby Dog. Kitten is a baby Cat." Relationship: <strong>Young to Adult</strong>.</p>
+                            </div>
+                            <div class="glass-panel p-5 border-l-4 border-l-allgood-secondary">
+                                <h4 class="font-bold text-sm text-gray-800 uppercase tracking-wide mb-1">Q2: The Rhythm</h4>
+                                <p class="text-sm text-gray-600">The pattern adds 3 each time. 19 + 3 = 22. Rule: <strong>+3 Interval</strong>.</p>
+                            </div>
+                            <div class="glass-panel p-5 border-l-4 border-l-green-500">
+                                <h4 class="font-bold text-sm text-gray-800 uppercase tracking-wide mb-1">Q3: The Blueprint</h4>
+                                <p class="text-sm text-gray-600">Deductive Logic. If A is inside B, and X is inside A, then X MUST be inside B.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 15: Contract -->
+                    <div class="page" id="page-15">
+                        <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Detective's Oath</h2></section>
+                        <div class="bg-[#FFFDF5] p-8 rounded shadow-lg border border-[#F2DDCB] relative max-w-sm mx-auto rotate-1 hover:rotate-0 transition-transform duration-500">
+                            <div class="absolute top-4 right-4 text-allgood-primary/20"><i data-lucide="feather" class="w-12 h-12"></i></div>
+                            <p class="text-lg text-gray-800 mb-8 leading-relaxed font-heading italic text-center">
+                                "I, <span class="font-bold text-allgood-secondary" id="contract-name">Detective</span>, promise to stop guessing. I will look for the rule first. I will build the bridge. I will find the rhythm."
+                            </p>
+                            <div class="mt-8 border-b-2 border-gray-400 w-full relative h-16 cursor-pointer hover:bg-black/5 transition-colors flex items-end pb-2" onclick="signContract(this)">
+                                <span class="text-xs text-gray-400 uppercase font-bold mr-4">x Sign Here:</span>
+                                <div class="opacity-0 transition-opacity duration-1000 text-allgood-primary font-heading font-bold text-2xl transform -rotate-2" id="signature-text">Detective</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 16: Certification -->
+                    <div class="page" id="page-16">
+                        <div class="flex flex-col items-center justify-start min-h-full py-10 text-center px-6">
+                            <h2 class="text-3xl font-heading font-bold text-allgood-dark mb-2">Certification Complete</h2>
+                            <p class="text-gray-500 mb-8 text-sm">You are now a Logic Lab Detective.</p>
+                            
+                            <!-- FEEDBACK -->
+                            <div id="feedback-container" class="w-full max-w-md mx-auto glass-panel p-6 mb-8 text-left relative">
+                                <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this Lab</h3>
+                                <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                    <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="window.setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                </div>
+                                <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback sharpens our tools. What worked? What didn't?</label>
+                                <textarea id="feedback-text" rows="3" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50" placeholder="Optional: Share your thoughts..."></textarea>
+                                <button onclick="window.submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm btn-tactile">Send Feedback</button>
+                            </div>
+                            <div id="feedback-success" class="hidden w-full max-w-md mx-auto bg-green-50 p-6 rounded-lg shadow-inner border border-green-200 mb-12 text-center">
+                                <i data-lucide="check-circle" class="w-12 h-12 text-green-600 mx-auto mb-2"></i>
+                                <h3 class="font-bold text-green-800">Feedback Received.</h3>
+                                <p class="text-xs text-green-700 mt-1">Thank you for helping us improve.</p>
+                            </div>
+
+                            <div id="badge-container" class="mb-8 transform transition-all duration-700 scale-90 hover:scale-100"></div>
+                            <a href="#" onclick="downloadBadge()" class="w-full max-w-xs bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 px-6 rounded-full shadow-lg transition-all transform active:scale-95 flex items-center justify-center mb-12 group btn-tactile">
+                                <i data-lucide="download" class="w-5 h-5 mr-2 group-hover:animate-bounce"></i><span>Download Credential</span>
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 3. FOOTER -->
+                <footer class="footer-content flex items-center justify-between px-6 shrink-0">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-hover font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body btn-tactile"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Back</button>
+                    <div class="text-center hidden sm:block">
+                        <a href="https://www.allgoodacademy.com" target="_blank" class="text-gray-400 text-[10px] font-body hover:text-allgood-primary transition-colors no-underline">
+                            <span class="font-bold">GoodBlock&trade;</span> powered by <span class="font-bold">Allgood Academy</span>
+                        </a>
+                    </div>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body btn-tactile"><span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></button>
+                </footer>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const totalPages = 16;
+        let currentPage = 0;
+        
+        // MENTOR SCRIPTS
+        const mentorScripts = [
+            "Welcome to the Logic Lab. We don't guess here. We decode.",
+            "Forget what you think you know about 'smart.' Real intelligence is about finding the hidden rule.",
+            "Three specific codes unlock the CogAT: Verbal, Quantitative, and Non-Verbal.",
+            "Words aren't just vocabulary. They are building blocks for logic. Lawyers use this every day.",
+            "Deconstruct the first pair. Find the bridge. Only then can you build the second pair.",
+            "Proving Ground: Let's see if your bridge holds up under pressure.",
+            "Numbers have a rhythm. If you can find the beat, you can predict the future.",
+            "Slide the variables until the pattern clicks. Look for the interval.",
+            "Proving Ground: Algebra is just a puzzle with missing pieces.",
+            "Shapes are blueprints. Engineers rotate 3D objects in their mind before building them.",
+            "Is it rotating? Is it flipping? Apply the rule to see the change.",
+            "Proving Ground: Classification is about finding the one thing that doesn't belong.",
+            "The Gauntlet: 3 questions. Mixed logic. Speed and accuracy.",
+            "Let's break down the logic. Did you guess, or did you know?",
+            "Commit to the process. The answer is always in the rule.",
+            "Congratulations, Detective. You are ready."
+        ];
+
+        // AUDIO
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+        function playTone(f,t,d,v=0.1) { try { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=t; o.frequency.setValueAtTime(f,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(v,audioCtx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+d); } catch(e){} }
+        const sfx = {
+            powerOn: () => { try { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type='triangle'; o.frequency.setValueAtTime(110,audioCtx.currentTime); o.frequency.exponentialRampToValueAtTime(220,audioCtx.currentTime+0.4); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(0.4,audioCtx.currentTime+0.1); g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+0.4); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+0.4); } catch(e){} },
+            nav: () => playTone(150,'sine',0.1), tick: () => playTone(1000,'sine',0.01), success: () => playTone(1200,'sine',0.2), error: () => playTone(100,'sawtooth',0.2)
+        };
+        window.sfx = sfx;
+
+        // NAVIGATION
+        const pages = document.querySelectorAll('.page');
+        const progressBar = document.getElementById('flex-progress-fill');
+        const nextBtn = document.getElementById('next-button');
+        const backBtn = document.getElementById('back-button');
+        const mentorText = document.getElementById('mentor-text');
+        
+        window.showPage = function(idx) {
+            if (idx < 0 || idx >= totalPages) return;
+            pages.forEach(p => p.classList.remove('active'));
+            pages[idx].classList.add('active');
+            currentPage = idx;
+            
+            // Update Mentor
+            mentorText.innerText = mentorScripts[idx] || "Logic Lab Active";
+            mentorText.parentElement.classList.remove('animate-pulse');
+            void mentorText.offsetWidth; // trigger reflow
+            mentorText.parentElement.classList.add('animate-pulse');
+            setTimeout(() => mentorText.parentElement.classList.remove('animate-pulse'), 500);
+
+            progressBar.style.width = `${((idx + 1) / totalPages) * 100}%`;
+            document.getElementById('header-page-indicator').textContent = `${idx + 1} / ${totalPages}`;
+            
+            if (idx === 12) startGauntletTimer();
+            if (idx === 15) generateBadge();
+            if (idx === 14) document.getElementById('contract-name').innerText = window.currentUserName || "Detective";
+
+            backBtn.disabled = idx === 0;
+            backBtn.classList.toggle('opacity-0', idx === 0);
+            
+            // Handle Next Button State - UPDATED LOGIC
+            if (idx === totalPages - 1) {
+                // Show "Next Lesson" button on final page
+                nextBtn.style.display = 'flex';
+                nextBtn.innerHTML = `<span>Next Lesson</span><i data-lucide="external-link" class="w-4 h-4 ml-1"></i>`;
+            } else {
+                nextBtn.style.display = 'flex';
+                nextBtn.innerHTML = `<span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>`;
+            }
+            if(window.lucide) window.lucide.createIcons();
+            
+            // Scroll to top
+            document.getElementById('main-scroll-view').scrollTop = 0;
+            
+            sfx.nav();
+        }
+
+        // UPDATED Event Listener for Redirection
+        nextBtn.addEventListener('click', () => {
+            if (currentPage === totalPages - 1) {
+                if(window.logEvent) window.logEvent('Navigation', 'Final Page Next Clicked');
+                // Open Custom Modal
+                const modal = document.getElementById('next-steps-modal');
+                modal.classList.remove('hidden-modal');
+                modal.classList.add('visible-modal');
+                sfx.nav();
+            } else {
+                showPage(currentPage + 1);
+            }
+        });
+        
+        backBtn.addEventListener('click', () => showPage(currentPage - 1));
+        
+        // New Restart Logic
+        window.restartModule = () => {
+            window.closeSystemMenu();
+            showPage(0);
+            sfx.nav();
+        }
+
+        // INTERACTIVITY
+        
+        // Shape Shifter
+        let shapeState = { r: 0, c: 0, rad: 0 };
+        window.manipulateShape = (type) => {
+            const shape = document.getElementById('test-shape');
+            const feedback = document.getElementById('shape-feedback');
+            
+            if (type === 'rotate') { shapeState.r += 45; shape.style.transform = `rotate(${shapeState.r}deg)`; }
+            if (type === 'color') { shape.style.backgroundColor = shape.style.backgroundColor === 'rgb(255, 255, 255)' ? '#357889' : '#FFFFFF'; }
+            if (type === 'radius') { shapeState.rad = shapeState.rad === 0 ? 50 : 0; shape.style.borderRadius = `${shapeState.rad}%`; }
+            sfx.tick();
+            
+            if (shape.style.backgroundColor === 'rgb(255, 255, 255)' && (shapeState.r % 90 !== 0) && shapeState.rad === 0) {
+                 feedback.classList.add('opacity-1');
+                 feedback.innerHTML = `<div class="font-bold text-lg mb-1 text-green-700">MATCH CONFIRMED: WHITE DIAMOND</div>`;
+                 sfx.success();
+                 
+                 // Unlock Reality
+                 setTimeout(() => {
+                     document.getElementById('spatial-reality-container').classList.remove('hidden');
+                 }, 500);
+            }
+        };
+        window.resetShape = () => { 
+            shapeState = { r: 0, c: 0, rad: 0 }; 
+            const shape = document.getElementById('test-shape');
+            shape.style.transform = 'rotate(0deg)'; 
+            shape.style.backgroundColor = '#357889'; 
+            shape.style.borderRadius = '8px';
+            const fb = document.getElementById('shape-feedback');
+            fb.innerHTML = '';
+        };
+
+        // Bridge Builder (UPDATED LOGIC)
+        window.selectBridge = (btn, isCorrect) => {
+            const fb = document.getElementById('phase-1-feedback');
+            fb.style.opacity = '0';
+
+            if (isCorrect) {
+                // Visuals for Correct Selection
+                btn.classList.add('bg-allgood-primary', 'text-white', 'border-allgood-primary');
+                btn.classList.remove('bg-white', 'text-allgood-dark');
+                
+                // Lock siblings
+                const parent = btn.parentElement;
+                Array.from(parent.children).forEach(child => {
+                    child.disabled = true;
+                    if(child !== btn) child.classList.add('opacity-50', 'pointer-events-none');
+                });
+
+                sfx.success();
+                
+                // Trigger Phase 2 Reveal
+                const p2 = document.getElementById('verbal-phase-2');
+                p2.classList.remove('hidden');
+                setTimeout(() => {
+                    p2.classList.remove('opacity-0', 'translate-y-4');
+                }, 100);
+                
+            } else {
+                sfx.error();
+                btn.classList.add('bg-red-50', 'border-red-300', 'text-red-800');
+                fb.textContent = "Try again. That connection doesn't fit.";
+                fb.style.opacity = '1';
+                setTimeout(() => btn.classList.remove('bg-red-50', 'border-red-300', 'text-red-800'), 1000);
+            }
+        };
+
+        window.solveVerbal = (btn, isCorrect) => {
+            if (isCorrect) {
+                document.getElementById('verbal-target').innerText = "SWEATER";
+                document.getElementById('verbal-target').classList.remove('decoration-dotted', 'underline');
+                btn.classList.add('bg-allgood-primary', 'text-white', 'border-allgood-primary');
+                
+                // REALITY REVEAL
+                setTimeout(() => {
+                    document.getElementById('verbal-reality-container').classList.remove('hidden');
+                }, 500);
+
+                sfx.success();
+            } else {
+                sfx.error();
+                btn.classList.add('bg-red-50', 'border-red-300');
+                setTimeout(() => btn.classList.remove('bg-red-50', 'border-red-300'), 500);
+            }
+        };
+        
+        // --- REALITY GAMES: VERBAL (WITH LOGGING) ---
+        window.playLawyer = () => {
+            const area = document.getElementById('verbal-game-area');
+            area.classList.remove('hidden');
+            area.innerHTML = `
+                <div class="text-sm font-bold mb-2">CASE FILE #2910</div>
+                <div class="text-xs bg-gray-100 p-2 rounded mb-2">
+                    <p class="mb-1"><strong>Precedent (Known Rule):</strong> In <i>Smith v. City</i>, icy sidewalk + no warning = Owner Liable.</p>
+                    <p class="font-bold text-gray-800">Current Case: Wet floor + no warning sign.</p>
+                </div>
+                <p class="text-xs mb-3">Does the pattern match?</p>
+                <button onclick="this.innerText='OBJECTION SUSTAINED (Won)'; this.classList.add('bg-green-600','text-white'); sfx.success();" class="w-full bg-allgood-dark text-white text-xs font-bold py-2 rounded">Argue Precedent</button>
+            `;
+            sfx.tick();
+            if(window.logEvent) window.logEvent('Persona_Select', 'Verbal', { role: 'Lawyer' });
+        };
+        window.playCoder = () => {
+            const area = document.getElementById('verbal-game-area');
+            area.classList.remove('hidden');
+            area.innerHTML = `
+                <div class="text-sm font-bold mb-2">DEBUG CONSOLE</div>
+                <div class="text-xs bg-black text-green-400 p-2 rounded mb-2 font-mono">
+                    <p>> ERROR in LoginModule.js</p>
+                    <p>> Pattern: Unclosed loop detected.</p>
+                    <p>> SCANNING PaymentModule.js...</p>
+                    <p>> WARNING: Identical pattern found.</p>
+                </div>
+                <button onclick="this.innerText='PATCH APPLIED (System Secure)'; this.classList.add('bg-green-600','text-white'); sfx.success();" class="w-full bg-allgood-dark text-white text-xs font-bold py-2 rounded">Patch Bug Pattern</button>
+            `;
+            sfx.tick();
+            if(window.logEvent) window.logEvent('Persona_Select', 'Verbal', { role: 'Coder' });
+        };
+
+        // Quant Pattern
+        window.checkQuant = (val) => {
+            const fb = document.getElementById('quant-feedback');
+            if (val === 'x2') {
+                document.getElementById('quant-slot').innerText = "16";
+                fb.className = "text-center text-sm font-bold min-h-[20px] text-green-600 mt-4";
+                fb.innerText = "Correct! The rule is Multiply by 2.";
+                sfx.success();
+                
+                // Unlock Reality
+                setTimeout(() => {
+                    document.getElementById('quant-reality-container').classList.remove('hidden');
+                }, 500);
+            } else {
+                fb.innerText = "Try again. Look at 2 -> 4 -> 8.";
+                fb.className = "text-center text-sm font-bold min-h-[20px] text-red-500 mt-4";
+                sfx.error();
+            }
+        };
+        
+        // --- REALITY GAME: QUANT (WITH LOGGING) ---
+        window.playMarket = (isBuy) => {
+            if(isBuy) {
+                document.getElementById('market-bar').classList.add('h-[160%]'); // Grow
+                document.getElementById('quant-game-feedback').innerText = "PROFIT SECURED: +200% Growth Pattern Matched.";
+                document.getElementById('quant-game-feedback').className = "mt-2 text-center font-bold text-sm min-h-[20px] text-green-600";
+                sfx.success();
+                if(window.logEvent) window.logEvent('Persona_Select', 'Quant', { action: 'Buy' });
+            } else {
+                document.getElementById('quant-game-feedback').innerText = "Missed Opportunity. The pattern was growth.";
+                document.getElementById('quant-game-feedback').className = "mt-2 text-center font-bold text-sm min-h-[20px] text-red-500";
+                sfx.error();
+                if(window.logEvent) window.logEvent('Persona_Select', 'Quant', { action: 'Sell' });
+            }
+        };
+        
+        // --- REALITY GAME: SPATIAL (WITH LOGGING) ---
+        window.playEngineer = () => {
+            const k = document.getElementById('keystone');
+            k.style.transform = "rotate(0deg)";
+            setTimeout(() => {
+                k.style.top = "50px"; // Drop
+                document.getElementById('spatial-game-feedback').innerText = "BRIDGE SECURE. Structural Integrity: 100%";
+                document.getElementById('spatial-game-feedback').className = "mt-2 text-center font-bold text-sm min-h-[20px] text-green-600";
+                sfx.success();
+                if(window.logEvent) window.logEvent('Persona_Select', 'Spatial', { action: 'Rotate' });
+            }, 600);
+        };
+
+        // Field Tests
+        window.checkFieldTest = (btn, isCorrect, feedbackId) => {
+            const fb = document.getElementById(feedbackId);
+            const parent = btn.parentElement;
+            parent.querySelectorAll('button').forEach(b => {
+                b.classList.remove('bg-green-100', 'bg-red-50', 'border-green-500', 'border-red-300');
+                b.classList.add('opacity-50', 'pointer-events-none');
+            });
+            
+            btn.classList.remove('opacity-50', 'pointer-events-none');
+            fb.classList.remove('hidden');
+            
+            if (isCorrect) {
+                btn.classList.add('bg-green-100', 'border-green-500', 'text-green-900');
+                fb.innerHTML = "<span class='text-green-600'>CORRECT.</span> Logic verified.";
+                sfx.success();
+            } else {
+                btn.classList.add('bg-red-50', 'border-red-300', 'text-red-900');
+                fb.innerHTML = "<span class='text-red-500'>INCORRECT.</span> Review the rule.";
+                sfx.error();
+                // Allow retry
+                parent.querySelectorAll('button').forEach(b => {
+                    b.classList.remove('opacity-50', 'pointer-events-none');
+                });
+            }
+        };
+
+        // Gauntlet Logic (UPDATED SCORING)
+        let gauntletActive = false;
+        window.gauntletScore = 0; // NEW: Track score
+
+        window.startGauntletTimer = () => {
+            if(gauntletActive) return;
+            gauntletActive = true;
+            document.getElementById('gauntlet-timer').style.width = '0%';
+        };
+
+        // NEW: Answer Handler
+        window.handleGauntletAnswer = (qNum, isCorrect) => {
+            if (isCorrect) {
+                window.gauntletScore++;
+                // Visual feedback could be added here, but gauntlet moves fast
+            }
+            window.gauntletNext(qNum);
+        };
+
+        window.gauntletNext = (qNum) => {
+            document.getElementById(`gauntlet-q${qNum}`).classList.add('hidden');
+            if (qNum < 3) {
+                document.getElementById(`gauntlet-q${qNum+1}`).classList.remove('hidden');
+            } else {
+                document.getElementById('gauntlet-done').classList.remove('hidden');
+                sfx.success();
+                // LOG FINAL SCORE
+                if(window.logFinalScoreToFirestore) {
+                    window.logFinalScoreToFirestore({ 
+                        gauntletScore: window.gauntletScore,
+                        rank: "Gauntlet Complete" 
+                    });
+                }
+            }
+            sfx.tick();
+        };
+
+        window.signContract = (el) => {
+            const sig = document.getElementById('signature-text');
+            sig.innerText = window.currentUserName || "Detective";
+            sig.style.opacity = '1';
+            sfx.success();
+            window.logFinalScoreToFirestore({ rank: "Contract Signed" });
+        };
+
+        function generateBadge() {
+            const name = (window.currentUserName || "Detective").toUpperCase();
+            const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+              <circle cx="150" cy="150" r="140" fill="#357889" stroke="#D34716" stroke-width="8"/>
+              <circle cx="150" cy="150" r="130" fill="none" stroke="white" stroke-width="2" stroke-dasharray="10 5"/>
+              <text x="150" y="140" font-family="Georgia" font-weight="bold" font-size="24" fill="white" text-anchor="middle">LOGIC LAB</text>
+              <text x="150" y="170" font-family="Verdana" font-weight="bold" font-size="14" fill="#D34716" text-anchor="middle" letter-spacing="2">CERTIFIED</text>
+              <text x="150" y="220" font-family="Verdana" font-size="14" fill="white" text-anchor="middle">${name}</text>
+              <path d="M150 50 L170 90 L220 90 L180 120 L195 160 L150 135 L105 160 L120 120 L80 90 L130 90 Z" fill="none" stroke="white" stroke-width="2" transform="scale(0.3) translate(350, 180)"/>
+            </svg>`;
+            document.getElementById('badge-container').innerHTML = svg;
+            window.logFinalScoreToFirestore({ rank: "Certified Detective", badgeSVG: svg }); // Log SVG too
+        }
+        
+        window.downloadBadge = () => {
+             const svg = document.getElementById('badge-container').innerHTML;
+             const blob = new Blob([svg], { type: 'image/svg+xml' });
+             const url = URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = 'CogAT_Badge.svg';
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+             sfx.success();
+        };
+
+        window.closeSystemMenu = () => { document.getElementById('system-menu-modal').classList.add('hidden-modal'); document.getElementById('system-menu-modal').classList.remove('visible-modal'); }
+        window.handleSystemExit = () => { window.location.href = "https://www.allgoodacademy.com"; }
+        window.handleLogOut = async () => {
+             if (window.authSignOut) await window.authSignOut();
+             localStorage.clear();
+             window.currentUserName = "Detective";
+             window.closeSystemMenu();
+             document.getElementById('startup-screen').style.display = 'flex';
+             setTimeout(() => document.getElementById('startup-screen').style.opacity = '1', 10);
+             window.showPage(0);
+             document.getElementById('login-modal').classList.remove('hidden-modal');
+             document.getElementById('login-modal').classList.add('visible-modal');
+        }
+
+        // NEW: Feedback Logic
+        let currentStarRating = 0;
+        window.setRating = (n) => {
+            currentStarRating = n;
+            for (let i = 1; i <= 5; i++) {
+                const star = document.getElementById(`star-${i}`);
+                star.classList.toggle('text-yellow-400', i <= n);
+                star.classList.toggle('text-gray-300', i > n);
+            }
+            sfx.tick();
+        }
+        
+        window.submitFeedback = () => {
+            const text = document.getElementById('feedback-text').value;
+            // Write to DB
+            if(window.logFinalScoreToFirestore) {
+                window.logFinalScoreToFirestore({ 
+                    rating: currentStarRating, 
+                    feedback: text,
+                    rank: "Feedback Submitted" 
+                });
+            }
+            
+            document.getElementById('feedback-container').classList.add('hidden');
+            document.getElementById('feedback-success').classList.remove('hidden');
+            sfx.nav();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            document.getElementById('startup-screen').addEventListener('click', function() {
+                sfx.powerOn();
+                this.style.opacity = '0';
+                setTimeout(() => { this.style.display = 'none'; }, 700);
+            });
+            
+            document.body.addEventListener('click', (e) => {
+                const acc = e.target.closest('.accordion-toggle');
+                if(acc) {
+                    const c = acc.nextElementSibling;
+                    const i = acc.querySelector('.accordion-icon');
+                    c.classList.toggle('hidden');
+                    if(!c.classList.contains('hidden')) { i.classList.add('rotate-180'); sfx.tick(); } else { i.classList.remove('rotate-180'); }
+                }
+                if(e.target.closest('#blueprint-toggle')) {
+                    document.getElementById('screen').classList.toggle('blueprint-mode');
+                    sfx.tick();
+                }
+            });
+
+            document.getElementById('fullscreen-toggle').addEventListener('click', function() {
+                const f = document.querySelector('.tablet-frame');
+                f.classList.toggle('focus-mode');
+                this.classList.toggle('text-green-300');
+                sfx.tick();
+            });
+
+            // MENU BUTTON FIX
+            const menuBtn = document.getElementById('menu-toggle');
+            if (menuBtn) {
+                menuBtn.addEventListener('click', () => {
+                    const m = document.getElementById('menu-modal');
+                    m.classList.remove('hidden-modal'); 
+                    m.classList.add('visible-modal');
+                    const t = document.getElementById('toc-list'); 
+                    t.innerHTML = '';
+                    ["Cover", "Mindset", "The 3 Codes", "Verbal Concept", "Bridge Builder", "Verbal Test", "Quant Concept", "Pattern Slider", "Quant Test", "Non-Verbal Concept", "Shape Shifter", "Non-Verbal Test", "The Gauntlet", "Review", "Contract", "Badge"].forEach((x,i) => {
+                        t.innerHTML += `<button class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 rounded text-sm font-bold" onclick="showPage(${i});document.getElementById('menu-modal').classList.add('hidden-modal');document.getElementById('menu-modal').classList.remove('visible-modal');">${i+1}. ${x}</button>`;
+                    });
+                });
+            }
+
+            document.getElementById('close-menu').addEventListener('click', () => { document.getElementById('menu-modal').classList.add('hidden-modal'); document.getElementById('menu-modal').classList.remove('visible-modal'); });
+
+            // Updated Home Button Logic - Simple Click
+            const hBtn = document.getElementById('home-button');
+            hBtn.addEventListener('click', () => {
+                const sysMenu = document.getElementById('system-menu-modal');
+                sysMenu.classList.remove('hidden-modal');
+                sysMenu.classList.add('visible-modal');
+                sfx.nav();
+            });
+        });
+    </script>
+</body>
+</html>

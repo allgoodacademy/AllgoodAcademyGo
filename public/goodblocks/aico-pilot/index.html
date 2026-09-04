@@ -1,0 +1,2564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AI Co-Pilot GoodBlock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons for interactions -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font Awesome for stars/icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- FIREBASE AND AUTHENTICATION SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        // UPDATED: Added setPersistence and browserLocalPersistence
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, updateProfile, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        // 1. CONFIGURATION
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
+            authDomain: "allgood-academy.firebaseapp.com",
+            projectId: "allgood-academy",
+            storageBucket: "allgood-academy.firebasestorage.app",
+            messagingSenderId: "978829044870",
+            appId: "1:978829044870:web:6c780f64230a77ad0ab507",
+            measurementId: "G-EN4M7T3BLQ"
+        };
+        
+        const appId = 'allgood-academy'; 
+        
+        // 2. INITIALIZE SERVICES
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // PERSISTENCE FIX: Ensure auth state survives refresh
+        setPersistence(auth, browserLocalPersistence)
+            .then(() => {
+                console.log("[Auth] Session persistence set to LOCAL.");
+            })
+            .catch((error) => {
+                console.error("[Auth] Failed to set persistence:", error);
+            });
+
+        // Expose signOut for Hard Reset
+        window.authSignOut = () => signOut(auth);
+
+        // 3. GLOBAL STATE & REHYDRATION
+        // Load Mission State from LocalStorage to survive refresh
+        const savedMission = localStorage.getItem('aa_mission_state');
+        // FIX 1: Merge saved state with defaults to ensure new keys (like sortingCompleted) exist
+        const defaultState = {
+            roleSelected: false,
+            role: null,
+            chipsMounted: 0,
+            contractSigned: false,
+            sortingCompleted: false 
+        };
+        
+        window.missionState = savedMission ? { ...defaultState, ...JSON.parse(savedMission) } : defaultState;
+
+        window.currentUser = null;
+        window.currentUserName = "Agent Learner";
+        window.currentUserEmail = "";
+        window.isAuthReady = false;
+        
+        // Define Session ID here
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+        console.log("[System] Session ID generated:", window.sessionId);
+
+        // 4. AUTH HANDLER
+        onAuthStateChanged(auth, async (user) => {
+            window.isAuthReady = true;
+            if (user) {
+                console.log("[Auth] User restored/detected:", user.uid);
+                window.currentUser = user;
+                
+                // FORCE AGENT LEARNER DEFAULT if no display name is explicitly set
+                let finalName = user.displayName || "Agent Learner";
+                
+                // Double check DB if local name is missing
+                if (finalName === "Agent Learner" || !user.displayName) {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists() && userDoc.data().displayName) {
+                            finalName = userDoc.data().displayName;
+                        }
+                    } catch(e) { console.log("Profile fetch skipped", e); }
+                }
+
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                
+                // Update UI with restored name
+                const welcomeText = document.getElementById('header-welcome-text');
+                if(welcomeText) welcomeText.textContent = `Welcome, ${finalName}`;
+
+                // Hide login modal if user exists
+                const loginModal = document.getElementById('login-modal');
+                if(loginModal) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                }
+                
+                if(window.SessionManager) window.SessionManager.start(finalName, user.email);
+                
+                // Restore Visuals based on saved state
+                if (window.restoreVisualState) window.restoreVisualState();
+                
+            } else {
+                console.log("[Auth] No user signed in.");
+                window.currentUser = null;
+                window.currentUserName = "Agent Learner";
+            }
+        });
+
+        // 5. IDENTITY ENGINE
+        async function ensureUserContainer(user, name, email, isGuest) {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             try {
+                 await setDoc(userRef, {
+                     displayName: name,
+                     email: email || (isGuest ? null : user.email || null),
+                     isGuest: isGuest,
+                     lastLogin: serverTimestamp(),
+                     lastActiveModule: "AI Co-Pilot"
+                 }, { merge: true });
+                 console.log("[Identity] User container verified/created.");
+             } catch (e) {
+                 console.error("[Identity] Failed to create user container:", e);
+             }
+        }
+
+        // 6. DATABASE LOGGING ENGINE
+        window.logToFirestore = async (action, detail, payload = {}) => {
+            const user = auth.currentUser;
+            if (!user) {
+                console.warn("[DB] Skipping write - No User");
+                return;
+            }
+            
+            console.log(`[DB] Writing event: ${action} - ${detail}`);
+
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            
+            const sessionData = {
+                gameName: "AI Co-Pilot", 
+                lastUpdated: serverTimestamp(),
+                user: {
+                    uid: user.uid,
+                    displayName: window.currentUserName,
+                    email: window.currentUserEmail
+                }
+            };
+
+            if (payload.score) sessionData.finalScore = payload.score; 
+            if (payload.rating) sessionData.rating = payload.rating;
+
+            try {
+                await setDoc(sessionRef, sessionData, { merge: true });
+                
+                const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'logs');
+                await addDoc(logsRef, {
+                    action: action,
+                    detail: detail,
+                    payload: payload,
+                    timestamp: serverTimestamp()
+                });
+                console.log("[DB] Write Success.");
+            } catch (e) {
+                console.error("[DB] Write FAILED:", e);
+            }
+        };
+
+        window.logModuleCompletion = async (badgeSVGString) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            console.log("[DB] Writing Completion Status & Artifact...");
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            
+            try {
+                await setDoc(sessionRef, {
+                    gameName: "AI Co-Pilot",
+                    completed: true,
+                    finalScore: 100,
+                    rank: "AI Co-Pilot Certified",
+                    lastUpdated: serverTimestamp(),
+                    badgeArtifact: badgeSVGString,
+                    user: {
+                        uid: user.uid,
+                        displayName: window.currentUserName
+                    }
+                }, { merge: true });
+                console.log("[DB] Completion Status & Badge Artifact Write Success.");
+            } catch (e) { console.error("[DB] Completion Status Write FAILED:", e); }
+        };
+
+        // 7. LOGIN FUNCTIONS
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            
+            const originalText = btn.innerText;
+            btn.innerText = "Connecting...";
+            btn.disabled = true;
+
+            try {
+                let user;
+                if (auth.currentUser) {
+                    // Reuse existing user if already there (Persistence Fix)
+                    user = auth.currentUser;
+                    console.log("[Auth] Reusing existing anonymous session");
+                } else {
+                    const result = await signInAnonymously(auth);
+                    user = result.user;
+                }
+                
+                const displayName = nameInput || "Agent Learner";
+                await updateProfile(user, { displayName: displayName });
+                
+                await ensureUserContainer(user, displayName, emailInput, true);
+
+                window.currentUserName = displayName;
+                window.currentUserEmail = emailInput;
+                
+                localStorage.setItem('aa_username', displayName);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'true');
+                
+                console.log("[Auth] Guest login successful. UID:", user.uid);
+                if(window.SessionManager) window.SessionManager.start(displayName, emailInput);
+                
+                document.getElementById('header-welcome-text').textContent = `Welcome, ${displayName}`;
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                
+                if(window.showPage) window.showPage(1);
+                if(window.sfx) window.sfx.nav();
+
+            } catch (error) {
+                console.error("Login Failed", error);
+                alert("Connection failed. Please try again.");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        window.handleGoogleLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            const btnContainer = document.getElementById('google-icon-container');
+            if(btnContainer) btnContainer.classList.add('opacity-50', 'pointer-events-none');
+            
+            try {
+                // Persistence handled by global setPersistence call
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user; 
+                
+                const finalName = user.displayName || "Agent";
+                await ensureUserContainer(user, finalName, user.email, false);
+
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                
+                localStorage.setItem('aa_username', finalName);
+                localStorage.setItem('aa_email', user.email);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'false');
+
+                console.log("[Auth] Google login successful. UID:", user.uid);
+                if(window.SessionManager) window.SessionManager.start(finalName, user.email);
+
+                document.getElementById('header-welcome-text').textContent = `Welcome, ${finalName}`;
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                
+                if(window.showPage) window.showPage(1);
+                if(window.sfx) window.sfx.nav();
+            } catch (error) {
+                console.error("Google Sign-In Error", error);
+                alert("Google Sign-In failed. Please try again.");
+            } finally {
+                 if(btnContainer) btnContainer.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        };
+        
+        (async function initAuth() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch (e) {
+                    console.warn("Auth token failed, falling back", e);
+                }
+            }
+        })();
+    </script>
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716', // Burnt Orange
+                        'allgood-secondary': '#357889', // Deep Cyan
+                        'allgood-dark': '#4C4C4C', // Dark Gray
+                        'allgood-light': '#F7F7F7', // Light Gray
+                        'allgood-hover': '#EB8D69', 
+                        'allgood-accent': '#2D6473',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        /* Base styles from Template */
+        body {
+            font-family: Verdana, sans-serif;
+            background-color: #1a1a1a;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-attachment: fixed;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+
+        .tablet-frame {
+            height: 80vh;
+            width: auto;
+            aspect-ratio: 16/10; 
+            max-width: 1100px;
+            max-height: 95vh;
+            min-height: 0; min-width: 0;
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+                radial-gradient(circle at 100% 100%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+                linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px;
+            padding: 12px; 
+            box-shadow: inset 1px 1px 2px rgba(255,255,255, 0.6), inset -1px -1px 2px rgba(0,0,0, 0.8), 0 30px 60px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px #111;
+            border: 1px solid #333;
+            position: relative;
+            margin: 20px auto;
+            transition: width 0.3s, height 0.3s, padding 0.3s;
+        }
+
+        .tablet-frame::before {
+            content: '';
+            position: absolute;
+            top: 10px; left: 10px; right: 10px; bottom: 10px;
+            border-radius: 6px;
+            background: #111;
+            z-index: 0;
+        }
+
+        .screen-container {
+            width: 100%;
+            height: 100%;
+            background-color: #F7F7F7;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column; 
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        /* SCROLLBAR: Move custom styles to the new Main Scroll View */
+        #main-scroll-view::-webkit-scrollbar { width: 14px; }
+        #main-scroll-view::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        #main-scroll-view::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
+        #main-scroll-view::-webkit-scrollbar-thumb:hover { background-color: #EB8D69; }
+
+        /* Modal Styles */
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        /* Layout Structure */
+        .navbar-content { flex: 0 0 60px; z-index: 20; }
+        
+        /* UPDATED .page: No internal scroll, height auto to fill wrapper */
+        .page { width: 100%; height: auto; padding: 20px; position: relative; display: none; overflow: visible; }
+        .page.active { display: block; }
+        
+        .footer-content { flex: 0 0 60px; z-index: 20; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        /* Blueprint Mode */
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode h1, .blueprint-mode h2, .blueprint-mode h3, .blueprint-mode strong { color: #38bdf8 !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        .blueprint-mode .bg-gray-100, .blueprint-mode .bg-gray-50 { background-color: #0f172a !important; border-color: #1e293b !important; }
+        .blueprint-mode .accordion-content { background-color: #0f172a !important; border-color: #334155 !important; color: #94a3b8 !important; }
+        .blueprint-mode .footer-content { background-color: #1e293b !important; border-top-color: #334155 !important; color: #94a3b8 !important; }
+        .blueprint-mode .footer-content a { color: #38bdf8 !important; }
+        .blueprint-mode .footer-content #back-button { color: #94a3b8 !important; }
+
+        /* Focus Mode */
+        .tablet-frame.focus-mode { 
+            position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; 
+            width: 100% !important; height: 100% !important;
+            aspect-ratio: auto !important; max-width: none !important; max-height: none !important; 
+            min-height: 0 !important;
+            margin: 0 !important; padding: 0 !important; 
+            background: #F7F7F7 !important; border: none !important; border-radius: 0 !important; 
+            box-shadow: none !important; z-index: 99999 !important; 
+            background-image: none !important;
+        }
+        .tablet-frame.focus-mode::before { display: none; }
+        .tablet-frame.focus-mode .screen-container { border-radius: 0; box-shadow: none; height: 100%; }
+        .tablet-frame.focus-mode .footer-content { padding-bottom: 0; }
+        body.is-focused main { padding: 0 !important; }
+
+        /* Mobile Layout */
+        @media (max-width: 768px) {
+            html, body { width: 100%; height: 100%; margin: 0; padding: 0 !important; overflow: hidden !important; position: fixed; inset: 0; overscroll-behavior: none; }
+            main { width: 100vw; height: 100dvh; position: fixed; inset: 0; padding: 0 !important; display: flex; flex-direction: column; z-index: 0; }
+            .tablet-frame { position: relative !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; min-height: 0 !important; aspect-ratio: auto !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; background-image: none !important; box-shadow: none !important; display: flex; flex-direction: column; }
+            .tablet-frame::before { display: none; }
+            .screen-container { flex: 1; width: 100%; height: 100%; display: flex; flex-direction: column; border-radius: 0 !important; box-shadow: none !important; overflow: hidden; }
+            .navbar-content { padding-top: max(env(safe-area-inset-top), 5px); }
+            .footer-content { z-index: 100; padding-bottom: max(env(safe-area-inset-bottom), 15px); height: auto; }
+        }
+
+        /* --- INTERACTIVE ELEMENTS --- */
+        /* Flip Card */
+        .flip-card { background-color: transparent; width: 100%; height: 240px; perspective: 1000px; cursor: pointer; }
+        .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .flip-card-front { background-color: white; border: 1px solid #e5e7eb; }
+        .flip-card-back { background-color: #357889; color: white; transform: rotateY(180deg); }
+
+        /* Drag and Drop (ACT Sort) */
+        .draggable-item { cursor: grab; transition: all 0.2s ease; user-select: none; }
+        .draggable-item.dragging { opacity: 0.5; transform: scale(1.05); cursor: grabbing; }
+        .drop-zone { transition: all 0.2s; }
+        .drop-zone.drag-over { background-color: #eff6ff; border-color: #357889; transform: scale(1.02); }
+        .drop-zone.correct-flash { animation: flashGreen 0.5s ease; }
+        .drop-zone.error-flash { animation: flashRed 0.5s ease; }
+        
+        @keyframes flashGreen { 0% { background-color: #d1fae5; border-color: #10b981; } 100% { background-color: #f9fafb; border-color: #e5e7eb; } }
+        @keyframes flashRed { 0% { background-color: #fee2e2; border-color: #ef4444; } 100% { background-color: #f9fafb; border-color: #e5e7eb; } }
+
+        /* Tone Dial */
+        .dial-container { width: 200px; height: 200px; position: relative; margin: 0 auto; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .dial-knob { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #4C4C4C, #1a1a1a); box-shadow: 0 10px 20px rgba(0,0,0,0.3); position: relative; border: 4px solid #333; }
+        .dial-marker { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 4px; height: 15px; background-color: #D34716; border-radius: 2px; }
+
+        /* Commitment Card */
+        .commit-card { transition: transform 0.3s; }
+        .commit-card.active { transform: scale(0.98); }
+        .commit-card.signed { border-color: #10b981; background-color: #ecfdf5; }
+
+        /* Role Card */
+        .role-card { transition: all 0.2s ease; cursor: pointer; border: 2px solid #e5e7eb; }
+        .role-card:hover { border-color: #D34716; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .role-card.selected { border-color: #D34716; background-color: #fff7ed; ring: 2px solid #D34716; }
+
+        /* Dynamic Context Box */
+        .dynamic-text-box { border-left: 4px solid #357889; background-color: #F3F4F6; padding: 1rem; border-radius: 0 0.5rem 0.5rem 0; margin-top: 1rem; }
+        .fade-in-up { animation: fadeInUp 0.5s ease-out forwards; opacity: 0; transform: translateY(20px); }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+        /* --- NEW VISUAL UPGRADE STYLES --- */
+        
+        /* Page 2: Split Reality */
+        .split-container { position: relative; height: 300px; overflow: hidden; border-radius: 12px; }
+        .split-panel { position: absolute; inset: 0; transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+        .split-left { background-color: #f3f4f6; z-index: 10; clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%); }
+        .split-right { background-color: #357889; color: white; z-index: 1; opacity: 0; transform: scale(0.9); }
+        
+        .split-active .split-left { opacity: 0; transform: scale(1.1); pointer-events: none; }
+        .split-active .split-right { opacity: 1; transform: scale(1); z-index: 20; }
+
+        /* Page 6: ACT Pyramid */
+        .pyramid-container { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; margin-top: 20px; }
+        .pyramid-block { width: 100%; text-align: center; padding: 12px; font-weight: bold; cursor: pointer; transition: all 0.3s; position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .pyramid-block:hover { transform: scale(1.02); z-index: 10; }
+        .pyramid-block.active { transform: scale(1.05); z-index: 20; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); border-color: white; }
+        
+        .block-top { width: 40%; background: #357889; color: white; border-radius: 12px 12px 4px 4px; } /* Tone */
+        .block-mid { width: 70%; background: #EB8D69; color: white; border-radius: 4px; } /* Context */
+        .block-base { width: 100%; background: #D34716; color: white; border-radius: 4px 4px 12px 12px; } /* Action */
+
+        /* Page 7: Magic Wand Shimmer */
+        .shimmer-card { position: relative; overflow: hidden; }
+        .shimmer-card::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: translateX(-100%); background-image: linear-gradient(85deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); animation: shimmer 2s infinite; pointer-events: none; }
+        @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+        /* Page 8: Recipe Builder */
+        .recipe-line { height: 2px; background: #e5e7eb; width: 30px; transition: width 1s ease; }
+        .recipe-active .recipe-line { width: 60px; background: #D34716; }
+        .ingredient-circle { transition: all 0.5s; }
+        .recipe-active .ingredient-circle { background-color: #D34716; color: white; border-color: #D34716; transform: scale(1.1); }
+
+        /* Page 11: Daily Timeline */
+        .timeline-container { position: relative; padding-left: 30px; border-left: 2px solid #e5e7eb; margin-left: 20px; }
+        .timeline-item { position: relative; margin-bottom: 30px; opacity: 0.5; transition: all 0.3s; cursor: pointer; }
+        .timeline-item:hover { opacity: 0.8; }
+        .timeline-item.active { opacity: 1; }
+        .timeline-dot { position: absolute; left: -37px; top: 0; width: 16px; height: 16px; border-radius: 50%; background: white; border: 2px solid #e5e7eb; transition: all 0.3s; }
+        .timeline-item.active .timeline-dot { background: #D34716; border-color: #D34716; transform: scale(1.3); box-shadow: 0 0 0 4px rgba(211, 71, 22, 0.2); }
+
+        /* Page 12: Red Alert */
+        .alert-bg { animation: redPulse 2s infinite; }
+        @keyframes redPulse { 0% { background-color: #FEF2F2; } 50% { background-color: #FECACA; } 100% { background-color: #FEF2F2; } }
+
+        /* Page 13: Checkmark Draw */
+        .checkmark-path { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: dash 2s ease-in-out forwards; }
+        @keyframes dash { to { stroke-dashoffset: 0; } }
+
+        /* Page 14: Signature */
+        .signature-font { font-family: 'Brush Script MT', cursive; font-size: 2rem; color: #1a1a1a; }
+        
+        /* Mentor Bar Static State - REMOVED COLLAPSE STYLES */
+        #mentor-bar { transition: opacity 0.3s ease-in-out; }
+
+        /* --- OPTION 3: COCKPIT DATA CHIPS STYLES --- */
+        .hud-panel {
+            background-color: #1f2937; /* Dark Gray bg */
+            border: 1px solid #374151;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        .hud-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, #357889, transparent);
+            opacity: 0.5;
+        }
+        .data-chip {
+            background-color: #111827;
+            border: 2px solid #4b5563; /* Gray border default */
+            color: #9ca3af;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .data-chip::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 4px;
+            background-color: #357889; /* Cyan indicator */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .data-chip:hover {
+            border-color: #357889;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(53, 120, 137, 0.3);
+        }
+        .data-chip.active {
+            background-color: #D34716; /* Burnt Orange Active */
+            border-color: #D34716;
+            color: white;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), 0 0 15px rgba(211, 71, 22, 0.4);
+        }
+        .data-chip.active::after { opacity: 1; background-color: white; }
+        
+        .status-light {
+            width: 8px; height: 8px; border-radius: 50%; background-color: #ef4444; /* Red */
+            box-shadow: 0 0 8px #ef4444;
+            transition: all 0.5s;
+        }
+        .status-light.ready {
+            background-color: #10b981; /* Green */
+            box-shadow: 0 0 8px #10b981;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-8">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative">
+                                <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                <i data-lucide="brain-circuit" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"></i>
+                                <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
+                                <h1 class="text-5xl md:text-7xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm">GoodBlock</h1>
+                                <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">AI Co-Pilot</p>
+                            </div>
+                            <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
+                        </div>
+                        <div class="absolute bottom-10 w-full text-center">
+                            <p class="text-white/40 text-xs font-body tracking-wide">Powered by the <span class="text-white/60 font-bold">Allgood Academy</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Header (Navigation & Controls) -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
+                    <div class="w-full px-4 flex items-center justify-between h-full">
+                        <div class="flex items-center overflow-hidden">
+                            <!-- HARDCODED DEFAULT: Agent Learner (Will update if auth loads different name) -->
+                            <div id="header-welcome-text" class="text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Welcome, Agent Learner</div>
+                            <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 15</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <!-- Control Cluster -->
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 mr-2" title="Go to Cover (Long-Press to System Menu)"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <button id="fullscreen-toggle" class="text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Jump to Page"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- MAIN SCROLL VIEW: Updated with min-h-0 and flex-basis-0 to prevent collapse -->
+                <div id="main-scroll-view" class="flex-1 min-h-0 overflow-y-auto w-full relative bg-[#F7F7F7] flex flex-col">
+
+                    <!-- Mentor Bar: Now part of the scrollable flow -->
+                    <div id="mentor-bar" class="w-full bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-start gap-4 transition-opacity duration-300 hidden shrink-0">
+                        <div class="mt-0.5 shrink-0">
+                            <i data-lucide="lightbulb" class="w-5 h-5 text-allgood-primary"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p id="mentor-text" class="text-sm font-medium text-gray-700 leading-relaxed font-body"></p>
+                        </div>
+                    </div>
+
+                    <!-- --- PAGES --- -->
+
+                    <!-- Page 1: Cover -->
+                    <div class="page active" id="page-1">
+                        <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-12">
+                            <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                            <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">The AI Co-Pilot:<br><span class="text-allgood-primary">GoodBlock</span></h1>
+                            
+                            <div class="w-full max-w-lg text-left mx-auto space-y-4">
+                                <!-- Accordion 1: About this module -->
+                                <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
+                                    <button class="accordion-toggle w-full bg-white p-4 flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                        <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">About this module</span>
+                                        <svg class="accordion-icon h-5 w-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                    <div class="hidden accordion-content bg-gray-50 border-t border-gray-200 p-5 text-gray-600 shadow-inner text-sm font-body">
+                                        <p class="mb-4 leading-relaxed">The world of work is changing. You don't need more tools; you need a new mindset. In this session, you will learn the <strong>one skill</strong> that matters most.</p>
+                                        <div class="flex items-center text-xs font-bold text-allgood-primary uppercase tracking-wide">
+                                            <i data-lucide="clock" class="w-4 h-4 mr-2"></i> 15 Minute Mission
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Accordion 2: How to use this GoodBlock -->
+                                <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
+                                    <button class="accordion-toggle w-full bg-white p-4 flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                        <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                        <svg class="accordion-icon h-5 w-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                    <div class="hidden accordion-content bg-gray-50 border-t border-gray-200 p-5 text-gray-600 shadow-inner text-xs font-body">
+                                        <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m5 5v-4m0 4h-4" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 2: The Myth -->
+                    <div class="page" id="page-2">
+                        <section class="mb-4 text-center">
+                            <h2 class="text-2xl font-heading font-bold text-allgood-dark">Myth vs. Reality</h2>
+                        </section>
+                        
+                        <div class="relative w-full h-[400px] bg-gray-100 rounded-2xl overflow-hidden border border-gray-200 shadow-inner group cursor-pointer" onclick="toggleMyth()">
+                            <!-- Background Split -->
+                            <div class="absolute inset-0 flex transition-transform duration-700" id="myth-slider">
+                                <!-- Left: Myth (Gray) -->
+                                <div class="w-full min-w-full h-full bg-gray-200 flex flex-col items-center justify-center p-8 text-center transition-opacity duration-500" id="myth-panel">
+                                    <div class="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center mb-6">
+                                        <i data-lucide="bot" class="w-12 h-12 text-gray-500"></i>
+                                        <i data-lucide="ban" class="w-24 h-24 text-red-500/20 absolute"></i>
+                                    </div>
+                                    <h3 class="text-2xl font-bold text-gray-600 mb-2">"AI is a Job Killer"</h3>
+                                    <p class="text-gray-500 text-sm">The fear: It replaces you.</p>
+                                    <div class="mt-8 px-4 py-2 bg-white rounded-full text-xs font-bold text-gray-400 shadow-sm">Tap to Reveal Truth</div>
+                                </div>
+                                
+                                <!-- Right: Reality (Color) - Hidden initially via transform -->
+                                <div class="w-full min-w-full h-full bg-gradient-to-br from-allgood-secondary to-allgood-accent flex flex-col items-center justify-center p-8 text-center text-white" id="reality-panel">
+                                    <div class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6 backdrop-blur-md shadow-xl animate-bounce">
+                                        <i data-lucide="zap" class="w-12 h-12 text-yellow-300"></i>
+                                    </div>
+                                    <h3 class="text-2xl font-bold text-white mb-2">"AI is a Task Killer"</h3>
+                                    <p class="text-white/80 text-sm max-w-xs">The reality: It removes the drudgery so you can focus on strategy.</p>
+                                    
+                                    <div class="mt-8 grid grid-cols-2 gap-4 w-full max-w-xs">
+                                        <div class="bg-white/10 p-2 rounded text-center">
+                                            <div class="text-[10px] font-bold opacity-70 uppercase tracking-wide">Unskilled + AI</div>
+                                            <div class="text-sm font-bold text-red-200">Generic</div>
+                                        </div>
+                                        <div class="bg-white/20 p-2 rounded text-center border border-white/30">
+                                            <div class="text-[10px] font-bold opacity-90 uppercase tracking-wide">Skilled + AI</div>
+                                            <div class="text-sm font-bold text-green-200">Superpowered</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 3: The Paradigm (UPGRADED) -->
+                    <div class="page" id="page-3">
+                        <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Cockpit View</h2></section>
+                        <p class="text-sm text-gray-600 mb-6 text-center">Stop flying solo. <strong>Tap the card</strong> to engage your co-pilot.</p>
+                        
+                        <div class="flip-card max-w-sm mx-auto h-[320px]" onclick="this.classList.toggle('flipped'); sfx.tick()">
+                            <div class="flip-card-inner">
+                                <!-- Front: Stressed -->
+                                <div class="flip-card-front bg-gray-50 border-gray-200">
+                                    <div class="absolute top-4 right-4"><i data-lucide="alert-circle" class="w-6 h-6 text-red-400"></i></div>
+                                    <i data-lucide="user" class="w-20 h-20 text-gray-400 mb-6"></i>
+                                    <div class="flex justify-center gap-2 mb-6">
+                                        <i data-lucide="file" class="w-6 h-6 text-gray-300 transform -rotate-12"></i>
+                                        <i data-lucide="mail" class="w-6 h-6 text-gray-300 transform rotate-12"></i>
+                                        <i data-lucide="calendar" class="w-6 h-6 text-gray-300 transform -rotate-6"></i>
+                                    </div>
+                                    <h3 class="text-2xl font-bold text-gray-600">Solo Pilot</h3>
+                                    <p class="text-xs text-gray-400 mt-2 font-bold uppercase tracking-widest">Manual Mode</p>
+                                </div>
+                                
+                                <!-- Back: Relaxed -->
+                                <div class="flip-card-back bg-gradient-to-br from-allgood-secondary to-allgood-accent">
+                                    <div class="absolute top-4 right-4"><i data-lucide="check-circle" class="w-6 h-6 text-green-300"></i></div>
+                                    <div class="flex items-center justify-center space-x-2 mb-6">
+                                        <i data-lucide="coffee" class="w-16 h-16 text-white"></i>
+                                        <div class="h-px w-8 bg-white/30"></div>
+                                        <i data-lucide="bot" class="w-12 h-12 text-white/80"></i>
+                                    </div>
+                                    <h3 class="text-2xl font-bold text-white">Co-Pilot Commander</h3>
+                                    <p class="text-sm text-white/90 mt-4 px-4 leading-relaxed">You set the course.<br>AI handles the turbulence.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 4: WIIFM (UPGRADED) -->
+                    <div class="page" id="page-4">
+                        <section class="mb-4 text-center">
+                            <h2 class="text-2xl font-heading font-bold text-allgood-dark">The Power Trio</h2>
+                            <p class="text-sm text-gray-500 mt-1">Why learn this? Tap to unlock benefits.</p>
+                        </section>
+
+                        <!-- UPDATED CONTAINER: Reduced height to min-h-[350px] -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[350px]">
+                            <!-- Card 1: Time -->
+                            <div class="flip-card h-full" onclick="this.classList.toggle('flipped'); sfx.tick()">
+                                <div class="flip-card-inner h-full">
+                                    <div class="flip-card-front hover:shadow-lg transition-shadow h-full flex flex-col items-center justify-center p-6">
+                                        <div class="bg-blue-50 p-4 rounded-full mb-4 flex items-center justify-center">
+                                            <i data-lucide="clock" class="w-10 h-10 text-blue-600"></i>
+                                        </div>
+                                        <h3 class="font-bold text-allgood-dark text-xl">Time</h3>
+                                    </div>
+                                    <div class="flip-card-back bg-blue-600 h-full flex flex-col items-center justify-center p-6 text-center">
+                                        <h3 class="font-bold mb-2 text-xl text-white">Reclaim It.</h3>
+                                        <p class="text-xs leading-relaxed text-white/90">Drafting emails? Summarizing notes? Stop doing "robotic" work manually. Automate the drudgery.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Creativity -->
+                            <div class="flip-card h-full" onclick="this.classList.toggle('flipped'); sfx.tick()">
+                                <div class="flip-card-inner h-full">
+                                    <div class="flip-card-front hover:shadow-lg transition-shadow h-full flex flex-col items-center justify-center p-6">
+                                        <div class="bg-orange-50 p-4 rounded-full mb-4 flex items-center justify-center">
+                                            <i data-lucide="sparkles" class="w-10 h-10 text-orange-500"></i>
+                                        </div>
+                                        <h3 class="font-bold text-allgood-dark text-xl">Creativity</h3>
+                                    </div>
+                                    <div class="flip-card-back bg-orange-500 h-full flex flex-col items-center justify-center p-6 text-center">
+                                        <h3 class="font-bold mb-2 text-xl text-white">Ignite It.</h3>
+                                        <p class="text-xs leading-relaxed text-white/90">Never start from a blank page. Use AI to brainstorm 10 ideas in 10 seconds. Spark your ideas, don't replace them.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Confidence -->
+                            <div class="flip-card h-full" onclick="this.classList.toggle('flipped'); sfx.tick()">
+                                <div class="flip-card-inner h-full">
+                                    <div class="flip-card-front hover:shadow-lg transition-shadow h-full flex flex-col items-center justify-center p-6">
+                                        <div class="bg-green-50 p-4 rounded-full mb-4 flex items-center justify-center">
+                                            <i data-lucide="shield-check" class="w-10 h-10 text-green-600"></i>
+                                        </div>
+                                        <h3 class="font-bold text-allgood-dark text-xl">Confidence</h3>
+                                    </div>
+                                    <div class="flip-card-back bg-green-600 h-full flex flex-col items-center justify-center p-6 text-center">
+                                        <h3 class="font-bold mb-2 text-xl text-white">Boost It.</h3>
+                                        <p class="text-xs leading-relaxed text-white/90">"Does this sound right?" Use AI as your editor-in-chief before you hit send. Communicate with precision.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 5: Role Selector (UPGRADED) -->
+                    <div class="page" id="page-5">
+                        <section class="mb-4 text-center">
+                            <h2 class="text-2xl font-heading font-bold text-allgood-dark">Choose Your Mindset</h2>
+                            <p class="text-sm text-gray-500 mt-1">How will you deploy your Co-Pilot today?</p>
+                        </section>
+
+                        <div class="space-y-4 max-w-md mx-auto">
+                            <!-- Option B1: The Optimizer -->
+                            <div class="role-card group relative bg-gradient-to-br from-white to-blue-50 p-5 rounded-xl shadow-sm border border-blue-100 cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-md hover:border-blue-300 hover:-translate-y-1" onclick="selectRole('optimizer', this)" data-role="optimizer">
+                                <!-- Watermark Icon -->
+                                <div class="absolute -right-6 -bottom-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i data-lucide="zap" class="w-32 h-32 text-blue-600"></i>
+                                </div>
+                                
+                                <div class="flex items-start relative z-10">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 mr-4 shadow-sm shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                        <i data-lucide="zap" class="w-6 h-6"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex justify-between items-center">
+                                            <h3 class="font-bold text-allgood-dark text-lg group-hover:text-blue-700 transition-colors">The Optimizer</h3>
+                                            <i data-lucide="check-circle" class="w-5 h-5 text-blue-500 opacity-0 transform scale-50 transition-all duration-300 group-[.selected]:opacity-100 group-[.selected]:scale-100"></i>
+                                        </div>
+                                        <p class="text-xs text-gray-600 mt-1 leading-relaxed">
+                                            <strong>Goal: Efficiency.</strong> You want to automate the boring stuff. Speed up drafts, summaries, and routine emails.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Option B2: The Innovator -->
+                            <div class="role-card group relative bg-gradient-to-br from-white to-orange-50 p-5 rounded-xl shadow-sm border border-orange-100 cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-md hover:border-orange-300 hover:-translate-y-1" onclick="selectRole('innovator', this)" data-role="innovator">
+                                <!-- Watermark Icon -->
+                                <div class="absolute -right-6 -bottom-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i data-lucide="sparkles" class="w-32 h-32 text-orange-500"></i>
+                                </div>
+                                
+                                <div class="flex items-start relative z-10">
+                                    <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center text-orange-500 mr-4 shadow-sm shrink-0 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                        <i data-lucide="lightbulb" class="w-6 h-6"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex justify-between items-center">
+                                            <h3 class="font-bold text-allgood-dark text-lg group-hover:text-orange-600 transition-colors">The Innovator</h3>
+                                            <i data-lucide="check-circle" class="w-5 h-5 text-orange-500 opacity-0 transform scale-50 transition-all duration-300 group-[.selected]:opacity-100 group-[.selected]:scale-100"></i>
+                                        </div>
+                                        <p class="text-xs text-gray-600 mt-1 leading-relaxed">
+                                            <strong>Goal: Growth.</strong> You want to break through creative blocks. Brainstorm ideas, rephrase content, and explore new angles.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Option B3: The Strategist -->
+                            <div class="role-card group relative bg-gradient-to-br from-white to-green-50 p-5 rounded-xl shadow-sm border border-green-100 cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-md hover:border-green-300 hover:-translate-y-1" onclick="selectRole('strategist', this)" data-role="strategist">
+                                <!-- Watermark Icon -->
+                                <div class="absolute -right-6 -bottom-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i data-lucide="map" class="w-32 h-32 text-green-600"></i>
+                                </div>
+                                
+                                <div class="flex items-start relative z-10">
+                                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-green-600 mr-4 shadow-sm shrink-0 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                        <i data-lucide="compass" class="w-6 h-6"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex justify-between items-center">
+                                            <h3 class="font-bold text-allgood-dark text-lg group-hover:text-green-700 transition-colors">The Strategist</h3>
+                                            <i data-lucide="check-circle" class="w-5 h-5 text-green-600 opacity-0 transform scale-50 transition-all duration-300 group-[.selected]:opacity-100 group-[.selected]:scale-100"></i>
+                                        </div>
+                                        <p class="text-xs text-gray-600 mt-1 leading-relaxed">
+                                            <strong>Goal: Clarity.</strong> You want better decisions. Synthesize complex reports, analyze data, and plan next steps.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Manual Confirm Button (No Auto-Advance) -->
+                        <div id="role-confirm" class="mt-8 text-center opacity-0 transition-opacity pointer-events-none transform translate-y-4 duration-500">
+                            <button class="bg-allgood-dark text-white px-10 py-3 rounded-full text-sm font-bold shadow-xl hover:scale-105 transition-transform hover:bg-gray-800 flex items-center mx-auto" onclick="window.showPage(6)">
+                                Confirm Mindset <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Page 6: ACT Framework (UPGRADED PYRAMID) -->
+                    <div class="page" id="page-6">
+                        <section class="mb-2 text-center">
+                            <h2 class="text-2xl font-heading font-bold text-allgood-dark">The ACT Pyramid</h2>
+                            <p class="text-xs text-gray-500">Build your prompt from the ground up.</p>
+                        </section>
+
+                        <div class="pyramid-container">
+                            <!-- Top: Tone -->
+                            <div class="pyramid-block block-top" onclick="togglePyramid(this, 'Tone')">
+                                <span>TONE</span>
+                                <div class="hidden text-xs font-normal mt-2 p-2 bg-white/20 rounded">
+                                    "The Polish"<br>Professional? Witty? Strict?
+                                </div>
+                            </div>
+                            <!-- Mid: Context -->
+                            <div class="pyramid-block block-mid" onclick="togglePyramid(this, 'Context')">
+                                <span>CONTEXT</span>
+                                <div class="hidden text-xs font-normal mt-2 p-2 bg-white/20 rounded">
+                                    "The Structure"<br>Audience? Background? Format?
+                                </div>
+                            </div>
+                            <!-- Base: Action -->
+                            <div class="pyramid-block block-base" onclick="togglePyramid(this, 'Action')">
+                                <span>ACTION</span>
+                                <div class="hidden text-xs font-normal mt-2 p-2 bg-white/20 rounded">
+                                    "The Foundation"<br>Draft. Summarize. Analyze.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="pyramid-detail" class="mt-6 text-center text-sm text-gray-600 h-12 italic">
+                            Tap a block to inspect the layer.
+                        </div>
+
+                        <!-- Context Anchor -->
+                        <div class="dynamic-text-box fade-in-up mt-6">
+                            <h4 class="text-xs font-bold text-allgood-secondary uppercase mb-1" id="dynamic-header-p6">Why this matters:</h4>
+                            <p class="text-sm text-gray-800 italic" id="dynamic-p6">Select a mindset on Page 5 to see your specific context.</p>
+                        </div>
+                    </div>
+
+                    <!-- Page 7: Action Drill (UPGRADED) -->
+                    <div class="page" id="page-7">
+                        <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Magic Wand</h2></section>
+                        
+                        <div class="relative max-w-md mx-auto mb-6">
+                            <!-- Weak State -->
+                            <div id="action-weak" class="bg-gray-100 p-8 rounded-lg border-2 border-dashed border-gray-300 text-center transition-all duration-500">
+                                <p class="text-xs uppercase font-bold text-gray-400 mb-4">Weak Input</p>
+                                <h3 class="text-2xl font-mono text-gray-500 mb-6">"Write something."</h3>
+                                <button onclick="activateMagicWand()" class="bg-white border border-gray-300 text-gray-600 px-6 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-gray-50 flex items-center mx-auto">
+                                    <i data-lucide="wand-2" class="w-4 h-4 mr-2"></i> Upgrade
+                                </button>
+                            </div>
+
+                            <!-- Strong State (Hidden) -->
+                            <div id="action-strong" class="absolute inset-0 bg-white p-8 rounded-lg border-2 border-allgood-primary shadow-xl text-center opacity-0 pointer-events-none transform scale-95 transition-all duration-700 flex flex-col items-center justify-center shimmer-card">
+                                <div class="absolute top-2 right-2"><i data-lucide="sparkles" class="w-5 h-5 text-yellow-400 animate-pulse"></i></div>
+                                <p class="text-xs uppercase font-bold text-allgood-primary mb-2">Strong Output</p>
+                                <h3 class="text-xl font-bold text-allgood-dark" id="strong-prompt-text">"Draft a detailed proposal..."</h3>
+                                <div class="mt-4 pt-4 border-t border-gray-100 w-full">
+                                    <p class="text-xs text-gray-500 italic" id="dynamic-p7-status">Dynamic context loading...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Context Anchor -->
+                        <div class="dynamic-text-box fade-in-up">
+                            <h4 class="text-xs font-bold text-allgood-secondary uppercase mb-1" id="dynamic-header-p7">Why this matters:</h4>
+                            <p class="text-sm text-gray-800 italic" id="dynamic-p7">Select a mindset on Page 5 to see your specific context.</p>
+                        </div>
+                    </div>
+
+                    <!-- Page 8: Context Stack (UPGRADED TO COCKPIT CHIPS) -->
+                    <div class="page" id="page-8">
+                        <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">System Check</h2></section>
+                        
+                        <div class="w-full max-w-md mx-auto">
+                            
+                            <!-- HUD DASHBOARD -->
+                            <div class="hud-panel rounded-xl p-6 text-center mb-6">
+                                <div class="flex items-center justify-between mb-6 border-b border-gray-700 pb-2">
+                                    <div class="text-[10px] font-mono text-gray-400 tracking-widest uppercase">Prompt Engine v2.0</div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="text-[10px] font-mono font-bold text-red-400 uppercase tracking-widest transition-colors duration-500" id="system-text">Offline</div>
+                                        <div class="status-light" id="system-light"></div>
+                                    </div>
+                                </div>
+
+                                <p class="text-xs text-gray-400 mb-4 font-mono">INSERT DATA CHIPS TO INITIALIZE</p>
+
+                                <div class="grid grid-cols-3 gap-3 mb-6" id="chip-container">
+                                    <!-- Chip 1: Role -->
+                                    <button class="data-chip rounded-lg h-24 flex flex-col items-center justify-center gap-2 group" onclick="activateChip(this)">
+                                        <i data-lucide="user-circle" class="w-6 h-6 group-hover:text-cyan-300 transition-colors"></i>
+                                        <span class="text-[10px] font-bold uppercase tracking-wide">Role</span>
+                                        <div class="text-[8px] opacity-50 font-mono">UNMOUNTED</div>
+                                    </button>
+                                    
+                                    <!-- Chip 2: Task -->
+                                    <button class="data-chip rounded-lg h-24 flex flex-col items-center justify-center gap-2 group" onclick="activateChip(this)">
+                                        <i data-lucide="cpu" class="w-6 h-6 group-hover:text-cyan-300 transition-colors"></i>
+                                        <span class="text-[10px] font-bold uppercase tracking-wide">Task</span>
+                                        <div class="text-[8px] opacity-50 font-mono">UNMOUNTED</div>
+                                    </button>
+                                    
+                                    <!-- Chip 3: Goal -->
+                                    <button class="data-chip rounded-lg h-24 flex flex-col items-center justify-center gap-2 group" onclick="activateChip(this)">
+                                        <i data-lucide="crosshair" class="w-6 h-6 group-hover:text-cyan-300 transition-colors"></i>
+                                        <span class="text-[10px] font-bold uppercase tracking-wide">Goal</span>
+                                        <div class="text-[8px] opacity-50 font-mono">UNMOUNTED</div>
+                                    </button>
+                                </div>
+
+                                <!-- Generate Button Area -->
+                                <button id="generate-output-btn" onclick="generatePromptOutput()" disabled class="w-full bg-gray-700 text-gray-400 py-3 rounded text-sm font-bold shadow-inner transition-all duration-300 flex items-center justify-center border border-gray-600 font-mono disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider">
+                                    <i data-lucide="power" class="w-4 h-4 mr-2"></i> Initialize System
+                                </button>
+                            </div>
+
+                            <div class="dynamic-text-box fade-in-up w-full">
+                                <h4 class="text-xs font-bold text-allgood-secondary uppercase mb-1" id="dynamic-header-p8">Context:</h4>
+                                <p class="text-sm text-gray-800 italic" id="dynamic-p8">...</p>
+                            </div>
+
+                            <!-- NEW LLM OUTPUT AREA -->
+                            <div id="llm-output-p8" class="mt-6 p-4 bg-white border border-gray-200 rounded-lg shadow-inner hidden">
+                                <h4 class="text-xs font-bold text-allgood-primary uppercase mb-2 border-b border-gray-100 pb-1">System Output:</h4>
+                                <div id="llm-result" class="text-sm text-gray-700 whitespace-pre-wrap min-h-[50px] italic font-medium leading-relaxed"></div>
+                                <div id="llm-sources" class="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-500 hidden"></div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Page 9: Tone Dial (UPGRADED) -->
+                    <div class="page" id="page-9">
+                        <section class="mb-4 text-center"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Equalizer</h2></section>
+                        
+                        <div class="flex flex-col items-center">
+                            <!-- DIAL CONTAINER: Now houses the emoji inside -->
+                            <div class="dial-container mb-8 scale-75 relative" id="tone-dial">
+                                <!-- The rotating part -->
+                                <div class="dial-knob" style="transform: rotate(0deg);">
+                                    <div class="dial-marker"></div>
+                                </div>
+                                
+                                <!-- The Emoji (Centered Absolutely) -->
+                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                                    <div class="text-6xl transition-all duration-300 transform drop-shadow-md" id="tone-emoji">😐</div>
+                                </div>
+                            </div>
+                            
+                            <!-- EXPANDED BUTTONS: 2 Rows of 3 -->
+                            <div class="grid grid-cols-3 gap-2 mb-6 w-full max-w-sm">
+                                <button onclick="rotateDial(-70, 'Witty')" class="px-3 py-2 bg-purple-50 text-purple-800 rounded text-[10px] font-bold border border-purple-200 hover:bg-purple-100">Witty</button>
+                                <button onclick="rotateDial(-35, 'Option A')" class="px-3 py-2 bg-blue-50 text-blue-800 rounded text-[10px] font-bold border border-blue-200 hover:bg-blue-100">Professional</button>
+                                <button onclick="rotateDial(-15, 'Direct')" class="px-3 py-2 bg-red-50 text-red-800 rounded text-[10px] font-bold border border-red-200 hover:bg-red-100">Direct</button>
+                                
+                                <button onclick="rotateDial(15, 'Neutral')" class="px-3 py-2 bg-gray-50 text-gray-800 rounded text-[10px] font-bold border border-gray-200 hover:bg-gray-100">Neutral</button>
+                                <button onclick="rotateDial(35, 'Option B')" class="px-3 py-2 bg-orange-50 text-orange-800 rounded text-[10px] font-bold border border-orange-200 hover:bg-orange-100">Empathetic</button>
+                                <button onclick="rotateDial(70, 'Socratic')" class="px-3 py-2 bg-teal-50 text-teal-800 rounded text-[10px] font-bold border border-teal-200 hover:bg-teal-100">Socratic</button>
+                            </div>
+
+                            <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-gray-300 w-full shadow-sm mb-6" id="tone-box">
+                                <p id="tone-output" class="text-lg font-serif italic text-gray-600">"Select a tone to adjust the frequency."</p>
+                            </div>
+
+                            <!-- Context Anchor -->
+                            <div class="dynamic-text-box fade-in-up w-full">
+                                <h4 class="text-xs font-bold text-allgood-secondary uppercase mb-1" id="dynamic-header-p9">Why this matters:</h4>
+                                <p class="text-sm text-gray-800 italic" id="dynamic-p9">Select a mindset on Page 5 to see your specific context.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 10: ACT Sort Drill (UPGRADED) -->
+                    <div class="page" id="page-10">
+                        <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-xl font-heading font-bold text-allgood-dark">The Sort Buckets</h2></section>
+                        
+                        <div class="grid grid-cols-3 gap-3 mb-6">
+                            <div class="drop-zone p-4 bg-gray-100 rounded-b-xl border-t-4 border-allgood-primary min-h-[120px] shadow-inner text-center" data-cat="A">
+                                <i data-lucide="play" class="w-6 h-6 mx-auto text-allgood-primary mb-2"></i>
+                                <span class="text-xs font-bold text-gray-500">ACTION</span>
+                            </div>
+                            <div class="drop-zone p-4 bg-gray-100 rounded-b-xl border-t-4 border-gray-500 min-h-[120px] shadow-inner text-center" data-cat="C">
+                                <i data-lucide="map" class="w-6 h-6 mx-auto text-gray-500 mb-2"></i>
+                                <span class="text-xs font-bold text-gray-500">CONTEXT</span>
+                            </div>
+                            <div class="drop-zone p-4 bg-gray-100 rounded-b-xl border-t-4 border-allgood-secondary min-h-[120px] shadow-inner text-center" data-cat="T">
+                                <i data-lucide="music" class="w-6 h-6 mx-auto text-allgood-secondary mb-2"></i>
+                                <span class="text-xs font-bold text-gray-500">TONE</span>
+                            </div>
+                        </div>
+
+                        <div id="act-draggables" class="flex flex-wrap gap-3 justify-center">
+                            <!-- Puzzle Piece Style -->
+                            <div class="draggable-item bg-white border-2 border-gray-200 px-4 py-2 rounded-lg text-xs font-bold shadow-sm cursor-grab active:cursor-grabbing hover:-translate-y-1 transition-transform" draggable="true" data-target="A">Summarize</div>
+                            <div class="draggable-item bg-white border-2 border-gray-200 px-4 py-2 rounded-lg text-xs font-bold shadow-sm cursor-grab active:cursor-grabbing hover:-translate-y-1 transition-transform" draggable="true" data-target="C">For the CEO</div>
+                            <div class="draggable-item bg-white border-2 border-gray-200 px-4 py-2 rounded-lg text-xs font-bold shadow-sm cursor-grab active:cursor-grabbing hover:-translate-y-1 transition-transform" draggable="true" data-target="T">Witty</div>
+                            <div class="draggable-item bg-white border-2 border-gray-200 px-4 py-2 rounded-lg text-xs font-bold shadow-sm cursor-grab active:cursor-grabbing hover:-translate-y-1 transition-transform" draggable="true" data-target="A">Draft Email</div>
+                            <div class="draggable-item bg-white border-2 border-gray-200 px-4 py-2 rounded-lg text-xs font-bold shadow-sm cursor-grab active:cursor-grabbing hover:-translate-y-1 transition-transform" draggable="true" data-target="C">Using this PDF</div>
+                            <div class="draggable-item bg-white border-2 border-gray-200 px-4 py-2 rounded-lg text-xs font-bold shadow-sm cursor-grab active:cursor-grabbing hover:-translate-y-1 transition-transform" draggable="true" data-target="T">Authoritative</div>
+                        </div>
+                        
+                        <div id="sort-feedback" class="mt-4 text-center hidden animate-bounce text-green-600 font-bold">
+                            <i data-lucide="check-circle" class="inline w-5 h-5 mr-1"></i> All Sorted!
+                        </div>
+
+                        <!-- Context Anchor -->
+                        <div class="dynamic-text-box fade-in-up mt-6">
+                            <h4 class="text-xs font-bold text-allgood-secondary uppercase mb-1" id="dynamic-header-p10">Why this matters:</h4>
+                            <p class="text-sm text-gray-800 italic" id="dynamic-p10">Select a mindset on Page 5 to see your specific context.</p>
+                        </div>
+                    </div>
+
+                    <!-- Page 11: Habits (UPGRADED) -->
+                    <div class="page" id="page-11">
+                        <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Daily Timeline</h2></section>
+                        
+                        <div class="timeline-container">
+                            <!-- Morning -->
+                            <div class="timeline-item" onclick="activateTimeline(this)">
+                                <div class="timeline-dot"></div>
+                                <h3 class="text-lg font-bold text-allgood-dark">Morning: The Draft</h3>
+                                <div class="flex items-center text-xs text-gray-500 mt-1 mb-2">
+                                    <i data-lucide="coffee" class="w-4 h-4 mr-1"></i> 8:00 AM
+                                </div>
+                                <p class="text-sm text-gray-600">"Draft a response to this angry email." Don't start with a blank page.</p>
+                            </div>
+
+                            <!-- Noon -->
+                            <div class="timeline-item" onclick="activateTimeline(this)">
+                                <div class="timeline-dot"></div>
+                                <h3 class="text-lg font-bold text-allgood-dark">Noon: The Summary</h3>
+                                <div class="flex items-center text-xs text-gray-500 mt-1 mb-2">
+                                    <i data-lucide="file-text" class="w-4 h-4 mr-1"></i> 12:30 PM
+                                </div>
+                                <p class="text-sm text-gray-600">"Summarize this meeting transcript." Catch up in seconds, not hours.</p>
+                            </div>
+
+                            <!-- Afternoon -->
+                            <div class="timeline-item" onclick="activateTimeline(this)">
+                                <div class="timeline-dot"></div>
+                                <h3 class="text-lg font-bold text-allgood-dark">Afternoon: The Spark</h3>
+                                <div class="flex items-center text-xs text-gray-500 mt-1 mb-2">
+                                    <i data-lucide="lightbulb" class="w-4 h-4 mr-1"></i> 3:45 PM
+                                </div>
+                                <p class="text-sm text-gray-600">"Give me 10 ideas for..." Break the afternoon slump.</p>
+                            </div>
+                        </div>
+
+                        <!-- Context Anchor -->
+                        <div class="dynamic-text-box fade-in-up mt-6">
+                            <h4 class="text-xs font-bold text-allgood-secondary uppercase mb-1" id="dynamic-header-p11">Why this matters:</h4>
+                            <p class="text-sm text-gray-800 italic" id="dynamic-p11">Select a mindset on Page 5 to see your specific context.</p>
+                        </div>
+                    </div>
+
+                    <!-- Page 12: Crisis (UPGRADED) -->
+                    <div class="page" id="page-12">
+                        <div class="alert-bg absolute inset-0 -z-10 rounded-lg opacity-50"></div>
+                        <section class="mb-4 text-center relative z-10">
+                            <div class="inline-block p-3 bg-red-100 rounded-full mb-2 animate-ping-slow">
+                                <i data-lucide="siren" class="w-8 h-8 text-red-600"></i>
+                            </div>
+                            <h2 class="text-2xl font-heading font-bold text-red-700">RED ALERT MODE</h2>
+                        </section>
+                        
+                        <!-- Tension Bar -->
+                        <div class="w-full bg-gray-200 rounded-full h-4 mb-6 relative overflow-hidden border border-gray-300">
+                            <div class="bg-red-500 h-4 rounded-full" style="width: 85%"></div>
+                            <span class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">TIME REMAINING: CRITICAL</span>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500 relative z-10">
+                            <p class="text-gray-800 font-bold mb-4">Scenario: 10-page report dump. Meeting in 15 mins. VP needs a brief.</p>
+                            <hr class="my-4 border-gray-200">
+                            
+                            <div class="space-y-3">
+                                <!-- Option A -->
+                                <button onclick="checkScenario('A')" class="w-full text-left p-4 bg-white border border-gray-200 rounded hover:bg-gray-50 shadow-sm group transition-colors flex items-start">
+                                    <span class="font-bold text-gray-500 mr-2 shrink-0">A.</span>
+                                    <span class="text-sm text-gray-600">Read it fast. (Speed Read)</span>
+                                </button>
+                                
+                                <!-- Option B -->
+                                <button onclick="checkScenario('B')" class="w-full text-left p-4 bg-white border border-gray-200 rounded hover:bg-gray-50 shadow-sm group transition-colors flex items-start">
+                                    <span class="font-bold text-gray-500 mr-2 shrink-0">B.</span>
+                                    <span class="text-sm text-gray-600">Decline the task. (Not enough time)</span>
+                                </button>
+                                
+                                <!-- Option C (Fixed to match A & B exactly) -->
+                                <button onclick="checkScenario('C')" class="w-full text-left p-4 bg-white border border-gray-200 rounded hover:bg-gray-50 shadow-sm group transition-colors flex items-start">
+                                    <span class="font-bold text-gray-500 mr-2 shrink-0">C.</span>
+                                    <span class="text-sm text-gray-600">ACT Prompt: "Summarize (A) this report (C) for key risks (T)."</span>
+                                </button>
+                            </div>
+                            <div id="scenario-feedback" class="mt-4 text-sm font-bold text-center h-6"></div>
+                        </div>
+
+                        <!-- Context Anchor -->
+                        <div class="dynamic-text-box fade-in-up mt-6">
+                            <h4 class="text-xs font-bold text-allgood-secondary uppercase mb-1" id="dynamic-header-p12">Why this matters:</h4>
+                            <p class="text-sm text-gray-800 italic" id="dynamic-p12">Select a mindset on Page 5 to see your specific context.</p>
+                        </div>
+                    </div>
+
+                    <!-- Page 13: Outcome (UPGRADED) -->
+                    <div class="page" id="page-13">
+                        <div class="flex flex-col items-center justify-center h-full text-center">
+                            <div class="relative mb-8">
+                                <svg class="w-32 h-32 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path class="checkmark-path" d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            
+                            <h2 class="text-4xl font-heading font-bold text-allgood-dark mb-2">Mission Success</h2>
+                            <div class="h-1 w-20 bg-allgood-primary mx-auto mb-6 rounded-full"></div>
+                            
+                            <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm max-w-sm mx-auto transform translate-y-4 animate-[fadeInUp_1s_ease-out_forwards]">
+                                <p class="text-gray-600 italic font-serif text-lg">"AI didn't replace you.<br>It just made you look like a genius."</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 14: Challenge (UPGRADED) -->
+                    <div class="page" id="page-14">
+                        <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Contract</h2></section>
+                        
+                        <div class="bg-yellow-50 p-8 rounded shadow-lg border border-yellow-200 relative max-w-sm mx-auto rotate-1 hover:rotate-0 transition-transform duration-500">
+                            <div class="absolute top-4 right-4 text-yellow-800/20"><i data-lucide="file-signature" class="w-24 h-24"></i></div>
+                            
+                            <h3 class="font-heading font-bold text-xl mb-4 text-allgood-dark uppercase tracking-widest border-b-2 border-black pb-2 inline-block">Mission Dossier</h3>
+                            <p class="text-sm text-gray-800 mb-6 leading-relaxed relative z-10">
+                                I, the undersigned, hereby agree to delegate <strong>ONE (1)</strong> mundane task to my AI Co-Pilot within the next 24 hours.
+                            </p>
+                            
+                            <div class="mt-8 border-b-2 border-black w-full relative h-12 cursor-pointer" onclick="signContract(this)">
+                                <span class="absolute bottom-1 left-0 text-xs text-gray-500 uppercase">x Sign Here</span>
+                                <div class="signature-font absolute bottom-2 left-10 opacity-0 transition-opacity duration-1000 text-allgood-primary transform -rotate-3" id="signature-text">Agent Learner</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Page 15: Credits & Certification (FINAL UPGRADE) -->
+                    <div class="page" id="page-15">
+                        <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-8">
+                            <div class="mb-8"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2><p class="text-xs text-gray-400 font-bold tracking-widest uppercase mt-2">Pragmatic Action</p></div>
+                            
+                            <!-- Feedback Card -->
+                            <div id="feedback-container" class="w-full max-w-md bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8 text-left relative">
+                                <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this GoodBlock</h3>
+                                
+                                <!-- Star Rating -->
+                                <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                    <button onclick="setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    <button onclick="setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                </div>
+
+                                <!-- Feedback Text -->
+                                <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback sharpens our tools. What worked? What didn't?</label>
+                                <textarea id="feedback-text" rows="3" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50" placeholder="Optional: Share your thoughts..."></textarea>
+                                
+                                <button onclick="submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm">Send Feedback</button>
+                            </div>
+
+                            <!-- Success State (Hidden by default) -->
+                            <div id="feedback-success" class="hidden w-full max-w-md bg-green-50 p-6 rounded-lg shadow-inner border border-green-200 mb-8 text-center">
+                                <i data-lucide="check-circle" class="w-12 h-12 text-green-600 mx-auto mb-2"></i>
+                                <h3 class="font-bold text-green-800">Feedback Received.</h3>
+                                <p class="text-xs text-green-700 mt-1">Thank you for helping us improve.</p>
+                            </div>
+
+                            <!-- Certification Badge Section -->
+                            <div id="certification-section" class="w-full max-w-md bg-gradient-to-br from-allgood-secondary to-allgood-accent p-1 rounded-lg shadow-xl mb-8 transform transition-all duration-700 scale-95 opacity-0">
+                                <div class="bg-white p-6 rounded-md text-center">
+                                    <div class="mb-4 relative inline-block">
+                                        <div class="absolute inset-0 bg-yellow-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+                                        <i data-lucide="award" class="relative w-16 h-16 text-allgood-primary mx-auto"></i>
+                                    </div>
+                                    <h3 class="font-heading font-bold text-2xl text-allgood-dark mb-2">Mission Complete</h3>
+                                    <p class="text-sm text-gray-600 mb-6">You have navigated the gauntlet. Verify your readiness to deploy.</p>
+                                    
+                                    <!-- Mission Checklist -->
+                                    <div class="text-left bg-gray-50 p-4 rounded border border-gray-200 mb-6 text-sm">
+                                        <h4 class="font-bold text-allgood-dark mb-3 uppercase text-[10px] tracking-widest border-b border-gray-200 pb-2">Certification Requirements</h4>
+                                        <ul class="space-y-3">
+                                            <li id="req-role" class="flex items-center text-gray-400 transition-colors">
+                                                <i data-lucide="circle" class="w-4 h-4 mr-2"></i> <span>Mindset Selection (Page 5)</span>
+                                            </li>
+                                            <!-- REPLACED: Page 8 with Page 10 -->
+                                            <li id="req-sort" class="flex items-center text-gray-400 transition-colors">
+                                                <i data-lucide="circle" class="w-4 h-4 mr-2"></i> <span>ACT Sort Drill (Page 10)</span>
+                                            </li>
+                                            <li id="req-contract" class="flex items-center text-gray-400 transition-colors">
+                                                <i data-lucide="circle" class="w-4 h-4 mr-2"></i> <span>Contract Signed (Page 14)</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    <!-- Locked Button -->
+                                    <button id="download-badge-btn" onclick="downloadBadge()" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300">
+                                        <i id="btn-icon" data-lucide="lock" class="w-4 h-4 mr-2"></i>
+                                        <span id="btn-text">Certification Locked</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="w-full max-w-md text-left mx-auto mb-4">
+                                <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                    <span class="font-heading font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors">About Us</span>
+                                    <svg class="accordion-icon h-5 w-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                                </button>
+                                <div class="accordion-content hidden bg-white border-x border-b border-gray-200 rounded-b-lg p-6 text-gray-600 space-y-3 shadow-inner text-sm font-body leading-relaxed">
+                                    <p>The Allgood Academy is a learning lab focused on Pragmatic Action. We apply the advanced instructional design used by top tech companies to guarantee one result: a mindset shift that converts passive learning into tangible, real-world execution.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div> 
+                <!-- END MAIN SCROLL VIEW -->
+
+                <!-- Footer -->
+                <footer class="footer-content flex items-center justify-between px-6 border-t border-gray-200 bg-white z-20 relative">
+                    <div id="flex-progress-bar" class="absolute top-0 left-0 h-1 bg-gray-200 w-full"><div id="flex-progress-fill" class="h-full bg-allgood-primary w-0 transition-all duration-300"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body">
+                        <i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Back
+                    </button>
+                    <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a> <span id="current-year"></span></p>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body">
+                        <span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+                    </button>
+                </footer>
+
+                <!-- 3. Login Modal (Standardized from Airport Navigator) -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 visible-modal modal-transition">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 font-body leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. <strong>Performance data is logged in real-time</strong> to improve the GoodBlock experience. All personal data is <strong>kept confidential</strong> and <strong>never sold.</strong></p>
+                                    <div class="border-t border-gray-700 my-1 pt-1"></div>
+                                    <p class="text-gray-300"><strong>Email (Optional):</strong> Enter to join the Allgood Academy community.</p>
+                                </div>
+                            </button>
+                        </div>
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Start Mission</button>
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4. Menu Modal -->
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Mission Log</span>
+                            <button id="close-menu" class="text-gray-500"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body">
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600 font-bold" data-page="1">1. Cover</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="2">2. The Myth</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="3">3. The Paradigm</button>
+                            <div class="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">The ACT Framework</div>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="4">4. Overview</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="5">5. Identity</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="6">6. Framework</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="7">7. Action</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="8">8. Context</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="9">9. Tone</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600 font-bold text-allgood-primary" data-page="10">10. ACT Sort Drill</button>
+                            <div class="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">Application</div>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="11">11. Daily Habits</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="12">12. Crisis Scenario</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="13">13. Outcome</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600" data-page="14">14. The Challenge</button>
+                            <button class="menu-link w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-600 font-bold text-allgood-secondary" data-page="15">15. Certification</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. System Menu Modal -->
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4">
+                            <i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i>
+                        </div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">Select an option to proceed.</p>
+                        
+                        <div class="space-y-3">
+                            <button onclick="handleSystemReset()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="power" class="w-4 h-4 mr-2"></i> Reset Mission
+                            </button>
+                            <button onclick="handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Exit to Dashboard
+                            </button>
+                            <button onclick="closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. SESSION MANAGER & GLOBAL STATE ---
+        let currentRole = null;
+        let chipsActive = 0;
+
+        const SessionManager = {
+            startTime: Date.now(),
+            userEmail: "",
+            userName: "",
+            
+            start: function(name, email) {
+                this.userName = name;
+                this.userEmail = email || "";
+                console.log("[Session] Started for:", this.userName);
+                window.logToFirestore("Session_Start", "User Logged In");
+            },
+
+            log: function(action, detail) {
+                if(window.logToFirestore) {
+                    window.logToFirestore(action, detail);
+                } else {
+                    console.log("[Local Log]", action, detail);
+                }
+            }
+        };
+        window.SessionManager = SessionManager;
+
+        // Role Content Data - FULLY POPULATED
+        const roleContent = {
+            optimizer: {
+                name: "Optimizer",
+                p6: "Structure is speed. The ACT framework cuts down on 'back-and-forth' chat. You get the right answer on the first try.",
+                p7: "Don't ask 'Write an email.' Ask 'Draft a concise update for the team that cuts reading time in half.'",
+                p8: "Context is speed. AI needs to know 'Format' (Bullet points) and 'Constraint' (Under 200 words) so you don't have to edit it later.",
+                p9: "Tone drives efficiency. Use 'Direct', 'Brief', or 'Action-Oriented' to get straight to the point without fluff.",
+                p10: "Sorting inputs quickly is a superpower. Knowing what to feed the AI means you spend less time prompting and more time doing.",
+                p11: "Your day is a race. Use these habits to automate the 'churn' work so you can focus on high-leverage tasks.",
+                p12: "In a crisis, speed is everything. The ACT framework creates a usable brief in seconds, not hours.",
+                p13: "Productivity isn't about working harder; it's about leveraging tools to multiply your output.",
+                p14: "One task a day. That's 260 tasks a year you don't have to do manually. Start tomorrow."
+            },
+            innovator: {
+                name: "Innovator",
+                p6: "Structure is a canvas. The ACT framework gives you a way to constrain the AI so it produces more creative, focused results.",
+                p7: "Don't ask 'Give me ideas.' Ask 'Generate 10 divergent metaphors for this concept to spark a new perspective.'",
+                p8: "Context is the prompt. AI needs to know 'Theme' (Futuristic) and 'Goal' (Inspire the audience) to give you something fresh.",
+                p9: "Tone drives engagement. Use 'Whimsical', 'Provocative', or 'Story-driven' to capture attention and break through the noise.",
+                p10: "Creativity requires inputs. Sorting the right context into your prompt is like choosing the right colors for your palette.",
+                p11: "Creative blocks happen. Use these habits to force the AI to 'pitch' you ideas so you never stare at a blank page.",
+                p12: "Crisis kills creativity. Use AI to handle the summary so your brain stays fresh for the strategic solution.",
+                p13: "Creativity is a multiplier. AI allows you to explore 100 paths in the time it used to take to explore one.",
+                p14: "Challenge yourself to use AI for something weird tomorrow. Push the boundaries of what it can do."
+            },
+            strategist: {
+                name: "Strategist",
+                p6: "Structure is clarity. The ACT framework ensures your instructions are unambiguous, leading to high-quality strategic output.",
+                p7: "Don't ask 'What does this say?' Ask 'Extract the top 3 risks and opportunities from this report for executive review.'",
+                p8: "Context is the stakes. AI needs to know 'Stakeholder' (The CEO) and 'Decision' (Go/No-Go) to provide relevant analysis.",
+                p9: "Tone drives authority. Use 'Objective', 'Analytical', or 'Balanced' to build trust with your audience.",
+                p10: "Strategy is about pattern recognition. Sorting ACT components helps you see the gaps in your own thinking.",
+                p11: "Strategic thinking requires mental space. These habits clear the administrative clutter so you can think big picture.",
+                p12: "Leaders don't panic; they process. Use AI to synthesize the noise so you can make the decision.",
+                p13: "Strategy is about leverage. You are moving from 'doing the work' to 'directing the outcome.'",
+                p14: "Delegate the tactics. Keep the strategy. Pick one strategic document tomorrow and have AI review it."
+            }
+        };
+
+        // --- 2. AUDIO SYSTEM (RESTORED EXACT ORIGINAL) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume().catch(e => console.error("Audio resume failed:", e));
+        }
+
+        function playTone(freq, type, duration, vol = 0.1, attack = 0.01, decay = 0.001) {
+            initAudio();	
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, now);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(vol, now + attack);	
+            gain.gain.exponentialRampToValueAtTime(decay, now + duration);	
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        const sfx = {
+            powerOn: () => {
+                initAudio();
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(110, now);
+                osc.frequency.exponentialRampToValueAtTime(220, now + 0.4);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.4, now + 0.1);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            },
+            powerOff: () => { initAudio(); playTone(80, 'triangle', 0.2, 0.5, 0.01, 0.001); },
+            nav: () => { initAudio(); playTone(150, 'sine', 0.1, 0.1, 0.01, 0.01); },
+            tick: () => { initAudio(); playTone(1000, 'sine', 0.01, 0.01); },
+            success: () => { playTone(400, 'sine', 0.1); setTimeout(() => playTone(600, 'sine', 0.2), 100); },
+            error: () => playTone(150, 'sawtooth', 0.3)
+        };
+        window.sfx = sfx;
+        window.initAudio = initAudio;
+
+        // --- 3. PAGE NAVIGATION ---
+        let currentPage = 0;
+        const totalPages = 15;
+        const pageIndicator = document.getElementById('header-page-indicator');
+        const progressBar = document.getElementById('flex-progress-fill');
+        const backBtn = document.getElementById('back-button');
+        const nextBtn = document.getElementById('next-button');
+
+        window.showPage = function(index) {
+            if (index < 1) index = 1;
+            if (index > totalPages) index = totalPages;
+
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            const targetPage = document.getElementById(`page-${index}`);
+            if(targetPage) targetPage.classList.add('active');
+
+            // SCROLL RESET: Target the new main-scroll-view
+            const scrollView = document.getElementById('main-scroll-view');
+            if(scrollView) scrollView.scrollTop = 0;
+
+            currentPage = index;
+            pageIndicator.innerText = `${currentPage} / ${totalPages}`;
+            
+            // Progress Bar
+            const progress = (currentPage / totalPages) * 100;
+            progressBar.style.width = `${progress}%`;
+
+            // Button States
+            backBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+
+            // Log navigation
+            SessionManager.log("Navigation", `Viewed Page ${index}`);
+            
+            // Init Lucide icons on new content
+            if(window.lucide) window.lucide.createIcons();
+
+            // UPDATE MENTOR BAR & CONTEXT
+            updateMentorBar(index);
+            updatePageContent(index);
+
+            // NEW: Check Certification on Page 15
+            if(index === 15) {
+                setTimeout(checkCertification, 500);
+            }
+        };
+
+        // Navigation Event Listeners
+        backBtn.addEventListener('click', () => { sfx.nav(); window.showPage(currentPage - 1); });
+        nextBtn.addEventListener('click', () => { sfx.nav(); window.showPage(currentPage + 1); });
+        
+        // --- 4. STARTUP SEQUENCE ---
+        const startupScreen = document.getElementById('startup-screen');
+        const loginModal = document.getElementById('login-modal');
+
+        if (startupScreen) {
+            const warmUp = () => initAudio();
+            startupScreen.addEventListener('mousedown', warmUp, { once: true });
+            startupScreen.addEventListener('touchstart', warmUp, { once: true });
+
+            startupScreen.addEventListener('click', () => {
+                sfx.powerOn();
+                startupScreen.style.opacity = '0';
+                startupScreen.style.pointerEvents = 'none';
+                
+                setTimeout(() => {
+                    // If user already auth'd (e.g. reload), skip login modal
+                    if(window.currentUser) {
+                        window.showPage(1);
+                    } else {
+                        loginModal.classList.remove('hidden-modal');
+                        loginModal.classList.add('visible-modal');
+                    }
+                }, 800);
+            });
+        }
+
+        // --- 5. INTERACTION FUNCTIONS (Visual Upgrades) ---
+
+        // Page 2: Split Reality Toggle (FIXED LOGIC)
+        let isRealityRevealed = false;
+        window.toggleMyth = function() {
+            const slider = document.getElementById('myth-slider');
+            if (!slider) return;
+
+            isRealityRevealed = !isRealityRevealed;
+            
+            if (isRealityRevealed) {
+                slider.style.transform = 'translateX(-100%)';
+                sfx.success();
+            } else {
+                slider.style.transform = 'translateX(0)';
+                sfx.tick();
+            }
+        };
+
+        // --- GLOBAL ACCORDION LOGIC (RESTORED) ---
+        document.querySelectorAll('.accordion-toggle').forEach(button => {
+            button.addEventListener('click', () => {
+                const content = button.nextElementSibling;
+                const icon = button.querySelector('.accordion-icon');
+                
+                // Toggle Content
+                content.classList.toggle('hidden');
+                
+                // Rotate Icon
+                if (icon) {
+                    icon.style.transform = content.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+                }
+                
+                sfx.tick();
+            });
+        });
+
+        // NEW: RESTORE VISUALS FUNCTION
+        window.restoreVisualState = function() {
+            // Restore Role Selection (Page 5)
+            if (window.missionState.role && window.missionState.roleSelected) {
+                currentRole = window.missionState.role;
+                const targetCard = document.querySelector(`.role-card[data-role="${currentRole}"]`);
+                if(targetCard) {
+                     document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected', 'ring-2', 'ring-allgood-primary'));
+                     targetCard.classList.add('selected', 'ring-2', 'ring-allgood-primary');
+                     const confirmBtn = document.getElementById('role-confirm');
+                     if(confirmBtn) confirmBtn.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+                }
+            }
+
+            // Restore Chips (Page 8)
+            if (window.missionState.chipsMounted >= 3) {
+                chipsActive = 3;
+                document.querySelectorAll('.data-chip').forEach(el => {
+                    el.classList.add('active');
+                    const subtext = el.querySelector('.font-mono');
+                    if(subtext) subtext.innerText = "MOUNTED";
+                });
+                const sysText = document.getElementById('system-text');
+                const sysLight = document.getElementById('system-light');
+                const btn = document.getElementById('generate-output-btn');
+                if(sysText) {
+                    sysText.innerText = "SYSTEM READY";
+                    sysText.classList.remove('text-red-400');
+                    sysText.classList.add('text-green-400');
+                }
+                if(sysLight) sysLight.classList.add('ready');
+                if(btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('bg-gray-700');
+                    btn.classList.add('bg-allgood-primary', 'text-white');
+                    btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 mr-2 fill-current"></i> EXECUTE PROMPT';
+                }
+            }
+            
+            // Restore Sort (Page 10)
+            if (window.missionState.sortingCompleted) {
+                 const fb = document.getElementById('sort-feedback');
+                 if(fb) fb.classList.remove('hidden');
+            }
+
+            // Restore Contract (Page 14)
+            if (window.missionState.contractSigned) {
+                const sig = document.getElementById('signature-text');
+                if(sig) {
+                    sig.innerText = window.currentUserName || "Agent Learner";
+                    sig.style.opacity = '1';
+                }
+            }
+
+            if(window.lucide) window.lucide.createIcons();
+        };
+
+        // Page 5: Role Selection (UPDATED FOR PERSISTENCE)
+        window.selectRole = function(role, card) {
+            currentRole = role;
+            
+            // Persist State
+            window.missionState.roleSelected = true;
+            window.missionState.role = role;
+            localStorage.setItem('aa_mission_state', JSON.stringify(window.missionState));
+            console.log(`[Certification] Role Requirement Recorded: ${role}`);
+
+            // Visuals
+            document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected', 'ring-2', 'ring-allgood-primary', 'bg-opacity-100'));
+            card.classList.add('selected', 'ring-2', 'ring-allgood-primary'); 
+            
+            // Confirm Button
+            const confirmBtn = document.getElementById('role-confirm');
+            confirmBtn.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+            sfx.success();
+            SessionManager.log("Role_Select", role);
+
+            // Force dynamic content update for current page (if not page 5)
+            updatePageContent(currentPage);
+            
+            // FIX 2: Trigger certification check immediately
+            if(window.checkCertification) window.checkCertification();
+        };
+
+        // Page 6: Pyramid Logic
+        window.togglePyramid = function(el, layer) {
+            document.querySelectorAll('.pyramid-block').forEach(b => {
+                b.classList.remove('active');
+                b.querySelector('div').classList.add('hidden');
+            });
+            el.classList.add('active');
+            el.querySelector('div').classList.remove('hidden');
+            
+            const detail = document.getElementById('pyramid-detail');
+            if(layer === 'Tone') detail.innerText = "Tone is the roof. It protects the message from being misinterpreted.";
+            if(layer === 'Context') detail.innerText = "Context is the walls. It gives the action structure and boundaries.";
+            if(layer === 'Action') detail.innerText = "Action is the foundation. Without a strong verb, the house falls.";
+            
+            sfx.tick();
+        };
+
+        // Page 7: Magic Wand
+        window.activateMagicWand = function() {
+            document.getElementById('action-weak').style.opacity = '0';
+            document.getElementById('action-weak').style.transform = 'scale(0.9)';
+            
+            const strong = document.getElementById('action-strong');
+            const strongText = document.getElementById('strong-prompt-text');
+            const status = document.getElementById('dynamic-p7-status');
+            
+            // Role-Specific Output
+            if (currentRole === 'optimizer') {
+                strongText.innerHTML = '"<u>Draft</u> a concise update..."';
+                status.innerText = "Applying brevity filter... Removing fluff...";
+            } else if (currentRole === 'innovator') {
+                strongText.innerHTML = '"<u>Generate</u> 10 divergent metaphors..."';
+                status.innerText = "Accessing creative lateral thinking... Sparking ideas...";
+            } else if (currentRole === 'strategist') {
+                strongText.innerHTML = '"<u>Extract</u> top 3 risks..."';
+                status.innerText = "Analyzing for executive relevance... Identifying key data...";
+            } else {
+                strongText.innerHTML = '"<u>Draft</u> a detailed proposal..."';
+                status.innerText = "Dynamic context loading...";
+            }
+
+            strong.classList.remove('pointer-events-none');
+            setTimeout(() => {
+                strong.style.opacity = '1';
+                strong.style.transform = 'scale(1)';
+                sfx.success();
+            }, 300);
+        };
+
+        // Page 8: Cockpit Chip Logic (UPDATED FOR PERSISTENCE)
+        window.activateChip = function(el) {
+            if(el.classList.contains('active')) return; // Already active
+            
+            // Activate Visuals
+            el.classList.add('active');
+            
+            // Change subtext from "UNMOUNTED" to "MOUNTED"
+            const subtext = el.querySelector('.font-mono');
+            if(subtext) {
+                subtext.innerText = "MOUNTED";
+                subtext.classList.remove('opacity-50');
+            }
+            
+            chipsActive++;
+            
+            // Persist State
+            window.missionState.chipsMounted = chipsActive;
+            localStorage.setItem('aa_mission_state', JSON.stringify(window.missionState));
+            console.log(`[Certification] Chip Requirement Update: ${chipsActive}/3`);
+
+            // Different sound for tactile feel if available, else standard tick
+            sfx.tick(); 
+            
+            if(chipsActive >= 3) {
+                // System Ready State
+                const sysText = document.getElementById('system-text');
+                const sysLight = document.getElementById('system-light');
+                const btn = document.getElementById('generate-output-btn');
+
+                sysText.innerText = "SYSTEM READY";
+                sysText.classList.remove('text-red-400');
+                sysText.classList.add('text-green-400', 'animate-pulse'); // Green pulse
+                
+                sysLight.classList.add('ready');
+
+                // Update Button Visuals
+                btn.disabled = false;
+                btn.classList.remove('bg-gray-700', 'text-gray-400', 'border-gray-600');
+                btn.classList.add('bg-allgood-primary', 'text-white', 'border-transparent', 'hover:bg-allgood-hover', 'hover:scale-105', 'shadow-lg');
+                btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 mr-2 fill-current"></i> EXECUTE PROMPT';
+
+                // Context update
+                document.getElementById('dynamic-header-p8').innerText = "SYSTEM CONTEXT LOADED:";
+                document.getElementById('dynamic-p8').innerText = "Role: Senior PM. Task: Summarize Q3 Report. Goal: Brief VP on risks.";
+                
+                if(window.lucide) window.lucide.createIcons();
+                sfx.success();
+            }
+        };
+
+        // SIMULATED OUTPUT DATA
+        const simulatedOutputs = {
+            optimizer: {
+                text: "Here is the efficiency summary:\n• Reduce meeting times by 15% using async updates.\n• Automate weekly report generation via the new CRM tool.\n• Immediate action: Schedule a 10-minute stand-up to align on these changes.",
+                source: "Source: Internal Efficiency Audit 2024"
+            },
+            innovator: {
+                text: "Idea Spark: Imagine the team as a jazz band—improvising within a structure. What if we rotated leadership weekly to keep perspectives fresh? Metaphor: We are currently gardening in winter; let's prep the soil before planting new seeds.",
+                source: "Source: Creative Leadership Review"
+            },
+            strategist: {
+                text: "Executive Summary: The Q3 data indicates a 12% risk in supply chain volatility, but a significant opportunity in emerging markets. Recommendation: Pivot resources to the APAC region immediately to capitalize on the trend. Decision required by Friday.",
+                source: "Source: Q3 Strategic Outlook"
+            }
+        };
+
+        // Page 8: Simulated Generation (Hardcoded)
+        window.generatePromptOutput = function() {
+            if (chipsActive < 3) {
+                sfx.error();
+                return;
+            }
+
+            const btn = document.getElementById('generate-output-btn');
+            const resultDiv = document.getElementById('llm-result');
+            const outputContainer = document.getElementById('llm-output-p8');
+            const sourcesDiv = document.getElementById('llm-sources');
+
+            // Set Loading State
+            const originalText = btn.innerHTML;
+            const originalClasses = btn.className;
+            
+            btn.innerHTML = '<i data-lucide="loader-circle" class="w-5 h-5 mr-2 animate-spin"></i> PROCESSING...';
+            btn.className = "w-full bg-allgood-secondary text-white py-3 rounded text-sm font-bold shadow-inner flex items-center justify-center border border-transparent font-mono uppercase tracking-wider cursor-wait";
+            
+            btn.disabled = true;
+            resultDiv.innerHTML = '<span class="text-gray-400 italic">Accessing Co-Pilot Neural Net...</span>';
+            outputContainer.classList.remove('hidden');
+            sourcesDiv.classList.add('hidden');
+            
+            if(window.lucide) window.lucide.createIcons();
+
+            // Simulate Delay
+            setTimeout(() => {
+                const role = currentRole || 'strategist'; // Default
+                const outputData = simulatedOutputs[role] || simulatedOutputs['strategist'];
+
+                resultDiv.innerText = outputData.text;
+                
+                // Optional: Show a simulated source
+                sourcesDiv.innerHTML = `<p class="font-bold mb-1">Simulated Source:</p><ul class="list-disc ml-4 space-y-0.5"><li><span class="text-allgood-secondary">${outputData.source}</span></li></ul>`;
+                sourcesDiv.classList.remove('hidden');
+
+                // Reset Button
+                btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 mr-2"></i> COMPLETE';
+                btn.className = "w-full bg-green-600 text-white py-3 rounded text-sm font-bold shadow-md flex items-center justify-center border border-transparent font-mono uppercase tracking-wider";
+                
+                if(window.lucide) window.lucide.createIcons();
+                sfx.success();
+            }, 1500); // 1.5 second delay for realism
+        };
+
+        // Page 9: Tone Dial
+        window.rotateDial = function(deg, label) {
+            const dial = document.querySelector('.dial-knob');
+            const emoji = document.getElementById('tone-emoji');
+            const output = document.getElementById('tone-output');
+            const box = document.getElementById('tone-box');
+            
+            dial.style.transform = `rotate(${deg}deg)`;
+            sfx.tick();
+
+            if(label === 'Witty') {
+                emoji.innerText = "😜";
+                output.innerText = "\"Here's the data, fresh from the oven and ready to impress.\"";
+                output.className = "text-lg font-serif italic text-purple-800";
+                box.className = "bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500 w-full shadow-sm";
+            } else if(label === 'Option A') { // Professional
+                emoji.innerText = "👔";
+                output.innerText = "\"Per your request, attached is the analysis for review.\"";
+                output.className = "text-lg font-serif italic text-blue-800";
+                box.className = "bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500 w-full shadow-sm";
+            } else if(label === 'Direct') {
+                emoji.innerText = "💥";
+                output.innerText = "\"Analysis attached. Action required by EOD.\"";
+                output.className = "text-lg font-serif italic text-red-800";
+                box.className = "bg-red-50 p-4 rounded-lg border-l-4 border-red-500 w-full shadow-sm";
+            } else if (label === 'Neutral') {
+                emoji.innerText = "⚖️";
+                output.innerText = "\"Here is the analysis you asked for.\"";
+                output.className = "text-lg font-serif italic text-gray-600";
+                box.className = "bg-gray-50 p-4 rounded-lg border-l-4 border-gray-300 w-full shadow-sm";
+            } else if (label === 'Option B') { // Empathetic
+                emoji.innerText = "🤝";
+                output.innerText = "\"I know you're swamped, so I summarized this for you.\"";
+                output.className = "text-lg font-serif italic text-orange-800";
+                box.className = "bg-orange-50 p-4 rounded-lg border-l-4 border-orange-500 w-full shadow-sm";
+            } else if(label === 'Socratic') {
+                emoji.innerText = "🤔";
+                output.innerText = "\"What conclusions can we draw from this data set?\"";
+                output.className = "text-lg font-serif italic text-teal-800";
+                box.className = "bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500 w-full shadow-sm";
+            }
+        };
+
+        // Page 10: ACT Sort Logic
+        let sortedCount = 0;
+        const draggables = document.querySelectorAll('.draggable-item');
+        const dropZones = document.querySelectorAll('.drop-zone');
+
+        // MOUSE EVENTS
+        draggables.forEach(draggable => {
+            draggable.addEventListener('dragstart', () => {
+                draggable.classList.add('dragging');
+                sfx.tick();
+            });
+            draggable.addEventListener('dragend', () => {
+                draggable.classList.remove('dragging');
+            });
+        });
+
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('drag-over');
+            });
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const draggable = document.querySelector('.dragging');
+                if(draggable) handleDrop(zone, draggable);
+            });
+        });
+
+        // SHARED DROP LOGIC (Used by Mouse and Touch)
+        function handleDrop(zone, draggable) {
+            const correctZone = zone.getAttribute('data-cat');
+            const itemTarget = draggable.getAttribute('data-target');
+
+            if (correctZone === itemTarget) {
+                zone.appendChild(draggable);
+                draggable.setAttribute('draggable', 'false');
+                draggable.classList.add('cursor-default', 'opacity-50');
+                // Remove touch listeners to prevent re-dragging
+                draggable.removeEventListener('touchstart', handleTouchStart);
+                
+                zone.classList.add('correct-flash');
+                setTimeout(() => zone.classList.remove('correct-flash'), 500);
+                sfx.success();
+                sortedCount++;
+                if(sortedCount === 6) {
+                    document.getElementById('sort-feedback').classList.remove('hidden');
+                    
+                    // NEW: Persist Sorting State
+                    window.missionState.sortingCompleted = true;
+                    localStorage.setItem('aa_mission_state', JSON.stringify(window.missionState));
+                    console.log("[Certification] Sort Requirement Recorded");
+                    window.SessionManager.log("Sort_Drill", "Completed");
+                    
+                    // FIX 2: Trigger certification check immediately
+                    if(window.checkCertification) window.checkCertification();
+                }
+            } else {
+                zone.classList.add('error-flash');
+                setTimeout(() => zone.classList.remove('error-flash'), 500);
+                sfx.error();
+            }
+        }
+
+        // --- NEW: MOBILE TOUCH HANDLER FOR DRAG & DROP ---
+        let activeTouchItem = null;
+        let initialTouchX = 0, initialTouchY = 0;
+        let touchXOffset = 0, touchYOffset = 0;
+
+        function handleTouchStart(e) {
+            if (e.target.getAttribute('draggable') === 'false') return;
+            activeTouchItem = e.target;
+            
+            const touch = e.touches[0];
+            initialTouchX = touch.clientX - touchXOffset;
+            initialTouchY = touch.clientY - touchYOffset;
+            
+            activeTouchItem.classList.add('dragging');
+            activeTouchItem.style.position = 'relative'; // Ensure movement works
+            activeTouchItem.style.zIndex = '1000';
+            sfx.tick();
+        }
+
+        function handleTouchMove(e) {
+            if (!activeTouchItem) return;
+            e.preventDefault(); // Prevent scrolling while dragging
+
+            const touch = e.touches[0];
+            const currentX = touch.clientX - initialTouchX;
+            const currentY = touch.clientY - initialTouchY;
+
+            activeTouchItem.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) scale(1.1)`;
+        }
+
+        function handleTouchEnd(e) {
+            if (!activeTouchItem) return;
+            
+            activeTouchItem.classList.remove('dragging');
+            activeTouchItem.style.zIndex = '';
+            
+            // Check what's under the finger
+            const touch = e.changedTouches[0];
+            const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const dropZone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+
+            if (dropZone) {
+                activeTouchItem.style.transform = 'none'; // Reset transform before appending
+                activeTouchItem.style.position = '';
+                handleDrop(dropZone, activeTouchItem);
+            } else {
+                // Return to start
+                activeTouchItem.style.transform = 'none';
+                activeTouchItem.style.position = '';
+                sfx.error();
+            }
+
+            activeTouchItem = null;
+            initialTouchX = 0; initialTouchY = 0;
+            touchXOffset = 0; touchYOffset = 0;
+        }
+
+        // Attach Touch Listeners
+        draggables.forEach(item => {
+            item.addEventListener('touchstart', handleTouchStart, {passive: false});
+            item.addEventListener('touchmove', handleTouchMove, {passive: false});
+            item.addEventListener('touchend', handleTouchEnd, {passive: false});
+        });
+
+        // Page 11: Timeline
+        window.activateTimeline = function(el) {
+            // Removed reliance on :hover, forcing class toggle for touch reliability
+            document.querySelectorAll('.timeline-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            sfx.tick();
+        };
+
+        // Page 12: Scenario
+        window.checkScenario = function(option) {
+            const fb = document.getElementById('scenario-feedback');
+            fb.classList.remove('hidden');
+            
+            if(option === 'C') {
+                fb.innerText = "CORRECT. This saves you 15 mins and makes you look prepared.";
+                fb.className = "mt-4 text-sm font-bold text-center h-6 text-green-600 animate-bounce";
+                sfx.success();
+            } else {
+                fb.innerText = "Inefficient. Try applying the ACT framework.";
+                fb.className = "mt-4 text-sm font-bold text-center h-6 text-red-500";
+                sfx.error();
+            }
+        };
+
+        // Page 14: Contract Sign (UPDATED FOR PERSISTENCE)
+        window.signContract = function(el) {
+            const sig = document.getElementById('signature-text');
+            if(sig.style.opacity !== '1') {
+                sig.innerText = window.currentUserName || "Agent Learner";
+                sig.style.opacity = '1';
+                
+                // Persist State
+                window.missionState.contractSigned = true;
+                localStorage.setItem('aa_mission_state', JSON.stringify(window.missionState));
+                console.log("[Certification] Contract Requirement Recorded");
+                
+                sfx.success();
+                window.SessionManager.log("Contract", "Signed");
+                
+                // FIX 2: Trigger certification check immediately
+                if(window.checkCertification) window.checkCertification();
+            }
+        };
+        
+        window.acceptChallenge = function(el) {
+            el.classList.add('signed');
+            document.getElementById('challenge-status').classList.remove('hidden');
+            sfx.success();
+            window.SessionManager.log("Challenge", "Accepted");
+        };
+
+        // --- NEW HELPER: Get Badge SVG (Shared) ---
+        window.getBadgeSVG = function() {
+            // FIX: Grab the actual name variable
+            const name = window.currentUserName || "Agent Learner";
+            
+            return `
+            <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <!-- Deep Cyan to Dark Gray Gradient for Background -->
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#357889;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Burnt Orange Gradient for Accents -->
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#EB8D69;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D34716;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Hexagon Badge Shape -->
+  <path d="M200 20 L355.8 110 L355.8 290 L200 380 L44.2 290 L44.2 110 Z" 
+        fill="url(#badgeGrad)" 
+        stroke="#D34716" 
+        stroke-width="8"
+        stroke-linejoin="round"/>
+        
+  <!-- Inner Decorative Circuit Lines (Low Opacity) -->
+  <path d="M44.2 110 L100 110 L120 130" stroke="#357889" stroke-width="2" fill="none" opacity="0.5"/>
+  <path d="M355.8 290 L300 290 L280 270" stroke="#357889" stroke-width="2" fill="none" opacity="0.5"/>
+
+  <!-- Brain Circuit Icon (Themed Vector) -->
+  <!-- Centered at 200, moved up to y=80 (approx 5% higher) -->
+  <g transform="translate(200, 80) scale(4) translate(-12, -12)" 
+     fill="none" 
+     stroke="white" 
+     stroke-width="1.5" 
+     stroke-linecap="round" 
+     stroke-linejoin="round" 
+     filter="url(#glow)">
+     
+     <!-- Left Brain Lobe -->
+     <path d="M12 4.5a2.5 2.5 0 0 0-4.96-.46 2.5 2.5 0 0 0-1.98 3 2.5 2.5 0 0 0-1.32 4.24 3 3 0 0 0 .34 5.58 2.5 2.5 0 0 0 2.96 3.08 2.5 2.5 0 0 0 4.91.05L12 20V4.5Z" />
+     
+     <!-- Right Circuit Connections -->
+     <path d="M16 8V5a2 2 0 0 1 2-2" />
+     <path d="M16 12h5" />
+     <path d="M16 16v3a2 2 0 0 1-2 2" />
+     
+     <!-- Circuit Nodes -->
+     <circle cx="18" cy="3" r="1" fill="white" stroke="none"/>
+     <circle cx="21" cy="12" r="1" fill="white" stroke="none"/>
+     <circle cx="14" cy="21" r="1" fill="white" stroke="none"/>
+  </g>
+
+  <!-- Top Title: PRAGMATIC ACTION BADGE (Right above AI CO-PILOT) -->
+  <text x="200" y="160" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-family="Georgia, serif" 
+        font-size="12" 
+        fill="#EB8D69" 
+        font-weight="bold" 
+        letter-spacing="2">
+    PRAGMATIC ACTION BADGE
+  </text>
+
+  <!-- Badge Title (CENTERED at 185 and 215) -->
+  <text x="200" y="185" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-family="Georgia, serif" 
+        font-size="28" 
+        fill="white" 
+        font-weight="bold">
+    AI CO-PILOT
+  </text>
+  
+  <text x="200" y="215" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-family="Verdana, sans-serif" 
+        font-size="16" 
+        fill="#D34716" 
+        font-weight="bold"
+        letter-spacing="4">
+    GOODBLOCK
+  </text>
+
+  <!-- Divider Line -->
+  <line x1="140" y1="235" x2="260" y2="235" stroke="#357889" stroke-width="1" opacity="0.5" />
+
+  <!-- User Details Block -->
+  
+  <!-- Name (y=255) - Font size reduced to 15 -->
+  <text x="200" y="255" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-family="Verdana, sans-serif" 
+        font-size="15" 
+        fill="white" 
+        font-weight="bold">
+    ${name}
+  </text>
+
+  <!-- Completion Text (y=285) -->
+  <text x="200" y="285" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-family="Verdana, sans-serif" 
+        font-size="11" 
+        fill="#b0c4de">
+    completed the AI Co-Pilot GoodBlock
+  </text>
+  
+  <!-- Organization (y=305) -->
+  <text x="200" y="305" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-family="Verdana, sans-serif" 
+        font-size="11" 
+        fill="#b0c4de">
+    by Allgood Academy
+  </text>
+
+</svg>`;
+        };
+
+        // Page 15: Badge Download
+        window.downloadBadge = function() {
+            const svgContent = window.getBadgeSVG();
+            
+            // Log completion again on manual download to ensure capture
+            window.logModuleCompletion(svgContent);
+
+            // Trigger download
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Allgood_CoPilot_Badge_${Date.now()}.svg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            sfx.success();
+        };
+
+        // --- MENTOR BAR LOGIC ---
+        const narrativeScripts = [
+            "", // Page 1 (Cover) - Skipped
+            "Headlines sell fear. Reality sells opportunity. You have a choice: view AI as your replacement, or hire it as your assistant.", // Page 2
+            "Pilots didn't disappear when autopilots arrived. They just stopped exhausting themselves on the controls. It's time to upgrade your role.", // Page 3
+            "Why are we doing this? Because time is the only asset you can't buy more of... unless you have a Co-Pilot.", // Page 4
+            "This isn't one-size-fits-all. Tell me who you are, and I'll show you how this applies to <i>your</i> reality.", // Page 5
+            "You don't need to learn code. You just need to learn how to speak clearly. We call it the ACT Framework.", // Page 6
+            "Weak verbs get weak results. Stop asking it to 'write.' Command it to 'Draft,' 'Analyze,' or 'Synthesize.' Be the boss.", // Page 7
+            "An AI without context is like a genius locked in a windowless room. It needs you to open the blinds. Give it the background it lacks.", // Page 8
+            "Facts are cheap; delivery is expensive. You are the conductor. Tell the orchestra exactly how to play the notes.", // Page 9
+            "Theory is nice, but practice is better. Let's see if you can distinguish the signal from the noise. Sort the fragments.", // Page 10
+            "Excellence isn't an act; it's a habit. Here are three 'power moves' you can use before you even finish your morning coffee.", // Page 11
+            "Pressure test. The clock is ticking, and the workload is impossible. Do you panic, or do you prompt?", // Page 12
+            "Look at that result. You didn't 'cheat.' You leveraged technology to deliver value faster. That is the definition of productivity.", // Page 13
+            "Knowledge is potential. Action is power. I'm not asking for a lifetime commitment—just one task, tomorrow.", // Page 14
+            "You're ready. This badge isn't just a pixel; it's a signal that you have upgraded your operating system. Well done, Commander." // Page 15
+        ];
+
+        function updateMentorBar(pageIndex) {
+            const bar = document.getElementById('mentor-bar');
+            const textContainer = document.getElementById('mentor-text');
+            
+            // Check if page 1 (cover) or text is empty
+            if (pageIndex === 1 || !narrativeScripts[pageIndex-1]) {
+                bar.classList.add('hidden');
+                return;
+            }
+
+            // Show bar
+            bar.classList.remove('hidden');
+            
+            // Static Update
+            const text = narrativeScripts[pageIndex-1];
+            
+            // Instant update for stability
+            textContainer.innerHTML = text; 
+            
+            // Re-run icons in case they are used in text (unlikely but safe)
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // --- 6. MENU & SYSTEM CONTROLS ---
+        
+        // --- FIX: ENABLE TOGGLES ---
+        const blueprintToggle = document.getElementById('blueprint-toggle');
+        if(blueprintToggle) blueprintToggle.addEventListener('click', () => {
+            document.body.classList.toggle('blueprint-mode');
+            sfx.tick();
+        });
+
+        const fullscreenToggle = document.getElementById('fullscreen-toggle');
+        if(fullscreenToggle) fullscreenToggle.addEventListener('click', () => {
+            document.querySelector('.tablet-frame').classList.toggle('focus-mode');
+            document.body.classList.toggle('is-focused');
+            sfx.tick();
+        });
+
+        // Basic Menu Toggles
+        const menuToggle = document.getElementById('menu-toggle');
+        if(menuToggle) menuToggle.addEventListener('click', () => {
+             document.getElementById('menu-modal').classList.remove('hidden-modal');
+             document.getElementById('menu-modal').classList.add('visible-modal');
+        });
+
+        const closeMenu = document.getElementById('close-menu');
+        if(closeMenu) closeMenu.addEventListener('click', () => {
+             document.getElementById('menu-modal').classList.add('hidden-modal');
+             document.getElementById('menu-modal').classList.remove('visible-modal');
+        });
+        
+        // Menu Links
+        document.querySelectorAll('.menu-link').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const page = parseInt(e.target.dataset.page);
+                window.showPage(page);
+                document.getElementById('menu-modal').classList.add('hidden-modal');
+                document.getElementById('menu-modal').classList.remove('visible-modal');
+            });
+        });
+
+        // Home Button Logic
+        const homeBtn = document.getElementById('home-button');
+        let pressTimer;
+        if(homeBtn) {
+            homeBtn.addEventListener('mousedown', () => {
+                pressTimer = setTimeout(() => {
+                    document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                    document.getElementById('system-menu-modal').classList.add('visible-modal');
+                }, 1000);
+            });
+            homeBtn.addEventListener('mouseup', () => clearTimeout(pressTimer));
+            homeBtn.addEventListener('click', () => window.showPage(1));
+        }
+
+        window.closeSystemMenu = () => {
+             document.getElementById('system-menu-modal').classList.add('hidden-modal');
+             document.getElementById('system-menu-modal').classList.remove('visible-modal');
+        };
+
+        window.handleSystemReset = () => {
+            localStorage.removeItem('aa_mission_state'); // Clear persistence on reset
+            if(window.authSignOut) window.authSignOut();
+            location.reload();
+        };
+        
+        // Dynamic Content Injection (RESTORED)
+        function updatePageContent(pageIndex) {
+            // Page Index is 1-based (Page 1 = 1)
+            const pNum = pageIndex; 
+            
+            // 1. Context Box Updates
+            const elementId = `dynamic-p${pNum}`;
+            const headerId = `dynamic-header-p${pNum}`;
+            
+            const element = document.getElementById(elementId);
+            const headerEl = document.getElementById(headerId);
+
+            if (headerEl) {
+                if (currentRole && roleContent[currentRole]) {
+                     headerEl.innerHTML = `<i data-lucide="info" class="w-3 h-3 inline mr-1"></i> Why this matters to the <strong>${roleContent[currentRole].name}</strong>:`;
+                } else {
+                     headerEl.innerHTML = `<i data-lucide="info" class="w-3 h-3 inline mr-1"></i> Why this matters to you:`;
+                }
+            }
+
+            if (element) {
+                if (currentRole && roleContent[currentRole]) {
+                    const contentKey = `p${pNum}`;
+                    if (roleContent[currentRole][contentKey]) {
+                        element.textContent = roleContent[currentRole][contentKey];
+                    } else {
+                        // Fallback if specific page content missing for role
+                        element.textContent = "Loading context for your role..."; 
+                    }
+                } else {
+                    element.textContent = "Select a mindset on Page 5 to see your specific context.";
+                }
+            }
+            
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // --- NEW: FEEDBACK & CERTIFICATION LOGIC ---
+        let userRating = 0;
+
+        window.setRating = function(val) {
+            userRating = val;
+            for(let i=1; i<=5; i++) {
+                const star = document.getElementById(`star-${i}`);
+                if(i <= val) {
+                    star.classList.remove('text-gray-300');
+                    star.classList.add('text-yellow-400');
+                } else {
+                    star.classList.remove('text-yellow-400');
+                    star.classList.add('text-gray-300');
+                }
+            }
+            sfx.tick();
+        };
+
+        window.submitFeedback = function() {
+            if(userRating === 0) {
+                alert("Please select a star rating first.");
+                return;
+            }
+            const text = document.getElementById('feedback-text').value;
+            
+            // Log to Firestore
+            window.logToFirestore("Module_Feedback", "User Submitted Feedback", { rating: userRating, comments: text });
+            
+            document.getElementById('feedback-container').classList.add('hidden');
+            document.getElementById('feedback-success').classList.remove('hidden');
+            sfx.success();
+        };
+
+        window.checkCertification = function() {
+            console.log("[Certification] Verifying requirements against state:", window.missionState);
+            
+            // Reveal section animation
+            const section = document.getElementById('certification-section');
+            if(section) {
+                section.classList.remove('scale-95', 'opacity-0');
+                section.classList.add('scale-100', 'opacity-100');
+            }
+
+            // Check Milestones based on Persistent State
+            let reqsMet = 0;
+
+            // 1. Mindset (Role Selected)
+            const roleEl = document.getElementById('req-role');
+            if (roleEl && window.missionState.roleSelected) {
+                roleEl.classList.remove('text-gray-400');
+                roleEl.classList.add('text-green-600', 'font-bold');
+                const icon = roleEl.querySelector('i');
+                if(icon) icon.setAttribute('data-lucide', 'check-circle');
+                reqsMet++;
+            }
+
+            // 2. Sorting Check (Page 10)
+            const sortEl = document.getElementById('req-sort');
+            if (sortEl && window.missionState.sortingCompleted) {
+                sortEl.classList.remove('text-gray-400');
+                sortEl.classList.add('text-green-600', 'font-bold');
+                const icon = sortEl.querySelector('i');
+                if(icon) icon.setAttribute('data-lucide', 'check-circle');
+                reqsMet++;
+            }
+
+            // 3. Contract (Signed)
+            const contractEl = document.getElementById('req-contract');
+            if (contractEl && window.missionState.contractSigned) {
+                contractEl.classList.remove('text-gray-400');
+                contractEl.classList.add('text-green-600', 'font-bold');
+                const icon = contractEl.querySelector('i');
+                if(icon) icon.setAttribute('data-lucide', 'check-circle');
+                reqsMet++;
+            }
+            
+            if(window.lucide) window.lucide.createIcons();
+
+            // Unlock if all met
+            if (reqsMet === 3) {
+                // Use shorter timeout for immediate responsiveness
+                setTimeout(() => {
+                    const btn = document.getElementById('download-badge-btn');
+                    if (btn && btn.disabled) {
+                        btn.disabled = false;
+                        btn.classList.remove('bg-gray-300', 'cursor-not-allowed');
+                        btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg', 'animate-pulse');
+                        
+                        const btnText = document.getElementById('btn-text');
+                        if(btnText) btnText.innerText = "ISSUE CERTIFICATE";
+                        
+                        const btnIcon = document.getElementById('btn-icon');
+                        if(btnIcon) btnIcon.setAttribute('data-lucide', 'download');
+                        
+                        if(window.lucide) window.lucide.createIcons();
+                        
+                        sfx.success();
+                        
+                        console.log("[System] Certification Unlocked. Sending completion signal.");
+                        window.logModuleCompletion(window.getBadgeSVG());
+                    }
+                }, 100);
+            }
+        };
+        
+        // --- SYSTEM EXIT LOGIC (Updated to Redirect) ---
+        window.handleSystemExit = () => {
+            window.location.href = "https://www.allgoodacademy.com";
+        };
+
+        // Init
+        document.getElementById('current-year').innerText = new Date().getFullYear();
+        if(window.lucide) window.lucide.createIcons();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Viewport Lock for Mobile Stability -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Allgood Academy GoodBlock: Digital Asset Defense</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font Awesome (Legacy Support) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- FIREBASE AND AUTHENTICATION SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        // 1. CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
+            authDomain: "allgood-academy.firebaseapp.com",
+            projectId: "allgood-academy",
+            storageBucket: "allgood-academy.firebasestorage.app",
+            messagingSenderId: "978829044870",
+            appId: "1:978829044870:web:6c780f64230a77ad0ab507",
+            measurementId: "G-EN4M7T3BLQ"
+        };
+        
+        const appId = 'allgood-academy'; 
+        
+        // 2. INITIALIZE SERVICES
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 3. GLOBAL STATE
+        window.currentUser = null;
+        window.currentUserName = "Anonymous";
+        window.currentUserEmail = "";
+        window.isAuthReady = false;
+        
+        // Define Session ID here to ensure it exists before any logging logic runs
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+        console.log("[System] Session ID generated:", window.sessionId);
+
+        // 4. AUTH HANDLER
+        onAuthStateChanged(auth, async (user) => {
+            window.isAuthReady = true;
+            if (user) {
+                console.log("[Auth] User detected:", user.uid);
+                window.currentUser = user;
+                
+                // Retrieve or Set Display Name
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Agent Learner";
+                
+                // Attempt to fetch from DB for consistency if missing
+                if (finalName === "Agent Learner") {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists()) {
+                            finalName = userDoc.data().displayName || finalName;
+                        }
+                    } catch(e) { console.log("Profile fetch skipped", e); }
+                }
+
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                
+                // Update UI
+                const welcomeText = document.getElementById('header-welcome-text');
+                if(welcomeText) welcomeText.textContent = `Agent: ${finalName}`;
+                
+                // Hide login modal if present (this handles the SSO case)
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                    // Auto-start session log if we just auto-logged in via SSO
+                    if(window.SessionManager) window.SessionManager.start(finalName, user.email);
+                }
+            } else {
+                console.log("[Auth] No user signed in.");
+                window.currentUser = null;
+            }
+        });
+
+        // 5. IDENTITY ENGINE
+        async function ensureUserContainer(user, name, email, isGuest) {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             
+             try {
+                 await setDoc(userRef, {
+                     displayName: name,
+                     email: email || (isGuest ? null : user.email || null),
+                     isGuest: isGuest,
+                     lastLogin: serverTimestamp(),
+                     lastActiveModule: "Digital Asset Defense"
+                 }, { merge: true });
+                 console.log("[Identity] User container verified/created.");
+             } catch (e) {
+                 console.error("[Identity] Failed to create user container:", e);
+             }
+        }
+
+        // 6. DATABASE LOGGING ENGINE
+        window.logToFirestore = async (action, detail, payload = {}) => {
+            const user = auth.currentUser;
+            if (!user) {
+                console.warn("[DB] Skipping write - No User");
+                return;
+            }
+            
+            console.log(`[DB] Writing event: ${action} - ${detail}`);
+
+            // Path: artifacts/allgood-academy/users/{uid}/game_scores/{sessionId}
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            
+            const sessionData = {
+                gameName: "Digital Asset Defense", 
+                lastUpdated: serverTimestamp(),
+                user: {
+                    uid: user.uid,
+                    displayName: window.currentUserName,
+                    email: window.currentUserEmail
+                }
+            };
+
+            // Merge High-Level Metrics
+            if (payload.score) sessionData.finalScore = parseInt(payload.score.split('/')[0]); 
+            if (payload.status) sessionData.status = payload.status; 
+            if (payload.percentage) sessionData.percentage = payload.percentage;
+
+            try {
+                await setDoc(sessionRef, sessionData, { merge: true });
+                
+                const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'logs');
+                await addDoc(logsRef, {
+                    action: action,
+                    detail: detail,
+                    payload: payload,
+                    timestamp: serverTimestamp()
+                });
+                console.log("[DB] Write Success.");
+            } catch (e) {
+                console.error("[DB] Write FAILED:", e);
+            }
+        };
+
+        // NEW: Completion Signal for Dashboard
+        window.logModuleCompletion = async (badgeSVG = null) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            console.log("[DB] Writing DAD Completion Status...");
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            
+            const completionData = {
+                gameName: "Digital Asset Defense",
+                completed: true,
+                finalScore: 100,
+                rank: "Key Holder",
+                lastUpdated: serverTimestamp(),
+                user: {
+                    uid: user.uid,
+                    displayName: window.currentUserName
+                }
+            };
+
+            // IF SVG provided, save it to the document
+            if (badgeSVG) completionData.badgeSVG = badgeSVG;
+
+            try {
+                await setDoc(sessionRef, completionData, { merge: true });
+                console.log("[DB] Completion Status Write Success.");
+            } catch (e) { console.error("[DB] Completion Status Write FAILED:", e); }
+        };
+
+        // 7. LOGIN FUNCTIONS
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            
+            const originalText = btn.innerText;
+            btn.innerText = "Connecting...";
+            btn.disabled = true;
+
+            try {
+                let user;
+                if (auth.currentUser && auth.currentUser.isAnonymous) {
+                    user = auth.currentUser;
+                } else {
+                    const result = await signInAnonymously(auth);
+                    user = result.user;
+                }
+                
+                const displayName = nameInput || "Agent Learner";
+                await updateProfile(user, { displayName: displayName });
+                
+                // Establish Identity
+                await ensureUserContainer(user, displayName, emailInput, true);
+
+                window.currentUserName = displayName;
+                window.currentUserEmail = emailInput;
+                
+                localStorage.setItem('aa_username', displayName);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'true');
+                
+                console.log("[Auth] Guest login successful. UID:", user.uid);
+                if(window.SessionManager) window.SessionManager.start(displayName, emailInput);
+                
+                document.getElementById('header-welcome-text').textContent = `Agent: ${displayName}`;
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                window.showPage(0);
+                if(window.sfx) window.sfx.nav();
+
+            } catch (error) {
+                console.error("Login Failed", error);
+                alert("Connection failed. Please try again.");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        window.handleGoogleLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            const btnContainer = document.getElementById('google-icon-container');
+            if(btnContainer) btnContainer.classList.add('opacity-50', 'pointer-events-none');
+            
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user; 
+                
+                const finalName = user.displayName || "Agent";
+                
+                // Establish Identity
+                await ensureUserContainer(user, finalName, user.email, false);
+
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                
+                localStorage.setItem('aa_username', finalName);
+                localStorage.setItem('aa_email', user.email);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', 'false');
+
+                console.log("[Auth] Google login successful. UID:", user.uid);
+                if(window.SessionManager) window.SessionManager.start(finalName, user.email);
+
+                document.getElementById('header-welcome-text').textContent = `Agent: ${finalName}`;
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                
+                window.showPage(0);
+                if(window.sfx) window.sfx.nav();
+            } catch (error) {
+                console.error("Google Sign-In Error", error);
+                alert("Google Sign-In failed. Please try again.");
+            } finally {
+                 if(btnContainer) btnContainer.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        };
+        
+        // Expose for Debugging
+        window.auth = auth;
+        window.db = db;
+        window.authSignOut = () => signOut(auth);
+    </script>
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',   // Burnt Orange
+                        'allgood-secondary': '#357889', // Deep Cyan
+                        'allgood-dark': '#4C4C4C',      // Dark Gray
+                        'allgood-light': '#F7F7F7',     // Light Gray
+                        'allgood-hover': '#EB8D69',     // Light Orange
+                        'allgood-accent': '#2D6473',    // Darker Cyan
+                        'crypto-gold': '#F7931A',       // Bitcoin Orange
+                        'crypto-dark': '#111827',       // Dark BG
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        /* --- CORE STYLES --- */
+        body {
+            font-family: Verdana, sans-serif;
+            background-color: #1a1a1a;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-attachment: fixed;
+            min-height: 100vh;
+            position: relative;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+
+        /* --- ANIMATIONS --- */
+        @keyframes pulse-glow {
+            0%, 100% { 
+                text-shadow: 0 0 10px rgba(211, 71, 22, 0.4); 
+                transform: scale(1);
+            }
+            50% { 
+                text-shadow: 0 0 30px rgba(211, 71, 22, 0.9), 0 0 15px rgba(211, 71, 22, 0.6); 
+                transform: scale(1.02);
+            }
+        }
+        
+        .animate-pulse-glow {
+            animation: pulse-glow 2.5s infinite ease-in-out;
+            will-change: transform, text-shadow;
+        }
+
+        /* --- TABLET FRAME --- */
+        .tablet-frame {
+            height: 80vh;
+            width: auto;
+            aspect-ratio: 16/10; 
+            max-width: 1100px;
+            max-height: 95vh;
+            min-height: 0;
+            min-width: 0;
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+                radial-gradient(circle at 100% 100%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+                linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px;
+            padding: 12px; 
+            box-shadow: 
+                inset 1px 1px 2px rgba(255,255,255, 0.6), 
+                inset -1px -1px 2px rgba(0,0,0, 0.8), 
+                0 30px 60px -12px rgba(0, 0, 0, 0.8), 
+                0 0 0 1px #111;
+            border: 1px solid #333;
+            position: relative;
+            margin: 20px auto;
+            transition: width 0.3s, height 0.3s, padding 0.3s;
+        }
+
+        .tablet-frame::before {
+            content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+            border-radius: 6px; background: #111; z-index: 0;
+        }
+
+        .screen-container {
+            width: 100%; height: 100%; background-color: #F7F7F7;
+            position: relative; z-index: 1; overflow: hidden;
+            display: flex; flex-direction: column; 
+            border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        /* --- SCROLLBARS --- */
+        .page::-webkit-scrollbar { width: 14px; }
+        .page::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        .page::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
+        .page::-webkit-scrollbar-thumb:hover { background-color: #EB8D69; }
+
+        /* --- MODALS --- */
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        /* --- PROGRESS BAR --- */
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        /* --- BLUEPRINT MODE --- */
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode h1, .blueprint-mode h2, .blueprint-mode h3, .blueprint-mode strong { color: #38bdf8 !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        .blueprint-mode .bg-gray-100, .blueprint-mode .bg-gray-50, .blueprint-mode .bg-gray-50 { background-color: #0f172a !important; border-color: #1e293b !important; }
+        .blueprint-mode .accordion-content { background-color: #0f172a !important; border-color: #334155 !important; color: #94a3b8 !important; }
+        .blueprint-mode .footer-content { background-color: #1e293b !important; border-top-color: #334155 !important; color: #94a3b8 !important; }
+        .blueprint-mode .footer-content a { color: #38bdf8 !important; }
+        .blueprint-mode .footer-content #back-button { color: #94a3b8 !important; }
+        .blueprint-mode .footer-content #back-button:not(:disabled):hover { color: #38bdf8 !important; }
+
+        /* --- FOCUS MODE (Desktop) --- */
+        .tablet-frame.focus-mode { 
+            position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; 
+            width: 100% !important; height: 100vh !important; 
+            aspect-ratio: auto !important; max-width: none !important; max-height: none !important; 
+            min-height: 0 !important;
+            margin: 0 !important; padding: 0 !important; 
+            background: #F7F7F7 !important; border: none !important; border-radius: 0 !important; 
+            box-shadow: none !important; z-index: 99999 !important; 
+            background-image: none !important;
+        }
+        .tablet-frame.focus-mode::before { display: none; }
+        .tablet-frame.focus-mode .screen-container { border-radius: 0; box-shadow: none; height: 100%; }
+        .tablet-frame.focus-mode .footer-content { padding-bottom: max(env(safe-area-inset-bottom), 20px); }
+        
+        /* --- MOBILE LAYOUT LOCK --- */
+        @media (max-width: 768px) {
+            html, body {
+                width: 100%;
+                height: 100%; margin: 0; padding: 0 !important;
+                overflow: hidden !important; position: fixed; inset: 0;
+                overscroll-behavior: none;
+            }
+            main { 
+                width: 100vw; height: 100dvh; height: -webkit-fill-available; 
+                position: fixed; inset: 0; padding: 0 !important; 
+                display: flex; flex-direction: column; z-index: 0;
+            }
+            .tablet-frame {
+                position: relative !important; width: 100% !important; height: 100% !important;
+                max-width: none !important; max-height: none !important;
+                min-height: 0 !important; aspect-ratio: auto !important;
+                margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important;
+                background-image: none !important; box-shadow: none !important;
+                display: flex; flex-direction: column;
+            }
+            .tablet-frame::before { display: none; }
+            .screen-container { 
+                flex: 1; width: 100%; height: 100%;
+                display: flex; flex-direction: column; border-radius: 0 !important; 
+                box-shadow: none !important; overflow: hidden;
+            }
+            .navbar-content { flex: 0 0 auto; width: 100%; z-index: 50; padding-top: max(env(safe-area-inset-top), 5px); }
+            .footer-content { 
+                flex: 0 0 auto; width: 100%; z-index: 100;
+                padding-bottom: max(env(safe-area-inset-bottom), 15px); 
+                background-color: white; border-top: 1px solid #e5e7eb; position: relative;
+            }
+            .page {
+                flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch;
+                height: 100%; min-height: 0; padding-bottom: 40px;
+            }
+        }
+
+        /* --- LAYOUT --- */
+        .navbar-content { flex: 0 0 60px; z-index: 20; }
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
+        .page.active { display: block; }
+        .footer-content { flex: 0 0 60px; z-index: 20; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        
+        /* --- INTERACTIVE ELEMENTS --- */
+        .flip-card { background-color: transparent; width: 100%; height: 200px; perspective: 1000px; cursor: pointer; }
+        .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .flip-card-front { background-color: white; border: 1px solid #e5e7eb; }
+        .flip-card-back { background-color: #357889; color: white; transform: rotateY(180deg); }
+
+        .mission-tooltip { transition: opacity 0.2s; }
+        .term { text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #D34716; text-underline-offset: 4px; cursor: help; position: relative; display: inline-block; font-weight: bold; color: #D34716; }
+        .term .term-def { visibility: hidden; opacity: 0; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background-color: #1f2937; color: #fff; padding: 10px; border-radius: 6px; font-size: 11px; width: 220px; z-index: 60; margin-bottom: 10px; text-align: left; line-height: 1.4; transition: all 0.2s ease; pointer-events: none; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); font-family: Verdana, sans-serif; font-weight: normal; border: 1px solid #374151; }
+        .term:hover .term-def { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(-5px); }
+        .term .term-def::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: #1f2937 transparent transparent transparent; }
+
+        .toggle-checkbox:checked { right: 0; border-color: #68D391; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #68D391; }
+        
+        .wallet-card { transition: all 0.3s ease; cursor: pointer; border: 2px solid transparent; }
+        .wallet-card.selected { border-color: #D34716; transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .wallet-zone { transition: all 0.3s ease; border: 2px dashed #CBD5E0; }
+        .wallet-zone:hover { border-color: #357889; background-color: #F0FDFA; }
+
+        .seed-word { filter: blur(4px); transition: filter 0.3s ease; cursor: pointer; user-select: none; }
+        .seed-word.revealed { filter: blur(0); background-color: #FFF7ED; color: #D34716; font-weight: bold; }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-8">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-allgood-accent">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative">
+                                <div class="absolute inset-0 bg-white/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <h2 class="text-xl md:text-3xl font-heading font-bold text-white mb-1 relative z-10">Digital Asset Defense</h2>
+                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-allgood-primary tracking-tighter relative z-10 drop-shadow-md animate-pulse-glow">GoodBlock</h1>
+                            </div>
+                            <p class="mt-12 text-white/80 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-white transition-colors animate-pulse font-body">Click to Power Up</p>
+                        </div>
+                        <div class="absolute bottom-10 w-full text-center">
+                            <p class="text-white/40 text-xs font-body tracking-wide">Powered by the <span class="text-white/60 font-bold">Allgood Academy</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Header -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Digital Asset Defense</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 25</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <!-- UPDATED: Visible only on MD+ screens (768px) to match Frame visibility -->
+                            <button id="fullscreen-toggle" class="hidden md:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- 3. LOGIN MODAL (UPDATED from Dashboard) -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 font-body leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged in real-time to improve the GoodBlock experience. All personal data is kept confidential and never sold.</p>
+                                    <div class="border-t border-gray-700 my-1 pt-1"></div>
+                                    <p class="text-gray-300"><strong>Email (Optional):</strong> Enter to join the Allgood Academy community.</p>
+                                </div>
+                            </button>
+                        </div>
+
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all font-body">
+                        
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">
+                            Start Challenge
+                        </button>
+
+                        <div class="mt-4 flex items-center justify-center space-x-2">
+                             <div class="h-px w-10 bg-gray-200"></div>
+                             <p class="text-xs text-gray-500 uppercase font-bold">OR</p>
+                             <div class="h-px w-10 bg-gray-200"></div>
+                        </div>
+
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" 
+                                class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5. Menu Modal -->
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Table of Contents</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body">
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 font-bold" data-page="0">1. Cover Page</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="1">2. Mission Briefing</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="2">3. The Jargon Buster</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="3">4. Operation Map</button>
+                            
+                            <div class="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">Phase II: Tech & Ethics</div>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 font-bold text-allgood-primary" data-page="4">5. The Infrastructure</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="5">6. Ledger vs. Bank</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="6">7. The Energy Cost</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="7">8. The Dark Side</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="8">9. Regulatory Radar</button>
+                            
+                            <div class="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">Phase III: Asset Intel</div>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 font-bold text-allgood-primary" data-page="9">10. Asset Selection</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="10">11. Market Cap vs Price</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="11">12. The Narrative Arc</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="12">13. Scarcity Simulator</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="13">14. The Dilution Trap</button>
+                            
+                            <div class="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">Phase IV: Protocol</div>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 font-bold text-allgood-primary" data-page="14">15. Custody & Execution</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="15">16. Not Your Keys</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="16">17. Wallet Sorter</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="17">18. Key Ceremony</button>
+                            
+                            <div class="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">Phase V: Deployment</div>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="18">19. Test Transaction</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="19">20. Address Audit</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="20">21. Irreversibility</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="21">22. The Crash</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600" data-page="22">23. The Tax Man</button>
+                            
+                            <div class="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">Phase VI: Certification</div>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 font-bold text-allgood-primary" data-page="23">24. The Final Exam</button>
+                            <button class="menu-link w-full text-left px-4 py-1.5 hover:bg-gray-100 text-gray-600 font-bold text-allgood-secondary" data-page="24">25. Mission Complete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Menu (NEW) -->
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4"><i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">Select an option to proceed.</p>
+                        <div class="space-y-3">
+                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out
+                            </button>
+                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard
+                            </button>
+                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --- PAGES START --- -->
+
+                <!-- Page 1: Cover -->
+                <div class="page active" id="page-1">
+                    <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-12">
+                        <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">Digital Asset Defense:<br><span class="text-allgood-primary">GoodBlock</span></h1>
+                        <div class="w-full max-w-lg text-left mx-auto">
+                            <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                <svg class="accordion-icon h-5 w-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
+                                <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> for system menu.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 2: Mission Briefing -->
+                <div class="page" id="page-2">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark mb-2">Mission Briefing</h2></section>
+                    <div class="bg-white p-6 rounded border border-gray-200 shadow-sm leading-relaxed text-gray-700 text-lg">
+                        <div class="grid grid-cols-3 gap-2 mb-6">
+                            <div class="bg-red-50 p-3 rounded border border-red-100 text-center"><i data-lucide="trending-down" class="w-6 h-6 text-red-500 mx-auto mb-1"></i><span class="text-[10px] font-bold text-red-800 uppercase leading-tight block">Exchange<br>Collapse</span></div>
+                            <div class="bg-orange-50 p-3 rounded border border-orange-100 text-center"><i data-lucide="shield-alert" class="w-6 h-6 text-orange-500 mx-auto mb-1"></i><span class="text-[10px] font-bold text-orange-800 uppercase leading-tight block">Billion $<br>Hack</span></div>
+                            <div class="bg-gray-100 p-3 rounded border border-gray-200 text-center"><i data-lucide="refresh-cw" class="w-6 h-6 text-gray-500 mx-auto mb-1"></i><span class="text-[10px] font-bold text-gray-600 uppercase leading-tight block">Money<br>Laundering</span></div>
+                        </div>
+                        <p class="mb-6"><strong>Situation Report.</strong> The Board of Directors is nervous. They have seen the headlines: <span class="term" tabindex="0">FTX collapsing<span class="term-def"><strong>Exchange Bankruptcy.</strong><br>A massive crypto exchange that went bankrupt due to fraud.</span></span>, billion-dollar hacks, and <span class="term" tabindex="0">money laundering<span class="term-def"><strong>Cleaning Dirty Money.</strong><br>The illegal process of filtering funds from criminal activity.</span></span> scandals.</p>
+                        <p class="mb-6">They authorized a 5% <span class="term" tabindex="0">allocation<span class="term-def"><strong>Portfolio Slice.</strong><br>The specific portion of an investment portfolio dedicated to a single asset.</span></span> to Bitcoin, but only on one condition: <strong>Zero Errors.</strong></p>
+                        <div class="bg-gray-100 p-4 rounded border-l-4 border-allgood-primary mb-6"><h3 class="font-bold text-allgood-dark mb-2">Your Mandate</h3><ul class="list-disc list-inside text-sm text-gray-600 space-y-2"><li><strong>Assess the Risk:</strong> Understand the dark side (scams, energy, regulation).</li><li><strong>Select the Asset:</strong> Distinguish signal (value) from noise (hype).</li><li><strong>Execute <span class="term" tabindex="0">Custody<span class="term-def"><strong>Self-Ownership.</strong><br>The act of holding and securing assets yourself.</span></span>:</strong> Secure the private keys without losing access.</li></ul></div>
+                        <p class="text-sm text-gray-500">This is not a game. There is no "Forgot Password" button on the blockchain. If you fail, the treasury is lost forever.</p>
+                    </div>
+                </div>
+
+                <!-- Page 3: The Jargon Buster -->
+                <div class="page" id="page-3">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Intel Report: Terminology</h2></section>
+                    <p class="text-gray-600 mb-8 text-sm">Before we deploy, we must speak the language. <strong>Hover over (or tap)</strong> the key terms below to unlock their definitions.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-4 border rounded bg-white shadow-sm"><h3 class="font-bold text-allgood-secondary mb-2">The Basics</h3><p class="leading-loose">Traditional money is called <span class="term" tabindex="0">Fiat<span class="term-def"><strong>Government Money.</strong><br>Currency (USD, Euro) backed by decree, not gold.</span></span>. It loses value via inflation. We are moving into <span class="term" tabindex="0">DeFi<span class="term-def"><strong>Decentralized Finance.</strong><br>Financial services built on code that remove the bank entirely.</span></span> to escape this trap.</p></div>
+                        <div class="p-4 border rounded bg-white shadow-sm"><h3 class="font-bold text-allgood-primary mb-2">The Psychology</h3><p class="leading-loose">Beware of <span class="term" tabindex="0">FOMO<span class="term-def"><strong>Fear Of Missing Out.</strong><br>The emotional impulse to buy when prices are skyrocketing.</span></span>. It leads to bad decisions. Instead, practice <span class="term" tabindex="0">HODL<span class="term-def"><strong>Hold On for Dear Life.</strong><br>A strategy of holding assets through volatility without selling.</span></span>.</p></div>
+                        <div class="p-4 border rounded bg-white shadow-sm md:col-span-2"><h3 class="font-bold text-gray-800 mb-2">The Tech</h3><p class="leading-loose">We rely on the <span class="term" tabindex="0">Blockchain<span class="term-def"><strong>The Chain of Truth.</strong><br>A shared digital record where transactions are locked together securely.</span></span> for truth. Security depends on our <span class="term" tabindex="0">Private Keys<span class="term-def"><strong>The Master Password.</strong><br>A cryptographic code that grants access to spend funds. Never share it.</span></span>.</p></div>
+                    </div>
+                </div>
+
+                <!-- Page 4: Operation Map -->
+                <div class="page" id="page-4">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Operation Roadmap</h2></section>
+                    <p class="text-sm text-gray-600 mb-8">Phase I (Briefing) is complete. The operation now moves into three active sectors. Click each phase to preview your objectives.</p>
+                    <div class="flex flex-col space-y-4">
+                        <div class="group relative cursor-pointer" onclick="toggleMissionTooltip('p2')"><div class="p-4 bg-white border-l-4 border-allgood-secondary shadow-sm hover:bg-gray-50 transition-colors"><h3 class="font-bold text-allgood-secondary uppercase tracking-wider text-sm">Phase II: Tech & Ethics</h3><p class="text-xs text-gray-500">Understanding the "Why" and the "Cost".</p></div><div id="tooltip-mission-p2" class="mission-tooltip hidden mt-2 p-3 bg-allgood-dark text-white text-xs rounded shadow-lg">Analyze the environmental impact, regulatory landscape, and the dark side of crypto criminality.</div></div>
+                        <div class="group relative cursor-pointer" onclick="toggleMissionTooltip('p3')"><div class="p-4 bg-white border-l-4 border-allgood-primary shadow-sm hover:bg-gray-50 transition-colors"><h3 class="font-bold text-allgood-primary uppercase tracking-wider text-sm">Phase III: Asset Intel</h3><p class="text-xs text-gray-500">Selecting the right vehicle.</p></div><div id="tooltip-mission-p3" class="mission-tooltip hidden mt-2 p-3 bg-allgood-dark text-white text-xs rounded shadow-lg">Differentiate between Bitcoin (Asset) and "Memecoins" (Gambling). Master Tokenomics.</div></div>
+                        <div class="group relative cursor-pointer" onclick="toggleMissionTooltip('p4')"><div class="p-4 bg-white border-l-4 border-green-600 shadow-sm hover:bg-gray-50 transition-colors"><h3 class="font-bold text-green-600 uppercase tracking-wider text-sm">Phase IV & V: Protocol</h3><p class="text-xs text-gray-500">Execution and Custody.</p></div><div id="tooltip-mission-p4" class="mission-tooltip hidden mt-2 p-3 bg-allgood-dark text-white text-xs rounded shadow-lg">Generate keys, secure the hardware wallet, and execute the irreversible transaction.</div></div>
+                    </div>
+                </div>
+
+                <!-- Page 5: Phase Header (Infrastructure) -->
+                <div class="page" id="page-5">
+                    <div class="h-full flex flex-col items-center justify-center">
+                        <div class="w-full max-w-lg bg-allgood-secondary text-white rounded-xl p-10 shadow-2xl text-center">
+                            <div class="bg-white/20 p-4 rounded-full mb-6 backdrop-blur-sm inline-block"><i data-lucide="server" class="w-12 h-12 text-white"></i></div>
+                            <h2 class="text-4xl font-heading font-bold mb-2 tracking-tight">PHASE II</h2>
+                            <h3 class="text-xl font-body font-bold text-white/80 mb-6">The Infrastructure</h3>
+                            <div class="w-16 h-1 bg-white/40 rounded mb-6 mx-auto"></div>
+                            <p class="text-sm leading-relaxed text-white/90 font-medium">Before we invest, we must understand the machine. How does it work? What does it cost? Is it ethical?</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 6: Ledger vs Bank -->
+                <div class="page" id="page-6">
+                    <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Trust Framework</h2></section>
+                    <div class="bg-blue-50 border-l-4 border-allgood-secondary p-4 mb-6 shadow-sm text-left"><strong class="text-sm text-allgood-secondary uppercase tracking-wide">The Problem: The Middleman</strong><p class="text-xs text-gray-700 mt-1 leading-relaxed">In traditional banking, you don't own your money; you have an IOU from a bank. You must <strong>trust</strong> that bank not to change the numbers in their private database.<br><br><strong>The Blockchain Solution:</strong> Imagine a "Town Ledger" shared by every citizen. If one person tries to secretly erase a page, everyone else's copies instantly reveal the fraud. This makes the record <strong>Trustless</strong>—you trust the math, not the man.</p></div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-center">
+                        <div class="bg-gray-200 p-1 rounded-lg flex relative mb-6">
+                            <div id="trust-pill-bg" class="absolute top-1 left-1 bottom-1 w-[calc(50%-4px)] bg-white rounded shadow-sm transition-all duration-300 ease-in-out"></div>
+                            <button id="btn-bank" class="flex-1 py-2 text-xs font-bold text-center z-10 relative transition-colors text-allgood-dark" onclick="setTrustMode('bank')">Bank Database (SQL)</button>
+                            <button id="btn-ledger" class="flex-1 py-2 text-xs font-bold text-center z-10 relative transition-colors text-gray-500" onclick="setTrustMode('ledger')">Town Ledger (Blockchain)</button>
+                        </div>
+                        <div id="ledger-display" class="border border-gray-300 bg-gray-900 p-4 rounded font-mono text-xs text-left transition-all h-24 overflow-hidden relative shadow-inner">
+                            <div class="text-blue-400 border-b border-gray-700 pb-1 mb-1 font-bold">SQL DATABASE (Admin Access)</div>
+                            <div class="text-red-400 animate-pulse">> UPDATE Balance SET = $0</div>
+                            <div class="mt-2 text-gray-500 text-[10px]">Log: Admin User modified entry.</div>
+                        </div>
+                        <div id="ledger-feedback" class="mt-4 text-sm font-bold text-red-500 min-h-[20px]">Centralized: A single admin or hacker can change the numbers.</div>
+                    </div>
+                </div>
+
+                <!-- Page 7: Energy Cost -->
+                <div class="page" id="page-7">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Cost of Truth</h2></section>
+                    <p class="text-gray-600 mb-4 text-sm leading-relaxed">Critics say Bitcoin "wastes" energy. In reality, that energy is a security feature called <strong>Proof-of-Work</strong>. Miners aren't just solving puzzles; they are competing to be the "security guards" of the network.</p>
+                    <div class="bg-white p-4 rounded border-l-4 border-allgood-primary shadow-sm mb-6"><h3 class="font-bold text-allgood-dark text-sm mb-1">Why burn energy?</h3><p class="text-xs text-gray-600">To rewrite the Bitcoin ledger, an attacker would need to spend billions of dollars in electricity to overpower the network. The massive energy cost is what makes the history <strong>unforgeable</strong>.</p></div>
+                    <div class="bg-gray-100 p-6 rounded-lg mb-6">
+                        <h3 class="font-bold text-center text-allgood-dark mb-4">Annual Energy Draw (TWh)</h3>
+                        <div class="space-y-4">
+                            <div class="w-full"><div class="flex justify-between text-xs mb-1"><span>Sweden (Country)</span><span>130 TWh</span></div><div class="h-4 bg-gray-300 rounded overflow-hidden"><div class="h-full bg-blue-400" style="width: 90%"></div></div></div>
+                            <div class="w-full"><div class="flex justify-between text-xs mb-1 font-bold text-allgood-primary"><span>Bitcoin (Security Layer)</span><span>110 TWh</span></div><div class="h-4 bg-gray-300 rounded overflow-hidden"><div class="h-full bg-allgood-primary" style="width: 75%"></div></div></div>
+                            <div class="w-full"><div class="flex justify-between text-xs mb-1"><span>Google (Tech Giant)</span><span>12 TWh</span></div><div class="h-4 bg-gray-300 rounded overflow-hidden"><div class="h-full bg-green-500" style="width: 10%"></div></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 8: The Dark Side -->
+                <div class="page" id="page-8">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Dark Side</h2></section>
+                    <p class="text-sm text-gray-600 mb-6">Anonymity attracts bad actors. We must be aware of the risks to avoid complicity.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flip-card" onclick="this.classList.toggle('flipped')"><div class="flip-card-inner"><div class="flip-card-front bg-white border border-red-200"><i data-lucide="skull" class="w-10 h-10 text-red-500 mb-2"></i><h3 class="font-bold text-gray-800">Ransomware</h3><p class="text-xs text-gray-400 mt-2">Tap to Reveal</p></div><div class="flip-card-back bg-red-600 text-white"><p class="text-xs p-2">Hackers lock hospital/corporate data and demand Bitcoin. It is untraceable cash for digital kidnappers.</p></div></div></div>
+                        <div class="flip-card" onclick="this.classList.toggle('flipped')"><div class="flip-card-inner"><div class="flip-card-front bg-white border border-gray-200"><i data-lucide="ghost" class="w-10 h-10 text-gray-500 mb-2"></i><h3 class="font-bold text-gray-800">Scams</h3><p class="text-xs text-gray-400 mt-2">Tap to Reveal</p></div><div class="flip-card-back bg-gray-700 text-white"><p class="text-xs p-2">"Send 1 BTC, get 2 back." Fake giveaways and "Pig Butchering" romance scams drain billions annually.</p></div></div></div>
+                    </div>
+                </div>
+
+                <!-- Page 9: Regulatory Radar -->
+                <div class="page" id="page-9">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Civic Duty: Regulation</h2></section>
+                    <div class="bg-white p-6 rounded border border-gray-200 shadow-sm">
+                        <h3 class="font-bold text-allgood-dark mb-4">Compliance Mode</h3>
+                        <p class="text-sm text-gray-600 mb-4">Crypto started as a "Wild West." But as a corporation, we operate in the light. We adhere to <span class="term" tabindex="0">KYC<span class="term-def"><strong>Know Your Customer.</strong><br>Identity verification required by law (ID scan, selfie) to prevent anonymity in regulated finance.</span></span> and <span class="term" tabindex="0">AML<span class="term-def"><strong>Anti-Money Laundering.</strong><br>Laws designed to prevent criminals from disguising illegally obtained funds as legitimate income.</span></span>.</p>
+                        <div class="bg-gray-200 p-1 rounded-lg flex relative mb-4">
+                            <div id="reg-pill-bg" class="absolute top-1 left-1 bottom-1 w-[calc(50%-4px)] bg-white rounded shadow-sm transition-all duration-300 ease-in-out"></div>
+                            <button id="btn-wild-west" class="flex-1 py-2 text-xs font-bold text-center z-10 relative transition-colors text-red-600" onclick="setRegMode('wild')">Wild West (Illegal)</button>
+                            <button id="btn-compliance" class="flex-1 py-2 text-xs font-bold text-center z-10 relative transition-colors text-gray-500" onclick="setRegMode('legal')">Compliance (Legal)</button>
+                        </div>
+                        <div id="reg-feedback" class="mt-4 text-xs font-bold text-center text-red-500 min-h-[20px]">Currently Unregulated. High Risk.</div>
+                    </div>
+                </div>
+
+                <!-- Page 10: Phase Header (Asset Selection) -->
+                <div class="page" id="page-10">
+                    <div class="h-full flex flex-col items-center justify-center">
+                        <div class="w-full max-w-lg bg-allgood-secondary text-white rounded-xl p-10 shadow-2xl text-center">
+                            <div class="bg-white/20 p-4 rounded-full mb-6 backdrop-blur-sm inline-block"><i data-lucide="pie-chart" class="w-12 h-12 text-white"></i></div>
+                            <h2 class="text-4xl font-heading font-bold mb-2 tracking-tight">PHASE III</h2>
+                            <h3 class="text-xl font-body font-bold text-white/80 mb-6">Asset Intelligence</h3>
+                            <div class="w-16 h-1 bg-white/40 rounded mb-6 mx-auto"></div>
+                            <p class="text-sm leading-relaxed text-white/90 font-medium">Not all digital assets are equal. We must distinguish between digital gold, programmable oil, and casino chips.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 11: Market Cap vs Price -->
+                <div class="page" id="page-11">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The "Cheap Coin" Trap</h2></section>
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 shadow-sm"><strong class="text-sm text-red-800 uppercase tracking-wide">Psychological Warning</strong><p class="text-xs text-gray-700 mt-1">New investors often buy coins priced at $0.0001 hoping they will reach $1.00. <strong>This is mathematically impossible</strong> for most coins due to supply.</p></div>
+                    <p class="text-sm text-gray-600 mb-6">You must judge an asset by its <span class="term" tabindex="0">Market Cap<span class="term-def"><strong>Total Network Value.</strong><br>Calculated as: Price per Coin × Total Supply.</span></span>, not its Unit Price.<br><span class="font-mono text-xs bg-gray-200 p-1 rounded mt-1 inline-block">Formula: Market Cap = Price × Circulating Supply</span></p>
+                    <div class="flex justify-center space-x-8 mb-6">
+                        <div class="text-center"><div class="w-24 h-24 bg-orange-100 rounded-full border-4 border-orange-500 flex items-center justify-center mb-2 shadow-md"><span class="font-bold text-orange-700">BITCOIN</span></div><p class="text-xs text-gray-500">Small Supply (21M)</p><p class="text-xs font-bold text-allgood-dark">$1 Trillion Value</p></div>
+                        <div class="text-center"><div class="w-24 h-24 bg-blue-100 rounded-full border-4 border-blue-500 flex items-center justify-center mb-2 relative shadow-md"><span class="font-bold text-blue-700 text-xs leading-tight">MEME<br>COIN</span></div><p class="text-xs text-gray-500">Infinite Supply</p><p class="text-xs font-bold text-allgood-dark">$1 Million Value</p></div>
+                    </div>
+                </div>
+
+                <!-- Page 12: Narrative Arc -->
+                <div class="page" id="page-12">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Power of Narrative</h2></section>
+                    <p class="text-sm text-gray-600 mb-6">Value is driven by the story the market believes. Match the asset to its narrative.</p>
+                    <div class="space-y-3">
+                        <div class="p-3 bg-orange-50 border-l-4 border-orange-500 rounded shadow-sm"><strong class="block text-orange-800 text-sm">Bitcoin (BTC)</strong><span class="text-xs text-gray-600">"Digital Gold." Store of value. Scarcity.</span></div>
+                        <div class="p-3 bg-blue-50 border-l-4 border-blue-500 rounded shadow-sm"><strong class="block text-blue-800 text-sm">Ethereum (ETH)</strong><span class="text-xs text-gray-600">"Digital Oil." Powering the decentralized internet (Web3).</span></div>
+                        <div class="p-3 bg-purple-50 border-l-4 border-purple-500 rounded shadow-sm"><strong class="block text-purple-800 text-sm">Doge/Pepe</strong><span class="text-xs text-gray-600">"Memecoins." Pure speculation and community hype. <strong>High Risk.</strong></span></div>
+                    </div>
+                </div>
+
+                <!-- Page 13: Scarcity Simulator -->
+                <div class="page" id="page-13">
+                    <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Silent Tax</h2></section>
+                    <p class="text-sm text-gray-600 mb-4 leading-relaxed"><strong>Currency Debasement:</strong> When governments print money, the dollars in your savings account buy less. This is inflation. Bitcoin was invented to solve this by having a <strong>Fixed Supply</strong> that can never change.</p>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                        <label class="block text-sm font-bold text-allgood-dark mb-4">Time Horizon: <span id="year-display" class="text-allgood-primary">Today</span></label>
+                        <input type="range" min="0" max="10" value="0" id="inflation-slider" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mb-8 accent-allgood-primary">
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="p-4 bg-red-50 rounded border border-red-100 flex flex-col justify-between"><div><h4 class="font-bold text-red-800 text-sm mb-1">Fiat (USD)</h4><span class="text-[10px] text-red-400 uppercase tracking-wide font-bold">Infinite Supply</span></div><div class="my-2"><div id="fiat-value" class="text-xl font-bold text-red-600">$100,000</div><p class="text-[10px] text-gray-500">Purchasing Power</p></div></div>
+                            <div class="p-4 bg-green-50 rounded border border-green-100 flex flex-col justify-between"><div><h4 class="font-bold text-green-800 text-sm mb-1">Bitcoin (BTC)</h4><span class="text-[10px] text-green-600 uppercase tracking-wide font-bold">Fixed Supply (21M)</span></div><div class="my-2"><div id="btc-value" class="text-xl font-bold text-green-600">1.00 BTC</div><p class="text-[10px] text-gray-500">Network Share</p></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 14: Dilution Trap -->
+                <div class="page" id="page-14">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Dilution Trap</h2></section>
+                    <div class="bg-white p-6 rounded border border-gray-200 shadow-sm quiz-container">
+                        <div class="flex items-center mb-4"><i data-lucide="alert-triangle" class="w-6 h-6 text-yellow-500 mr-3"></i><div><h4 class="font-bold text-sm text-allgood-dark">Scenario: The Insider Coin</h4><p class="text-xs text-gray-500">You find a coin with a low price. But you notice <strong>90% of the supply is locked</strong> by the founders.</p></div></div>
+                        <p class="font-bold text-sm mb-3">Do we invest?</p>
+                        <div class="grid grid-cols-1 gap-2">
+                            <button class="quiz-btn w-full text-left p-3 bg-gray-50 border border-gray-200 rounded text-sm" onclick="checkAnswer(this)" data-correct="false" data-feedback="DANGEROUS. When the founders unlock their coins, they will sell, flooding the market and crashing the price.">Yes, early access!</button>
+                            <button class="quiz-btn w-full text-left p-3 bg-gray-50 border border-gray-200 rounded text-sm" onclick="checkAnswer(this)" data-correct="true" data-feedback="CORRECT. High 'Insider Supply' leads to massive dilution. We want High Circulating Supply.">No, risk of dumping.</button>
+                        </div>
+                        <div class="feedback mt-3 text-xs font-bold hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Page 15: Phase Header (Custody) -->
+                <div class="page" id="page-15">
+                    <div class="h-full flex flex-col items-center justify-center">
+                        <div class="w-full max-w-lg bg-allgood-secondary text-white rounded-xl p-10 shadow-2xl text-center">
+                            <div class="bg-white/20 p-4 rounded-full mb-6 backdrop-blur-sm inline-block"><i data-lucide="shield" class="w-12 h-12 text-white"></i></div>
+                            <h2 class="text-4xl font-heading font-bold mb-2 tracking-tight">PHASE IV</h2>
+                            <h3 class="text-xl font-body font-bold text-white/80 mb-6">Custody Protocol</h3>
+                            <div class="w-16 h-1 bg-white/40 rounded mb-6 mx-auto"></div>
+                            <p class="text-sm leading-relaxed text-white/90 font-medium">Possession is nine-tenths of the law. In crypto, possession of the key is 100% of the law.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 16: Not Your Keys -->
+                <div class="page" id="page-16">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Custody: The Launch Codes</h2></section>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                         <div class="bg-white p-4 rounded border border-gray-200 shadow-sm"><h3 class="font-bold text-allgood-secondary text-sm mb-2">Concept: The Private Key</h3><p class="text-xs text-gray-600 leading-relaxed">Your wallet doesn't hold coins; it holds a <strong>Private Key</strong>. Think of this like the unique launch codes for a vault in space. Without these codes, nobody on Earth—not even the government—can touch your assets.</p></div>
+                        <div class="bg-white p-4 rounded border border-gray-200 shadow-sm"><h3 class="font-bold text-allgood-primary text-sm mb-2">Risk: The Exchange</h3><p class="text-xs text-gray-600 leading-relaxed">If you leave crypto on Coinbase/FTX, <strong>they</strong> hold the launch codes. You only have an <strong>IOU</strong>. If they go bankrupt, your IOU is worthless.</p></div>
+                    </div>
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 shadow-sm"><h3 class="font-bold text-red-800 text-sm mb-1">The Golden Rule</h3><p class="text-lg font-heading font-bold text-allgood-dark">"Not your keys, not your coins."</p></div>
+                </div>
+
+                <!-- Page 17: Wallet Sorter -->
+                <div class="page" id="page-17">
+                    <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Custody Sorter</h2></section>
+                    <p class="text-sm text-gray-600 mb-4">Assign the storage methods to the correct risk category.</p>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div id="zone-high" class="wallet-zone p-4 bg-red-50 rounded text-center min-h-[120px]" onclick="moveToZone('high')"><div class="text-xs font-bold text-red-700 uppercase tracking-widest mb-2">High Risk</div><div class="text-[10px] text-gray-500">Hackable / IOU</div><div id="container-high" class="mt-2 space-y-2"></div></div>
+                        <div id="zone-low" class="wallet-zone p-4 bg-blue-50 rounded text-center min-h-[120px]" onclick="moveToZone('low')"><div class="text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">Low Risk</div><div class="text-[10px] text-gray-500">Cold Storage</div><div id="container-low" class="mt-2 space-y-2"></div></div>
+                    </div>
+                    <div class="bg-gray-100 p-4 rounded border border-gray-200"><p class="text-xs font-bold text-gray-500 mb-2">Tap to Select, then Tap Zone:</p><div class="flex space-x-2 overflow-x-auto pb-2" id="card-source"><div id="card-exchange" class="wallet-card bg-white p-3 rounded shadow w-1/3 shrink-0 text-center" onclick="selectCard('exchange')"><i data-lucide="globe" class="w-6 h-6 mx-auto mb-1 text-gray-600"></i><div class="text-xs font-bold text-allgood-dark">Exchange</div></div><div id="card-mobile" class="wallet-card bg-white p-3 rounded shadow w-1/3 shrink-0 text-center" onclick="selectCard('mobile')"><i data-lucide="smartphone" class="w-6 h-6 mx-auto mb-1 text-gray-600"></i><div class="text-xs font-bold text-allgood-dark">Hot Wallet</div></div><div id="card-hardware" class="wallet-card bg-white p-3 rounded shadow w-1/3 shrink-0 text-center" onclick="selectCard('hardware')"><i data-lucide="hard-drive" class="w-6 h-6 mx-auto mb-1 text-gray-600"></i><div class="text-xs font-bold text-allgood-dark">Hardware</div></div></div></div>
+                    <p id="custody-feedback" class="text-xs font-bold text-allgood-primary mt-3 h-4 text-center"></p>
+                </div>
+
+                <!-- Page 18: Key Ceremony -->
+                <div class="page" id="page-18">
+                    <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The Key Ceremony</h2></section>
+                    <p class="text-sm text-gray-600 mb-4">You are initializing the hardware wallet. This <strong>12-word Seed Phrase</strong> is the only backup.</p>
+                    <div class="bg-gray-800 p-4 rounded-lg relative overflow-hidden mb-4"><div class="grid grid-cols-3 gap-2 text-center" id="seed-grid"></div><div id="screenshot-flash" class="absolute inset-0 bg-white opacity-0 pointer-events-none transition-opacity duration-100"></div></div>
+                    <div class="flex space-x-3"><button onclick="attemptScreenshot()" class="w-1/2 bg-gray-200 text-gray-700 py-2 rounded font-bold text-sm flex items-center justify-center hover:bg-gray-300"><i data-lucide="camera" class="w-4 h-4 mr-2"></i> Screenshot</button><button onclick="confirmWritten()" class="w-1/2 bg-allgood-primary text-white py-2 rounded font-bold text-sm flex items-center justify-center hover:bg-allgood-hover"><i data-lucide="pen-tool" class="w-4 h-4 mr-2"></i> I Wrote it Down</button></div>
+                    <p id="seed-feedback" class="text-xs font-bold text-red-500 mt-2 text-center min-h-[16px]"></p>
+                </div>
+
+                <!-- Page 19: Test Transaction (Deployment) -->
+                <div class="page" id="page-19">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">The $10 Rule</h2></section>
+                    <div class="bg-white p-6 rounded border border-gray-200 shadow-sm quiz-container">
+                        <div class="flex items-center mb-4"><i data-lucide="send" class="w-6 h-6 text-blue-500 mr-3"></i><div><h4 class="font-bold text-sm text-allgood-dark">Scenario: The Big Move</h4><p class="text-xs text-gray-500">We are moving $1,000,000 to Cold Storage. The Board says "Get it done fast."</p></div></div>
+                        <p class="font-bold text-sm mb-3">Action?</p>
+                        <div class="grid grid-cols-1 gap-2">
+                            <button class="quiz-btn w-full text-left p-3 bg-gray-50 border border-gray-200 rounded text-sm" onclick="checkAnswer(this)" data-correct="false" data-feedback="RECKLESS. If the address is wrong, we lose $1M instantly.">Send Full Amount ($1M)</button>
+                            <button class="quiz-btn w-full text-left p-3 bg-gray-50 border border-gray-200 rounded text-sm" onclick="checkAnswer(this)" data-correct="true" data-feedback="SAFE. Always send a test amount first. Confirm receipt, THEN send the rest.">Send Test ($10) First</button>
+                        </div>
+                        <div class="feedback mt-3 text-xs font-bold hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Page 20: Address Audit -->
+                <div class="page" id="page-20">
+                    <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Final Audit</h2></section>
+                    <p class="text-sm text-gray-600 mb-4">Verify the destination address string. <strong>Spot the error.</strong></p>
+                    <div class="bg-white p-4 rounded border border-gray-300 shadow-sm mb-4 relative"><div class="absolute top-2 right-2 text-[10px] bg-gray-200 px-2 py-0.5 rounded text-gray-600">Exchange</div><div class="mb-4 mt-2"><label class="block text-xs font-bold text-gray-500 mb-1">Destination (Clipboard)</label><div class="font-mono text-sm bg-gray-100 p-2 rounded border border-gray-200 text-gray-800 break-all">1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa</div></div><div class="mb-4"><label class="block text-xs font-bold text-gray-500 mb-1">Cold Wallet Screen</label><div class="font-mono text-sm bg-black text-green-400 p-2 rounded border border-gray-600 break-all">1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNu</div></div></div>
+                    <div class="flex space-x-4"><button onclick="auditTransaction(true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded shadow flex flex-col items-center"><i data-lucide="x-circle" class="w-6 h-6 mb-1"></i><span class="text-xs">REJECT</span></button><button onclick="auditTransaction(false)" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded shadow flex flex-col items-center"><i data-lucide="check-circle" class="w-6 h-6 mb-1"></i><span class="text-xs">APPROVE</span></button></div>
+                    <p id="tx-feedback" class="text-sm font-bold mt-4 text-center min-h-[20px]"></p>
+                </div>
+
+                <!-- Page 21: Irreversibility -->
+                <div class="page" id="page-21">
+                    <div class="flex flex-col items-center justify-start sm:justify-center min-h-full py-8 text-center bg-gray-900 text-white rounded -m-5 p-8 shadow-inner relative">
+                        <i data-lucide="alert-octagon" class="w-12 h-12 text-red-500 mb-4 animate-pulse mt-4 sm:mt-0"></i>
+                        <h2 class="text-3xl font-heading font-bold mb-2">Point of No Return</h2>
+                        <p class="text-sm max-w-md leading-relaxed text-gray-400 mb-8">Blockchain transactions are immutable. Once you press confirm, no bank, no government, and no admin can reverse it. History is full of regrets.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-4xl z-10">
+                            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 hover:border-red-500 cursor-pointer transition-all group" onclick="showHistoryModal('pizza')"><div class="bg-orange-500/20 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 transition-colors"><i data-lucide="pizza" class="w-5 h-5 text-orange-500 group-hover:text-white"></i></div><h3 class="font-bold text-sm mb-1">The $700M Pizza</h3><p class="text-xs text-gray-500">2010 • Regret</p></div>
+                            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 hover:border-blue-500 cursor-pointer transition-all group" onclick="showHistoryModal('drive')"><div class="bg-blue-500/20 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-500 transition-colors"><i data-lucide="hard-drive" class="w-5 h-5 text-blue-500 group-hover:text-white"></i></div><h3 class="font-bold text-sm mb-1">The Landfill</h3><p class="text-xs text-gray-500">2013 • Loss</p></div>
+                            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 hover:border-green-500 cursor-pointer transition-all group" onclick="showHistoryModal('fee')"><div class="bg-green-500/20 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-green-500 transition-colors"><i data-lucide="mouse-pointer-click" class="w-5 h-5 text-green-500 group-hover:text-white"></i></div><h3 class="font-bold text-sm mb-1">The $23M Fee</h3><p class="text-xs text-gray-500">2021 • Error</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Modal -->
+                <div id="history-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/90 flex items-center justify-center p-6 modal-transition" onclick="closeHistoryModal()">
+                    <div class="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl p-6 max-w-md w-full text-center relative" onclick="event.stopPropagation()">
+                        <button onclick="closeHistoryModal()" class="absolute top-3 right-3 text-gray-500 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <div id="history-icon-container" class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl transition-colors bg-gray-800"></div>
+                        <h3 id="history-title" class="text-2xl font-heading font-bold text-white mb-2"></h3>
+                        <p id="history-text" class="text-sm text-gray-400 font-body mb-6 leading-relaxed"></p>
+                        <div class="bg-gray-800 p-3 rounded border-l-4 border-red-500 text-left mb-4"><strong class="text-red-400 text-xs uppercase tracking-wide block mb-1">The Lesson</strong><p id="history-lesson" class="text-xs text-gray-300"></p></div>
+                    </div>
+                </div>
+
+                <!-- Page 22: The Crash -->
+                <div class="page" id="page-22">
+                    <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Market Discipline</h2></section>
+                    <div class="bg-white p-4 rounded border border-gray-200 shadow-sm mb-6">
+                        <div class="flex justify-between items-end mb-2"><div class="text-xs text-gray-500">BTC/USD Price</div><div id="price-display" class="text-xl font-bold text-red-600">-20%</div></div>
+                        <div class="relative h-32 bg-gray-50 border-b border-l border-gray-300 flex items-end px-2 pb-0 overflow-hidden" id="chart-container">
+                            <div class="w-1/5 bg-gray-300 h-[60%] mx-1"></div><div class="w-1/5 bg-gray-300 h-[70%] mx-1"></div><div class="w-1/5 bg-gray-300 h-[80%] mx-1"></div><div class="w-1/5 bg-gray-300 h-[85%] mx-1"></div><div class="w-1/5 bg-red-400 h-[30%] mx-1 animate-pulse" id="crash-bar"></div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">The day after deployment, the market crashes. The CEO calls: "Sell it all!"</p>
+                    <div class="flex flex-col space-y-3"><button onclick="marketDecision('panic')" id="btn-panic" class="w-full bg-white border-2 border-red-100 hover:border-red-500 text-red-600 font-bold py-3 rounded transition-colors text-sm">Panic Sell (Realize Loss)</button><button onclick="marketDecision('hodl')" id="btn-hodl" class="w-full bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-3 rounded transition-colors text-sm shadow-md">Hold Thesis (Long Term)</button></div>
+                    <p id="market-feedback" class="text-xs text-gray-500 mt-4 text-center italic"></p>
+                </div>
+
+                <!-- Page 23: The Tax Man -->
+                <div class="page" id="page-23">
+                    <section class="mb-6 border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Civic Duty: Taxes</h2></section>
+                    <p class="text-sm text-gray-600 mb-6">Crypto is not tax-free. Every trade is a taxable event. You must have a record-keeping system in place.</p>
+                    <div class="bg-white p-6 rounded border border-gray-200 shadow-sm">
+                        <h3 class="font-bold text-allgood-dark mb-4">IRS Compliance Checklist</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center p-2 bg-gray-50 rounded cursor-pointer" onclick="this.classList.toggle('bg-green-50'); this.querySelector('svg').classList.toggle('text-green-500'); sfx.tick()"><i data-lucide="square" class="w-5 h-5 text-gray-300 mr-3"></i><span class="text-sm text-gray-700">Portfolio Tracker Installed</span></div>
+                            <div class="flex items-center p-2 bg-gray-50 rounded cursor-pointer" onclick="this.classList.toggle('bg-green-50'); this.querySelector('svg').classList.toggle('text-green-500'); sfx.tick()"><i data-lucide="square" class="w-5 h-5 text-gray-300 mr-3"></i><span class="text-sm text-gray-700">Cost Basis Recorded</span></div>
+                            <div class="flex items-center p-2 bg-gray-50 rounded cursor-pointer" onclick="this.classList.toggle('bg-green-50'); this.querySelector('svg').classList.toggle('text-green-500'); sfx.tick()"><i data-lucide="square" class="w-5 h-5 text-gray-300 mr-3"></i><span class="text-sm text-gray-700">Long Term Capital Gains (>1 Year)</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 24: The Final Exam -->
+                <div class="page" id="page-24">
+                    <section class="mb-4 border-b border-gray-200 pb-2"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Final Exam</h2></section>
+                    <p class="text-sm text-gray-600 mb-6">To earn your badge, you must pass this situational assessment. <strong>Pass Mark: 6/7</strong>.</p>
+                    
+                    <div id="final-quiz-container" class="bg-white p-6 rounded border border-gray-200 shadow-sm relative min-h-[300px]">
+                        <div class="flex justify-between items-center mb-4 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                            <span id="quiz-progress-text">Question 1 of 7</span>
+                            <span id="quiz-score-display" class="text-allgood-primary hidden">Score: 0</span>
+                        </div>
+
+                        <div id="quiz-question-block">
+                            <h3 id="quiz-scenario-title" class="font-bold text-allgood-dark text-lg mb-2">Loading...</h3>
+                            <p id="quiz-scenario-text" class="text-sm text-gray-600 mb-6 leading-relaxed">Loading scenario...</p>
+                            <div id="quiz-options" class="space-y-3"></div>
+                        </div>
+
+                        <div id="quiz-feedback-block" class="hidden mt-4 p-4 rounded border bg-gray-50 border-gray-200">
+                            <div class="flex items-start">
+                                <div id="quiz-feedback-icon" class="mr-3 mt-1"></div>
+                                <div>
+                                    <strong id="quiz-feedback-title" class="block text-sm font-bold mb-1"></strong>
+                                    <p id="quiz-feedback-text" class="text-xs text-gray-600 leading-relaxed"></p>
+                                </div>
+                            </div>
+                            <button id="quiz-next-btn" onclick="nextQuestion()" class="mt-4 w-full bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded text-xs uppercase tracking-wider transition-colors">Next Question</button>
+                        </div>
+
+                        <div id="quiz-result-block" class="hidden text-center py-8">
+                            <div id="quiz-result-icon" class="mx-auto mb-4"></div>
+                            <h3 id="quiz-result-title" class="text-2xl font-heading font-bold text-allgood-dark mb-2"></h3>
+                            <p id="quiz-result-text" class="text-sm text-gray-600 mb-6"></p>
+                            <div id="quiz-result-actions"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 25: Credits -->
+                <div class="page" id="page-final">
+                    <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-8">
+                        <div class="mb-8"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2><p class="text-xs text-gray-400 font-bold tracking-widest uppercase mt-2">Pragmatic Action</p></div>
+                        
+                        <div id="feedback-container" class="w-full max-w-md bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8 text-left relative">
+                            <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this GoodBlock</h3>
+                            <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                <button onclick="setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                            </div>
+                            <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback sharpens our tools.</label>
+                            <textarea id="feedback-text" rows="2" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50" placeholder="Optional: Share your thoughts..."></textarea>
+                            <button onclick="submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm">Send Feedback</button>
+                        </div>
+
+                        <div id="feedback-success" class="hidden w-full max-w-md bg-green-50 p-6 rounded-lg shadow-inner border border-green-200 mb-8 text-center">
+                            <i data-lucide="check-circle" class="w-12 h-12 text-green-600 mx-auto mb-2"></i>
+                            <h3 class="font-bold text-green-800">Feedback Received.</h3>
+                            <p class="text-xs text-green-700 mt-1">Thank you for helping us improve.</p>
+                        </div>
+
+                        <div id="certification-section" class="w-full max-w-md bg-gradient-to-br from-allgood-secondary to-allgood-accent p-1 rounded-lg shadow-xl mb-6 transform transition-all duration-700 scale-95 opacity-0">
+                            <div class="bg-white p-6 rounded-md text-center">
+                                <div class="mb-4 relative inline-block">
+                                    <div class="absolute inset-0 bg-yellow-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+                                    <i data-lucide="award" class="relative w-16 h-16 text-allgood-primary mx-auto"></i>
+                                </div>
+                                <h3 class="font-heading font-bold text-2xl text-allgood-dark mb-2">Mission Complete</h3>
+                                <p class="text-sm text-gray-600 mb-6">Verify readiness to deploy.</p>
+                                <button id="download-badge-btn" onclick="downloadBadge()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md flex items-center justify-center transition-all duration-300">
+                                    <i id="btn-icon" data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                    <span id="btn-text">Download Badge</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="w-full max-w-md text-left mx-auto mb-8 mt-12">
+                             <div class="text-center mt-6">
+                                <a href="https://www.allgoodacademy.com/goodblocks" target="_blank" class="inline-block group">
+                                    <span class="font-heading font-bold text-3xl tracking-tight text-allgood-primary animate-pulse-glow block">
+                                        GoodBlock
+                                    </span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer (Standard) -->
+                <footer class="footer-content flex items-center justify-between px-6">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>Back
+                    </button>
+                    <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a> <span id="current-year"></span></p>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body"><span>Next</span><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
+                </footer>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Main Application Logic -->
+    <script>
+        // --- GLOBAL VARIABLES ---
+        window.currentUserName = "Anonymous";
+        window.currentUserEmail = "";
+        let currentPageIndex = 0; 
+        let totalPages = 25; 
+        
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        // --- SESSION MANAGER (REFACTORED FOR FIRESTORE) ---
+        window.SessionManager = {
+            log: function(action, detail, payload = {}) {
+                // Delegate to the Firestore logic defined in the module script
+                if (window.logToFirestore) {
+                    window.logToFirestore(action, detail, payload);
+                } else {
+                    console.warn("Firestore logger not ready:", action, detail);
+                }
+            },
+            start: function(name, email) { 
+                // Initial log to create the session document
+                this.log("System", "Session Started", { startTime: new Date().toISOString() }); 
+            }
+        };
+
+        // --- AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) { audioCtx = new AudioContext(); } if (audioCtx.state === 'suspended') { audioCtx.resume().catch(e => console.error("Audio Error:", e)); } }
+        function playTone(freq, type, duration, vol=0.1, attack=0.01, decay=0.001) {
+            initAudio(); const now = audioCtx.currentTime; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, now); osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(vol, now + attack); gain.gain.exponentialRampToValueAtTime(decay, now + duration);
+            osc.start(now); osc.stop(now + duration);
+        }
+        const sfx = {
+            powerOn: () => { initAudio(); const now = audioCtx.currentTime; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.type = 'triangle'; osc.frequency.setValueAtTime(110, now); osc.frequency.exponentialRampToValueAtTime(220, now + 0.4); gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.4, now + 0.1); gain.gain.linearRampToValueAtTime(0, now + 0.4); osc.start(now); osc.stop(now + 0.4); },
+            powerOff: () => { initAudio(); playTone(80, 'triangle', 0.2, 0.5, 0.01, 0.001); },
+            nav: () => { initAudio(); playTone(150, 'sine', 0.1, 0.1, 0.01, 0.01); },
+            tick: () => { initAudio(); playTone(1000, 'sine', 0.01, 0.01); },
+            success: () => { playTone(440, 'triangle', 0.1, 0.1, 0.01, 0.1); setTimeout(()=>playTone(880, 'triangle', 0.2, 0.1, 0.01, 0.2), 100); },
+            error: () => playTone(150, 'sawtooth', 0.3, 0.1, 0.01, 0.1)
+        };
+        window.sfx = sfx;
+        window.initAudio = initAudio;
+
+        // --- CUSTOM LOGIC ---
+
+        // Page 3: Jargon Buster Tooltips
+        window.toggleMissionTooltip = function(id) {
+            document.querySelectorAll('.mission-tooltip').forEach(el => el.classList.add('hidden'));
+            const tooltip = document.getElementById(`tooltip-mission-${id}`);
+            if (tooltip) { tooltip.classList.toggle('hidden'); sfx.tick(); }
+        }
+
+        // PAGE 6: TRUST FRAMEWORK LOGIC
+        window.setTrustMode = function(mode) {
+            const pill = document.getElementById('trust-pill-bg');
+            const btnBank = document.getElementById('btn-bank');
+            const btnLedger = document.getElementById('btn-ledger');
+            const display = document.getElementById('ledger-display');
+            const feedback = document.getElementById('ledger-feedback');
+
+            window.SessionManager.log("Infrastructure", "Trust Model Toggle", { selected: mode === 'bank' ? "SQL Database" : "Blockchain Ledger" });
+
+            if (mode === 'bank') {
+                pill.style.transform = 'translateX(0)';
+                btnBank.classList.remove('text-gray-500'); btnBank.classList.add('text-allgood-dark');
+                btnLedger.classList.remove('text-allgood-dark'); btnLedger.classList.add('text-gray-500');
+                display.innerHTML = `<div class="text-blue-400 border-b border-gray-700 pb-1 mb-1 font-bold">SQL DATABASE (Admin Access)</div><div class="text-red-400 animate-pulse">> UPDATE Balance SET = $0</div><div class="mt-2 text-gray-500 text-[10px]">Log: Admin User modified entry.</div>`;
+                feedback.textContent = "Centralized: A single admin or hacker can change the numbers.";
+                feedback.className = "mt-4 text-sm font-bold text-red-500 min-h-[20px]";
+                sfx.tick();
+            } else {
+                pill.style.transform = 'translateX(104%)';
+                btnBank.classList.remove('text-allgood-dark'); btnBank.classList.add('text-gray-500');
+                btnLedger.classList.remove('text-gray-500'); btnLedger.classList.add('text-allgood-dark');
+                display.innerHTML = `<div class="text-green-400 border-b border-gray-700 pb-1 mb-1 font-bold">BLOCK #890123 (Verified)</div><div class="text-gray-300 opacity-50">Tx: User A -> User B | 50 BTC</div><div class="mt-2 text-green-600 text-[10px]">Hash: 0000a8f... (IMMUTABLE)</div>`;
+                feedback.textContent = "Distributed: Thousands of nodes verified this. Cannot be deleted.";
+                feedback.className = "mt-4 text-sm font-bold text-green-600 min-h-[20px]";
+                sfx.success();
+            }
+        }
+
+        // PAGE 9: REGULATORY SEGMENTED CONTROL
+        window.setRegMode = function(mode) {
+            const pill = document.getElementById('reg-pill-bg');
+            const btnWild = document.getElementById('btn-wild-west');
+            const btnLegal = document.getElementById('btn-compliance');
+            const feedback = document.getElementById('reg-feedback');
+
+            window.SessionManager.log("Infrastructure", "Regulatory Mode", { selected: mode });
+
+            if (mode === 'wild') {
+                pill.style.transform = 'translateX(0)';
+                pill.classList.remove('bg-green-100'); pill.classList.add('bg-white');
+                btnWild.classList.remove('text-gray-500'); btnWild.classList.add('text-red-600');
+                btnLegal.classList.remove('text-green-700'); btnLegal.classList.add('text-gray-500');
+                feedback.textContent = "Currently Unregulated. High Risk.";
+                feedback.classList.replace('text-green-600', 'text-red-500');
+                sfx.tick();
+            } else {
+                pill.style.transform = 'translateX(104%)';
+                pill.classList.remove('bg-white'); pill.classList.add('bg-green-100');
+                btnWild.classList.remove('text-red-600'); btnWild.classList.add('text-gray-500');
+                btnLegal.classList.remove('text-gray-500'); btnLegal.classList.add('text-green-700');
+                feedback.textContent = "Fully Compliant. Auditable. Safe for Treasury.";
+                feedback.classList.replace('text-red-500', 'text-green-600');
+                sfx.success();
+            }
+        }
+
+        // PAGE 13: SCARCITY SIMULATOR LOGIC
+        window.initSlider = function() {
+            const slider = document.getElementById('inflation-slider');
+            if(slider) {
+                window.updateScarcity(slider.value);
+                let slideLogTimer;
+                slider.addEventListener('input', (e) => {
+                    window.updateScarcity(e.target.value);
+                    clearTimeout(slideLogTimer);
+                    slideLogTimer = setTimeout(() => {
+                         window.SessionManager.log("Simulation", "Inflation Slider", { years: e.target.value });
+                    }, 1000);
+                });
+            }
+        }
+
+        window.updateScarcity = function(val) {
+            val = parseInt(val);
+            const year = new Date().getFullYear() + val;
+            const yearDisplay = document.getElementById('year-display');
+            if(yearDisplay) yearDisplay.textContent = val === 0 ? "Today" : year;
+            const power = 100000 * Math.pow(0.96, val);
+            const fiatDisplay = document.getElementById('fiat-value');
+            if(fiatDisplay) {
+                fiatDisplay.textContent = "$" + Math.floor(power).toLocaleString();
+                if (val > 5) { fiatDisplay.classList.add('text-red-400'); fiatDisplay.classList.remove('text-red-600'); } 
+                else { fiatDisplay.classList.remove('text-red-400'); fiatDisplay.classList.add('text-red-600'); }
+            }
+        }
+
+        // PAGE 17: CARD SORT LOGIC
+        let selectedCard = null;
+        const correctMap = { 'exchange': 'high', 'mobile': 'high', 'hardware': 'low' };
+        let sortedCount = 0;
+        let custodyMistakes = 0;
+        
+        window.selectCard = function(id) {
+            document.querySelectorAll('.wallet-card').forEach(c => c.classList.remove('selected'));
+            if(document.getElementById(`card-${id}`).parentElement.id.includes('container')) return;
+            document.getElementById(`card-${id}`).classList.add('selected');
+            selectedCard = id;
+            sfx.tick();
+            document.getElementById('custody-feedback').textContent = "Select a Risk Zone above.";
+        }
+        
+        window.moveToZone = function(zone) {
+            if (!selectedCard) return;
+            const correctZone = correctMap[selectedCard];
+            if (zone === correctZone) {
+                const card = document.getElementById(`card-${selectedCard}`);
+                card.classList.remove('selected', 'w-1/3'); card.classList.add('w-full', 'mb-2');
+                document.getElementById(`container-${zone}`).appendChild(card);
+                selectedCard = null; sortedCount++; sfx.success();
+                document.getElementById('custody-feedback').textContent = "Correct assessment.";
+                
+                if(sortedCount === 3) {
+                    document.getElementById('custody-feedback').textContent = "Protocol complete. Risk segregated.";
+                    window.SessionManager.log("Protocol", "Custody Sorter Completed", { mistakes: custodyMistakes, performance: custodyMistakes === 0 ? "Perfect" : "Needs Review" });
+                }
+            } else {
+                sfx.error();
+                custodyMistakes++;
+                document.getElementById('custody-feedback').textContent = "Incorrect. Check the security level.";
+            }
+        }
+
+        // PAGE 18: KEY CEREMONY
+        window.initSeeds = function() {
+            const seeds = ["witch", "collapse", "practice", "feed", "shame", "open", "despair", "creek", "road", "again", "ice", "least"];
+            const grid = document.getElementById('seed-grid');
+            if(grid && grid.children.length === 0) {
+                seeds.forEach((word, index) => {
+                    const div = document.createElement('div');
+                    div.className = "seed-word bg-white p-2 rounded border border-gray-600 text-gray-800 text-xs";
+                    div.textContent = `${index+1}. ${word}`;
+                    div.onclick = function() { this.classList.add('revealed'); sfx.tick(); };
+                    grid.appendChild(div);
+                });
+            }
+        }
+
+        window.attemptScreenshot = function() {
+            const flash = document.getElementById('screenshot-flash'); 
+            flash.style.opacity = '1'; flash.style.backgroundColor = 'red'; sfx.error();
+            setTimeout(() => { flash.style.opacity = '0'; flash.style.backgroundColor = 'white'; }, 300);
+            const feedback = document.getElementById('seed-feedback');
+            feedback.innerHTML = `<span class="block text-red-600 font-bold uppercase mb-1">SECURITY BREACH DETECTED</span><span class="font-normal text-gray-600">Your phone gallery is synced to the cloud. If you screenshot this, hackers can find it. This key must exist in the physical world <strong>ONLY</strong>.</span>`;
+            feedback.classList.remove('text-center'); feedback.classList.add('text-left', 'p-3', 'bg-red-50', 'border', 'border-red-200', 'rounded');
+        }
+
+        window.confirmWritten = function() {
+            const revealed = document.querySelectorAll('.seed-word.revealed').length;
+            const feedback = document.getElementById('seed-feedback');
+            if (revealed < 12) { sfx.error(); feedback.textContent = "You must reveal and write down all 12 words first."; feedback.className = "text-xs font-bold text-red-500 mt-2 text-center min-h-[16px]"; } 
+            else { sfx.success(); feedback.innerHTML = `<span class="block text-green-600 font-bold uppercase mb-1">AIR GAP SECURED</span><span class="font-normal text-gray-600">Correct. By writing it on paper, you have created a physical "Air Gap." No remote hacker can access a piece of paper in your safe.</span>`; feedback.className = "text-xs mt-2 text-left p-3 bg-green-50 border border-green-200 rounded"; }
+        }
+
+        // QUIZ LOGIC
+        window.checkAnswer = function(btn) {
+            const isCorrect = btn.getAttribute('data-correct') === 'true';
+            const feedbackText = btn.getAttribute('data-feedback');
+            const container = btn.closest('.quiz-container');
+            const feedbackEl = container.querySelector('.feedback');
+            const questionTitle = container.querySelector('h4') ? container.querySelector('h4').innerText : "Unknown Question";
+            const answerText = btn.innerText;
+
+            window.SessionManager.log("Decision", questionTitle, { selectedAnswer: answerText, isCorrect: isCorrect });
+            
+            container.querySelectorAll('.quiz-btn').forEach(b => { b.classList.remove('bg-green-100', 'border-green-500', 'bg-red-50', 'border-red-300'); b.classList.add('bg-gray-50', 'border-gray-200'); });
+            if(isCorrect) { btn.classList.remove('bg-gray-50', 'border-gray-200'); btn.classList.add('bg-green-100', 'border-green-500'); feedbackEl.textContent = feedbackText; feedbackEl.className = "feedback mt-3 text-xs font-bold text-green-600"; feedbackEl.classList.remove('hidden'); sfx.success(); } 
+            else { btn.classList.remove('bg-gray-50', 'border-gray-200'); btn.classList.add('bg-red-50', 'border-red-500'); feedbackEl.textContent = feedbackText; feedbackEl.className = "feedback mt-3 text-xs font-bold text-red-500"; feedbackEl.classList.remove('hidden'); sfx.error(); }
+        }
+
+        // PAGE 20: ADDRESS AUDIT
+        window.auditTransaction = function(isReject) {
+            const feedback = document.getElementById('tx-feedback');
+            window.SessionManager.log("Deployment", "Address Audit", { decision: isReject ? "Rejected (Safe)" : "Approved (Dangerous)", outcome: isReject ? "Success" : "Funds Lost" });
+            if (isReject) { feedback.textContent = "CRISIS AVERTED. The addresses did not match. You saved the company funds."; feedback.className = "text-sm font-bold mt-4 text-center min-h-[20px] text-green-600"; sfx.success(); } 
+            else { feedback.textContent = "FATAL ERROR. The last character was different ('n' vs 'u'). Funds lost."; feedback.className = "text-sm font-bold mt-4 text-center min-h-[20px] text-red-600"; sfx.error(); }
+        }
+
+        // PAGE 21: HISTORY MODAL LOGIC
+        const historyData = {
+            'pizza': { title: "The Bitcoin Pizza", text: "On May 22, 2010, Laszlo Hanyecz paid 10,000 BTC for two Papa John's pizzas. At the time, it was worth about $41. Today, those pizzas would be worth over $700 Million.", lesson: "Understand the asset you are holding. Spending a deflationary asset on consumables is the most expensive mistake you can make.", icon: "pizza", color: "text-orange-500" },
+            'drive': { title: "Buried Treasure", text: "James Howells accidentally threw away a hard drive containing the private keys to 8,000 BTC. He has spent a decade petitioning the city council to let him excavate the landfill. They refuse.", lesson: "Physical security is paramount. A private key is not 'in the cloud.' If the device holding it is destroyed, the wealth is gone forever.", icon: "hard-drive", color: "text-blue-500" },
+            'fee': { title: "The Fat Finger Error", text: "In 2021, an exchange (Bitfinex) accidentally paid $23.7 Million in transaction fees to send just $100k of ETH. It was a simple typo in the software configuration.", lesson: "There is no 'Undo' button. Automation must be double-checked. Precision is not optional in a system where code is law.", icon: "mouse-pointer-click", color: "text-green-500" }
+        };
+
+        window.showHistoryModal = function(key) {
+            const data = historyData[key];
+            const modal = document.getElementById('history-modal');
+            const iconContainer = document.getElementById('history-icon-container');
+            document.getElementById('history-title').textContent = data.title;
+            document.getElementById('history-text').textContent = data.text;
+            document.getElementById('history-lesson').textContent = data.lesson;
+            iconContainer.innerHTML = `<i data-lucide="${data.icon}" class="${data.color}"></i>`;
+            modal.classList.remove('hidden-modal'); modal.classList.add('visible-modal'); sfx.nav(); lucide.createIcons();
+        }
+
+        window.closeHistoryModal = function() {
+            const modal = document.getElementById('history-modal');
+            modal.classList.remove('visible-modal'); modal.classList.add('hidden-modal');
+        }
+
+        // PAGE 22: MARKET
+        window.marketDecision = function(choice) {
+            const feedback = document.getElementById('market-feedback');
+            document.getElementById('crash-bar').classList.remove('bg-red-400', 'animate-pulse');
+            if (choice === 'panic') { feedback.textContent = "You sold at the bottom. The company locked in a 20% loss."; feedback.classList.remove('text-green-600'); feedback.classList.add('text-red-500'); sfx.error(); document.getElementById('crash-bar').classList.add('bg-red-600'); } 
+            else { feedback.textContent = "You held firm. 3 months later, price recovered."; feedback.classList.remove('text-red-500'); feedback.classList.add('text-green-600'); sfx.success(); document.getElementById('crash-bar').classList.add('bg-green-500'); const crashBar = document.getElementById('crash-bar'); crashBar.style.transition = 'height 1.5s ease-out'; setTimeout(() => { crashBar.style.height = '88%'; }, 100); }
+            document.getElementById('btn-panic').disabled = true; document.getElementById('btn-hodl').disabled = true;
+        }
+
+        // --- PAGE 24: FINAL EXAM LOGIC ---
+        const examQuestions = [
+            { title: "The Urgent Email", scenario: "You receive an email from 'Metamask Security' claiming your wallet is compromised. They ask you to reply with your 12-word seed phrase to 'verify ownership' and secure your funds.", options: [ { text: "Reply immediately to secure the funds.", correct: false, feedback: "FAIL. Legitimate support teams will NEVER ask for your seed phrase. This is a classic phishing attack." }, { text: "Ignore the email.", correct: true, feedback: "CORRECT. This is a phishing attempt. No company needs your private keys to check security status." }, { text: "Click the link to check the status.", correct: false, feedback: "FAIL. Clicking unknown links in crypto emails can install malware or keyloggers on your device." } ] },
+            { title: "The 'Guaranteed' 100x", scenario: "An influencer invites you to a Telegram group for a new coin called 'SafeMoonMars'. They promise a guaranteed 100x return within 24 hours.", options: [ { text: "Invest $100 just in case.", correct: false, feedback: "FAIL. 'Guaranteed' returns are the hallmark of a scam. This is likely a Rug Pull waiting to happen." }, { text: "Research the team and utility first.", correct: true, feedback: "CORRECT. Always Do Your Own Research (DYOR). Hype is not a fundamental metric." }, { text: "Borrow money to invest maximum amount.", correct: false, feedback: "FAIL. Never invest money you cannot afford to lose, especially on speculative assets." } ] },
+            { title: "Cold Storage Backup", scenario: "You have moved the corporate Bitcoin to a Hardware Wallet. You need to store the backup paper seed phrase.", options: [ { text: "Take a photo and save to cloud.", correct: false, feedback: "FAIL. Cloud photos can be hacked. Your keys must remain air-gapped (offline)." }, { text: "Store it in a fireproof physical safe.", correct: true, feedback: "CORRECT. Physical security is the only way to protect a non-digital key." }, { text: "Save it in a password manager.", correct: false, feedback: "FAIL. If your computer is compromised, the hacker gets your passwords and your crypto." } ] },
+            { title: "The Transaction", scenario: "You are authorized to send $50,000 worth of BTC to a new exchange account. The Board wants it done fast.", options: [ { text: "Send full amount immediately.", correct: false, feedback: "FAIL. If the address is wrong, the company loses $50k instantly. High risk." }, { text: "Send a $10 test transaction first.", correct: true, feedback: "CORRECT. Always verify receipt with a small amount before sending the treasure." }, { text: "Ask a friend to check the address.", correct: false, feedback: "FAIL. Trustless systems require YOU to verify, not third parties." } ] },
+            { title: "Market Crash", scenario: "You bought BTC at $60k. A week later, bad news hits and it drops to $45k (-25%). The fundamentals of the protocol haven't changed.", options: [ { text: "Panic sell to stop the bleeding.", correct: false, feedback: "FAIL. You just realized a loss based on emotion. Panic selling destroys wealth." }, { text: "Double down with leverage.", correct: false, feedback: "FAIL. Trading with leverage during volatility is gambling, not investing." }, { text: "Hold the thesis (HODL).", correct: true, feedback: "CORRECT. Volatility is the price of performance. If the thesis is sound, you wait." } ] },
+            { title: "The 'Generous' Giveaway", scenario: "A YouTube livestream features Elon Musk promising to double any Bitcoin sent to a specific address.", options: [ { text: "Send immediately! It's live!", correct: false, feedback: "FAIL. This is a classic 'doubling' scam using deepfake video loops." }, { text: "Recognize no one gives money for free.", correct: true, feedback: "CORRECT. If it sounds too good to be true, it is. There is no free lunch in crypto." }, { text: "Check his official Twitter.", correct: false, feedback: "FAIL. Even verified accounts get hacked. The premise itself is the red flag." } ] },
+            { title: "Compliance", scenario: "The company made a $5,000 profit trading crypto this quarter.", options: [ { text: "Don't report it. Crypto is anon.", correct: false, feedback: "FAIL. Blockchains are public ledgers. Tax evasion is a crime and puts the company at risk." }, { text: "Move it to a privacy coin to hide it.", correct: false, feedback: "FAIL. Attempting to obfuscate funds is money laundering. High legal risk." }, { text: "Report it as capital gains.", correct: true, feedback: "CORRECT. Operating in the light allows you to build wealth legally and sustainably." } ] }
+        ];
+
+        let quizIndex = 0;
+        let quizScore = 0;
+        let examPassed = false;
+        let answerLog = [];
+
+        window.loadQuestion = function() {
+            const q = examQuestions[quizIndex];
+            document.getElementById('quiz-progress-text').textContent = `Question ${quizIndex + 1} of ${examQuestions.length}`;
+            document.getElementById('quiz-scenario-title').textContent = q.title;
+            document.getElementById('quiz-scenario-text').textContent = q.scenario;
+            const optsDiv = document.getElementById('quiz-options');
+            optsDiv.innerHTML = '';
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 border border-gray-200 rounded text-sm hover:bg-gray-50 hover:border-allgood-secondary transition-all font-body flex items-center group";
+                btn.innerHTML = `<div class="w-4 h-4 rounded-full border border-gray-300 mr-3 group-hover:border-allgood-secondary flex-shrink-0"></div><span>${opt.text}</span>`;
+                btn.onclick = () => window.selectAnswer(idx, btn);
+                optsDiv.appendChild(btn);
+            });
+            document.getElementById('quiz-question-block').classList.remove('hidden');
+            document.getElementById('quiz-feedback-block').classList.add('hidden');
+            document.getElementById('quiz-next-btn').classList.add('hidden'); 
+        }
+
+        window.selectAnswer = function(idx, btnEl) {
+            const allBtns = document.getElementById('quiz-options').querySelectorAll('button');
+            allBtns.forEach(b => { b.disabled = true; b.classList.add('opacity-60', 'cursor-not-allowed'); });
+
+            const q = examQuestions[quizIndex];
+            const isCorrect = q.options[idx].correct;
+            const selectedText = q.options[idx].text;
+            answerLog.push({ question: q.title, selected: selectedText, isCorrect: isCorrect });
+            
+            btnEl.classList.remove('opacity-60');
+            if(isCorrect) { btnEl.classList.add('bg-green-50', 'border-green-500'); btnEl.querySelector('div').classList.add('bg-green-500', 'border-green-500'); quizScore++; sfx.success(); document.getElementById('quiz-feedback-icon').innerHTML = `<i data-lucide="check-circle" class="w-6 h-6 text-green-600"></i>`; document.getElementById('quiz-feedback-title').textContent = "Correct"; document.getElementById('quiz-feedback-title').className = "block text-sm font-bold mb-1 text-green-700"; } 
+            else { btnEl.classList.add('bg-red-50', 'border-red-500'); btnEl.querySelector('div').classList.add('bg-red-500', 'border-red-500'); sfx.error(); document.getElementById('quiz-feedback-icon').innerHTML = `<i data-lucide="x-circle" class="w-6 h-6 text-red-600"></i>`; document.getElementById('quiz-feedback-title').textContent = "Incorrect"; document.getElementById('quiz-feedback-title').className = "block text-sm font-bold mb-1 text-red-700"; }
+
+            document.getElementById('quiz-feedback-text').textContent = q.options[idx].feedback;
+            document.getElementById('quiz-feedback-block').classList.remove('hidden');
+            document.getElementById('quiz-next-btn').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        window.nextQuestion = function() {
+            quizIndex++;
+            if (quizIndex < examQuestions.length) { loadQuestion(); } else { window.showFinalResult(); }
+            sfx.nav();
+        }
+
+        window.showFinalResult = function() {
+            document.getElementById('quiz-question-block').classList.add('hidden');
+            document.getElementById('quiz-feedback-block').classList.add('hidden');
+            document.getElementById('quiz-progress-text').textContent = "Assessment Complete";
+            
+            const resultBlock = document.getElementById('quiz-result-block');
+            const title = document.getElementById('quiz-result-title');
+            const text = document.getElementById('quiz-result-text');
+            const icon = document.getElementById('quiz-result-icon');
+            const actions = document.getElementById('quiz-result-actions');
+            resultBlock.classList.remove('hidden');
+
+            const status = quizScore >= 6 ? "Pass" : "Fail";
+            const percentage = Math.round((quizScore/7)*100);
+            
+            // LOG FINAL EXAM TO FIRESTORE
+            window.SessionManager.log("Certification", "Final Exam Completed", { status: status, score: `${quizScore}/7`, percentage: percentage, detailedAnswers: answerLog });
+
+            if (quizScore >= 6) {
+                examPassed = true;
+                icon.innerHTML = `<div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mx-auto"><i data-lucide="award" class="w-8 h-8"></i></div>`;
+                title.textContent = "Mission Accomplished";
+                text.textContent = `You scored ${quizScore}/7. You have demonstrated the pragmatic mindset required to defend digital assets.`;
+                actions.innerHTML = `<button onclick="goToCertification()" class="bg-allgood-primary hover:bg-allgood-hover text-white px-6 py-3 rounded font-bold shadow-lg transition-transform hover:scale-105">Access Certification</button>`;
+                sfx.success();
+                document.getElementById('next-button').style.display = 'flex'; 
+            } else {
+                examPassed = false;
+                icon.innerHTML = `<div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600 mx-auto"><i data-lucide="alert-triangle" class="w-8 h-8"></i></div>`;
+                title.textContent = "Deployment Failed";
+                text.textContent = `You scored ${quizScore}/7. The Treasury cannot be risked with this error rate. Review the intel and try again.`;
+                actions.innerHTML = `<button onclick="retryExam()" class="bg-gray-800 hover:bg-gray-900 text-white px-6 py-3 rounded font-bold shadow transition-colors">Retry Assessment</button>`;
+                sfx.error();
+                document.getElementById('next-button').style.display = 'none'; 
+            }
+            lucide.createIcons();
+        }
+
+        window.retryExam = function() {
+            quizIndex = 0; quizScore = 0; answerLog = [];
+            document.getElementById('quiz-result-block').classList.add('hidden');
+            window.loadQuestion();
+        }
+
+        window.goToCertification = function() {
+            const nextBtn = document.getElementById('next-button');
+            if (currentPageIndex < totalPages - 1) { nextBtn.click(); }
+        }
+
+        window.downloadBadge = function() {
+            if (!examPassed) { sfx.error(); return; }
+            
+            const nameText = (window.currentUserName && window.currentUserName !== "Anonymous") ? window.currentUserName.toUpperCase() : "TRAVELER";
+            const badgeSVG = `<svg width="600" height="350" viewBox="0 0 600 350" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#2d2d2d;stop-opacity:1" /><stop offset="50%" style="stop-color:#1a1a1a;stop-opacity:1" /><stop offset="100%" style="stop-color:#000000;stop-opacity:1" /></linearGradient></defs><rect x="10" y="10" width="580" height="330" rx="20" fill="url(#metalGrad)" stroke="#444" stroke-width="2"/><rect x="50" y="50" width="500" height="180" rx="8" fill="#0f172a" stroke="#334155" stroke-width="2"/><text x="70" y="90" font-family="Courier New, monospace" font-size="14" fill="#D34716" font-weight="bold">PROTOCOL: VERIFIED</text><text x="70" y="140" font-family="Verdana, sans-serif" font-size="24" fill="white" font-weight="bold">${nameText}</text><text x="70" y="170" font-family="Verdana, sans-serif" font-size="14" fill="#94a3b8">DIGITAL ASSET DEFENSE</text><text x="70" y="210" font-family="Courier New, monospace" font-size="10" fill="#357889">0x7f8...a9b2 [PRAGMATIC ACTION BADGE SECURED]</text><circle cx="500" cy="140" r="30" fill="none" stroke="#D34716" stroke-width="3" opacity="0.5"/><path d="M 500 120 L 500 160 M 480 140 L 520 140" stroke="#D34716" stroke-width="2" opacity="0.5"/><rect x="50" y="260" width="120" height="60" rx="30" fill="#333" /><circle cx="80" cy="290" r="10" fill="#111" stroke="#555" stroke-width="2"/><circle cx="140" cy="290" r="10" fill="#111" stroke="#555" stroke-width="2"/><text x="420" y="300" font-family="Georgia, serif" font-size="16" fill="#666" text-anchor="end">ALLGOOD ACADEMY</text><rect x="440" y="285" width="110" height="20" rx="4" fill="#D34716"/><text x="495" y="300" font-family="Verdana, sans-serif" font-size="10" fill="white" text-anchor="middle" font-weight="bold">KEY HOLDER</text></svg>`;
+
+            // FIRE THE SIGNAL (Now passing the SVG)
+            window.logModuleCompletion(badgeSVG);
+            
+            window.SessionManager.log("Badge Downloaded", "Certification Earned");
+            
+            const blob = new Blob([badgeSVG], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a'); link.href = url; link.download = `Allgood-Badge-${nameText}.svg`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+            sfx.nav();
+            const downloadBtn = document.getElementById('download-badge-btn');
+            if(downloadBtn) { downloadBtn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover'); downloadBtn.classList.add('bg-green-600', 'hover:bg-green-700'); downloadBtn.innerHTML = `<i data-lucide="check" class="w-4 h-4 mr-2"></i>Badge Saved`; lucide.createIcons(); }
+        };
+
+        let currentRating = 0;
+        window.setRating = function(n) { currentRating = n; for (let i = 1; i <= 5; i++) { const star = document.getElementById(`star-${i}`); if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); } } sfx.tick(); }
+        window.submitFeedback = function() { const feedbackText = document.getElementById('feedback-text').value; const ratingDetail = currentRating > 0 ? `${currentRating}/5 Stars` : "No Rating"; window.SessionManager.log("Session Completed", ratingDetail, { feedbackComment: feedbackText }); document.getElementById('feedback-container').classList.add('hidden'); document.getElementById('feedback-success').classList.remove('hidden'); sfx.nav(); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            lucide.createIcons();
+            
+            const startupScreen = document.getElementById('startup-screen');
+            if (startupScreen) {
+                const warmUp = () => initAudio();
+                startupScreen.addEventListener('mousedown', warmUp, { once: true });
+                startupScreen.addEventListener('touchstart', warmUp, { once: true });
+                startupScreen.addEventListener('click', () => {
+                    sfx.powerOn();
+                    
+                    if (window.currentUser) {
+                        // User exists (SSO/Auth)?
+                        // Log Session Start immediately
+                        window.SessionManager.start(window.currentUserName, window.currentUserEmail);
+                        
+                        // Reveal Page 1 immediately
+                        window.showPage(0);
+                        // Fade out Startup Screen
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    } else {
+                        // No user (Direct Link)?
+                        // Show Modal *over* current view
+                        const loginModal = document.getElementById('login-modal');
+                        if (loginModal) {
+                            loginModal.classList.remove('hidden-modal');
+                            loginModal.classList.add('visible-modal');
+                        }
+                        // Fade out Startup Screen (revealing modal + obscured page 1)
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    }
+                });
+            }
+
+            document.body.addEventListener('click', (e) => {
+                const target = e.target;
+                const accBtn = target.closest('.accordion-toggle');
+                if (accBtn) { const content = accBtn.nextElementSibling; const icon = accBtn.querySelector('.accordion-icon'); const isOpen = !content.classList.contains('hidden'); document.querySelectorAll('.accordion-content').forEach(c => c.classList.add('hidden')); document.querySelectorAll('.accordion-icon').forEach(i => i.classList.remove('rotate-180')); if (!isOpen) { content.classList.remove('hidden'); if(icon) icon.classList.add('rotate-180'); sfx.tick(); } return; }
+                if (target.closest('#blueprint-toggle')) { document.getElementById('screen').classList.toggle('blueprint-mode'); const btn = document.getElementById('blueprint-toggle'); if (document.getElementById('screen').classList.contains('blueprint-mode')) { btn.classList.add('text-cyan-300', 'bg-white/10'); } else { btn.classList.remove('text-cyan-300', 'bg-white/10'); } sfx.tick(); return; }
+                if (target.closest('#fullscreen-toggle')) { const frame = document.querySelector('.tablet-frame'); const btn = document.getElementById('fullscreen-toggle'); frame.classList.toggle('focus-mode'); const isFocus = frame.classList.contains('focus-mode'); if (isFocus) { document.body.classList.add('is-focused'); if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(e=>{}); btn.classList.add('text-green-300', 'bg-white/10'); } else { document.body.classList.remove('is-focused'); if (document.exitFullscreen) document.exitFullscreen().catch(e=>{}); btn.classList.remove('text-green-300', 'bg-white/10'); } sfx.tick(); return; }
+                if (target.closest('#menu-toggle')) { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); return; }
+                if (target.closest('#close-menu')) { document.getElementById('menu-modal').classList.add('hidden-modal'); document.getElementById('menu-modal').classList.remove('visible-modal'); return; }
+                const link = target.closest('.menu-link'); if (link) { const idx = parseInt(link.dataset.page); window.showPage(idx); return; }
+            });
+
+            // Navigation Logic
+            const pages = document.querySelectorAll('.page');
+            const nextButton = document.getElementById('next-button');
+            const backButton = document.getElementById('back-button');
+
+            window.showPage = function(index) {
+                if (index < 0 || index >= pages.length) return;
+                pages.forEach(p => p.classList.remove('active'));
+                pages[index].classList.add('active');
+                currentPageIndex = index;
+                pages[index].scrollTop = 0;
+
+                const indicator = document.getElementById('header-page-indicator');
+                if(indicator) indicator.textContent = `${currentPageIndex + 1} / ${totalPages}`;
+
+                if (currentPageIndex === 0) { backButton.disabled = true; backButton.classList.add('opacity-0'); } 
+                else { backButton.disabled = false; backButton.classList.remove('opacity-0'); }
+
+                const nextSpan = nextButton.querySelector('span');
+                if (currentPageIndex === 23) { 
+                    if (!examPassed) { nextButton.style.display = 'none'; } else { nextButton.style.display = 'flex'; }
+                    if(document.getElementById('quiz-options').children.length === 0) { window.loadQuestion(); }
+                } else { nextButton.style.display = 'flex'; }
+
+                if (nextSpan) {
+                    if (currentPageIndex === totalPages - 2) { nextSpan.textContent = 'Finish'; nextButton.style.display = 'flex'; } 
+                    else if (currentPageIndex === totalPages - 1) { nextButton.style.display = 'none'; setTimeout(() => { const cs = document.getElementById('certification-section'); if(cs) { cs.classList.remove('scale-95', 'opacity-0'); cs.classList.add('scale-100', 'opacity-100'); } }, 500); } 
+                    else { nextSpan.textContent = 'Next'; nextButton.style.display = 'flex'; }
+                }
+                
+                if (currentPageIndex === 23 && !examPassed) { nextButton.style.display = 'none'; }
+
+                const progressBar = document.getElementById('flex-progress-fill');
+                if (progressBar) progressBar.style.width = `${((currentPageIndex + 1) / totalPages) * 100}%`;
+                
+                document.getElementById('menu-modal').classList.add('hidden-modal');
+                document.getElementById('menu-modal').classList.remove('visible-modal');
+                lucide.createIcons();
+                sfx.nav();
+            }
+
+            document.getElementById('home-button').addEventListener('click', () => window.showPage(0));
+            nextButton.addEventListener('click', () => { if (currentPageIndex < totalPages - 1) { window.showPage(currentPageIndex + 1); } });
+            backButton.addEventListener('click', () => { if (currentPageIndex > 0) { window.showPage(currentPageIndex - 1); } });
+
+            // --- SYSTEM FUNCTIONS (UPDATED) ---
+            window.closeSystemMenu = () => { document.getElementById('system-menu-modal').classList.add('hidden-modal'); document.getElementById('system-menu-modal').classList.remove('visible-modal'); }
+            window.handleSystemExit = () => { window.location.href = "https://www.allgoodacademy.com"; }
+            window.handleLogOut = async () => {
+                 if (window.authSignOut) await window.authSignOut();
+                 localStorage.clear();
+                 window.currentUserName = "Anonymous";
+                 window.currentUserEmail = "";
+                 
+                 // Reset inputs if they exist
+                 const nameInput = document.getElementById('user-name-input');
+                 if(nameInput) nameInput.value = "";
+                 const emailInput = document.getElementById('user-email-input');
+                 if(emailInput) emailInput.value = "";
+                 
+                 window.closeSystemMenu();
+                 document.getElementById('startup-screen').style.display = 'flex';
+                 setTimeout(() => document.getElementById('startup-screen').style.opacity = '1', 10);
+                 window.showPage(0);
+                 
+                 // Show login modal
+                 document.getElementById('login-modal').classList.remove('hidden-modal');
+                 document.getElementById('login-modal').classList.add('visible-modal');
+                 
+                 sfx.powerOff();
+            }
+
+            // Home Long Press
+            const homeBtn = document.getElementById('home-button');
+            let pressTimer;
+            const startPress = () => { pressTimer = setTimeout(() => { 
+                document.getElementById('system-menu-modal').classList.remove('hidden-modal'); 
+                document.getElementById('system-menu-modal').classList.add('visible-modal'); 
+                sfx.nav(); 
+            }, 2000); };
+            const endPress = () => clearTimeout(pressTimer);
+            
+            homeBtn.addEventListener('mousedown', () => {
+                // Short click logic handled by standard listener, long press logic here
+                startPress();
+            });
+            homeBtn.addEventListener('touchstart', (e) => { 
+                // Don't prevent default immediately or clicks might fail
+                startPress(); 
+            }, {passive: true});
+            
+            homeBtn.addEventListener('mouseup', endPress);
+            homeBtn.addEventListener('mouseleave', endPress);
+            homeBtn.addEventListener('touchend', endPress);
+
+            window.showPage(0);
+            
+            // Re-init specific modules if needed
+            window.initSlider();
+            window.initSeeds();
+        });
+    </script>
+</body>
+</html>

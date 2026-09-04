@@ -7,8 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- FIREBASE AND AUTHENTICATION SETUP -->
     <script type="module">
@@ -274,7 +272,7 @@
                     },
                     fontFamily: {
                         'heading': ['Georgia', 'serif'],
-                        'body': ['Inter', 'Verdana', 'sans-serif'],
+                        'body': ['Verdana', 'sans-serif'],
                     },
                 },
             },
@@ -283,8 +281,10 @@
 
     <style>
         body { 
-            font-family: 'Inter', Verdana, sans-serif; 
-            background: linear-gradient(135deg, #eef2f3 0%, #dde4e6 100%);
+            font-family: Verdana, sans-serif; 
+            background-color: #1a1a1a; 
+            background-image: url("https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+            background-size: cover; background-position: center; background-attachment: fixed;
             min-height: 100vh; margin: 0; padding: 0;
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
         }
@@ -292,30 +292,27 @@
         input, textarea { -webkit-user-select: text; user-select: text; }
         h1, h2, h3, h4 { font-family: Georgia, serif; }
 
-        /* App shell replaces the old tablet-frame + screen-container pairing.
-           Full-bleed, edge to edge, at every screen size. */
-        .app-shell {
-            width: 100%;
-            height: 100dvh;
-            background-color: #F7F7F7;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+        .tablet-frame {
+            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
         }
+        .tablet-frame::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border-radius: 6px; background: #111; z-index: 0; }
+        .screen-container { width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1; overflow: hidden; display: flex; flex-direction: column; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
 
         .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
         .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
         .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-        .page::-webkit-scrollbar, .hud-scroll::-webkit-scrollbar { width: 10px; }
-        .page::-webkit-scrollbar-track, .hud-scroll::-webkit-scrollbar-track { background: transparent; }
-        .page::-webkit-scrollbar-thumb, .hud-scroll::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; }
+        .page::-webkit-scrollbar, .hud-scroll::-webkit-scrollbar { width: 14px; }
+        .page::-webkit-scrollbar-track, .hud-scroll::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        .page::-webkit-scrollbar-thumb, .hud-scroll::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
 
         #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
         #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
 
-        .choice-btn { background-color: #FFFFFF; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s ease; }
+        .choice-btn { background-color: #FFFFFF; border: 2px solid #E5E7EB; transition: all 0.2s ease; }
         .choice-btn:hover:not(:disabled) { border-color: #357889; background-color: #F9FAFB; }
         .choice-correct { background-color: #D1FAE5 !important; border-color: #10B981 !important; font-weight: bold; }
         .choice-less-effective { background-color: #FFFBEB !important; border-color: #FBBF24 !important; font-weight: 600; }
@@ -333,20 +330,16 @@
         .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
         .blueprint-mode .choice-btn { background-color: #1e293b !important; border-color: #334155 !important; }
         
-        /* Flex children default to min-height:auto, which stops them from shrinking below their
-           content size — this is what let tall scenario content push past the fixed app-shell
-           height and create a second outer scrollbar. min-h-0 lets each level shrink and hand
-           scrolling to the one true scroll region (.page-container). */
-        .app-shell, #workstation-wrapper, #workstation-wrapper > main { min-height: 0; }
-        #workstation-wrapper { min-width: 0; }
-
-        /* Focus Mode: collapses the Mission Control sidebar to give the scenario more room */
-        .sidebar-collapsed .hud-sidebar { display: none !important; }
+        .tablet-frame.expanded-mode { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; aspect-ratio: unset !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; z-index: 9999 !important; background: #F7F7F7 !important; box-shadow: none !important; }
+        .tablet-frame.expanded-mode::before { display: none !important; }
+        .tablet-frame.expanded-mode .screen-container { border-radius: 0 !important; }
 
         @media (max-width: 768px) {
             html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
             body > main { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; padding: 0 !important; display: block; }
-            .app-shell { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; max-width: none !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; border: none !important; }
+            .tablet-frame { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #F7F7F7 !important; aspect-ratio: unset !important; transform: none !important; }
+            .tablet-frame::before { display: none !important; }
+            .screen-container { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; border-radius: 0 !important; box-shadow: none !important; display: flex; flex-direction: column; background: #F7F7F7; overflow: hidden; }
             header.navbar-content { flex-shrink: 0; padding-top: max(env(safe-area-inset-top), 12px); height: auto; min-height: 60px; padding-bottom: 12px; z-index: 50; }
             footer.footer-content { display: none !important; }
             .page-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -356,8 +349,9 @@
 </head>
 <body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
 
-    <main class="flex-grow flex items-center justify-center h-[100dvh] w-full">
-        <div class="app-shell" id="screen">
+    <main class="flex-grow flex items-center justify-center py-0 md:py-8 h-[100dvh] w-full">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
 
                 <!-- 1. STARTUP SCREEN -->
                 <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
@@ -418,7 +412,7 @@
                             <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Reset"><i data-lucide="home" class="w-6 h-6"></i></button>
                             <div class="h-6 w-px bg-white/20 mx-1"></div>
                             <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="moon" class="w-5 h-5"></i></button>
-                            <button id="fullscreen-toggle" title="Focus Mode" class="hidden sm:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="panel-left-close" class="w-5 h-5"></i></button>
+                            <button id="fullscreen-toggle" class="hidden sm:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="maximize" class="w-5 h-5"></i></button>
                             
                             <!-- THE MESSAGING PORTAL BUTTON -->
                             <button id="message-toggle" onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ">
@@ -435,7 +429,7 @@
                 </header>
 
                 <!-- WORKSTATION SPLIT LAYOUT WRAPPER -->
-                <div id="workstation-wrapper" class="flex-1 flex overflow-hidden w-full relative">
+                <div class="flex-1 flex overflow-hidden w-full relative">
                     
                     <!-- HUD SIDEBAR (Mission Control) - Desktop Only -->
                     <aside class="hud-sidebar w-64 md:w-72 bg-white border-r border-gray-200 hidden md:flex flex-col z-20 shadow-[2px_0_10px_rgba(0,0,0,0.05)] hud-panel shrink-0">
@@ -519,7 +513,7 @@
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
                                                 <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
-                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600"><i data-lucide="panel-left-close" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Collapse Mission Control to give the scenario more room (desktop).</span></div></div>
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
                                                 <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
                                             </div>
                                         </div>
@@ -569,18 +563,45 @@
                                                 <h3 class="font-bold text-green-800 text-sm">Feedback Received.</h3>
                                             </div>
 
-                                            <button id="init-eval-btn" onclick="window.showPage(3)" class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-md transition-colors uppercase tracking-wide text-xs cursor-not-allowed" disabled>Initialize Evaluation (Locked)</button>
+                                            <button id="init-eval-btn" onclick="window.showPage(32)" class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-md transition-colors uppercase tracking-wide text-xs cursor-not-allowed" disabled>Initialize Evaluation (Locked)</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Continuous-scroll feed: all scenarios in the active category render here, unlocking in sequence -->
-                            <div class="page" id="page-scenario-feed">
-                                <div id="scenario-feed-container" class="max-w-2xl mx-auto pb-16"></div>
-                            </div>
+                            <!-- Dynamic Scenario Pages (3-32) -->
+                            <div class="page" id="page-3" data-scenario-index="1"></div>
+                            <div class="page" id="page-4" data-scenario-index="2"></div>
+                            <div class="page" id="page-5" data-scenario-index="3"></div>
+                            <div class="page" id="page-6" data-scenario-index="4"></div>
+                            <div class="page" id="page-7" data-scenario-index="5"></div>
+                            <div class="page" id="page-8" data-scenario-index="6"></div>
+                            <div class="page" id="page-9" data-scenario-index="7"></div>
+                            <div class="page" id="page-10" data-scenario-index="8"></div>
+                            <div class="page" id="page-11" data-scenario-index="9"></div>
+                            <div class="page" id="page-12" data-scenario-index="10"></div>
+                            <div class="page" id="page-13" data-scenario-index="11"></div>
+                            <div class="page" id="page-14" data-scenario-index="12"></div>
+                            <div class="page" id="page-15" data-scenario-index="13"></div>
+                            <div class="page" id="page-16" data-scenario-index="14"></div>
+                            <div class="page" id="page-17" data-scenario-index="15"></div>
+                            <div class="page" id="page-18" data-scenario-index="16"></div>
+                            <div class="page" id="page-19" data-scenario-index="17"></div>
+                            <div class="page" id="page-20" data-scenario-index="18"></div>
+                            <div class="page" id="page-21" data-scenario-index="19"></div>
+                            <div class="page" id="page-22" data-scenario-index="20"></div>
+                            <div class="page" id="page-23" data-scenario-index="21"></div>
+                            <div class="page" id="page-24" data-scenario-index="22"></div>
+                            <div class="page" id="page-25" data-scenario-index="23"></div>
+                            <div class="page" id="page-26" data-scenario-index="24"></div>
+                            <div class="page" id="page-27" data-scenario-index="25"></div>
+                            <div class="page" id="page-28" data-scenario-index="26"></div>
+                            <div class="page" id="page-29" data-scenario-index="27"></div>
+                            <div class="page" id="page-30" data-scenario-index="28"></div>
+                            <div class="page" id="page-31" data-scenario-index="29"></div>
+                            <div class="page" id="page-32" data-scenario-index="30"></div>
 
-                            <!-- Page 4 (index 3): Final Score -->
+                            <!-- Page 33: Final Score -->
                             <div class="page bg-white h-full" id="page-33">
                                 <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-3xl font-heading font-bold text-allgood-dark mb-2 mt-4">Final Readiness Assessment</h2><p class="text-xs font-bold text-allgood-primary uppercase tracking-widest">Your Digital Decisions Score</p></section>
                                 <div id="final-score-content">
@@ -720,6 +741,7 @@
                     </div>
                 </div>
 
+            </div>
         </div>
     </main>
 
@@ -760,7 +782,7 @@
         // --- GLOBAL APP VARIABLES ---
         let currentUserName = "Anonymous";
         let currentPageIndex = 0; 
-        const TOTAL_PAGES = 4; // 0=cover, 1=launchpad, 2=scenario feed, 3=final score
+        const TOTAL_PAGES = 33; 
         const TOTAL_SCENARIOS = 30;
         const MAX_SCORE = 90; 
         const BADGE_THRESHOLD = 80;
@@ -770,12 +792,10 @@
         let currentStarRating = 0;
         window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 
-        // CONTINUOUS SCROLL FEED STATE
+        // RAPID FIRE STATE
         let activeCategory = null;
-        let categoryQueue = []; // array of scenario indices (1-based) for the active category
-        let currentQueueIndex = 0; // position within categoryQueue currently in view / being worked on
-        let feedObserver = null;
-        let lastAnsweredScenario = null;
+        let categoryQueue = [];
+        let currentQueueIndex = 0;
 
         const CATEGORIES = {
             privacy_security: { title: "Privacy & Security", icon: "shield-alert", desc: "Data protection & scam evasion.", color: "bg-cyan-600" },
@@ -979,7 +999,7 @@
                 document.getElementById('metric-integrity').textContent = `${inPct}%`;
                 document.getElementById('bar-integrity').style.width = `${inPct}%`;
                 
-                if (currentPageIndex < 2 || currentPageIndex === 3) {
+                if (currentPageIndex < 2 || currentPageIndex === 32) {
                     document.getElementById('hud-active-mission').textContent = "Standing By";
                     document.getElementById('hud-mission-progress').textContent = "Select a mission to begin.";
                     document.getElementById('mobile-hud-mission').textContent = "Standing By";
@@ -1028,107 +1048,18 @@
                 lucide.createIcons();
             }
 
-            // --- CATEGORY ROUTING / CONTINUOUS SCROLL FEED ---
-            window.startCategory = function(catKey, opts) {
-                opts = opts || {};
+            // --- CATEGORY ROUTING ---
+            window.startCategory = function(catKey) {
                 activeCategory = catKey;
                 categoryQueue = [];
-                SCENARIO_DATA.forEach((s, idx) => { if (s.cat === catKey) categoryQueue.push(idx + 1); }); // scenario indices, 1-based
+                // Collect real page indices for this category (Page 3 is Scen 1, etc.)
+                SCENARIO_DATA.forEach((s, idx) => { if (s.cat === catKey) categoryQueue.push(idx + 2); });
+                
+                // Find first unanswered, or start at 0
+                currentQueueIndex = categoryQueue.findIndex(pageIdx => answeredScenarioScores[pageIdx - 1] === undefined);
+                if(currentQueueIndex === -1) currentQueueIndex = 0; // All answered, review mode
 
-                // Find first unanswered position, or land at the end (review mode) if all done
-                let firstUnansweredPos = categoryQueue.findIndex(sIdx => answeredScenarioScores[sIdx] === undefined);
-                if (firstUnansweredPos === -1) firstUnansweredPos = categoryQueue.length - 1;
-                currentQueueIndex = firstUnansweredPos;
-
-                buildCategoryFeed(firstUnansweredPos, opts.forceUnlockIndex);
-                window.showPage(2);
-
-                // Scroll to a specific scenario if requested (e.g. from the Table of Contents)
-                requestAnimationFrame(() => {
-                    const targetScenario = opts.scrollToScenario || categoryQueue[firstUnansweredPos];
-                    const targetEl = document.getElementById('scenario-block-' + targetScenario);
-                    if (targetEl) targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
-                });
-            }
-
-            // Builds the full vertical feed for the active category: answered scenarios shown read-only,
-            // the next unanswered one active/interactive, everything after it locked until reached.
-            function buildCategoryFeed(firstUnansweredPos, forceUnlockScenario) {
-                const container = document.getElementById('scenario-feed-container');
-                let html = '';
-                categoryQueue.forEach((sIdx, pos) => {
-                    let state;
-                    if (answeredScenarioScores[sIdx] !== undefined) state = 'answered';
-                    else if (pos === firstUnansweredPos || sIdx === forceUnlockScenario) state = 'active';
-                    else state = 'locked';
-                    html += renderScenarioBlockHTML(sIdx, state);
-                });
-                html += `<div id="mission-complete-card" class="${firstUnansweredPos === categoryQueue.length - 1 && answeredScenarioScores[categoryQueue[categoryQueue.length-1]] !== undefined ? '' : 'hidden'} max-w-xl mx-auto bg-white rounded-2xl border-t-4 border-allgood-primary shadow-sm p-8 text-center">
-                    <i data-lucide="check-circle-2" class="w-10 h-10 text-allgood-primary mx-auto mb-3"></i>
-                    <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Mission Complete</h3>
-                    <p class="text-sm text-gray-500 mb-5">You've answered every scenario in this sector.</p>
-                    <button onclick="window.showPage(1)" class="bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 px-6 rounded-full text-xs uppercase tracking-wider shadow-md">Back to Launchpad</button>
-                </div>`;
-                container.innerHTML = html;
-                lucide.createIcons();
-                setupFeedObserver();
-            }
-
-            // Watches which scenario block is in view so the HUD, mobile pill, and Back/Next buttons
-            // stay in sync as the user scrolls — this is what makes scroll a first-class nav method.
-            function setupFeedObserver() {
-                if (feedObserver) feedObserver.disconnect();
-                const scrollRoot = document.querySelector('#page-scenario-feed');
-                feedObserver = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const sIdx = parseInt(entry.target.getAttribute('data-scenario-idx'));
-                            const pos = categoryQueue.indexOf(sIdx);
-                            if (pos !== -1) { currentQueueIndex = pos; updateFeedNav(); }
-                        }
-                    });
-                }, { root: scrollRoot, threshold: 0.5 });
-                document.querySelectorAll('.scenario-block').forEach(el => feedObserver.observe(el));
-            }
-
-            // Refreshes HUD text, mobile pill, and Back/Next button state based on currentQueueIndex —
-            // called whenever the user scrolls to a new scenario, or answers one.
-            function updateFeedNav() {
-                if (!activeCategory) return;
-                const sIdx = categoryQueue[currentQueueIndex];
-                const isAnswered = answeredScenarioScores[sIdx] !== undefined;
-                const hudCatName = CATEGORIES[activeCategory].title;
-
-                document.getElementById('hud-active-mission').textContent = hudCatName;
-                document.getElementById('mobile-hud-mission').textContent = hudCatName;
-                document.getElementById('hud-mission-progress').textContent = `Scenario ${currentQueueIndex + 1} of ${categoryQueue.length}`;
-
-                let btnHtml;
-                if (!isAnswered) {
-                    nextButton.disabled = true;
-                    btnHtml = '<span class="hidden sm:inline">Awaiting Action</span>';
-                } else {
-                    nextButton.disabled = false;
-                    if (currentQueueIndex === categoryQueue.length - 1) {
-                        btnHtml = '<span class="hidden sm:inline">Complete Mission</span><i data-lucide="check" class="w-4 h-4 ml-1"></i>';
-                        nextButton.onclick = () => window.showPage(1);
-                    } else {
-                        btnHtml = '<span class="hidden sm:inline">Next Scenario</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
-                        nextButton.onclick = () => {
-                            const target = unlockScenarioBlock(categoryQueue[currentQueueIndex + 1]);
-                            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        };
-                    }
-                }
-                nextButton.innerHTML = btnHtml;
-
-                const pillText = document.getElementById('pill-text');
-                const pillHints = document.getElementById('pill-hints');
-                if (pillText) {
-                    pillText.textContent = isAnswered ? `Scenario ${currentQueueIndex + 1} of ${categoryQueue.length}` : "Answer above to continue";
-                    if (pillHints) pillHints.style.opacity = isAnswered ? "0.8" : "0.2";
-                }
-                lucide.createIcons();
+                window.showPage(categoryQueue[currentQueueIndex]);
             }
 
             // --- PAGE NAVIGATION ---
@@ -1141,37 +1072,60 @@
                 pages[index].classList.add('active');
                 currentPageIndex = index;
                 pages[index].scrollTop = 0;
-                const pageContainerEl = document.querySelector('.page-container');
-                if (pageContainerEl) pageContainerEl.scrollTop = 0;
 
                 backButton.disabled = (index === 0);
                 backButton.classList.toggle('opacity-0', index === 0);
 
                 let btnHtml = '<span class="hidden sm:inline">Next</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
+                let isAnswered = false;
 
+                // BUTTON & HUD ROUTING LOGIC
                 if (index === 0) {
                     btnHtml = '<span class="hidden sm:inline">Start Challenge</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
-                    nextButton.style.display = 'flex';
                     nextButton.onclick = () => window.showPage(1);
                     nextButton.disabled = false;
-                    nextButton.innerHTML = btnHtml;
                 } else if (index === 1) {
                     renderLaunchpad();
                     nextButton.style.display = 'none'; // Hide next on launchpad
-                } else if (index === 2) {
-                    nextButton.style.display = 'flex';
-                    updateFeedNav();
-                } else if (index === 3) {
+                } else if (index === 32) {
                     btnHtml = '<span class="hidden sm:inline">Dashboard</span><i data-lucide="layout-grid" class="w-4 h-4 ml-1"></i>';
                     nextButton.style.display = 'flex';
-                    nextButton.disabled = false;
                     nextButton.onclick = () => {
                         window.location.href = 'https://www.allgoodacademy.com';
                     };
-                    nextButton.innerHTML = btnHtml;
                     if(window.updateFinalScorePage) window.updateFinalScorePage();
+                } else if (index >= 2) {
+                    nextButton.style.display = 'flex';
+                    const scenarioIndex = index - 1;
+                    isAnswered = answeredScenarioScores[scenarioIndex] !== undefined;
+
+                    // HUD Updates
+                    if(activeCategory) {
+                        const hudCatName = CATEGORIES[activeCategory].title;
+                        document.getElementById('hud-active-mission').textContent = hudCatName;
+                        document.getElementById('mobile-hud-mission').textContent = hudCatName;
+                        document.getElementById('hud-mission-progress').textContent = `Scenario ${currentQueueIndex + 1} of ${categoryQueue.length}`;
+                    }
+
+                    if (!isAnswered) {
+                        nextButton.disabled = true;
+                        btnHtml = '<span class="hidden sm:inline">Awaiting Action</span>';
+                    } else {
+                        nextButton.disabled = false;
+                        if (currentQueueIndex === categoryQueue.length - 1) {
+                            btnHtml = '<span class="hidden sm:inline">Complete Mission</span><i data-lucide="check" class="w-4 h-4 ml-1"></i>';
+                            nextButton.onclick = () => window.showPage(1); // Go to Launchpad
+                        } else {
+                            btnHtml = '<span class="hidden sm:inline">Next Scenario</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
+                            nextButton.onclick = () => {
+                                currentQueueIndex++;
+                                window.showPage(categoryQueue[currentQueueIndex]);
+                            };
+                        }
+                    }
                 }
 
+                nextButton.innerHTML = btnHtml;
                 updateProgress();
                 updateHUDDisplay();
 
@@ -1181,8 +1135,16 @@
                 if (pillText) {
                     if (index === 0) pillText.textContent = "Swipe left to begin";
                     else if (index === 1) pillText.textContent = "Select a mission";
-                    else if (index === 3) pillText.textContent = "Mission Complete";
-                    else if (index === 2 && pillHints) pillHints.style.opacity = "0.2";
+                    else if (index === 32) pillText.textContent = "Mission Complete";
+                    else if (activeCategory) {
+                        pillText.textContent = `Scenario ${currentQueueIndex + 1} of ${categoryQueue.length}`;
+                        if (!isAnswered) {
+                            pillText.textContent = "Awaiting Action";
+                            pillHints.style.opacity = "0.2";
+                        } else {
+                            pillHints.style.opacity = "0.8";
+                        }
+                    }
                 }
 
                 lucide.createIcons();
@@ -1226,144 +1188,225 @@
             // --- SCENARIO LOGIC ---
             function getScenarioTemplate(type, title, icon, choicesHtml, feedbackHtml) {
                 const cleanText = title.split(" Question:")[0];
+                const deskStyleMobile = `background-image: radial-gradient(#cfc8c2 2px, transparent 2px), radial-gradient(#cfc8c2 2px, transparent 2px); background-color: #f0ebe6; background-position: 0 0, 10px 10px; background-size: 20px 20px;`;
+                const deskStyleDesktop = `background-image: linear-gradient(135deg, #e2e8f0 25%, #cbd5e1 25%, #cbd5e1 50%, #e2e8f0 50%, #e2e8f0 75%, #cbd5e1 75%, #cbd5e1 100%); background-size: 40px 40px;`;
 
-                // The interactive card ALWAYS sits below the scene, at a comfortable reading width.
-                // Nothing interactive lives inside the small device mockups anymore — that was
-                // what forced a scrollbar inside a 280px-wide box. Now there's exactly one scroll
-                // region (the page itself), and the mockups are purely decorative context.
-                const answerCard = `
-                    <div class="max-w-xl mx-auto mt-5 bg-white rounded-2xl border border-gray-200 shadow-sm p-5 sm:p-6">
-                        <p class="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-3">Select Response</p>
-                        <div class="space-y-2">${choicesHtml}</div>
-                        ${feedbackHtml ? `<div class="mt-4">${feedbackHtml}</div>` : ''}
-                    </div>`;
-
-                let sceneHtml = '';
+                const choicesWrapper = `<div class="mt-2 pt-2 border-t border-slate-100"><p class="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-1">Select Response:</p><div class="space-y-1">${choicesHtml}</div></div>`;
+                const feedbackWrapper = feedbackHtml ? `<div class="mt-2 animate-fade-in">${feedbackHtml}</div>` : '';
 
                 if (type === 'chat') {
-                    sceneHtml = `
-                    <div class="mx-auto bg-gray-800 border-[8px] border-gray-800 rounded-[1.8rem] w-full max-w-[260px] shadow-lg">
-                        <div class="rounded-[1.2rem] overflow-hidden w-full bg-slate-50">
-                            <div class="bg-slate-50 h-5 w-full flex justify-between items-center px-3 text-[8px] font-bold text-black"><span>9:41</span><div class="flex gap-1"><i class="fas fa-signal"></i><i class="fas fa-wifi"></i><i class="fas fa-battery-full"></i></div></div>
-                            <div class="bg-slate-100/90 px-3 py-1.5 border-b border-slate-200/60 flex items-center justify-center"><span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Messages</span></div>
-                            <div class="p-3">
-                                <div class="flex items-end">
-                                    <div class="w-5 h-5 rounded-full bg-slate-200 flex-shrink-0 mr-2 flex items-center justify-center text-slate-500 border border-white shadow-sm"><i data-lucide="${icon}" class="w-2.5 h-2.5"></i></div>
-                                    <div class="bg-white p-2.5 rounded-2xl rounded-bl-none shadow-sm text-xs text-slate-700 leading-snug border border-slate-100">${cleanText}</div>
+                    return `
+                    <div class="relative w-full sm:py-8 sm:px-8 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-stone-200 mb-2 transition-all duration-500">
+                        <div class="hidden sm:block absolute inset-0 z-0" style="${deskStyleMobile}"></div>
+                        <div class="relative z-10 mx-auto bg-gray-800 sm:border-[8px] sm:border-gray-800 sm:rounded-[2rem] h-auto w-full sm:max-w-[300px] sm:shadow-2xl flex flex-col transform transition-transform sm:hover:scale-[1.01] duration-300">
+                            <div class="hidden sm:block h-[32px] w-[3px] bg-gray-700 absolute -left-[10px] top-[72px] rounded-l-lg"></div>
+                            <div class="hidden sm:block h-[46px] w-[3px] bg-gray-700 absolute -left-[10px] top-[124px] rounded-l-lg"></div>
+                            <div class="hidden sm:block h-[64px] w-[3px] bg-gray-700 absolute -right-[10px] top-[142px] rounded-r-lg"></div>
+                            <div class="sm:rounded-[1.5rem] overflow-hidden w-full h-full bg-slate-50 relative flex flex-col font-sans border-x border-slate-200 sm:border-0">
+                                <div class="bg-slate-50 h-6 w-full flex justify-between items-center px-4 text-[9px] font-bold text-black border-b border-slate-100 shrink-0"><span>9:41</span><div class="flex gap-1"><i class="fas fa-signal"></i><i class="fas fa-wifi"></i><i class="fas fa-battery-full"></i></div></div>
+                                <div class="bg-slate-100/90 backdrop-blur-sm px-4 py-2 border-b border-slate-200/60 sticky top-0 z-10 flex items-center justify-center shrink-0"><span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Messages</span></div>
+                                <div class="flex-1 p-3 overflow-visible pb-4 sm:pb-12">
+                                    <div class="flex items-center justify-center mb-2"><span class="text-[9px] text-slate-400 font-bold">Today 9:41 AM</span></div>
+                                    <div class="flex items-end group mb-2">
+                                        <div class="w-6 h-6 rounded-full bg-slate-200 flex-shrink-0 mr-2 flex items-center justify-center text-slate-500 border border-white shadow-sm"><i data-lucide="${icon}" class="w-3 h-3"></i></div>
+                                        <div class="bg-white p-3 rounded-2xl rounded-bl-none shadow-sm text-xs text-slate-700 leading-snug max-w-[85%] border border-slate-100 relative">${cleanText}</div>
+                                    </div>
+                                    <div class="bg-slate-100 rounded-xl p-3 border border-slate-200/60">${choicesWrapper}</div>
+                                    ${feedbackWrapper}
                                 </div>
+                                <div class="hidden sm:block absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1/3 h-1 bg-black/20 rounded-full mb-1"></div>
                             </div>
                         </div>
                     </div>`;
                 } else if (type === 'social') {
-                    sceneHtml = `
-                    <div class="mx-auto max-w-xs bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div class="px-3 py-2 flex items-center justify-between border-b border-gray-100">
-                            <div class="flex items-center space-x-2"><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[1.5px]"><div class="w-full h-full rounded-full bg-white p-[1px] flex items-center justify-center"><i data-lucide="user" class="w-3 h-3 text-gray-400"></i></div></div><div class="leading-none"><div class="text-[10px] font-bold text-gray-900">friend_123</div><div class="text-[8px] text-gray-400">Sponsored</div></div></div><i data-lucide="more-horizontal" class="w-3 h-3 text-gray-400"></i>
+                    return `
+                    <div class="relative w-full sm:py-8 sm:px-8 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-stone-200 mb-2 transition-all duration-500">
+                        <div class="hidden sm:block absolute inset-0 z-0" style="${deskStyleMobile}"></div>
+                        <div class="relative z-10 mx-auto bg-gray-900 sm:border-[8px] sm:border-gray-900 sm:rounded-[2rem] h-auto w-full sm:max-w-[300px] sm:shadow-2xl flex flex-col transform transition-transform sm:hover:scale-[1.01] duration-300">
+                            <div class="hidden sm:block h-[46px] w-[3px] bg-gray-800 absolute -left-[10px] top-[124px] rounded-l-lg"></div>
+                            <div class="hidden sm:block h-[64px] w-[3px] bg-gray-800 absolute -right-[10px] top-[142px] rounded-r-lg"></div>
+                            <div class="sm:rounded-[1.5rem] overflow-hidden w-full h-full bg-white relative flex flex-col font-sans border-x border-gray-100 sm:border-0">
+                                <div class="bg-white h-6 w-full flex justify-between items-center px-4 text-[9px] font-bold text-black border-b border-gray-50 z-20 shrink-0"><span>10:24</span><div class="flex gap-1"><i class="fas fa-signal"></i><i class="fas fa-battery-three-quarters"></i></div></div>
+                                <div class="px-3 py-2 flex items-center justify-between border-b border-gray-100 shrink-0"><i data-lucide="chevron-left" class="w-4 h-4 text-gray-800"></i><span class="text-[10px] font-bold text-gray-900">Feed</span><i data-lucide="send" class="w-4 h-4 text-gray-800"></i></div>
+                                <div class="flex-1 overflow-visible bg-gray-50 pb-4 sm:pb-8">
+                                    <div class="bg-white mb-2 pb-2">
+                                        <div class="px-3 py-2 flex items-center justify-between">
+                                            <div class="flex items-center space-x-2"><div class="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[1.5px]"><div class="w-full h-full rounded-full bg-white p-[1px] flex items-center justify-center"><i data-lucide="user" class="w-3 h-3 text-gray-400"></i></div></div><div class="leading-none"><div class="text-[10px] font-bold text-gray-900">friend_123</div><div class="text-[8px] text-gray-400">Sponsored</div></div></div><i data-lucide="more-horizontal" class="w-3 h-3 text-gray-400"></i>
+                                        </div>
+                                        <div class="bg-gray-100 h-24 sm:h-32 flex items-center justify-center text-center relative overflow-hidden"><div class="absolute inset-0 opacity-10 bg-repeat" style="background-image: radial-gradient(#000 1px, transparent 1px); background-size: 8px 8px;"></div><p class="text-xs font-serif font-medium text-gray-800 italic relative z-10 px-4">"${cleanText}"</p></div>
+                                        <div class="px-3 py-2"><div class="flex space-x-3 mb-1"><i data-lucide="heart" class="w-4 h-4 text-gray-800"></i><i data-lucide="message-circle" class="w-4 h-4 text-gray-800"></i><i data-lucide="share-2" class="w-4 h-4 text-gray-800"></i></div><div class="text-[9px] font-bold text-gray-900">4,203 likes</div></div>
+                                    </div>
+                                    <div class="mx-2 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">${choicesWrapper} ${feedbackWrapper}</div>
+                                </div>
+                                <div class="hidden sm:block absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1/3 h-1 bg-black/20 rounded-full mb-1"></div>
+                            </div>
                         </div>
-                        <div class="bg-gray-100 py-6 px-4 flex items-center justify-center text-center"><p class="text-xs font-serif font-medium text-gray-800 italic">"${cleanText}"</p></div>
-                        <div class="px-3 py-2"><div class="flex space-x-3 mb-1"><i data-lucide="heart" class="w-4 h-4 text-gray-800"></i><i data-lucide="message-circle" class="w-4 h-4 text-gray-800"></i><i data-lucide="share-2" class="w-4 h-4 text-gray-800"></i></div><div class="text-[9px] font-bold text-gray-900">4,203 likes</div></div>
                     </div>`;
                 } else if (type === 'browser') {
-                    sceneHtml = `
-                    <div class="max-w-lg mx-auto bg-white rounded-lg overflow-hidden border border-gray-300 shadow-sm">
-                        <div class="bg-gray-100 px-3 py-2 flex items-center space-x-2 border-b border-gray-200">
-                            <div class="flex space-x-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-400"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div><div class="w-2.5 h-2.5 rounded-full bg-green-400"></div></div>
-                            <div class="flex-grow bg-white rounded shadow-inner h-6 flex items-center px-2 border border-gray-200"><i data-lucide="lock" class="w-2.5 h-2.5 text-green-600 mr-1.5"></i><span class="text-[10px] text-gray-400 font-mono">https://search.web/results</span></div>
+                    return `
+                    <div class="relative w-full sm:py-8 sm:px-8 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-slate-300 mb-2 transition-all duration-500">
+                        <div class="hidden sm:block absolute inset-0 z-0" style="${deskStyleDesktop}"></div>
+                        <div class="relative z-10 bg-gray-800 sm:rounded-t-xl sm:p-3 sm:pb-0 max-w-lg mx-auto sm:shadow-2xl transform transition-transform sm:hover:scale-[1.01] duration-500">
+                             <div class="hidden sm:flex justify-center mb-2"><div class="w-1.5 h-1.5 bg-gray-600 rounded-full border border-gray-700"></div></div>
+                             <div class="bg-white sm:rounded-t-lg overflow-hidden sm:border-4 sm:border-gray-800 sm:border-b-0 h-auto font-sans relative flex flex-col border border-gray-300 rounded-lg">
+                                <div class="bg-gray-100 px-3 py-2 flex items-center space-x-2 border-b border-gray-200 flex-shrink-0">
+                                    <div class="flex space-x-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-400 border border-red-500/20"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-500/20"></div><div class="w-2.5 h-2.5 rounded-full bg-green-400 border border-green-500/20"></div></div>
+                                    <div class="flex-grow bg-white rounded shadow-inner h-6 mx-2 flex items-center px-2 border border-gray-200"><i data-lucide="lock" class="w-2.5 h-2.5 text-green-600 mr-1.5"></i><span class="text-[10px] text-gray-400 font-mono">https://search.web/results</span></div>
+                                </div>
+                                <div class="p-5 bg-white flex-1 overflow-visible">
+                                    <div class="text-[10px] text-gray-500 mb-1 flex items-center"><span class="bg-gray-200 rounded px-1 mr-1">Ad</span> www.result.com</div>
+                                    <h3 class="text-base text-blue-700 hover:underline font-medium mb-1 cursor-pointer truncate">Search Result: ${cleanText.substring(0, 40)}...</h3>
+                                    <p class="text-sm text-gray-600 leading-relaxed mb-6">${cleanText}</p>
+                                    <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-100">${choicesWrapper} ${feedbackWrapper}</div>
+                                </div>
+                             </div>
                         </div>
-                        <div class="p-5 bg-white">
-                            <div class="text-[10px] text-gray-500 mb-1 flex items-center"><span class="bg-gray-200 rounded px-1 mr-1">Ad</span> www.result.com</div>
-                            <h3 class="text-base text-blue-700 font-medium mb-1 truncate">Search Result: ${cleanText.substring(0, 40)}...</h3>
-                            <p class="text-sm text-gray-600 leading-relaxed">${cleanText}</p>
-                        </div>
+                        <div class="hidden sm:flex h-4 bg-gray-700 max-w-lg mx-auto rounded-b-md shadow-lg justify-center items-start"><div class="w-16 h-1 bg-gray-600 rounded-b-md"></div></div>
                     </div>`;
                 } else if (type === 'email') {
-                    sceneHtml = `
-                    <div class="max-w-lg mx-auto bg-white rounded-lg overflow-hidden border border-gray-300 shadow-sm">
-                        <div class="bg-blue-600 px-3 py-2 flex items-center justify-between text-white">
-                            <div class="flex items-center gap-2"><i data-lucide="mail" class="w-4 h-4"></i><span class="text-xs font-bold">MailClient</span></div>
-                            <div class="flex space-x-1"><div class="w-2 h-2 rounded-full bg-white/20"></div><div class="w-2 h-2 rounded-full bg-white/20"></div></div>
-                        </div>
-                        <div class="p-5">
-                            <div class="border-b border-gray-100 pb-3 mb-3">
-                                <h3 class="text-sm font-bold text-gray-800">Professional Opportunity</h3>
-                                <div class="flex items-center gap-2 mt-1">
-                                    <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-[10px] font-bold">HR</div>
-                                    <div class="text-[10px] text-gray-500">To: Me &lt;applicant@email.com&gt;</div>
+                    return `
+                    <div class="relative w-full sm:py-8 sm:px-8 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-slate-300 mb-2 transition-all duration-500">
+                        <div class="hidden sm:block absolute inset-0 z-0" style="${deskStyleDesktop}"></div>
+                        <div class="relative z-10 bg-gray-800 sm:rounded-t-xl sm:p-3 sm:pb-0 max-w-lg mx-auto sm:shadow-2xl transform transition-transform sm:hover:scale-[1.01] duration-500">
+                             <div class="hidden sm:flex justify-center mb-2"><div class="w-1.5 h-1.5 bg-gray-600 rounded-full border border-gray-700"></div></div>
+                             <div class="bg-white sm:rounded-t-lg overflow-hidden sm:border-4 sm:border-gray-800 sm:border-b-0 h-auto font-sans relative flex flex-col border border-gray-300 rounded-lg">
+                                <div class="bg-blue-600 px-3 py-2 flex items-center justify-between border-b border-blue-700 flex-shrink-0 text-white">
+                                    <div class="flex items-center gap-2"><i data-lucide="mail" class="w-4 h-4"></i><span class="text-xs font-bold">MailClient</span></div>
+                                    <div class="flex space-x-1"><div class="w-2 h-2 rounded-full bg-white/20"></div><div class="w-2 h-2 rounded-full bg-white/20"></div></div>
                                 </div>
-                            </div>
-                            <p class="text-sm text-gray-600 leading-relaxed font-serif">${cleanText}</p>
+                                <div class="flex flex-1 overflow-hidden">
+                                    <div class="w-1/4 bg-gray-50 border-r border-gray-200 p-2 hidden sm:block">
+                                        <div class="space-y-1">
+                                            <div class="text-[10px] font-bold text-gray-500 px-2 mb-1">FAVORITES</div>
+                                            <div class="bg-blue-100 text-blue-700 rounded px-2 py-1 text-[10px] font-bold flex items-center gap-1"><i data-lucide="inbox" class="w-3 h-3"></i> Inbox</div>
+                                            <div class="text-gray-600 px-2 py-1 text-[10px] flex items-center gap-1"><i data-lucide="send" class="w-3 h-3"></i> Sent</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 p-5 overflow-visible bg-white">
+                                        <div class="border-b border-gray-100 pb-3 mb-3">
+                                            <h3 class="text-sm font-bold text-gray-800 truncate">Professional Opportunity</h3>
+                                            <div class="flex items-center gap-2 mt-1">
+                                                <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-[10px] font-bold">HR</div>
+                                                <div class="text-[10px] text-gray-500">To: Me &lt;applicant@email.com&gt;</div>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm text-gray-600 leading-relaxed mb-6 font-serif">${cleanText}</p>
+                                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm relative">
+                                            <div class="absolute -top-2 left-3 bg-white px-1 text-[9px] font-bold text-gray-400">YOUR RESPONSE</div>
+                                            ${choicesWrapper} ${feedbackWrapper}
+                                        </div>
+                                    </div>
+                                </div>
+                             </div>
                         </div>
+                        <div class="hidden sm:flex h-4 bg-gray-700 max-w-lg mx-auto rounded-b-md shadow-lg justify-center items-start"><div class="w-16 h-1 bg-gray-600 rounded-b-md"></div></div>
                     </div>`;
                 } else if (type === 'video') {
-                    sceneHtml = `
-                    <div class="max-w-sm mx-auto bg-gray-900 rounded-lg overflow-hidden border border-gray-700 shadow-sm">
-                        <div class="p-2 grid grid-cols-2 gap-2">
-                            <div class="bg-gray-800 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-gray-700 min-h-[80px]">
-                                <div class="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-sm">P</div>
-                                <div class="absolute bottom-1 left-2 text-[8px] text-white font-bold bg-black/50 px-1 rounded">Professor</div>
-                            </div>
-                            <div class="bg-gray-800 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-gray-700 min-h-[80px]">
-                                <i data-lucide="smile" class="text-gray-600 w-7 h-7"></i>
-                                <div class="absolute bottom-1 left-2 text-[8px] text-white font-bold bg-black/50 px-1 rounded">Classmate A</div>
-                                <div class="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            </div>
+                    return `
+                    <div class="relative w-full sm:py-8 sm:px-8 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-slate-300 mb-2 transition-all duration-500">
+                        <div class="hidden sm:block absolute inset-0 z-0" style="${deskStyleDesktop}"></div>
+                        <div class="relative z-10 bg-gray-800 sm:rounded-t-xl sm:p-3 sm:pb-0 max-w-lg mx-auto sm:shadow-2xl transform transition-transform sm:hover:scale-[1.01] duration-500">
+                             <div class="hidden sm:flex justify-center mb-2"><div class="w-1.5 h-1.5 bg-gray-600 rounded-full border border-gray-700"></div></div>
+                             <div class="bg-gray-900 sm:rounded-t-lg overflow-hidden sm:border-4 sm:border-gray-800 sm:border-b-0 h-auto font-sans relative flex flex-col border border-gray-300 rounded-lg">
+                                <div class="flex-1 p-2 grid grid-cols-2 gap-2">
+                                    <div class="bg-gray-800 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-gray-700 min-h-[100px]">
+                                        <div class="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-lg">P</div>
+                                        <div class="absolute bottom-1 left-2 text-[9px] text-white font-bold bg-black/50 px-1 rounded">Professor</div>
+                                    </div>
+                                    <div class="bg-gray-800 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-gray-700 min-h-[100px]">
+                                        <i data-lucide="smile" class="text-gray-600 w-10 h-10"></i>
+                                        <div class="absolute bottom-1 left-2 text-[9px] text-white font-bold bg-black/50 px-1 rounded">Classmate A</div>
+                                        <div class="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                    </div>
+                                    <div class="bg-gray-800 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-gray-700 col-span-2 p-4">
+                                        <div class="text-white/80 text-center px-4">
+                                            <p class="text-xs italic">"${cleanText}"</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="h-12 bg-gray-800 border-t border-gray-700 flex items-center justify-center gap-4 shrink-0">
+                                    <div class="p-2 rounded-full bg-gray-700 text-white"><i data-lucide="mic-off" class="w-4 h-4"></i></div>
+                                    <div class="p-2 rounded-full bg-gray-700 text-white"><i data-lucide="video" class="w-4 h-4"></i></div>
+                                    <div class="p-2 rounded-full bg-red-600 text-white px-4 text-xs font-bold">Leave</div>
+                                </div>
+                                <div class="bg-gray-800/90 border-t border-gray-700 p-4">
+                                    ${choicesWrapper} ${feedbackWrapper}
+                                </div>
+                             </div>
                         </div>
-                        <div class="mx-2 mb-2 bg-gray-800 rounded-lg border border-gray-700 p-3 text-center"><p class="text-xs italic text-white/80">"${cleanText}"</p></div>
-                        <div class="h-9 bg-gray-800 border-t border-gray-700 flex items-center justify-center gap-3">
-                            <div class="p-1.5 rounded-full bg-gray-700 text-white"><i data-lucide="mic-off" class="w-3 h-3"></i></div>
-                            <div class="p-1.5 rounded-full bg-gray-700 text-white"><i data-lucide="video" class="w-3 h-3"></i></div>
-                            <div class="p-1.5 rounded-full bg-red-600 text-white px-3 text-[9px] font-bold">Leave</div>
-                        </div>
+                        <div class="hidden sm:flex h-4 bg-gray-700 max-w-lg mx-auto rounded-b-md shadow-lg justify-center items-start"><div class="w-16 h-1 bg-gray-600 rounded-b-md"></div></div>
                     </div>`;
                 } else if (type === 'game') {
-                    sceneHtml = `
-                    <div class="max-w-sm mx-auto bg-gray-900 rounded-lg overflow-hidden border border-gray-700 shadow-sm font-mono">
-                        <div class="bg-black/50 px-3 py-1 flex justify-between items-center text-green-500 text-[9px] border-b border-green-500/30">
-                            <span>FPS: 60</span> <span>PING: 24ms</span>
-                        </div>
-                        <div class="bg-gray-800 flex items-center justify-center p-4">
-                            <div class="w-full bg-black/60 border border-green-500/30 rounded p-2">
-                                <div class="text-[9px] text-gray-400">[Global] <span class="text-red-400">Troll_User99:</span> ${cleanText}</div>
-                            </div>
+                    return `
+                    <div class="relative w-full sm:py-8 sm:px-8 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-stone-200 mb-2 transition-all duration-500">
+                        <div class="hidden sm:block absolute inset-0 z-0 bg-black"></div>
+                        <div class="relative z-10 bg-black sm:rounded-t-xl sm:p-3 sm:pb-0 max-w-lg mx-auto sm:shadow-2xl transform transition-transform sm:hover:scale-[1.01] duration-500">
+                             <div class="bg-gray-900 sm:rounded-t-lg overflow-hidden sm:border-4 sm:border-gray-800 sm:border-b-0 h-auto font-mono relative flex flex-col border border-gray-700 rounded-lg">
+                                <div class="bg-black/50 px-3 py-1 flex justify-between items-center text-green-500 text-[10px] border-b border-green-500/30">
+                                    <span>FPS: 60</span> <span>PING: 24ms</span>
+                                </div>
+                                <div class="flex-1 bg-gray-800 relative flex flex-col items-center justify-center p-4 min-h-[150px]">
+                                    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle, #22c55e 1px, transparent 1px); background-size: 20px 20px;"></div>
+                                    <div class="w-full bg-black/60 border border-green-500/30 rounded p-2 mb-4 backdrop-blur-sm max-w-xs self-start relative z-10">
+                                        <div class="text-[9px] text-gray-400 mb-1">[Global] <span class="text-red-400">Troll_User99:</span> ${cleanText}</div>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-900 p-4 border-t border-green-500/30">
+                                    <div class="border border-green-500/20 rounded p-3 bg-black/40">
+                                        ${choicesWrapper} ${feedbackWrapper}
+                                    </div>
+                                </div>
+                             </div>
                         </div>
                     </div>`;
                 } else if (type === 'form') {
-                    sceneHtml = `
-                    <div class="mx-auto max-w-[260px] bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-center">
-                        <div class="w-11 h-11 bg-blue-600 rounded-xl mx-auto flex items-center justify-center text-white mb-3 shadow-lg shadow-blue-200"><i data-lucide="${icon}" class="w-5 h-5"></i></div>
-                        <h3 class="text-base font-bold text-gray-800">Security Check</h3>
-                        <p class="text-xs text-gray-500 mt-1">${cleanText}</p>
+                    return `
+                    <div class="relative w-full sm:py-8 sm:px-8 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-stone-200 mb-2 transition-all duration-500">
+                        <div class="hidden sm:block absolute inset-0 z-0" style="${deskStyleMobile}"></div>
+                        <div class="relative z-10 mx-auto bg-gray-800 sm:border-[8px] sm:border-gray-800 sm:rounded-[2rem] h-auto w-full sm:max-w-[300px] sm:shadow-2xl flex flex-col transform transition-transform sm:hover:scale-[1.01] duration-300">
+                            <div class="hidden sm:block h-[46px] w-[3px] bg-gray-700 absolute -right-[10px] top-[142px] rounded-r-lg"></div>
+                            <div class="sm:rounded-[1.5rem] overflow-hidden w-full h-full bg-white relative flex flex-col font-sans border-x border-slate-200 sm:border-0">
+                                <div class="bg-white h-6 w-full flex justify-between items-center px-4 text-[9px] font-bold text-black border-b border-slate-50 shrink-0"><span>9:41</span><i class="fas fa-battery-full"></i></div>
+                                <div class="flex-1 p-6 flex flex-col justify-center bg-gray-50 overflow-visible pb-4 sm:pb-12">
+                                    <div class="mb-4 text-center">
+                                        <div class="w-12 h-12 bg-blue-600 rounded-xl mx-auto flex items-center justify-center text-white mb-3 shadow-lg shadow-blue-200"><i data-lucide="${icon}" class="w-6 h-6"></i></div>
+                                        <h3 class="text-lg font-bold text-gray-800">Security Check</h3>
+                                        <p class="text-xs text-gray-500 mt-1 px-4">${cleanText}</p>
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                                        ${choicesWrapper}
+                                    </div>
+                                    ${feedbackWrapper}
+                                </div>
+                                <div class="hidden sm:block absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1/3 h-1 bg-black/20 rounded-full mb-1"></div>
+                            </div>
+                        </div>
                     </div>`;
                 } else {
-                    sceneHtml = `
-                    <div class="mx-auto max-w-sm bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                        <div class="flex items-start space-x-3">
-                            <div class="bg-gray-50 p-2 rounded-lg border border-gray-100 shadow-sm shrink-0"><i data-lucide="${icon}" class="w-5 h-5 text-allgood-primary"></i></div>
-                            <div><h4 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">System Notification</h4><p class="text-sm text-gray-600 leading-snug">${cleanText}</p></div>
+                    return `
+                    <div class="relative w-full sm:py-10 sm:px-4 rounded-xl sm:overflow-hidden sm:shadow-inner sm:border sm:border-slate-200 mb-2">
+                        <div class="hidden sm:block absolute inset-0 z-0" style="background: radial-gradient(circle at center, #f8fafc, #e2e8f0);"></div>
+                        <div class="relative z-10 bg-white/80 backdrop-blur-md rounded-xl overflow-hidden border border-white/50 shadow-sm sm:shadow-xl font-sans mb-6 max-w-sm mx-auto transform sm:scale-95 sm:hover:scale-100 transition-transform duration-300">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-allgood-primary"></div>
+                            <div class="p-6">
+                                <div class="flex items-start space-x-3 mb-4">
+                                    <div class="bg-gray-50 p-2 rounded-lg border border-gray-100 shadow-sm"><i data-lucide="${icon}" class="w-6 h-6 text-allgood-primary"></i></div>
+                                    <div><h4 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">System Notification</h4><p class="text-sm text-gray-600 leading-snug">${cleanText}</p></div>
+                                </div>
+                                ${choicesWrapper} ${feedbackWrapper}
+                            </div>
                         </div>
                     </div>`;
                 }
-
-                return `<div class="w-full">${sceneHtml}${answerCard}</div>`;
             }
 
-            // Renders one scenario as a feed block. state: 'locked' | 'active' | 'answered'.
-            // Locked blocks are a lightweight placeholder — the real content only renders once reached,
-            // so scrolling ahead never spoils answers and never has to render 30 scenarios' worth of DOM upfront.
-            function renderScenarioBlockHTML(scenarioIndex, state) {
-                if (state === 'locked') {
-                    return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" data-locked="true" class="scenario-block mb-10 max-w-xl mx-auto bg-white/60 rounded-2xl border border-dashed border-gray-300 p-8 text-center select-none">
-                        <i data-lucide="lock" class="w-5 h-5 text-gray-300 mx-auto mb-2"></i>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Scenario ${scenarioIndex}</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Answer the scenario above to continue</p>
-                    </div>`;
-                }
-
+            function renderScenarioPage(pageElement, scenarioIndex) {
                 const data = SCENARIO_DATA[scenarioIndex - 1];
-                const isAnswered = state === 'answered';
-
-                let uiType = 'system';
+                const isAnswered = answeredScenarioScores[scenarioIndex] !== undefined;
+                
+                let uiType = 'system'; 
                 const icon = data.icon;
+                
                 if (['briefcase'].includes(icon)) uiType = 'email';
                 else if (['tv'].includes(icon)) uiType = 'video';
                 else if (['gamepad-2'].includes(icon)) uiType = 'game';
@@ -1371,15 +1414,15 @@
                 else if (['message-square', 'message-square-off', 'phone-off', 'split'].includes(icon)) uiType = 'chat';
                 else if (['users', 'users-x', 'user-plus', 'heart-off', 'camera-off', 'user-round-minus', 'user-round-x', 'thumbs-down', 'image-up', 'frown'].includes(icon)) uiType = 'social';
                 else if (['search', 'globe', 'search-check', 'book-open-check', 'image'].includes(icon)) uiType = 'browser';
-
+                
                 let choicesHtml = data.choices.map((choice, index) => {
                     let btnClass = 'w-full text-left p-2.5 rounded-lg text-xs font-medium transition-all shadow-sm mb-2 border';
                     if (isAnswered) {
                         if (choice.score === 3) {
-                            btnClass += ' bg-emerald-50 border-emerald-200 text-emerald-800 ring-1 ring-emerald-300';
+                            btnClass += ' bg-emerald-50 border-emerald-200 text-emerald-800 ring-1 ring-emerald-300'; 
                         } else if (answeredScenarioScores[scenarioIndex] === choice.score) {
-                             btnClass += choice.score === 1
-                                ? ' bg-amber-50 border-amber-200 text-amber-800 ring-1 ring-amber-300'
+                             btnClass += choice.score === 1 
+                                ? ' bg-amber-50 border-amber-200 text-amber-800 ring-1 ring-amber-300' 
                                 : ' bg-rose-50 border-rose-200 text-rose-800 ring-1 ring-rose-300';
                         } else {
                             btnClass += ' bg-gray-50 border-gray-100 text-gray-400 opacity-60';
@@ -1387,9 +1430,9 @@
                     } else {
                         btnClass += ' bg-white border-gray-200 text-gray-700 md:hover:border-allgood-primary md:hover:bg-orange-50 md:hover:text-allgood-primary active:border-allgood-primary active:bg-orange-50 active:text-allgood-primary cursor-pointer active:scale-[0.98]';
                     }
-
+                    
                     const disabledAttr = isAnswered ? 'disabled' : '';
-
+                    
                     return `<button class="${btnClass}" onclick="window.selectScenarioChoice(${scenarioIndex}, ${index})" ${disabledAttr}>
                         <div class="flex items-start">
                             <span class="font-bold mr-2 opacity-50 text-[10px] uppercase mt-0.5">${String.fromCharCode(65 + index)}</span>
@@ -1404,7 +1447,7 @@
                     let bgClass = chosen.score === 3 ? 'bg-emerald-100 border-emerald-200' : (chosen.score === 1 ? 'bg-amber-100 border-amber-200' : 'bg-rose-100 border-rose-200');
                     let textClass = chosen.score === 3 ? 'text-emerald-800' : (chosen.score === 1 ? 'text-amber-800' : 'text-rose-800');
                     let iconName = chosen.score === 3 ? 'check-circle' : 'alert-circle';
-
+                    
                     feedbackHtml = `
                     <div class="${bgClass} border rounded-lg p-3 flex items-start gap-3 shadow-sm">
                          <i data-lucide="${iconName}" class="w-5 h-5 ${textClass} flex-shrink-0 mt-0.5"></i>
@@ -1419,31 +1462,14 @@
 
                 const visualHtml = getScenarioTemplate(uiType, data.title, icon, choicesHtml, feedbackHtml);
 
-                return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" class="scenario-block mb-10 scroll-mt-4">
-                    <section class="mb-4 border-b border-gray-200 pb-2 flex justify-between items-end max-w-xl mx-auto">
+                pageElement.innerHTML = `
+                    <section class="mb-4 border-b border-gray-200 pb-2 flex justify-between items-end">
                         <h2 class="text-xl font-heading font-bold text-allgood-dark">Scenario ${scenarioIndex}</h2>
-                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">${isAnswered ? 'Reviewed' : 'Decide'}</span>
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Decide</span>
                     </section>
                     <div class="flex justify-center">
                         ${visualHtml}
-                    </div>
-                </div>`;
-            }
-
-            // Unlocks a scenario block in place if it's still showing the locked placeholder.
-            // Shared by closeScenarioModal (auto-advance) and the Next button (manual advance) so
-            // neither path can scroll a user to a block that's still locked.
-            function unlockScenarioBlock(sIdx) {
-                const el = document.getElementById('scenario-block-' + sIdx);
-                if (!el) return null;
-                if (el.dataset.locked === 'true') {
-                    el.outerHTML = renderScenarioBlockHTML(sIdx, 'active');
-                    lucide.createIcons();
-                    const freshEl = document.getElementById('scenario-block-' + sIdx);
-                    if (feedObserver && freshEl) feedObserver.observe(freshEl);
-                    return freshEl;
-                }
-                return el;
+                    </div>`;
             }
 
             window.selectScenarioChoice = function(sIdx, cIdx) {
@@ -1467,18 +1493,7 @@
                         sessionId: window.sessionId 
                     });
                 }
-
-                // Re-render just this block in its answered state — the rest of the feed stays untouched.
-                const blockEl = document.getElementById('scenario-block-' + sIdx);
-                if (blockEl) {
-                    blockEl.outerHTML = renderScenarioBlockHTML(sIdx, 'answered');
-                    lucide.createIcons();
-                    // Re-observe since outerHTML replaced the node the observer was watching
-                    const freshEl = document.getElementById('scenario-block-' + sIdx);
-                    if (feedObserver && freshEl) feedObserver.observe(freshEl);
-                }
-                updateHUDDisplay();
-                if (currentPageIndex === 2) updateFeedNav();
+                window.showPage(currentPageIndex);
                 
                 let iconClass = chosen.score === 3 ? 'bg-green-100 text-green-600' : (chosen.score === 1 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600');
                 let iconInner = chosen.score === 3 ? '<i data-lucide="check-circle" class="w-8 h-8"></i>' : (chosen.score === 1 ? '<i data-lucide="alert-triangle" class="w-8 h-8"></i>' : '<i data-lucide="x-circle" class="w-8 h-8"></i>');
@@ -1487,8 +1502,7 @@
                     title: `${chosen.effectiveness.toUpperCase().replace('-', ' ')} (${chosen.score} / 3 pts)`,
                     htmlText: formatFeedbackContent(chosen.feedback, 'text-gray-600'),
                     iconClass: iconClass,
-                    iconInner: iconInner,
-                    answeredScenario: sIdx
+                    iconInner: iconInner
                 });
             }
 
@@ -1496,24 +1510,9 @@
                 document.getElementById('scenario-modal').classList.remove('visible-modal');
                 document.getElementById('scenario-modal').classList.add('hidden-modal');
                 sfx.nav();
-
-                if (advance && currentPageIndex === 2 && activeCategory && lastAnsweredScenario !== null) {
-                    const pos = categoryQueue.indexOf(lastAnsweredScenario);
-                    const nextScenario = categoryQueue[pos + 1];
-
-                    setTimeout(() => {
-                        if (nextScenario !== undefined) {
-                            const freshEl = unlockScenarioBlock(nextScenario);
-                            if (freshEl) freshEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        } else {
-                            // That was the last scenario in the category — reveal the completion card
-                            const completeCard = document.getElementById('mission-complete-card');
-                            if (completeCard) {
-                                completeCard.classList.remove('hidden');
-                                completeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                        }
-                    }, 100);
+                if (advance && currentPageIndex >= 2 && currentPageIndex <= 31) {
+                    const btn = document.getElementById('next-button');
+                    if(!btn.disabled) btn.click();
                 }
             }
 
@@ -1535,7 +1534,6 @@
                     fb.innerHTML = data.htmlText; 
                     icon.className = `mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl ${data.iconClass}`;
                     icon.innerHTML = data.iconInner;
-                    if (data.answeredScenario !== undefined) lastAnsweredScenario = data.answeredScenario;
                     btn.onclick = () => window.closeScenarioModal(true);
                 }
                 modal.classList.remove('hidden-modal');
@@ -1650,10 +1648,7 @@
                     
                     btn.className = 'w-full text-left p-1.5 hover:bg-gray-100 rounded text-gray-600 text-[10px] flex items-center truncate';
                     btn.innerHTML = `<i data-lucide="${iconName}" class="w-3 h-3 mr-2 shrink-0 ${iconClass}"></i> <span class="truncate">Scenario ${idx + 1}</span>`;
-                    btn.onclick = () => {
-                        window.startCategory(s.cat, { scrollToScenario: idx + 1, forceUnlockIndex: idx + 1 });
-                        window.closeMenuModal();
-                    };
+                    btn.onclick = () => { window.showPage(idx + 2); window.closeMenuModal(); };
                     tocList.appendChild(btn);
                 });
                 if(window.lucide) window.lucide.createIcons();
@@ -1661,14 +1656,11 @@
 
             // --- NAV LISTENERS & SWIPE LOGIC ---
             const handleBackAction = () => {
-                if (currentPageIndex === 2 && activeCategory) {
-                    if (currentQueueIndex > 0) {
-                        const prevScenario = categoryQueue[currentQueueIndex - 1];
-                        const prevEl = document.getElementById('scenario-block-' + prevScenario);
-                        if (prevEl) prevEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    } else {
-                        window.showPage(1);
-                    }
+                if (currentPageIndex >= 2 && currentPageIndex <= 31 && currentQueueIndex > 0) {
+                    currentQueueIndex--;
+                    window.showPage(categoryQueue[currentQueueIndex]);
+                } else if (currentPageIndex >= 2 && currentPageIndex <= 31 && currentQueueIndex === 0) {
+                    window.showPage(1);
                 } else if (currentPageIndex > 0) {
                     window.showPage(currentPageIndex - 1); 
                 }
@@ -1697,7 +1689,6 @@
             }
 
             function handleSwipe() {
-                if (currentPageIndex === 2) return; // feed page: vertical scroll is the primary gesture
                 const swipeThreshold = 50; 
                 const verticalTolerance = 60; 
                 const isHorizontalSwipe = Math.abs(touchStartX - touchEndX) > swipeThreshold;
@@ -1801,15 +1792,11 @@
             });
 
             document.getElementById('fullscreen-toggle').addEventListener('click', () => {
-                const wrapper = document.getElementById('workstation-wrapper');
-                const isCollapsed = wrapper.classList.toggle('sidebar-collapsed');
+                const frame = document.querySelector('.tablet-frame');
+                frame.classList.toggle('expanded-mode');
                 const btn = document.getElementById('fullscreen-toggle');
-                btn.classList.toggle('text-green-300', isCollapsed);
-                btn.classList.toggle('text-gray-200', !isCollapsed);
-                btn.title = isCollapsed ? 'Exit Focus Mode' : 'Focus Mode';
-                const icon = btn.querySelector('i');
-                if (icon) icon.setAttribute('data-lucide', isCollapsed ? 'panel-left-open' : 'panel-left-close');
-                if (window.lucide) window.lucide.createIcons();
+                btn.classList.toggle('text-green-300');
+                btn.classList.toggle('text-gray-200');
                 sfx.tick();
             });
 
@@ -1832,19 +1819,17 @@
             }
 
             // Initial Render
+            pages.forEach(p => { 
+                const idx = parseInt(p.getAttribute('data-scenario-index')); 
+                if(idx) renderScenarioPage(p, idx); 
+            });
             window.showPage(0);
             updateTOC();
             
             window.performHardReset = () => {
                 totalChallengeScore = 0;
                 answeredScenarioScores = {};
-                activeCategory = null;
-                categoryQueue = [];
-                currentQueueIndex = 0;
-                if (feedObserver) feedObserver.disconnect();
-                const feedContainer = document.getElementById('scenario-feed-container');
-                if (feedContainer) feedContainer.innerHTML = '';
-                updateTOC();
+                pages.forEach(p => { const idx = parseInt(p.getAttribute('data-scenario-index')); if(idx) renderScenarioPage(p, idx); });
                 const startup = document.getElementById('startup-screen');
                 startup.style.display = 'flex';
                 setTimeout(() => startup.style.opacity = '1', 10);

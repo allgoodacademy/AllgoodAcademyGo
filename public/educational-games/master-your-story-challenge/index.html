@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Master Your Story Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- FIREBASE AND AUTHENTICATION SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko", authDomain: "allgood-academy.firebaseapp.com", projectId: "allgood-academy" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'allgood-academy';
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.authSignOut = () => signOut(auth);
+        window.currentUser = null;
+        window.currentUserName = "Anonymous";
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        window.updateUserDisplay = (name) => {
+            const el = document.getElementById('header-welcome-text');
+            if (el) el.textContent = `Welcome: ${name}`;
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                window.currentUser = user;
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Learner";
+                if (finalName === "Learner") {
+                    try { const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid)); if (userDoc.exists()) finalName = userDoc.data().displayName || finalName; } catch(e) {}
+                }
+                window.currentUserName = finalName;
+                window.updateUserDisplay(finalName);
+                
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                    if (window.logFinalScoreToFirestore) {
+                        window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+                    }
+                }
+            } else {
+                window.currentUser = null;
+                window.updateUserDisplay("Learner");
+            }
+        });
+
+        async function ensureUserContainer(user, name, email, isGuest) {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             try { await setDoc(userRef, { displayName: name, email: email || (isGuest ? null : user.email || null), isGuest: isGuest, lastLogin: serverTimestamp(), lastActiveModule: "Master Your Story" }, { merge: true }); } catch (e) { console.error(e); }
+        }
+
+        window.logScenarioAttempt = async (data) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const attemptRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'scenario_attempts', `scenario_${data.scenarioIndex}`);
+            try { await setDoc(attemptRef, { ...data, timestamp: serverTimestamp() }); } catch (e) {}
+        };
+
+        window.logFinalScoreToFirestore = async (scoreData) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            try { await setDoc(sessionRef, { gameName: "Master Your Story", ...scoreData, lastUpdated: serverTimestamp(), user: { uid: user.uid, displayName: window.currentUserName } }, { merge: true }); } catch (e) {}
+        }
+
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            const ot = btn.innerText; btn.innerText = "Connecting..."; btn.disabled = true;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token); else if (!auth.currentUser) await signInAnonymously(auth);
+                const user = auth.currentUser;
+                const displayName = nameInput || "Learner";
+                await updateProfile(user, { displayName: displayName });
+                await ensureUserContainer(user, displayName, emailInput, true);
+                window.currentUserName = displayName;
+                window.updateUserDisplay(displayName);
+                window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+            } catch (error) { alert("Connection failed."); } finally { btn.innerText = ot; btn.disabled = false; }
+        };
+
+        window.handleGoogleLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                const finalName = user.displayName || "Learner";
+                await ensureUserContainer(user, finalName, user.email, false);
+                window.currentUserName = finalName;
+                window.updateUserDisplay(finalName);
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                window.showPage(0);
+                if(window.sfx) sfx.nav();
+            } catch (error) { alert("Google Sign-In failed."); }
+        };
+        
+        window.auth = auth; window.db = db;
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'inner-story-bg': '#FEF7F5',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                        'mono': ['Courier New', 'monospace'],
+                        'typewriter': ['Courier New', 'Courier', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body { 
+            font-family: Verdana, sans-serif; 
+            background-color: #1a1a1a; 
+            min-height: 100vh; 
+            margin: 0; padding: 0;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        h1, h2, h3, h4 { font-family: Georgia, serif; }
+
+        /* TABLET FRAME */
+        .tablet-frame {
+            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
+            transition: width 0.3s, height 0.3s;
+        }
+        .tablet-frame::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border-radius: 6px; background: #111; z-index: 0; }
+        .screen-container { width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1; overflow: hidden; display: flex; flex-direction: column; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .page::-webkit-scrollbar { width: 14px; }
+        .page::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        .page::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; border: 3px solid #e5e5e5; }
+
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        /* UI ELEMENTS */
+        .choice-btn { background-color: #FDF6E3; border: 1px solid #D6D3D1; transition: all 0.2s ease; font-family: 'Courier New', monospace; box-shadow: 2px 2px 0px rgba(0,0,0,0.1); }
+        .choice-btn:hover:not(:disabled) { border-color: #D34716; background-color: #FFF; transform: translateY(-1px); box-shadow: 3px 3px 0px rgba(0,0,0,0.15); }
+        .choice-correct { background-color: #D1FAE5 !important; border-color: #10B981 !important; font-weight: bold; }
+        .choice-less-effective { background-color: #FFFBEB !important; border-color: #FBBF24 !important; font-weight: 600; }
+        .choice-least-effective { background-color: #FEE2E2 !important; border-color: #F87171 !important; font-weight: 500; opacity: 0.7; }
+        
+        /* DETECTIVE BOARD STYLES */
+        .corkboard-bg {
+            background-color: #e8dcc5;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d4c5a9' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .evidence-photo {
+            background-color: white;
+            padding: 12px 12px 40px 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transform: rotate(-2deg);
+            position: relative;
+            max-width: 340px;
+            width: 100%;
+            z-index: 10;
+            margin-right: 20px; /* Space between photo and note on desktop */
+        }
+        .evidence-photo::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b);
+            border-radius: 50%;
+            box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        .evidence-photo-content {
+            background: #f8f8f8;
+            border: 1px solid #eee;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            color: #333;
+            min-height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .sticky-note-clue {
+            background-color: #fef08a; /* Yellow */
+            color: #422006;
+            padding: 20px;
+            width: 260px;
+            box-shadow: 4px 4px 8px rgba(0,0,0,0.15);
+            font-family: 'Courier New', monospace; /* Legible Typewriter */
+            font-weight: bold;
+            font-size: 1rem;
+            line-height: 1.4;
+            transform: rotate(2deg);
+            z-index: 20;
+            border-bottom-right-radius: 30px 10px;
+            border: 1px solid #eab308;
+            position: relative; /* Relative for flex flow on desktop */
+        }
+        
+        .red-string {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            width: 100px;
+            height: 3px;
+            background-color: #ef4444;
+            transform-origin: left center;
+            transform: rotate(0deg);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            z-index: 15;
+            display: none; /* Hidden by default, shown via JS or specific media query if strictly positioned */
+        }
+        /* Desktop visual string simulation */
+        @media (min-width: 768px) {
+            .red-string-connector {
+                width: 60px;
+                height: 4px;
+                background-color: #ef4444;
+                position: relative;
+                top: 50px;
+                transform: rotate(15deg);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                z-index: 5;
+                flex-shrink: 0;
+                margin: 0 -10px;
+            }
+        }
+
+        .navbar-content { flex: 0 0 60px; z-index: 50; }
+        .footer-content { flex: 0 0 60px; z-index: 50; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
+        .page.active { display: block; }
+
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        .blueprint-mode .choice-btn { background-color: #1e293b !important; border-color: #334155 !important; }
+
+        .tablet-frame.expanded-mode { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; aspect-ratio: unset !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; z-index: 9999 !important; background: #F7F7F7 !important; box-shadow: none !important; }
+        .tablet-frame.expanded-mode::before { display: none !important; }
+        .tablet-frame.expanded-mode .screen-container { border-radius: 0 !important; }
+
+        @media (max-width: 768px) {
+            html, body { position: fixed; width: 100%; height: 100dvh; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            main { padding: 0 !important; height: 100dvh !important; width: 100% !important; display: block; position: fixed; top: 0; left: 0; }
+            .tablet-frame { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #F7F7F7 !important; aspect-ratio: unset !important; transform: none !important; }
+            .tablet-frame::before { display: none !important; }
+            .screen-container { width: 100%; height: 100%; border-radius: 0 !important; box-shadow: none !important; display: flex; flex-direction: column; background: #F7F7F7; overflow: hidden; position: relative; }
+            header.navbar-content { padding-top: max(env(safe-area-inset-top), 12px); min-height: 60px; padding-bottom: 12px; z-index: 50; background-color: #357889; }
+            footer.footer-content { position: absolute; bottom: 0; left: 0; width: 100%; padding-bottom: max(env(safe-area-inset-bottom), 20px); padding-top: 12px; min-height: 80px; z-index: 100; background-color: white; border-top: 1px solid #e5e7eb; }
+            .page { padding-bottom: 120px !important; }
+            
+            /* Mobile adjustment */
+            .evidence-photo { margin-right: 0; margin-bottom: 15px; }
+            .sticky-note-clue { width: 90%; max-width: 100%; margin-bottom: 20px; }
+            .red-string-connector { display: none; } /* Hide string on mobile stack */
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-0 md:py-8 h-[100dvh] w-full">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-slate-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative">
+                                <div class="absolute inset-0 bg-white/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <h2 class="text-xl md:text-3xl font-heading font-bold text-white mb-1 relative z-10">Allgood Academy</h2>
+                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-allgood-primary tracking-tighter relative z-10 drop-shadow-md">Master Your Story</h1>
+                                <p class="mt-2 text-white/80 relative z-10 font-body text-sm font-semibold">Reclaiming Control of Your Emotions Challenge</p>
+                            </div>
+                            <p class="mt-12 text-white/80 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-white transition-colors animate-pulse font-body">Click to Power Up</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. LOGIN MODAL -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 font-body border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged to improve the experience.</p>
+                                </div>
+                            </button>
+                        </div>
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary outline-none transition-all font-body">
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] font-body uppercase">Start Challenge</button>
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        <button onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. HEADER -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Welcome: Learner</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 18</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <!-- FIXED: Swapped SVG for Font Awesome Icon -->
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i class="fas fa-home text-xl"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg></button>
+                            <button id="fullscreen-toggle" class="hidden sm:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- 4. MODALS (Scenario Feedback & Menu) -->
+                <div id="scenario-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-4 modal-transition" onclick="window.closeScenarioModal(false)">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center relative border-t-4 border-allgood-secondary" onclick="event.stopPropagation()">
+                        <div id="scenario-icon" class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl transition-colors"></div>
+                        <h3 id="scenario-title" class="text-xl font-heading font-bold text-allgood-dark mb-2"></h3>
+                        <div id="scenario-feedback" class="text-sm text-gray-600 font-body mb-6 leading-relaxed text-left"></div>
+                        <button id="scenario-modal-next-btn" class="bg-allgood-dark text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-allgood-primary transition-colors shadow-md">Next Scenario</button>
+                    </div>
+                </div>
+
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Table of Contents</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                    </div>
+                </div>
+
+                <!-- 5. System Menu Modal -->
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4"><i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
+                        <div class="space-y-3">
+                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center"><i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out</button>
+                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center"><i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard</button>
+                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAGES -->
+                <!-- Page 1: Cover -->
+                <div class="page active" id="page-1">
+                    <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-12">
+                        <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">Master Your Story<br><span class="text-allgood-primary">Challenge</span></h1>
+                        <div class="w-full max-w-lg text-left mx-auto">
+                            <!-- RESTORED ACCORDION -->
+                            <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                <svg class="accordion-icon h-5 w-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
+                                <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m5 5v-4m0 4h-4" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark shrink-0"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white border border-gray-200 p-6 rounded-lg shadow-md mt-6">
+                                <h3 class="font-bold text-allgood-dark text-lg mb-2"><i class="fas fa-list-check mr-2 text-allgood-primary"></i>Mission Rules</h3>
+                                <ul class="text-sm text-gray-600 space-y-2 list-disc list-inside">
+                                    <li><strong>15 Scenarios:</strong> Real-world conflict situations.</li>
+                                    <li><strong>Challenge the Story:</strong> Identify the negative "Inner Story".</li>
+                                    <li><strong>Scoring:</strong> Most Effective (3pts), Less Effective (1pt), Least Effective (0pts).</li>
+                                    <li><strong>Goal:</strong> Score <strong>40+</strong> to earn the Story Architect badge.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page 2: Setup -->
+                <div class="page" id="page-2">
+                    <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-2xl font-heading font-bold text-allgood-secondary">Meet David</h2></section>
+                    <div class="flex flex-col items-center justify-center mb-8">
+                        <!-- UPDATED: Replaced Icon Placeholder with Custom Image -->
+                        <div class="w-48 h-48 rounded-full border-4 border-allgood-primary shadow-lg overflow-hidden mb-6 bg-gray-100 relative group">
+                            <img src="https://i.ibb.co/84Ms1BBp/2025-11-26-20-13-38.png" alt="David" class="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110">
+                        </div>
+                        
+                        <p class="text-center text-gray-600 max-w-md text-lg leading-relaxed px-4">
+                            David is a student at South Savannah High School. As he navigates through the school day, he faces many high-stakes social scenarios.
+                        </p>
+                        
+                        <div class="bg-blue-50 border-l-4 border-allgood-primary p-4 mt-6 max-w-md mx-auto shadow-sm rounded-r-lg">
+                            <p class="text-center font-bold text-allgood-dark text-sm">
+                                Your job is to navigate David through the day by choosing the actions that serve his long-term goals best.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Scenarios (3-17) -->
+                <div class="page" id="page-3" data-scenario-index="1"></div>
+                <div class="page" id="page-4" data-scenario-index="2"></div>
+                <div class="page" id="page-5" data-scenario-index="3"></div>
+                <div class="page" id="page-6" data-scenario-index="4"></div>
+                <div class="page" id="page-7" data-scenario-index="5"></div>
+                <div class="page" id="page-8" data-scenario-index="6"></div>
+                <div class="page" id="page-9" data-scenario-index="7"></div>
+                <div class="page" id="page-10" data-scenario-index="8"></div>
+                <div class="page" id="page-11" data-scenario-index="9"></div>
+                <div class="page" id="page-12" data-scenario-index="10"></div>
+                <div class="page" id="page-13" data-scenario-index="11"></div>
+                <div class="page" id="page-14" data-scenario-index="12"></div>
+                <div class="page" id="page-15" data-scenario-index="13"></div>
+                <div class="page" id="page-16" data-scenario-index="14"></div>
+                <div class="page" id="page-17" data-scenario-index="15"></div>
+
+                <!-- Page 18: Conclusion (Replaced with Master Template Ending) -->
+                <div class="page" id="page-18">
+                    <div class="flex flex-col items-center justify-start min-h-full py-10 text-center px-6">
+                        <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-8">Congratulations!</h2>
+
+                        <!-- FEEDBACK SECTION -->
+                        <div id="feedback-container" class="w-full max-w-md mx-auto bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-12 text-left relative">
+                            <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this GoodBlock</h3>
+                            <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                <button onclick="window.setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                            </div>
+                            <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback sharpens our tools. What worked? What didn't?</label>
+                            <textarea id="feedback-text" rows="3" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50" placeholder="Optional: Share your thoughts..."></textarea>
+                            <button onclick="window.submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm">Send Feedback</button>
+                        </div>
+                        <div id="feedback-success" class="hidden w-full max-w-md mx-auto bg-green-50 p-6 rounded-lg shadow-inner border border-green-200 mb-12 text-center">
+                            <i data-lucide="check-circle" class="w-12 h-12 text-green-600 mx-auto mb-2"></i>
+                            <h3 class="font-bold text-green-800">Feedback Received.</h3>
+                            <p class="text-xs text-green-700 mt-1">Thank you for helping us improve.</p>
+                        </div>
+
+                        <div class="mb-8 transform scale-90 sm:scale-100 transition-transform" id="badge-container"></div>
+                        
+                        <!-- Dynamic Badge Download Button -->
+                        <a id="download-badge-btn" href="#" download="Allgood_Badge.svg" class="w-full max-w-xs bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all transform active:scale-95 flex items-center justify-center mb-12 group">
+                            <i data-lucide="download" class="w-5 h-5 mr-2 group-hover:animate-bounce"></i><span>Download Badge</span>
+                        </a>
+
+                        <button onclick="window.performHardReset()" class="text-allgood-secondary font-bold text-sm hover:underline mt-4">Retake Challenge</button>
+                    </div>
+                </div>
+
+                <!-- FOOTER -->
+                <footer class="footer-content flex items-center justify-between px-4 sm:px-6 shrink-0 z-50 bg-white">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body p-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg><span class="hidden sm:inline">Back</span></button>
+                    <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold no-underline">Allgood Academy</a></p>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-4 sm:px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body"><span class="hidden sm:inline">Next</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
+                </footer>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume().catch(e => console.error(e)); }
+        function playTone(f,t,d,v=0.1) { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=t; o.frequency.setValueAtTime(f,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(v,audioCtx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+d); }
+        const sfx = {
+            powerOn: () => { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type='triangle'; o.frequency.setValueAtTime(110,audioCtx.currentTime); o.frequency.exponentialRampToValueAtTime(220,audioCtx.currentTime+0.4); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(0.4,audioCtx.currentTime+0.1); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+0.4); },
+            powerOff: () => playTone(80, 'triangle', 0.2, 0.5), nav: () => playTone(150, 'sine', 0.1, 0.1), tick: () => playTone(1000, 'sine', 0.01, 0.01)
+        };
+        window.sfx = sfx; window.initAudio = initAudio;
+
+        // --- GLOBAL STATE ---
+        let currentPageIndex = 0; 
+        const TOTAL_PAGES = 18; 
+        const TOTAL_SCENARIOS = 15;
+        const MAX_SCORE = 45; 
+        const BADGE_THRESHOLD = 40;
+        let totalChallengeScore = 0;
+        let answeredScenarioScores = {};
+
+        // Helper: Shuffle Array (Fisher-Yates)
+        function shuffleArray(array) {
+            let currentIndex = array.length, randomIndex;
+            // While there remain elements to shuffle.
+            while (currentIndex != 0) {
+                // Pick a remaining element.
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                // And swap it with the current element.
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        // --- SCENARIO DATA (MIGRATED 1-TO-1 FROM OLD FILE) ---
+        const SCENARIO_DATA = [
+            { 
+                type: 'detective', 
+                icon: 'message-square', 
+                context: "David watches Alice take the stage for the Geology presentation. When she hits the \"next slide\" button, his stomach completely drops. She's acting like the brilliant idea he gave her at the coffee shop is all hers.", 
+                innerStory: "He's thinking: 'She's a total snake who planned this. I can't believe she just stole my work!'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David fires off an urgent email to the professor and Alice demanding: \"I need credit for this right now! Alice stole my idea!\"", score: 0, effectiveness: "Least Effective", feedback: "When David hits send on that email, David destroys trust. His anger took over, and now Alice and his professor see him as demanding, making it harder for anyone to help him." }, 
+                    { text: "David decides to say nothing, packs his bag as soon as the bell rings, and avoids Alice for the rest of the semester.", score: 1, effectiveness: "Less Effective", feedback: "This assumes powerlessness and leads to avoiding the issue by withdrawing. David accepted the belief that \"there's nothing to be done\" and hurt himself (and the team) by keeping his good ideas hidden." }, 
+                    { text: "David takes a breath, then sends Alice a private message saying, \"Hey, I saw your slide. Did I miss a detail when we talked? Can we clarify that idea?\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to check his assumptions and act safely. He separated his feeling from the facts and chose a respectful, private way to clarify the truth." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'users', 
+                context: "David's Student Council advisor sees David's detailed plan for the spring festival. They cut David off, saying, \"I'm stopping this now. I just don't trust this idea; go back to the basic plan.\"", 
+                innerStory: "He's thinking: 'They don't respect me or trust me. My hard work was a total waste.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David focuses on his goals, then asks the advisor privately, \"I really want this plan to work. What specific facts made you lose trust, and how can I fix those?\"", score: 3, effectiveness: "Most Effective", feedback: "You guided David to focus on his true goals (<strong>solution AND respect</strong>). He moved from feeling powerless to taking purposeful action, targeting the reason for the rejection (trust)." }, 
+                    { text: "David argues fiercely right there in the office, repeating his data points until the advisor finally gives in.", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior. David is acting on the belief that \"I have to win.\" David may win the battle, but he damages mutual respect, making future collaboration harder." }, 
+                    { text: "David quietly scraps the proposal and works only on tasks the advisor explicitly assigns, complaining to all his friends that the advisor is unfair.", score: 1, effectiveness: "Less Effective", feedback: "This is avoiding the issue driven by the assumption of powerlessness. David is making a self-sabotage of his own competence by letting fear determine his contribution." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'home', 
+                context: "David's roommate, Alex, walks past, and David overhears Alex joke loudly to a friend, \"Look, David's washing his one dish for the week. Hope they don't break their back!\"", 
+                innerStory: "He's thinking: 'They think I'm lazy. I'm always the one getting blamed, so why even try?'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David chooses to address his part first, finding Alex later to say, \"I missed the chore I promised. That's on me. Next time, just tell me what's up instead of joking, okay?\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to focus on his influence. David addresses his own miss first and then calmly sets a boundary for respectful communication." }, 
+                    { text: "David shouts back from the kitchen, \"Stop making those passive-aggressive comments, Alex! I'm doing the best I can!\"", score: 1, effectiveness: "Less Effective", feedback: "David correctly addressed the behavior but moved to aggression. While setting a boundary, he hasn't identified the root cause or addressed his own contribution to the conflict." }, 
+                    { text: "David starts making equally harsh sarcastic jokes about Alex's messy side of the room to \"level the playing field.\"", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior. David is engaging in a battle of wits rather than dialogue, escalating the conflict and confirming the belief that the situation is beyond solving." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'message-square-off', 
+                context: "In David's Project Discord, a teammate, Kai, suddenly posts a shocking, offensive meme that causes immediate angry reactions and chaos in the chat.", 
+                innerStory: "He's thinking: 'This person is intentionally trying to blow up the group. They're a toxic problem.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David immediately sends Kai a private message asking, \"Hey, what was the idea behind that post? People are getting upset, and I want to make sure you're protected.\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to check his assumptions by seeking clarity respectfully. This keeps his anger in check and allows him to approach Kai as a teammate, not a threat." }, 
+                    { text: "David decides to try to have Kai removed, believing: \"They did this on purpose to get attention. I need to make sure they're removed from the team immediately.\"", score: 0, effectiveness: "Least Effective", feedback: "This acts fully on the negative assumption (assigning bad motive). David is prioritizing punishment and revenge over mutual purpose (improving the team's reputation), which will shut down dialogue." }, 
+                    { text: "David decides: \"It's not my job to parent them. I'm just leaving the chat until someone else deals with this problem.\"", score: 1, effectiveness: "Less Effective", feedback: "This is avoiding the issue and assumes powerlessness disguised as good judgment. David is passing the responsibility to avoid the crucial conversation required for team health." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'briefcase', 
+                context: "In David's internship review, his supervisor only talks about the 3 days David spent organizing a closet, completely skipping over David's huge, successful presentation. David feels totally ignored.", 
+                innerStory: "He's thinking: 'I am a victim of my supervisor's ignorance. They have no idea what I actually do!'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David schedules a short meeting, and asks with a respectful tone, \"I want to improve. Can you tell me what specific steps I missed on that task to make it a weakness on my review?\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to shift from focusing on blame to focusing on his influence by asking for the facts behind the perception. This ensures David gets clarity without being aggressive." }, 
+                    { text: "David assumes the supervisor is right and immediately starts overhauling his entire work process, even the successful parts he knows are good.", score: 1, effectiveness: "Less Effective", feedback: "David has accepted a flawed negative assumption. He's self-sabotaged the successful aspects of his work. The goal should be dialogue to gain clarity, not blind compliance." }, 
+                    { text: "David schedules a follow-up meeting and spends the entire time detailing every success he's had to prove the supervisor wrong.", score: 0, effectiveness: "Least Effective", feedback: "David is still focusing on blame and self-pity, trying to counter the supervisor's perception. This is aggressive behavior as he tries to force his perspective rather than achieve mutual understanding." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'alert-triangle', 
+                context: "David's final project deadline passes because the main server crashed again—it's the second time this semester.", 
+                innerStory: "He's thinking: 'This is totally outside my control. I am a victim of a broken system, and I just have to accept the failure.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David immediately emails his project leader explaining the server crash (the fact), and details the two specific steps he'll take to prevent future crashes.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to take control of his role (<strong>actor</strong>). David is focusing on controlling the controllables (communication and backup systems) to ensure results, rather than giving up." }, 
+                    { text: "David tells his project leader he is frustrated and will be avoiding all tasks that rely on the faulty system until someone fixes it.", score: 1, effectiveness: "Less Effective", feedback: "David correctly identified the problem but moved to avoiding the issue. While stating a boundary, he's embracing the assumption of powerlessness by taking zero responsibility for finding a creative workaround." }, 
+                    { text: "David apologizes profusely and takes all the blame for the failure, hoping to gain sympathy and avoid detailed questions.", score: 0, effectiveness: "Least Effective", feedback: "This focuses on self-pity (victim). David avoided the crucial conversation about the root cause (the system) and self-sabotaged his credibility for temporary safety." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'users', 
+                context: "In David's study group, every time David starts talking, Ben, cuts him off with a loud, \"That's not right,\" before David can finish his point.", 
+                innerStory: "He's thinking: 'This person is selfish and controlling. They think their ideas are the only ones that matter.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David pulls Ben aside after the meeting to say, \"Hey, I noticed you cut me off a couple times. I'm guessing you're excited, but can we agree to let each other finish our thoughts?\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to act safely and respectfully. He addressed the behavior privately and tentatively, which avoids making Ben defensive and preserves mutual respect." }, 
+                    { text: "David thinks: \"I'm bad at speaking up, and they are just a loud person. I need to accept that I'll always be talked over.\"", score: 1, effectiveness: "Less Effective", feedback: "This assumes powerlessness disguised as self-reflection. David accepts powerlessness and fails to recognize his ability to use assertive communication skills to intervene." }, 
+                    { text: "David waits until Ben interrupts him again, then loudly says, \"I'm speaking! Stop interrupting me, now!\"", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior driven by the negative assumption. David let his emotion build and reacted in a way that destroys mutual respect, guaranteeing Ben will become defensive." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'message-square', 
+                context: "David's roommate, Sam, hasn't come out of his room all weekend. When David texts, Sam only replies with \"K.\"", 
+                innerStory: "He's thinking: 'I failed to connect, so the situation is beyond my help. I should just leave him alone.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David walks to Sam's door and gently says, \"Hey, you seem quiet. I'm not here to judge or fix anything. I just wanted to check in and let you know I'm here.\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to actively explore the other's path and open the door for the conversation by tentatively voicing the barrier to safety, which helps create a trusting environment." }, 
+                    { text: "David stops initiating conversations about Sam's feelings altogether, only talking about surface-level topics like school or work.", score: 1, effectiveness: "Less Effective", feedback: "This is avoiding the issue driven by the assumption of powerlessness. David is accepting a dysfunctional equilibrium, reinforcing the belief that the relationship cannot be improved." }, 
+                    { text: "David demands Sam tell him what's wrong: \"I'm your roommate/partner, and I deserve to know why you're ignoring me.\"", score: 0, effectiveness: "Least Effective", feedback: "This moves to aggressive behavior and confirms the story that Sam is unsafe talking to David. This is the surest way to reinforce Sam's avoiding the issue by withdrawing." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'home', 
+                context: "David's roommate just bought a giant 60-inch TV for their small dorm room, breaking the clear agreement to save that money for the security deposit.", 
+                innerStory: "He's thinking: 'They are intentionally disrespecting the budget and me. This is sabotage.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David focuses on the TV purchase (the fact), then privately asks his roommate, \"I saw the TV. Can you explain the facts? What happened to the security deposit money we agreed on?\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to check his assumptions by looking for a neutral cause. This allows David to calmly investigate the underlying purpose for the overspending, rather than just labeling the roommate 'irresponsible'." }, 
+                    { text: "David just accepts the purchase and works extra hours over the weekend to cover the deficit without mentioning the violation.", score: 1, effectiveness: "Less Effective", feedback: "This is a self-sabotage driven by the assumption of powerlessness. David is enabling the pattern by taking on the burden, ensuring it will happen again. David misses the crucial conversation about setting boundaries." }, 
+                    { text: "David threatens to pull all shared funds and demands they return the item immediately, or he will call the landlord.", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior. David is prioritizing punishment over mutual purpose (reliable financial financial planning). David hasn't explored the reason behind the violation." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'frown', 
+                context: "David posts his scholarship acceptance on Instagram. An old high school acquaintance comments, \"Must be nice to have so much free time to apply to those.\"", 
+                innerStory: "He's thinking: 'They are jealous and trying to make my work seem worthless. I am a victim of their petty cruelty.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David responds to the comment by posting a follow-up story: \"Thanks! That scholarship took 60 hours of work, but totally worth it. Let's talk about how to apply!\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to focus on his influence (actor). By focusing on the facts (the 60 hours of work), David removes the emotional sting of the comment and shifts the conversation to a productive topic." }, 
+                    { text: "David sends a private message explaining his 60-hour work week and all the sacrifices he made to prove how much he suffered.", score: 1, effectiveness: "Less Effective", feedback: "David still hasn't fixed the self-pity mindset. He is seeking validation for his suffering, which is often unproductive and will invite more defensiveness, not mutual respect." }, 
+                    { text: "David replies publicly: \"It's called hard work, something you clearly know nothing about, but I'm sure you'll figure it out!\"", score: 0, effectiveness: "Least Effective", feedback: "David acted on the negative assumption with aggressive behavior. His goal shifted from pride in his achievement to revenge, escalating the online conflict." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'credit-card', 
+                context: "David forgot to cancel the 7-day free trial for the \"Zen Focus\" app. Now his card has a \$59 charge, and there's no way to call customer service.", 
+                innerStory: "He's thinking: 'I've been scammed! I am powerless against this giant company, and I just lost $59.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David researches the app's billing policy, then emails customer service politely stating the facts and asking for a one-time refund.", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to take control of his role (<strong>actor</strong>). David is focusing on his ability to use communication skills to influence the company, rather than accepting the loss." }, 
+                    { text: "David immediately pays the bill, but spends the next hour researching how to ruin the company's reputation online.", score: 1, effectiveness: "Less Effective", feedback: "This is a self-sabotage leading to revenge. David accepted the loss (powerless) and compensated by moving to unproductive aggressive behavior, missing the window for actual dialogue with the company." }, 
+                    { text: "David yells about the unfairness of the world to his friends, throws the bill away, and does nothing.", score: 0, effectiveness: "Least Effective", feedback: "This is a direct reaction of aggressive behavior toward people who can't help. David is sacrificing his emotional health for the sake of avoiding the crucial conversation with the company." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'users', 
+                context: "David's team member, Maya, never takes notes during the weekly group Zoom call. Every time, she asks, \"Wait, what were the due dates again?\"", 
+                innerStory: "He's thinking: 'She is lazy and doesn't care about the project. She expects me to do all the work.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David sends Maya a direct chat saying, \"I noticed you asked for the due dates again. Could we talk about an easy way for both of us to track action items during the call?\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to check his assumptions by focusing on a solution (easy tracking) rather than her motive (laziness). This allows David to suggest a solution respectfully." }, 
+                    { text: "David takes over all the note-taking himself without saying anything, accepting the increased workload to ensure success.", score: 1, effectiveness: "Less Effective", feedback: "This is a self-sabotage driven by the assumption of powerlessness. David avoided the crucial conversation and reinforced the belief that Maya doesn't need to change, enabling the poor behavior." }, 
+                    { text: "David sends an email to the whole team: \"We have inconsistent note-taking, so I'm implementing a mandatory template.\"", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior. David is punishing the whole group for one person's behavior, which breeds resentment and violates mutual respect with everyone else." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'image-off', 
+                context: "David checks Snapchat and sees photos of his close friends laughing and eating pizza at his favorite spot—and he wasn't invited.", 
+                innerStory: "He's thinking: 'They are trying to exclude me. I am being actively rejected.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David decides to approach the closest friend later and casually say, \"I saw the pizza pics—it looked great! Next time, give me a heads-up if you guys are going.\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to check his assumptions by choosing a safe, private action. This calms his emotional reaction and allows him to set a boundary with curiosity, not accusation." }, 
+                    { text: "David posts a cryptic, sad status update on social media about feeling lonely and unwanted.", score: 1, effectiveness: "Less Effective", feedback: "This is avoiding the issue. David is acting on self-pity, seeking sympathy rather than clarity or mutual purpose." }, 
+                    { text: "David confronts immediately a person in the group: \"Why did you exclude me? Was it because of what I said yesterday?\"", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior based purely on an unverified negative assumption. David is demanding an answer, which destroys safety and invites immediate defensiveness." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'message-circle', 
+                context: "David leads the Student Council's Food Drive. A student posts a public comment claiming: \"The only reason you do this is to boost your college resume.\"", 
+                innerStory: "He's thinking: 'This person is jealous and trying to sabotage my good work. I have to fight back!'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David publicly posts a reply that only addresses the facts: \"Thanks for the feedback. The Food Drive is collecting donations behind the library until 5 PM today.\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to separate facts from the attack and focus on the goal (the Food Drive). David prioritized learning over defending his ego, which is essential for leadership." }, 
+                    { text: "David replies to the public critique, defending his motives and credentials in a long, detailed post.", score: 1, effectiveness: "Defensive", feedback: "David is still focusing on self-defense over progress. David is engaging in a public argument that distracts from the initiative's true purpose." }, 
+                    { text: "David tries to get the post taken down and reports the user for harassment.", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior and accepting the negative assumption as fact. David is trying to suppress dissent rather than engage, which is anti-dialogue and harmful to the community." } 
+                ] 
+            },
+            { 
+                type: 'detective', 
+                icon: 'users', 
+                context: "David finishes presenting the Art Club budget to the treasurer. The treasurer just stares at their screen for 10 seconds, says, \"Talk next week,\" and immediately closes their laptop.", 
+                innerStory: "He's thinking: 'They are trying to manipulate me and gain control. They're being rude on purpose.'", 
+                question: "Before David acts, what is the best way to check his assumptions and choose a purposeful action?", 
+                choices: [ 
+                    { text: "David checks his motives, then sends a quick email asking, \"I noticed you closed your laptop quickly. Can you share the top three facts that made you hesitate about the budget plan?\"", score: 3, effectiveness: "Most Effective", feedback: "This is the most effective choice. You guided David to check his true goals (<strong>fair budget AND respect</strong>) and check his assumptions. David turns the perceived manipulation into a simple hesitation, which safely invites dialogue." }, 
+                    { text: "David sends a new, less generous offer, hoping to shock them into responding immediately.", score: 0, effectiveness: "Least Effective", feedback: "This is aggressive behavior. David is acting on the negative assumption by treating them as an adversary to be manipulated, which is likely to damage mutual respect." }, 
+                    { text: "David assumes the negotiation is dead and immediately escalates the issue to the club president.", score: 1, effectiveness: "Less Effective", feedback: "This is avoiding the issue driven by self-pity (I'm being rejected). David has assumed the worst outcome without checking the facts or exploring the cause of their silence." } 
+                ] 
+            }
+        ];
+
+        // --- APP LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const pages = document.querySelectorAll('.page');
+            const nextButton = document.getElementById('next-button');
+            const backButton = document.getElementById('back-button');
+            const progressBar = document.getElementById('flex-progress-fill');
+            const startupScreen = document.getElementById('startup-screen');
+            const loginModal = document.getElementById('login-modal');
+
+            // --- MENU LOGIC ---
+            function updateTOC() {
+                const tocList = document.getElementById('toc-list');
+                tocList.innerHTML = '';
+                const addLink = (text, idx, bold=false) => {
+                    const btn = document.createElement('button');
+                    btn.className = `w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 rounded ${bold ? 'font-bold' : ''}`;
+                    btn.textContent = text;
+                    btn.onclick = () => { window.showPage(idx); window.closeMenuModal(); };
+                    tocList.appendChild(btn);
+                }
+                addLink("1. Cover Page", 0, true);
+                addLink("2. Meet David", 1, true);
+                const div = document.createElement('div');
+                div.className = "px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2";
+                div.textContent = "Scenarios";
+                tocList.appendChild(div);
+                SCENARIO_DATA.forEach((s, i) => addLink(`${i+1}. ${s.context.substring(0, 30)}...`, i+2));
+                addLink("18. Conclusion", 17, true);
+            }
+
+            // Navigation
+            window.showPage = function(index) {
+                if (index < 0 || index >= TOTAL_PAGES) return;
+                
+                // Check completion before allowing entry to Page 18 (Index 17)
+                if (index === 17 && Object.keys(answeredScenarioScores).length < TOTAL_SCENARIOS) {
+                    window.showScenarioOutcome('challenge-incomplete'); return;
+                }
+
+                if(window.sfx) window.sfx.nav();
+                pages.forEach(p => p.classList.remove('active'));
+                pages[index].classList.add('active');
+                currentPageIndex = index;
+                pages[index].scrollTop = 0;
+                
+                backButton.disabled = (index === 0);
+                backButton.classList.toggle('opacity-0', index === 0);
+                
+                const nextSpan = nextButton.querySelector('span');
+                const startSpan = nextButton.querySelector('.hidden.sm\\:inline');
+                let btnText = 'Next';
+                
+                if (index === 0) btnText = 'Start Challenge';
+                else if (index === 17) { 
+                    // Hide Next button on final page
+                    nextButton.style.display = 'none';
+                    // Trigger Badge Generation
+                    window.generateBadge();
+                    // Log Final Score
+                    window.logFinalScoreToFirestore({ finalScore: totalChallengeScore, rank: "Completed", completed: true, sessionId: window.sessionId });
+                } else {
+                    nextButton.style.display = 'flex'; // Ensure it's visible for other pages
+                }
+
+                if (index >= 2 && index < 17) { 
+                    btnText = Object.keys(answeredScenarioScores).length === 15 ? 'View Score' : 'Next'; 
+                }
+                
+                if(startSpan) startSpan.textContent = btnText;
+                
+                progressBar.style.width = `${((index + 1) / TOTAL_PAGES) * 100}%`;
+                document.getElementById('header-page-indicator').textContent = `${index + 1} / ${TOTAL_PAGES}`;
+            }
+
+            // Scenario Renderer - The Engine
+            function getScenarioTemplate(type, context, innerStory, choicesHtml, feedbackHtml) {
+                
+                // Common Choices/Feedback Wrapper
+                const interactionWrapper = `
+                    <div class="mt-4 pt-4 border-t border-gray-300">
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Case Files (Select One):</p>
+                        <div class="space-y-2">${choicesHtml}</div>
+                        ${feedbackHtml ? `<div class="mt-3 animate-fade-in">${feedbackHtml}</div>` : ''}
+                    </div>`;
+
+                // The "Detective Board" Template
+                return `
+                <div class="relative w-full max-w-2xl mx-auto corkboard-bg p-4 sm:p-8 rounded-lg shadow-inner border-[12px] border-[#8d6e63] min-h-[600px] flex flex-col font-mono">
+                    
+                    <!-- Board Title -->
+                    <div class="bg-white/80 backdrop-blur-sm px-4 py-2 mb-6 border-b border-gray-300 transform -rotate-1 self-center shadow-sm">
+                        <span class="text-xs font-bold text-red-700 uppercase tracking-widest">Case Evidence #${currentPageIndex - 1}</span>
+                    </div>
+
+                    <div class="flex-1 relative flex flex-col sm:flex-row items-start sm:items-center">
+                        <!-- Evidence Photo (The Context) -->
+                        <div class="evidence-photo transform -rotate-2 hover:rotate-0 transition-transform duration-300 cursor-pointer z-10 relative">
+                            <div class="evidence-photo-content">
+                                "${context}"
+                            </div>
+                            <div class="absolute bottom-2 right-2 text-[10px] text-gray-400 font-sans">EVIDENCE A</div>
+                        </div>
+
+                        <!-- Red String Connector (Desktop Only) -->
+                        <div class="red-string-connector hidden sm:block"></div>
+
+                        <!-- Sticky Note (The Inner Story/Assumption) -->
+                        <div class="sticky-note-clue">
+                            "${innerStory}"
+                        </div>
+                    </div>
+
+                    <!-- Interaction Area (Manila Folder Style) -->
+                    <div class="bg-[#f0e6d2] p-6 -mx-2 -mb-2 mt-8 rounded-t-lg shadow-lg border-t border-[#dccfb9] relative z-30">
+                        <div class="absolute -top-3 left-0 w-24 h-4 bg-[#f0e6d2] rounded-t-lg border-t border-l border-r border-[#dccfb9]"></div>
+                        ${interactionWrapper}
+                    </div>
+                </div>`;
+            }
+
+            function renderScenarioPage(pageElement, scenarioIndex) {
+                const data = SCENARIO_DATA[scenarioIndex - 1];
+                const isAnswered = answeredScenarioScores[scenarioIndex] !== undefined;
+                
+                // Create a copy of choices to shuffle, preserving original indices/structure if needed
+                // We map original indices to the objects so we know which one was clicked
+                let choicesToRender = data.choices.map((c, i) => ({...c, originalIndex: i}));
+                
+                // Shuffle if not answered yet (or keep shuffled order if we stored it? 
+                // For simplicity in this static engine, we re-shuffle or simple random sort. 
+                // To keep consistency if user goes back/forth, we should ideally seed it, 
+                // but strictly for "next" flow, shuffling here is fine as long as we don't re-render actively.
+                // However, since we re-render on page load, simple shuffle might change order on Back button.
+                // A pragmatic fix: Use a deterministic sort based on text length or hash for stability, OR just shuffle.
+                // Given the prompt "correct answer is always first", we just need to break that pattern.
+                
+                // Stable Shuffle using a simple seed based on scenario text length to keep it consistent across navigations
+                // (Pragmatic hack to avoid complex state management for order)
+                if (!isAnswered) {
+                    // Seeded random-like sort based on text content length to be deterministic but "random"
+                    choicesToRender.sort((a, b) => {
+                        let seed = (a.text.length + scenarioIndex) % 3;
+                        if (seed === 0) return 1;
+                        if (seed === 1) return -1;
+                        return 0;
+                    });
+                } else {
+                    // If answered, we likely want to see the order we clicked? 
+                    // Or just keep the deterministic sort. Let's keep deterministic.
+                    choicesToRender.sort((a, b) => {
+                         let seed = (a.text.length + scenarioIndex) % 3;
+                        if (seed === 0) return 1;
+                        if (seed === 1) return -1;
+                        return 0;
+                    });
+                }
+                
+                // Actually, a true random shuffle is better for the first time. 
+                // Let's just use the shuffleArray helper. 
+                // Note: If user goes 'Back', order might change. That is acceptable for this MVP phase.
+                choicesToRender = shuffleArray(choicesToRender);
+
+                let choicesHtml = choicesToRender.map((choice) => {
+                    let btnClass = 'w-full text-left p-3 rounded-md text-xs font-medium transition-all shadow-sm border choice-btn';
+                    if (isAnswered) {
+                        if (choice.score === 3) btnClass += ' choice-correct';
+                        else if (answeredScenarioScores[scenarioIndex] === choice.score) btnClass += choice.score === 1 ? ' choice-less-effective' : ' choice-least-effective';
+                        else btnClass += ' opacity-50 bg-gray-50';
+                    }
+                    const disabledAttr = isAnswered ? 'disabled' : '';
+                    
+                    // Note: We pass originalIndex to selectScenarioChoice so it looks up the correct data in SCENARIO_DATA
+                    return `<button class="${btnClass}" onclick="window.selectScenarioChoice(${scenarioIndex}, ${choice.originalIndex})" ${disabledAttr}>
+                        <span class="font-bold mr-2 text-allgood-primary">FILE ${String.fromCharCode(65 + Math.floor(Math.random()*26)) /* Cosmetic Random Letter or just generic icon */}:</span>
+                        <i class="fas fa-file-alt mr-2 opacity-50"></i>
+                        ${choice.text}
+                    </button>`;
+                }).join('');
+
+                let feedbackHtml = '';
+                if (isAnswered) {
+                    const chosen = data.choices.find(c => c.score === answeredScenarioScores[scenarioIndex]);
+                    let bgClass = chosen.score === 3 ? 'bg-emerald-50 border-emerald-100' : (chosen.score === 1 ? 'bg-amber-50 border-amber-100' : 'bg-rose-50 border-rose-100');
+                    let textClass = chosen.score === 3 ? 'text-emerald-800' : (chosen.score === 1 ? 'text-amber-800' : 'text-rose-800');
+                    feedbackHtml = `
+                    <div class="${bgClass} border rounded p-3 text-xs ${textClass}">
+                        <strong class="block mb-1 uppercase tracking-wide text-[10px]">${chosen.effectiveness}</strong>
+                        ${chosen.feedback}
+                    </div>`;
+                }
+
+                // Render specific visual template
+                const visualHtml = getScenarioTemplate(data.type || 'detective', data.context, data.innerStory, choicesHtml, feedbackHtml);
+
+                pageElement.innerHTML = `
+                    <div class="h-full flex flex-col justify-center">
+                        <div class="flex-1 overflow-y-auto px-2 sm:px-4 pb-20 pt-4">
+                            ${visualHtml}
+                        </div>
+                    </div>`;
+            }
+
+            // IMPORTANT: Restored missing functions
+            window.showScenarioOutcome = (title, text, iconClass, iconInner) => {
+                if (title === 'challenge-incomplete') {
+                    document.getElementById('scenario-title').textContent = "Incomplete";
+                    document.getElementById('scenario-feedback').textContent = "Please answer all questions.";
+                    document.getElementById('scenario-icon').className = "mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl bg-red-100 text-red-600";
+                    document.getElementById('scenario-icon').innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                    document.getElementById('scenario-modal-next-btn').onclick = () => window.closeScenarioModal(false);
+                } else {
+                    document.getElementById('scenario-title').textContent = title;
+                    document.getElementById('scenario-feedback').innerHTML = text; 
+                    document.getElementById('scenario-icon').className = `mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl ${iconClass}`;
+                    document.getElementById('scenario-icon').innerHTML = iconInner;
+                    document.getElementById('scenario-modal-next-btn').onclick = () => window.closeScenarioModal(true);
+                }
+                document.getElementById('scenario-modal').classList.remove('hidden-modal');
+                document.getElementById('scenario-modal').classList.add('visible-modal');
+                if(window.sfx) sfx.tick();
+            }
+
+            window.closeScenarioModal = (advance) => {
+                document.getElementById('scenario-modal').classList.remove('visible-modal');
+                document.getElementById('scenario-modal').classList.add('hidden-modal');
+                if (advance && currentPageIndex < 17) window.showPage(currentPageIndex + 1);
+            }
+
+            window.selectScenarioChoice = function(sIdx, cIdx) {
+                const data = SCENARIO_DATA[sIdx - 1];
+                const chosen = data.choices[cIdx]; // cIdx is now the index in the MAIN data array, passed via onclick
+                if (answeredScenarioScores[sIdx] === undefined) {
+                    totalChallengeScore += chosen.score;
+                    answeredScenarioScores[sIdx] = chosen.score;
+                    window.logScenarioAttempt({ scenarioIndex: sIdx, score: chosen.score, effectiveness: chosen.effectiveness });
+                    window.logFinalScoreToFirestore({ finalScore: totalChallengeScore, sessionId: window.sessionId });
+                }
+                window.showPage(currentPageIndex);
+                let iconClass = chosen.score === 3 ? 'text-green-600 bg-green-100' : (chosen.score === 1 ? 'text-yellow-600 bg-yellow-100' : 'text-red-600 bg-red-100');
+                let iconInner = chosen.score === 3 ? '<i class="fas fa-check-circle"></i>' : (chosen.score === 1 ? '<i class="fas fa-exclamation-circle"></i>' : '<i class="fas fa-times-circle"></i>');
+                window.showScenarioOutcome(chosen.effectiveness, chosen.feedback, iconClass, iconInner);
+            }
+
+            // --- MASTER TEMPLATE ENDING LOGIC (PORTED) ---
+            window.generateBadge = function() {
+                const name = (window.currentUserName || "Learner");
+                const score = totalChallengeScore;
+                
+                // Determine Badge Color Scheme based on score
+                let coverColor = "#357889"; // Secondary (Default - Blue/Teal)
+                let spineColor = "#2a5f6d"; 
+                let accentColor = "#D34716"; // Orange
+                
+                // FIXED: Use >= 40 for top tier to match BADGE_THRESHOLD
+                if (score >= 40) { 
+                    coverColor = "#D34716"; // Brand Primary (Orange)
+                    spineColor = "#a03810";
+                    accentColor = "#357889"; // Teal Accent
+                } else if (score >= 30) { // Adjusted middle tier slightly
+                    coverColor = "#2D6473"; // Brand Accent (Dark Teal)
+                    spineColor = "#1e4b55";
+                    accentColor = "#EAB308"; // Gold Accent
+                } else if (score >= 16) { 
+                    coverColor = "#EAB308"; // Yellow
+                    spineColor = "#ca8a04";
+                    accentColor = "#357889"; 
+                }
+                
+                document.querySelector('#page-18 h2').textContent = `Congratulations, ${name}!`;
+                
+                // OPTION 4: THE STORYBOOK COVER (Vertical Layout)
+                // ViewBox: 0 0 400 600 (Aspect ratio of a book)
+                const svgBadge = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+                    <defs>
+                        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="4" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+                        </filter>
+                        <linearGradient id="spine-highlight" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="white" stop-opacity="0.1"/>
+                            <stop offset="50%" stop-color="white" stop-opacity="0.3"/>
+                            <stop offset="100%" stop-color="white" stop-opacity="0.1"/>
+                        </linearGradient>
+                    </defs>
+                    
+                    <!-- Book Cover Base -->
+                    <rect x="20" y="20" width="360" height="560" rx="5" ry="5" fill="${coverColor}" filter="url(#shadow)"/>
+                    
+                    <!-- Spine Detail (Left side) -->
+                    <rect x="20" y="20" width="40" height="560" rx="2" ry="2" fill="${spineColor}"/>
+                    <rect x="20" y="20" width="40" height="560" fill="url(#spine-highlight)"/>
+                    
+                    <!-- Vertical Line Separator -->
+                    <line x1="60" y1="20" x2="60" y2="580" stroke="#000" stroke-opacity="0.2" stroke-width="2"/>
+
+                    <!-- Title Block Area (Top) -->
+                    <rect x="80" y="60" width="280" height="200" fill="none" stroke="white" stroke-width="2" stroke-opacity="0.5"/>
+                    <rect x="85" y="65" width="270" height="190" fill="none" stroke="white" stroke-width="1" stroke-opacity="0.3"/>
+
+                    <!-- Main Title: Master of My Own Story -->
+                    <text x="220" y="130" font-family="Georgia, serif" font-weight="bold" font-size="36" fill="white" text-anchor="middle">MASTER</text>
+                    <text x="220" y="170" font-family="Georgia, serif" font-style="italic" font-size="24" fill="white" text-anchor="middle">of My Own</text>
+                    <text x="220" y="220" font-family="Georgia, serif" font-weight="bold" font-size="36" fill="white" text-anchor="middle">STORY</text>
+
+                    <!-- Central Graphic / Ornament -->
+                    <circle cx="220" cy="320" r="40" fill="white" fill-opacity="0.15"/>
+                    <path d="M220 290 L230 315 L255 315 L235 330 L245 355 L220 340 L195 355 L205 330 L185 315 L210 315 Z" fill="white"/>
+
+                    <!-- Author Name (Learner) -->
+                    <text x="220" y="420" font-family="Verdana, sans-serif" font-size="14" fill="white" text-anchor="middle" letter-spacing="2" opacity="0.8">WRITTEN BY</text>
+                    <text x="220" y="450" font-family="Georgia, serif" font-weight="bold" font-size="22" fill="white" text-anchor="middle" text-decoration="underline">${name}</text>
+
+                    <!-- Bottom Badge: Pragmatic Action -->
+                    <rect x="100" y="500" width="240" height="40" rx="20" fill="${accentColor}"/>
+                    <text x="220" y="526" font-family="Verdana, sans-serif" font-weight="bold" font-size="12" fill="white" text-anchor="middle" letter-spacing="1">PRAGMATIC ACTION BADGE</text>
+                </svg>`;
+                
+                document.getElementById('badge-container').innerHTML = svgBadge;
+                
+                // Setup Download
+                const blob = new Blob([svgBadge], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const dlBtn = document.getElementById('download-badge-btn');
+                if(dlBtn) dlBtn.href = url;
+
+                // NEW: Log to Database if Unlocked (Score >= 40)
+                if (score >= 40) {
+                    window.logFinalScoreToFirestore({ 
+                        finalScore: totalChallengeScore, 
+                        rank: "Story Architect", 
+                        completed: true, 
+                        badgeSVG: svgBadge,
+                        sessionId: window.sessionId 
+                    });
+                }
+            }
+
+            window.setRating = function(n) {
+                for (let i = 1; i <= 5; i++) {
+                    const star = document.getElementById(`star-${i}`);
+                    if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                    else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
+                }
+                sfx.tick();
+            }
+            
+            window.submitFeedback = function() {
+                const feedbackText = document.getElementById('feedback-text').value;
+                window.logFinalScoreToFirestore({ feedback: feedbackText, rank: "Feedback", sessionId: window.sessionId });
+                document.getElementById('feedback-container').classList.add('hidden');
+                document.getElementById('feedback-success').classList.remove('hidden');
+                sfx.nav(); 
+            }
+
+            window.performHardReset = () => {
+                totalChallengeScore = 0;
+                answeredScenarioScores = {};
+                pages.forEach(p => { 
+                    const idx = parseInt(p.getAttribute('data-scenario-index')); 
+                    if(idx) renderScenarioPage(p, idx); 
+                });
+                
+                // Reset Ending Page UI
+                document.getElementById('feedback-container').classList.remove('hidden');
+                document.getElementById('feedback-success').classList.add('hidden');
+                document.getElementById('feedback-text').value = '';
+                window.setRating(0);
+                
+                startupScreen.style.display = 'flex';
+                setTimeout(() => startupScreen.style.opacity = '1', 10);
+                window.showPage(0);
+                sfx.powerOff();
+            }
+
+            // Init
+            pages.forEach(p => { const idx = parseInt(p.getAttribute('data-scenario-index')); if(idx) renderScenarioPage(p, idx); });
+            updateTOC();
+            
+            // Listeners
+            if(nextButton) nextButton.addEventListener('click', () => { if (currentPageIndex < (TOTAL_PAGES - 1)) window.showPage(currentPageIndex + 1); else window.performHardReset(); });
+            if(backButton) backButton.addEventListener('click', () => { if(currentPageIndex > 0) window.showPage(currentPageIndex - 1); });
+            
+            // Startup
+            if (startupScreen) {
+                const warmUp = () => { if(window.initAudio) window.initAudio(); };
+                startupScreen.addEventListener('mousedown', warmUp, { once: true });
+                startupScreen.addEventListener('click', () => {
+                    if(window.sfx) window.sfx.powerOn();
+                    if (window.currentUser) {
+                        window.logFinalScoreToFirestore({ finalScore: 0, rank: "Session Started", sessionId: window.sessionId });
+                        window.showPage(0);
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    } else {
+                        loginModal.classList.remove('hidden-modal');
+                        loginModal.classList.add('visible-modal');
+                        startupScreen.style.opacity = '0';
+                        setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+                    }
+                });
+            }
+            
+            // Accordion Logic
+            document.querySelectorAll('.accordion-toggle').forEach(acc => {
+                acc.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    const icon = this.querySelector('.accordion-icon');
+                    content.classList.toggle('hidden');
+                    if(icon) icon.classList.toggle('rotate-180');
+                    if(window.sfx) window.sfx.tick();
+                });
+            });
+
+            // System Menu
+            window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); };
+            window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); };
+            window.closeSystemMenu = () => { document.getElementById('system-menu-modal').classList.add('hidden-modal'); document.getElementById('system-menu-modal').classList.remove('visible-modal'); };
+            window.handleLogOut = async () => { if (window.authSignOut) await window.authSignOut(); window.performHardReset(); window.closeSystemMenu(); };
+            window.handleSystemExit = () => { window.location.href = "https://www.allgoodacademy.com"; };
+            
+            document.getElementById('menu-toggle').addEventListener('click', window.openMenuModal);
+            document.getElementById('close-menu').addEventListener('click', window.closeMenuModal);
+            
+            // Home Long Press
+            const hBtn = document.getElementById('home-button');
+            let pressTimer;
+            const startPress = () => { pressTimer = setTimeout(() => { 
+                document.getElementById('system-menu-modal').classList.remove('hidden-modal'); 
+                document.getElementById('system-menu-modal').classList.add('visible-modal'); 
+                if(window.sfx) window.sfx.nav(); 
+            }, 2000); };
+            const endPress = () => clearTimeout(pressTimer);
+            
+            hBtn.addEventListener('mousedown', startPress);
+            hBtn.addEventListener('touchstart', (e) => { startPress(); }, {passive: true});
+            hBtn.addEventListener('mouseup', endPress);
+            hBtn.addEventListener('mouseleave', endPress);
+            hBtn.addEventListener('touchend', endPress);
+            hBtn.addEventListener('click', () => { if(currentPageIndex !== 0) window.showPage(0); });
+
+            document.getElementById('fullscreen-toggle').addEventListener('click', () => { document.querySelector('.tablet-frame').classList.toggle('expanded-mode'); document.getElementById('fullscreen-toggle').classList.toggle('text-green-300'); });
+            
+            document.getElementById('blueprint-toggle').addEventListener('click', () => {
+                document.getElementById('screen').classList.toggle('blueprint-mode');
+                document.getElementById('blueprint-toggle').classList.toggle('text-cyan-300');
+                if(window.sfx) window.sfx.tick();
+            });
+
+            window.showPage(0);
+        });
+    </script>
+</body>
+</html>

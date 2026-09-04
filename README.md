@@ -3,18 +3,28 @@
 Static site for [allgoodacademy.com](https://www.allgoodacademy.com), deployed via Firebase Hosting.
 Each page is a standalone HTML file (Tailwind + vanilla JS + Firebase Auth/Firestore), no build step required.
 
+Mirrors the local `Allgood_OS_Host` Firebase Hosting folder, plus `insider/` (not part of the
+original local folder, added separately).
+
 ## Structure
 
 ```
 public/
   index.html                                     # Allgood Academy dashboard (home page)
   insider/index.html                             # Insider (internal agent/intel view)
-  educational-games/
-    digital-decisions/index.html                 # Digital Decisions Challenge
-    jolenes-lemonade-challenge/index.html         # Jolene's Lemonade Challenge
+  educational-games/                              # conflict-resolution, digital-decisions,
+                                                    # jolenes-lemonade-challenge, master-your-story,
+                                                    # purposeful-communicator
+  goodblocks/                                      # aico-pilot, airport-navigator, cogat-logic-lab,
+                                                    # cogat-verbal-practice, digital-asset-defense,
+                                                    # testing, your-digital-identity
+  jsh/                                             # finding-yourself, rage-revenue
+  404.html, privacy.html, terms.html, favicon.png
 ```
 
-Firebase project: `allgood-academy` (see `.firebaserc`).
+Firebase Hosting project: `allgood-academy-goodblocks` (see `.firebaserc`). Note this is a
+*different* Firebase project than the one referenced inside the pages' `firebaseConfig`
+(`allgood-academy`, used for Auth/Firestore) — that's expected, not a bug.
 
 ## Connecting GitHub to Firebase Hosting (one-time, no terminal needed)
 

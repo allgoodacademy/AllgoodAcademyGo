@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Allgood Academy: The Verbal Sprint</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    
+    <!-- FIREBASE SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, updateProfile, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko", authDomain: "allgood-academy.firebaseapp.com", projectId: "allgood-academy" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'allgood-academy';
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // EXPOSE SIGNOUT GLOBALLY
+        window.authSignOut = () => signOut(auth);
+        
+        window.currentUser = null;
+        window.currentUserName = "Analyst";
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                window.currentUser = user;
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Analyst";
+                if (finalName === "Analyst") {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists() && userDoc.data().displayName) finalName = userDoc.data().displayName;
+                    } catch(e) {}
+                }
+                window.currentUserName = finalName;
+                document.getElementById('header-welcome-text').textContent = `Welcome: ${finalName}`;
+                
+                const loginModal = document.getElementById('login-modal');
+                // FIX: If logged in, ensure modal is hidden AND engine initializes
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                }
+                // CRITICAL FIX: Force engine start on auto-login if logic loaded
+                if (window.showPage) {
+                    window.showPage(0);
+                    window.logFinalScoreToFirestore({ rank: "Session Resumed", sessionId: window.sessionId });
+                }
+            }
+        });
+
+        window.ensureUserContainer = async (user, name, email) => {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             try { await setDoc(userRef, { displayName: name, email: email || null, lastLogin: serverTimestamp(), lastActiveModule: document.title }, { merge: true }); } catch (e) {}
+        }
+
+        window.logFinalScoreToFirestore = async (data) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            try { 
+                await setDoc(sessionRef, { 
+                    gameName: document.title, 
+                    ...data, 
+                    lastUpdated: serverTimestamp(), 
+                    user: { uid: user.uid, displayName: window.currentUserName } 
+                }, { merge: true }); 
+                console.log("Data logged:", data);
+            } catch (e) { console.error("Logging error", e); }
+        }
+
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            const emailInput = document.getElementById('user-email-input').value.trim();
+            const btn = document.getElementById('btn-guest-login');
+            btn.innerText = "Connecting..."; btn.disabled = true;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                else if (!auth.currentUser) await signInAnonymously(auth);
+                const user = auth.currentUser;
+                const displayName = nameInput || "Analyst";
+                if (user) {
+                    await updateProfile(user, { displayName: displayName });
+                    await window.ensureUserContainer(user, displayName, emailInput);
+                    window.currentUserName = displayName;
+                    localStorage.setItem('aa_username', displayName);
+                    document.getElementById('header-welcome-text').textContent = `Welcome: ${displayName}`;
+                    document.getElementById('login-modal').classList.add('hidden-modal');
+                    document.getElementById('login-modal').classList.remove('visible-modal');
+                    window.logFinalScoreToFirestore({ rank: "Session Started", sessionId: window.sessionId });
+                    if(window.showPage) window.showPage(0);
+                    if(window.sfx) window.sfx.nav();
+                }
+            } catch (error) { alert("Connection failed."); } finally { btn.innerText = "Start GoodBlock"; btn.disabled = false; }
+        };
+
+        window.handleGoogleLogin = async () => {
+            try {
+                const result = await signInWithPopup(auth, new GoogleAuthProvider());
+                const user = result.user;
+                const finalName = user.displayName || "Analyst";
+                await window.ensureUserContainer(user, finalName, user.email);
+                window.currentUserName = finalName;
+                localStorage.setItem('aa_username', finalName);
+                document.getElementById('header-welcome-text').textContent = `Welcome: ${finalName}`;
+                document.getElementById('login-modal').classList.add('hidden-modal');
+                document.getElementById('login-modal').classList.remove('visible-modal');
+                if(window.showPage) window.showPage(0);
+                if(window.sfx) window.sfx.nav();
+            } catch (error) { alert("Google Sign-In failed."); }
+        };
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'allgood-accent': '#2D6473',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: Verdana, sans-serif;
+            /* EXACT MAHOGANY BACKGROUND FROM EXAMPLE */
+            background-color: #3E2723; 
+            background-image: radial-gradient(circle at center, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.6) 90%), repeating-linear-gradient(90deg, #3E2723 0px, #4E342E 2px, #3E2723 6px, #3E2723 12px, #2D1F1B 16px, #3E2723 24px);
+            background-attachment: fixed;
+            
+            min-height: 100vh; margin: 0; padding: 0;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+
+        .tablet-frame {
+            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
+            /* Updated Shadow: Sharper drop shadow to lift tablet off the desk */
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative; margin: 20px auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            transition: all 0.3s ease;
+        }
+        .tablet-frame::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border-radius: 6px; background: #111; z-index: 0; }
+
+        .screen-container {
+            width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1;
+            overflow: hidden; display: flex; flex-direction: column; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        .tactile-grid {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 0.75rem;
+        }
+
+        /* TACTILE TERMINAL ARCHITECTURE - RESPONSIVE UPDATE */
+        /* Base (Mobile): Content flows naturally, no container box */
+        .terminal-shell {
+            display: flex; 
+            flex-direction: column; 
+            gap: 1rem;
+        }
+        
+        .terminal-header { 
+            padding: 0.75rem 1rem; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            border-radius: 0.75rem; /* Standalone bar on mobile */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .terminal-header.junior { background-color: #357889; color: white; }
+        .terminal-header.senior { background-color: #2D6473; color: white; }
+        .terminal-header.director { background-color: #D34716; color: white; }
+
+        .terminal-body { 
+            padding: 0; /* No extra padding on mobile */
+        }
+
+        /* Desktop/Tablet (sm+): Restore the Terminal Card look */
+        @media (min-width: 640px) {
+            .terminal-shell {
+                background-color: #ffffff;
+                border: 2px solid #cbd5e1;
+                border-radius: 1.25rem;
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+                height: 100%; 
+                max-height: 600px; 
+                overflow: hidden;
+                background-image: linear-gradient(to bottom, #ffffff, #f1f5f9);
+                gap: 0; /* Reset gap */
+            }
+            .terminal-header { 
+                border-radius: 0; /* Reset radius */
+                box-shadow: none;
+                border-bottom: 2px solid rgba(0,0,0,0.05);
+                padding: 0.8rem 1.25rem;
+            }
+            .terminal-body { 
+                padding: 1.5rem; 
+                flex-grow: 1; 
+                overflow-y: auto; 
+            }
+            .terminal-body::-webkit-scrollbar { width: 6px; }
+            .terminal-body::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+        }
+
+        .choice-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+        @media (min-width: 640px) { .choice-grid { grid-template-columns: 1fr 1fr; } }
+
+        .choice-card {
+            background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 0.75rem;
+            padding: 0.9rem; text-align: left; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
+            display: flex; flex-direction: column; gap: 0.35rem; position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .choice-card:hover:not(:disabled) { border-color: #357889; background-color: #f8fafc; transform: translateY(-1px); }
+        .choice-card.correct { border-color: #10B981; border-width: 2px; background-color: #ecfdf5; }
+        .choice-card.incorrect { border-color: #EF4444; border-width: 2px; background-color: #fef2f2; }
+        
+        .choice-label { font-family: Georgia, serif; font-weight: 900; font-size: 0.6rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
+        .choice-text { font-weight: 700; color: #334155; font-size: 0.8rem; line-height: 1.4; }
+
+        @media (max-width: 768px) {
+            html, body { position: fixed; width: 100%; height: 100dvh; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            main { padding: 0 !important; height: 100dvh !important; width: 100% !important; display: block; position: fixed; top: 0; left: 0; }
+            .tablet-frame {
+                position: absolute !important; top: 0; left: 0; right: 0; bottom: 0;
+                width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important;
+                margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important;
+                box-shadow: none !important; background: #F7F7F7 !important; aspect-ratio: unset !important;
+            }
+            .tablet-frame::before { display: none !important; }
+            .screen-container { border-radius: 0 !important; box-shadow: none !important; }
+            header.navbar-content { padding-top: max(env(safe-area-inset-top), 12px); min-height: 60px; padding-bottom: 12px; }
+            footer.footer-content {
+                position: absolute; bottom: 0; left: 0; width: 100%;
+                padding-bottom: max(env(safe-area-inset-bottom), 20px); padding-top: 12px; min-height: 80px;
+                z-index: 100; background-color: white; border-top: 1px solid #e5e7eb;
+            }
+            .page { padding-bottom: 240px !important; } 
+        }
+
+        .tablet-frame.expanded-mode { 
+            position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            max-width: none !important; max-height: none !important; aspect-ratio: unset !important;
+            margin: 0 !important; padding: 0 !important; z-index: 99999 !important;
+            border-radius: 0 !important; background: #F7F7F7 !important; box-shadow: none !important;
+        }
+        .tablet-frame.expanded-mode::before { display: none; }
+        
+        .navbar-content { flex: 0 0 60px; z-index: 50; }
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
+        .page.active { display: block; }
+        .footer-content { flex: 0 0 60px; z-index: 50; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page { background-color: #0f172a !important; }
+        .blueprint-mode .choice-card { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .choice-text { color: #cbd5e1 !important; }
+        .blueprint-mode .terminal-shell { background-color: #1e293b !important; border-color: #334155 !important; background-image: none; }
+        .blueprint-mode .glass-panel { background-color: rgba(30, 41, 59, 0.8) !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+
+        .career-step { opacity: 0.3; transition: all 0.5s; }
+        .career-step.active { opacity: 1; transform: scale(1.05); }
+
+        .btn-tactile:active { transform: scale(0.97); }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-8 h-[100dvh] w-full">
+        <div class="tablet-frame" id="tablet-frame-element">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative text-center">
+                                <div class="absolute inset-0 bg-white/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <i data-lucide="shield-check" class="w-20 h-20 text-white mb-6 mx-auto relative z-10 drop-shadow-md"></i>
+                                <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-[0.2em] uppercase">Allgood Academy</h2>
+                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm leading-tight">Verbal Sprint</h1>
+                                <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10 inline-block">30-Question Challenge</p>
+                            </div>
+                            <p class="mt-16 text-white/80 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. HEADER -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center shrink-0">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Welcome: Analyst</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 9</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <button id="fullscreen-toggle" class="hidden md:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- 3. MODALS -->
+                <!-- Home Navigation Modal -->
+                <div id="home-prompt-modal" class="hidden-modal absolute inset-0 z-[260] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-secondary font-body">
+                        <div class="mb-4"><i data-lucide="home" class="w-12 h-12 mx-auto text-allgood-secondary"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Home Portal</h2>
+                        <p class="text-sm text-gray-500 mb-6">Where would you like to navigate?</p>
+                        <div class="space-y-3">
+                            <button onclick="window.handleSystemExit()" class="w-full bg-allgood-secondary hover:bg-allgood-accent text-white font-bold py-3 rounded shadow-sm transition-colors flex items-center justify-center"><i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Visit allgoodacademy.com</button>
+                            <button onclick="window.restartChallenge()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center"><i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i> Restart this GoodBlock</button>
+                            <button onclick="window.closeHomePrompt()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2 font-body">Resume Sprint</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mission Debrief / Next Steps Modal -->
+                <div id="next-steps-modal" class="hidden-modal absolute inset-0 z-[270] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary font-body">
+                        <div class="mb-4"><i data-lucide="flag" class="w-12 h-12 mx-auto text-allgood-primary"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Mission Debrief</h2>
+                        <p class="text-sm text-gray-500 mb-6">Objective complete. Select your next directive.</p>
+                        <div class="space-y-3">
+                            <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-sm transition-colors flex items-center justify-center"><i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Return to Dashboard</button>
+                            <button onclick="window.restartChallenge()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center"><i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i> Restart Sprint</button>
+                            <button onclick="document.getElementById('next-steps-modal').classList.add('hidden-modal'); document.getElementById('next-steps-modal').classList.remove('visible-modal');" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2 font-body">Stay Here</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Identity Hub -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 visible-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary font-body">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Identity Verification</h2>
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm">Please sign in to start.</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <i data-lucide="help-circle" class="w-4 h-4 mr-1"></i>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your performance record. Performance data is logged in real-time to improve the experience.</p>
+                                    <div class="border-t border-gray-700 my-1 pt-1"></div>
+                                    <p class="text-gray-300"><strong>Email (Optional):</strong> Enter to join the Allgood Academy community.</p>
+                                </div>
+                            </button>
+                        </div>
+                        <input type="text" id="user-name-input" placeholder="Your Name" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary outline-none transition-all">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary focus:border-transparent outline-none transition-all">
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase">Start GoodBlock</button>
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table of Contents (With Log Out) -->
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Mission Phases</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                        <!-- New Log Out Footer -->
+                        <div class="p-4 border-t border-gray-200 bg-gray-50">
+                            <button onclick="window.handleLogOut()" class="w-full text-red-600 font-bold text-sm flex items-center justify-center py-2 hover:bg-red-50 rounded transition-colors btn-tactile">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SCROLLABLE CONTENT AREA -->
+                <div id="main-scroll-view" class="flex-1 min-h-0 overflow-y-auto w-full relative tactile-grid flex flex-col pb-20 md:pb-0">
+                    
+                    <!-- Page 1: Standardized Instructions -->
+                    <div class="page active" id="page-1">
+                        <div class="flex flex-col items-center justify-start min-h-full py-10 text-center px-6">
+                            <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                            <h1 class="text-4xl sm:text-5xl font-heading font-bold text-allgood-dark mb-4 leading-tight">The Verbal Sprint</h1>
+                            <div class="inline-block bg-allgood-dark text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4 shadow-sm border border-white/20">Operational Briefing</div>
+                            
+                            <div class="w-full max-w-lg text-left mx-auto space-y-3 mt-8">
+                                <div class="glass-panel overflow-hidden">
+                                    <button class="accordion-toggle w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-100/50 transition-colors">
+                                        <div class="flex items-center"><i data-lucide="info" class="w-5 h-5 text-allgood-primary mr-3"></i><span class="font-bold text-allgood-dark text-sm font-heading">About this GoodBlock</span></div>
+                                        <i data-lucide="chevron-down" class="accordion-icon w-4 h-4 text-gray-400 transition-transform"></i>
+                                    </button>
+                                    <div class="accordion-content hidden p-4 text-sm text-gray-600 border-t border-gray-200 leading-relaxed font-body bg-white/50">
+                                        <p class="mb-4">This Sprint is engineered to move verbal logic from conscious thought to <strong>automatic execution</strong>. You will decode 30 transmissions across 3 difficulty stages.</p>
+                                        <ul class="list-disc ml-4 space-y-1">
+                                            <li><strong>Junior Analyst:</strong> Base Analogies (10 Qs)</li>
+                                            <li><strong>Senior Associate:</strong> Complex Classification (10 Qs)</li>
+                                            <li><strong>Lead Director:</strong> Abstract Relationships (10 Qs)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="glass-panel overflow-hidden">
+                                    <button class="accordion-toggle w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-100/50 transition-colors">
+                                        <div class="flex items-center">
+                                            <i data-lucide="mouse-pointer-2" class="w-5 h-5 text-allgood-primary mr-3"></i>
+                                            <span class="font-bold text-allgood-dark text-sm font-heading">How to use this GoodBlock</span>
+                                        </div>
+                                        <i data-lucide="chevron-down" class="accordion-icon w-4 h-4 text-gray-400 transition-transform"></i>
+                                    </button>
+                                    <div class="accordion-content hidden p-4 text-sm text-gray-600 border-t border-gray-200 leading-relaxed font-body bg-white/50">
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home Portal</strong><span class="text-gray-500 leading-snug">Click to visit academy hub or restart your attempt.</span></div></div>
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600 shrink-0"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for tactical focus.</span></div></div>
+                                            <div class="hidden md:flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600 shrink-0"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                            <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark shrink-0"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Mission Map</strong><span class="text-gray-500 leading-snug">Jump between clearance stages and access log out options.</span></div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-sm text-allgood-primary font-bold mt-12 animate-pulse uppercase tracking-[0.2em]">Click Next to Start</p>
+                        </div>
+                    </div>
+
+                    <!-- Page 2: Roadmap -->
+                    <div class="page" id="page-2">
+                        <section class="mb-8 text-center border-b border-gray-200 pb-4"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Clearance Roadmap</h2></section>
+                        <div class="space-y-4 max-w-md mx-auto">
+                            <!-- LOCKED MISSION CARD -->
+                            <div id="mission-card-1" onclick="window.unlockMission()" class="glass-panel p-6 flex items-center gap-6 career-step active cursor-pointer hover:bg-white transition-all relative overflow-hidden ring-0">
+                                <div class="absolute inset-0 bg-gray-100/80 z-10 flex items-center justify-center font-bold text-gray-400 uppercase tracking-widest text-xs transition-opacity duration-300" id="mission-lock-overlay"><i data-lucide="lock" class="w-4 h-4 mr-2"></i> Click to Unlock</div>
+                                <div class="w-10 h-10 bg-allgood-secondary text-white rounded-full flex items-center justify-center font-bold shadow-md relative z-0">01</div>
+                                <div class="relative z-0"><h4 class="font-bold text-allgood-secondary">Junior Analyst</h4><p class="text-xs text-gray-500">Core relational connections.</p></div>
+                            </div>
+                            
+                            <div class="glass-panel p-6 flex items-center gap-6 career-step active"><div class="w-10 h-10 bg-allgood-accent text-white rounded-full flex items-center justify-center font-bold shadow-md">02</div><div><h4 class="font-bold text-allgood-accent">Senior Associate</h4><p class="text-xs text-gray-500">Group properties and anomalies.</p></div></div>
+                            <div class="glass-panel p-6 flex items-center gap-6 career-step active"><div class="w-10 h-10 bg-allgood-primary text-white rounded-full flex items-center justify-center font-bold shadow-md">03</div><div><h4 class="font-bold text-allgood-primary">Lead Director</h4><p class="text-xs text-gray-500">Abstract relationships.</p></div></div>
+                        </div>
+                    </div>
+
+                    <!-- Engines (Pages 3, 5, 7) -->
+                    <div class="page" id="page-3"><div class="h-full max-w-2xl mx-auto flex flex-col"><div class="terminal-shell"><header class="terminal-header junior" id="s1-header"><div class="flex items-center gap-2"><i data-lucide="shield" class="w-4 h-4"></i> <span class="text-[10px] font-bold uppercase tracking-widest">Level: Junior Analyst</span></div><span id="q-counter-1" class="text-[10px] font-mono font-bold">1 / 10</span></header><div class="terminal-body" id="s1-body"><div class="bg-blue-50/50 rounded-lg p-5 mb-6 border-l-4 border-allgood-secondary shadow-inner"><p class="text-lg font-heading font-bold text-slate-800 leading-tight" id="s1-q-text"></p></div><div class="choice-grid" id="s1-options"></div><div id="s1-fb" class="mt-6 opacity-0 transition-all duration-500 transform translate-y-2"></div></div></div></div></div>
+                    <div class="page" id="page-4"><div class="glass-panel p-8 text-center max-w-md mx-auto"><i data-lucide="check-circle-2" class="w-16 h-16 text-green-500 mx-auto mb-4"></i><h2 class="text-2xl font-heading font-bold mb-2">Stage 1 Success</h2><div class="bg-gray-50 p-4 rounded border mb-6"><p class="text-xs font-bold text-gray-400 uppercase mb-2 tracking-widest">Efficiency Report</p><div class="text-3xl font-heading font-bold text-allgood-secondary" id="s1-score-display">0/10</div></div></div></div>
+                    
+                    <div class="page" id="page-5"><div class="h-full max-w-2xl mx-auto flex flex-col"><div class="terminal-shell"><header class="terminal-header senior" id="s2-header"><div class="flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> <span class="text-[10px] font-bold uppercase tracking-widest">Level: Senior Associate</span></div><span id="q-counter-2" class="text-[10px] font-mono font-bold">1 / 10</span></header><div class="terminal-body" id="s2-body"><div class="bg-teal-50/50 rounded-lg p-5 mb-6 border-l-4 border-allgood-accent shadow-inner"><p class="text-lg font-heading font-bold text-slate-800 leading-tight" id="s2-q-text"></p></div><div class="choice-grid" id="s2-options"></div><div id="s2-fb" class="mt-6 opacity-0 transition-all duration-500 transform translate-y-2"></div></div></div></div></div>
+                    <div class="page" id="page-6"><div class="glass-panel p-8 text-center max-w-md mx-auto"><i data-lucide="award" class="w-16 h-16 text-allgood-primary mx-auto mb-4"></i><h2 class="text-2xl font-heading font-bold mb-2">Associate Clearance</h2><div class="bg-gray-50 p-4 rounded border mb-6"><p class="text-xs font-bold text-gray-400 uppercase mb-2 tracking-widest">Efficiency Report</p><div class="text-3xl font-heading font-bold text-allgood-secondary" id="s2-score-display">0/10</div></div></div></div>
+
+                    <div class="page" id="page-7"><div class="h-full max-w-2xl mx-auto flex flex-col"><div class="terminal-shell"><header class="terminal-header director" id="s3-header"><div class="flex items-center gap-2"><i data-lucide="shield-alert" class="w-4 h-4"></i> <span class="text-[10px] font-bold uppercase tracking-widest">Level: Lead Director</span></div><span id="q-counter-3" class="text-[10px] font-mono font-bold">1 / 10</span></header><div class="terminal-body" id="s3-body"><div class="bg-orange-50/50 rounded-lg p-5 mb-6 border-l-4 border-allgood-primary shadow-inner"><p class="text-lg font-heading font-bold text-slate-800 leading-tight" id="s3-q-text"></p></div><div class="choice-grid" id="s3-options"></div><div id="s3-fb" class="mt-6 opacity-0 transition-all duration-500 transform translate-y-2"></div></div></div></div></div>
+                    <div class="page" id="page-8"><div class="glass-panel p-10 text-center max-w-lg mx-auto"><h2 class="text-3xl font-heading font-bold text-allgood-dark mb-2">Service Record</h2><div class="bg-gray-50 p-6 rounded border flex justify-between items-center"><div class="text-left"><p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Decryptions</p><h3 class="text-2xl font-heading font-bold text-allgood-dark" id="final-total">0 / 30</h3></div><div class="text-right"><p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confirmed Rank</p><h3 class="text-xl font-bold text-allgood-primary" id="final-rank">Junior Analyst</h3></div></div></div></div>
+
+                    <!-- Page 9: SYNCED FEEDBACK PORTAL -->
+                    <div class="page" id="page-9">
+                        <div class="flex flex-col items-center justify-start min-h-full py-10 text-center px-6">
+                            <div id="feedback-container" class="w-full max-w-md mx-auto glass-panel p-8 mb-8 text-left relative shadow-xl">
+                                <h3 class="font-bold text-slate-800 text-sm uppercase tracking-widest mb-6 text-center">Rate this Sprint</h3>
+                                <div class="flex justify-center space-x-3 mb-6" id="star-wrapper">
+                                    <button onclick="window.setRating(1)" class="star-btn transition-transform hover:scale-125 focus:outline-none" data-val="1"><i id="star-1" class="fas fa-star text-3xl text-gray-200"></i></button>
+                                    <button onclick="window.setRating(2)" class="star-btn transition-transform hover:scale-125 focus:outline-none" data-val="2"><i id="star-2" class="fas fa-star text-3xl text-gray-200"></i></button>
+                                    <button onclick="window.setRating(3)" class="star-btn transition-transform hover:scale-125 focus:outline-none" data-val="3"><i id="star-3" class="fas fa-star text-3xl text-gray-200"></i></button>
+                                    <button onclick="window.setRating(4)" class="star-btn transition-transform hover:scale-125 focus:outline-none" data-val="4"><i id="star-4" class="fas fa-star text-3xl text-gray-200"></i></button>
+                                    <button onclick="window.setRating(5)" class="star-btn transition-transform hover:scale-125 focus:outline-none" data-val="5"><i id="star-5" class="fas fa-star text-3xl text-gray-200"></i></button>
+                                </div>
+                                <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide font-body">Mission Observations</label>
+                                <textarea id="feedback-text" rows="3" class="w-full border-2 border-slate-100 rounded-xl p-4 text-sm focus:ring-1 focus:ring-allgood-primary outline-none bg-slate-50 transition-all font-body" placeholder="Describe your experience..."></textarea>
+                                <button onclick="window.submitFeedback()" class="w-full mt-6 bg-slate-800 hover:bg-black text-white font-bold py-3 rounded-xl transition-all shadow-md btn-tactile">SUBMIT FEEDBACK</button>
+                            </div>
+                            <div id="feedback-success" class="hidden w-full max-w-md mx-auto bg-green-50 p-8 rounded-2xl border-2 border-green-100 text-center shadow-inner">
+                                <i data-lucide="check-circle" class="w-16 h-16 text-green-600 mx-auto mb-4"></i>
+                                <h3 class="font-bold text-green-900 text-xl font-heading">Record Archived.</h3>
+                                <p class="text-sm text-green-700 mt-2 font-body">Thank you for helping us improve.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 5. FOOTER -->
+                <footer class="footer-content flex items-center justify-between px-6 shrink-0 bg-white">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-hover font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Back</button>
+                    <div class="text-center hidden sm:block">
+                        <a href="https://www.allgoodacademy.com" target="_blank" class="text-gray-400 text-[10px] font-body hover:text-allgood-primary transition-colors no-underline">
+                            <span class="font-bold">GoodBlock&trade;</span> powered by <span class="font-bold">Allgood Academy</span>
+                        </a>
+                    </div>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-8 py-2.5 rounded-full text-sm font-bold shadow-lg transition-transform transform hover:scale-105 active:scale-95 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body"><span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></button>
+                </footer>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const totalPages = 9; 
+        let currentPageIndex = 0;
+        let stageScores = [0, 0, 0];
+        let currentLevelIndices = [0, 0, 0];
+        
+        // UNLOCK MISSION LOGIC
+        window.missionUnlocked = false;
+        window.unlockMission = () => {
+            if(window.missionUnlocked) return;
+            window.missionUnlocked = true;
+            document.getElementById('mission-lock-overlay').style.opacity = '0';
+            document.getElementById('mission-lock-overlay').style.pointerEvents = 'none';
+            document.getElementById('mission-card-1').classList.add('ring-2', 'ring-allgood-secondary', 'bg-blue-50');
+            
+            const btn = document.getElementById('next-button');
+            btn.style.display = 'flex';
+            btn.innerHTML = `<span>LAUNCH MISSION ALPHA</span><i data-lucide="rocket" class="w-4 h-4 ml-1"></i>`;
+            btn.classList.add('animate-pulse'); 
+            sfx.powerOn();
+            lucide.createIcons();
+        }
+
+        // VERBAL DATASET (30 Questions from RTF)
+        const questions = {
+            s1: [
+                { q: "Puppy : Dog :: Kitten : ?", options: ["Cat", "Purr", "Pet", "Fur"], a: 0, 
+                  why: ["Correct. A kitten is a young cat, just as a puppy is a young dog.", "Incorrect. Purring is an action, but the relationship is about age/species.", "Incorrect. While both are pets, look for the specific age-based relationship.", "Incorrect. Fur is a physical trait, not the relationship of the first pair."] },
+                { q: "Hot : Cold :: Up : ?", options: ["High", "Down", "Left", "Sky"], a: 1,
+                  why: ["Incorrect. High is a synonym, but the first pair are opposites.", "Correct. Down is the opposite of Up, matching the Hot/Cold pattern.", "Incorrect. While related to direction, Left is not the direct opposite of Up.", "Incorrect. The sky is UP, but the pattern requires an opposite."] },
+                { q: "Teacher : School :: Doctor : ?", options: ["Hospital", "Nurse", "Patient", "Medicine"], a: 0,
+                  why: ["Correct. A school is where a teacher works; a hospital is where a doctor works.", "Incorrect. A nurse is a coworker, but look for the 'Place of Work' bridge.", "Incorrect. A patient is who a doctor helps, not the place where they work.", "Incorrect. Medicine is a tool, not the workspace."] },
+                { q: "Feather : Bird :: Fin : ?", options: ["Swim", "Water", "Fish", "Ocean"], a: 2,
+                  why: ["Incorrect. Swimming is an action, not the owner of the fin.", "Incorrect. Water is the environment, not the owner of the part.", "Correct. A fin is a part of a fish, just as a feather is a part of a bird.", "Incorrect. The ocean is the environment, not the specific owner."] },
+                { q: "The baby bird was too young to fly, so it stayed ____ the nest.", options: ["under", "inside", "near", "above"], a: 1,
+                  why: ["Incorrect. Under the nest would be dangerous for a flightless bird.", "Correct. Staying inside provides safety and matches the context of being 'too young to fly'.", "Incorrect. Near is too vague; inside is the logical safe zone for a hatchling.", "Incorrect. Above the nest is physically impossible for a bird that can't fly."] },
+                { q: "The students worked together to finish the project, showing great ____.", options: ["loneliness", "fear", "collaboration", "speed"], a: 2,
+                  why: ["Incorrect. Working together is the opposite of loneliness.", "Incorrect. Group success implies confidence, not fear.", "Correct. Working together is the definition of collaboration.", "Incorrect. While they might be fast, 'working together' specifically defines collaboration."] },
+                { q: "The sky grew dark, so we knew a storm was ____.", options: ["finished", "approaching", "fading", "impossible"], a: 1,
+                  why: ["Incorrect. If the sky is just growing dark, the storm hasn't finished yet.", "Correct. Darkening skies are a logical sign that a storm is coming or approaching.", "Incorrect. Fading would imply the sky is getting lighter.", "Incorrect. The dark sky makes a storm very possible, not impossible."] },
+                { q: "Which word does NOT belong?", options: ["Apple", "Banana", "Carrot", "Grape"], a: 2,
+                  why: ["Incorrect. Apple is a fruit.", "Incorrect. Banana is a fruit.", "Correct. Carrot is a vegetable, while the others are fruits.", "Incorrect. Grape is a fruit."] },
+                { q: "Which word is most SIMILAR to 'Brave'?", options: ["Fearless", "Tiny", "Quiet", "Gentle"], a: 0,
+                  why: ["Correct. Fearless is a direct synonym for brave.", "Incorrect. Size has no logical connection to bravery.", "Incorrect. Quiet describes volume, not courage.", "Incorrect. Gentle describes personality, not necessarily courage."] },
+                { q: "Which word is the best category for: pencil, marker, crayon?", options: ["Tools", "Writing Utensils", "Toys", "Shapes"], a: 1,
+                  why: ["Incorrect. Tools is too broad; 'Writing Utensils' is the specific category.", "Correct. All three are specifically used for writing or drawing.", "Incorrect. These are for work/art, not necessarily toys.", "Incorrect. These create shapes, but they are not shapes themselves."] }
+            ],
+            s2: [
+                { q: "River : Water :: Highway : ?", options: ["Cars", "Road", "Traffic", "Speed"], a: 0, 
+                  why: ["Correct. Water flows through a river; cars flow through a highway.", "Incorrect. A road is what the highway IS, but look for what 'flows' through it.", "Incorrect. Traffic is a condition, whereas cars are the specific units.", "Incorrect. Speed is a measurement, not the substance moving through the path."] },
+                { q: "Artist : Paint :: Writer : ?", options: ["Book", "Read", "Words", "Ink"], a: 2,
+                  why: ["Incorrect. A book is a finished product, but look for the 'Primary Medium' bridge.", "Incorrect. Reading is an action, not a creative medium.", "Correct. Words are the primary medium used by a writer, just as paint is for an artist.", "Incorrect. Ink is a tool, but words are the actual medium of the craft."] },
+                { q: "Cautious : Careful :: Silent : ?", options: ["Quiet", "Noisy", "Hidden", "Secret"], a: 0,
+                  why: ["Correct. Cautious/Careful are synonyms; Silent/Quiet are synonyms.", "Incorrect. Noisy is an antonym, but look for the synonym pattern.", "Incorrect. Hidden relates to sight; Silent relates to sound.", "Incorrect. While related, 'Quiet' is the direct synonym for 'Silent'."] },
+                { q: "Nest : Bird :: Den : ?", options: ["Rabbit", "Lion", "Tree", "Cave"], a: 1,
+                  why: ["Incorrect. Rabbits live in burrows or warrens.", "Correct. A den is a home for a lion, just as a nest is for a bird.", "Incorrect. A tree is a location, not the home name.", "Incorrect. A cave is a location, whereas 'Den' is the specific home designation."] },
+                { q: "The scientist recorded her observations carefully so she could ____ her results later.", options: ["ignore", "forget", "verify", "hide"], a: 2,
+                  why: ["Incorrect. Scientists don't record data to ignore it.", "Incorrect. Recording data is the specific way to prevent forgetting.", "Correct. Reviewing recorded data is the standard way to verify or prove results.", "Incorrect. Recording observations is a public act, not a hiding act."] },
+                { q: "The museum guide spoke with such ____ that everyone listened closely.", options: ["silence", "enthusiasm", "boredom", "speed"], a: 1,
+                  why: ["Incorrect. If the guide was silent, no one could listen.", "Correct. Enthusiasm captures attention and makes people listen closely.", "Incorrect. Boredom would make people stop listening.", "Incorrect. Speaking too fast usually makes it harder to listen closely."] },
+                { q: "The hikers brought extra supplies in case the trip took ____ than expected.", options: ["less", "longer", "shorter", "exactly"], a: 1,
+                  why: ["Incorrect. You don't need extra supplies if the trip is shorter.", "Correct. Extra supplies are a logical precaution for a trip taking longer than planned.", "Incorrect. Shorter trips require fewer supplies.", "Incorrect. 'Extra' implies a duration that exceeds the expectation."] },
+                { q: "Which word does NOT belong?", options: ["Triangle", "Square", "Circle", "Cube"], a: 3,
+                  why: ["Incorrect. Triangle is a 2D shape.", "Incorrect. Square is a 2D shape.", "Incorrect. Circle is a 2D shape.", "Correct. A cube is a 3D object, while the others are 2D shapes."] },
+                { q: "Choose the word most SIMILAR to 'Predict':", options: ["Guess", "Forget", "Explain", "Remove"], a: 0,
+                  why: ["Correct. To predict is to guess what will happen in the future.", "Incorrect. Forgetting is the opposite of foresight.", "Incorrect. Explaining happens after the fact; predicting happens before.", "Incorrect. Removing is an action; predicting is a thought process."] },
+                { q: "What is the best category for: violin, flute, trumpet?", options: ["Animals", "Instruments", "Tools", "Vehicles"], a: 1,
+                  why: ["Incorrect. These are not living things.", "Correct. All three are musical instruments.", "Incorrect. These are for art, not construction or maintenance.", "Incorrect. These are for music, not transportation."] }
+            ],
+            s3: [
+                { q: "Fragile : Break :: Valuable : ?", options: ["Hide", "Gold", "Steal", "Guard"], a: 3,
+                  why: ["Incorrect. You might hide it, but the pattern is 'Trait -> Action Required'.", "Incorrect. Gold is an example, not the required action.", "Incorrect. Stealing is what others do, not the owner's logical response.", "Correct. Because it is fragile, you handle it with care; because it is valuable, you guard it."] },
+                { q: "Compass : Direction :: Thermometer : ?", options: ["Weather", "Temperature", "Hot", "Science"], a: 1,
+                  why: ["Incorrect. Weather is too broad; look for the specific measurement.", "Correct. A compass measures direction; a thermometer measures temperature.", "Incorrect. Hot is just one state of temperature, not the measurement itself.", "Incorrect. Science is the field, not the specific metric."] },
+                { q: "Harvest : Crops :: Mine : ?", options: ["Dig", "Ores", "Cave", "Gold"], a: 1,
+                  why: ["Incorrect. Digging is the action, but look for the 'Collection -> Substance' bridge.", "Correct. You harvest crops; you mine ores.", "Incorrect. A cave is a place, not the substance gathered.", "Incorrect. Gold is one specific ore, but 'Ores' is the broader, more logical match for 'Crops'."] },
+                { q: "Generous : Giving :: Curious : ?", options: ["Smart", "Questioning", "Rude", "Helpful"], a: 1,
+                  why: ["Incorrect. One can be smart without being curious.", "Correct. Generous/Giving are synonyms; Curious/Questioning are synonyms.", "Incorrect. Curiosity is a positive trait, not rude.", "Incorrect. Helpful is a trait, but not a synonym for curious."] },
+                { q: "Although the directions were complicated, Maya managed to ____ the puzzle with patience.", options: ["discard", "solve", "complicate", "break"], a: 1,
+                  why: ["Incorrect. 'Patience' suggests effort toward a goal, not giving up.", "Correct. Solving is the logical success state for a complicated puzzle handled with patience.", "Incorrect. She wouldn't make it harder if she had patience.", "Incorrect. Breaking it is the opposite of what a patient person would do."] },
+                { q: "The committee reached a decision only after considering every member’s ____.", options: ["silence", "perspective", "clothing", "lunch"], a: 1,
+                  why: ["Incorrect. Silence doesn't help reach a group decision.", "Correct. Group decisions logically require looking at different points of view or perspectives.", "Incorrect. Clothing is irrelevant to committee logic.", "Incorrect. Lunch is a distraction, not a part of the decision logic."] },
+                { q: "The ancient ruins were so well preserved that visitors could easily ____ how people once lived there.", options: ["ignore", "visualize", "forget", "dislike"], a: 1,
+                  why: ["Incorrect. Well-preserved ruins make it harder to ignore the history.", "Correct. Good preservation allows the mind to 'see' or visualize the past clearly.", "Incorrect. Preservation helps people remember, not forget.", "Incorrect. There is no logical reason to dislike something just because it is well-preserved."] },
+                { q: "Which word does NOT belong?", options: ["Hesitate", "Pause", "Delay", "Sprint"], a: 3,
+                  why: ["Incorrect. Hesitate implies stopping.", "Incorrect. Pause implies stopping.", "Incorrect. Delay implies stopping.", "Correct. Sprint implies moving fast, while the others imply slowing down or stopping."] },
+                { q: "Which word is most SIMILAR to 'Reluctant'?", options: ["Unwilling", "Cheerful", "Certain", "Eager"], a: 0,
+                  why: ["Correct. Being reluctant means you are unwilling to do something.", "Incorrect. Cheerful is a positive emotion; reluctance is hesitation.", "Incorrect. Being certain is the opposite of the hesitation found in reluctance.", "Incorrect. Eager is the direct antonym of reluctant."] },
+                { q: "What is the best category for: oxygen, nitrogen, helium?", options: ["Gases", "Liquids", "Metals", "Solids"], a: 0,
+                  why: ["Correct. All three are elements that exist in a gaseous state at room temperature.", "Incorrect. These are not liquids.", "Incorrect. These are non-metals.", "Incorrect. These are not solids."] }
+            ]
+        };
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+        function playTone(f,t,d,v=0.1) { try { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=t; o.frequency.setValueAtTime(f,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(v,audioCtx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+d); } catch(e){} }
+        const sfx = {
+            powerOn: () => { try { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type='triangle'; o.frequency.setValueAtTime(110,audioCtx.currentTime); o.frequency.exponentialRampToValueAtTime(220,audioCtx.currentTime+0.4); g.gain.setValueAtTime(0,audioCtx.currentTime); g.gain.linearRampToValueAtTime(0.4,audioCtx.currentTime+0.1); g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+0.4); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+0.4); } catch(e){} },
+            nav: () => playTone(150,'sine',0.1), tick: () => playTone(1000,'sine',0.01), success: () => playTone(1200,'sine',0.2), error: () => playTone(100,'sawtooth',0.2)
+        };
+
+        function loadQuestion(stageNum) {
+            const data = questions[`s${stageNum}`];
+            const idx = currentLevelIndices[stageNum - 1];
+            if (idx >= data.length) return;
+
+            const q = data[idx];
+            document.getElementById(`s${stageNum}-q-text`).innerText = q.q;
+            
+            // ACTIVE COMMAND HEADER UPDATE
+            const directives = {
+                1: "DIRECTIVE: DECIPHER ANALOGY",
+                2: "DIRECTIVE: ISOLATE ANOMALY",
+                3: "DIRECTIVE: ANALYZE RELATIONSHIP"
+            };
+            const iconMap = {1: "shield", 2: "shield-check", 3: "shield-alert"};
+            
+            const headerHTML = `
+                <div class="flex items-center gap-2">
+                    <i data-lucide="${iconMap[stageNum]}" class="w-4 h-4"></i> 
+                    <span class="text-[10px] font-bold uppercase tracking-widest">${directives[stageNum]}</span>
+                </div>
+                <span id="q-counter-${stageNum}" class="text-[10px] font-mono font-bold">${idx + 1} / 10</span>
+            `;
+            const headerEl = document.getElementById(`s${stageNum}-header`);
+            if(headerEl) headerEl.innerHTML = headerHTML;
+            
+            const options = document.getElementById(`s${stageNum}-options`);
+            options.innerHTML = '';
+            q.options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = "choice-card font-body text-sm font-bold text-gray-700";
+                btn.innerHTML = `<span class="choice-label">${String.fromCharCode(65 + i)}</span> <span class="choice-text">${opt}</span>`;
+                btn.onclick = () => handleAnswer(stageNum, i);
+                options.appendChild(btn);
+            });
+            document.getElementById(`s${stageNum}-fb`).style.opacity = '0';
+            
+            // Remove internal scrolling reset for mobile since we removed the scroll container
+            const body = document.getElementById(`s${stageNum}-body`);
+            if(body) body.scrollTop = 0; 
+            lucide.createIcons();
+        }
+
+        function handleAnswer(stageNum, choiceIdx) {
+            const data = questions[`s${stageNum}`];
+            const idx = currentLevelIndices[stageNum - 1];
+            const q = data[idx];
+            const fb = document.getElementById(`s${stageNum}-fb`);
+            const btns = document.querySelectorAll(`#s${stageNum}-options button`);
+            
+            btns.forEach(b => b.disabled = true);
+            
+            const isCorrect = (choiceIdx === q.a);
+            const feedbackText = q.why[choiceIdx];
+            
+            if (isCorrect) {
+                stageScores[stageNum - 1]++;
+                btns[choiceIdx].classList.add('correct');
+                sfx.success();
+                setTimeout(() => window.nextQuestion(stageNum), 600);
+            } else {
+                btns[choiceIdx].classList.add('incorrect');
+                fb.innerHTML = `
+                    <div class="bg-rose-50 border-2 border-rose-200 p-5 rounded-2xl shadow-sm font-body">
+                        <div class="flex items-center gap-2 text-rose-800 text-[10px] font-black uppercase tracking-widest mb-2"><i data-lucide="alert-octagon" class="w-4 h-4"></i> Interference Detected</div>
+                        <p class="text-rose-900 text-sm leading-relaxed font-body">${feedbackText}</p>
+                        <button onclick="window.nextQuestion(${stageNum})" class="mt-4 w-full bg-slate-800 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg hover:bg-black transition-all">Continue Search</button>
+                    </div>`;
+                fb.style.opacity = '1';
+                fb.style.transform = 'translateY(0)';
+                sfx.error();
+                lucide.createIcons();
+            }
+        }
+
+        window.nextQuestion = function(stageNum) {
+            currentLevelIndices[stageNum - 1]++;
+            if (currentLevelIndices[stageNum - 1] < 10) {
+                loadQuestion(stageNum);
+            } else {
+                document.getElementById(`s${stageNum}-score-display`).innerText = `${stageScores[stageNum - 1]} / 10`;
+                // FIX: Auto-advance stage 3 like the others
+                window.showPage(currentPageIndex + 1);
+            }
+            sfx.nav();
+        }
+
+        const pages = document.querySelectorAll('.page');
+        const progressBar = document.getElementById('flex-progress-fill');
+        const nextBtn = document.getElementById('next-button');
+        const backBtn = document.getElementById('back-button');
+        
+        window.showPage = function(idx) {
+            if (idx < 0 || idx >= totalPages) return;
+            pages.forEach(p => p.classList.remove('active'));
+            pages[idx].classList.add('active');
+            currentPageIndex = idx;
+            progressBar.style.width = `${((idx + 1) / totalPages) * 100}%`;
+            document.getElementById('header-page-indicator').textContent = `${idx + 1} / ${totalPages}`;
+            
+            // PAGE 2 (ROADMAP) LOGIC
+            if (idx === 1) {
+                window.missionUnlocked = false; 
+                nextBtn.style.display = 'none'; // Lock navigation
+                
+                // Reset card UI
+                const overlay = document.getElementById('mission-lock-overlay');
+                const card = document.getElementById('mission-card-1');
+                if(overlay && card) {
+                     overlay.style.opacity = '1';
+                     overlay.style.pointerEvents = 'auto';
+                     card.classList.remove('ring-2', 'ring-allgood-secondary', 'bg-blue-50');
+                }
+            } else {
+                 nextBtn.style.display = 'flex';
+                 nextBtn.classList.remove('animate-pulse');
+            }
+
+            if (idx === 2) loadQuestion(1);
+            if (idx === 4) loadQuestion(2);
+            if (idx === 6) loadQuestion(3);
+            
+            // SUCCESS PAGE BUTTON TEXT UPDATES
+            if (idx === 3) { // Success 1
+                 nextBtn.innerHTML = `<span>INITIALIZE STAGE 2</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>`;
+            } else if (idx === 5) { // Success 2
+                 nextBtn.innerHTML = `<span>INITIALIZE STAGE 3</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>`;
+            } else if (idx === totalPages - 1) { // Final Page
+                nextBtn.innerHTML = `<span>Finish</span><i data-lucide="flag" class="w-4 h-4 ml-1"></i>`;
+                nextBtn.onclick = window.openNextStepsModal;
+            } else {
+                // Default Next Button (Logic handles hiding for Page 2 above)
+                if (idx !== 1) nextBtn.innerHTML = `<span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>`;
+                nextBtn.onclick = () => showPage(currentPageIndex + 1);
+            }
+            
+            if (idx === 7) { 
+                const total = stageScores.reduce((a, b) => a + b, 0);
+                document.getElementById('final-total').innerText = `${total} / 30`;
+                let rank = total > 25 ? "Lead Director" : (total > 15 ? "Senior Associate" : "Junior Analyst");
+                document.getElementById('final-rank').innerText = rank;
+                
+                // Enhanced Logging
+                window.logFinalScoreToFirestore({ 
+                    score: total, 
+                    rank: rank,
+                    stageScores: {
+                        junior: stageScores[0],
+                        senior: stageScores[1],
+                        director: stageScores[2]
+                    }
+                });
+            }
+            if (idx === 8) { 
+                generateBadge();
+            }
+
+            backBtn.disabled = idx === 0;
+            backBtn.classList.toggle('opacity-0', idx === 0);
+            document.getElementById('main-scroll-view').scrollTop = 0;
+            lucide.createIcons();
+            sfx.nav();
+        }
+
+        // REMOVED DUPLICATE LISTENER HERE - FIXED DOUBLE CLICK ISSUE
+        
+        backBtn.addEventListener('click', () => showPage(currentPageIndex - 1));
+
+        window.closeHomePrompt = () => { document.getElementById('home-prompt-modal').classList.add('hidden-modal'); }
+        window.openNextStepsModal = () => {
+            document.getElementById('next-steps-modal').classList.remove('hidden-modal');
+            document.getElementById('next-steps-modal').classList.add('visible-modal');
+            sfx.nav();
+        }
+        
+        window.restartChallenge = () => {
+             stageScores = [0, 0, 0];
+             currentLevelIndices = [0, 0, 0];
+             window.closeHomePrompt();
+             document.getElementById('next-steps-modal').classList.add('hidden-modal'); 
+             document.getElementById('next-steps-modal').classList.remove('visible-modal');
+             window.showPage(0);
+             sfx.nav();
+        }
+
+        window.closeSystemMenu = () => { document.getElementById('system-menu-modal').classList.add('hidden-modal'); }
+        window.handleSystemExit = () => { window.location.href = "https://www.allgoodacademy.com"; }
+        window.handleLogOut = async () => {
+             if (window.authSignOut) await window.authSignOut();
+             localStorage.clear();
+             window.closeSystemMenu();
+             document.getElementById('startup-screen').style.display = 'flex';
+             setTimeout(() => document.getElementById('startup-screen').style.opacity = '1', 10);
+             window.showPage(0);
+             document.getElementById('login-modal').classList.remove('hidden-modal');
+             document.getElementById('login-modal').classList.add('visible-modal');
+        }
+
+        let currentStarRating = 0; // Initialize variable
+
+        window.setRating = (n) => {
+            currentStarRating = n; // Capture value
+            for (let i = 1; i <= 5; i++) {
+                const star = document.getElementById(`star-${i}`);
+                if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
+            }
+            sfx.tick();
+        }
+        window.submitFeedback = () => {
+            const text = document.getElementById('feedback-text').value;
+            window.logFinalScoreToFirestore({ 
+                feedback: text, 
+                rating: currentStarRating, // Send value
+                rank: "Feedback Submitted", 
+                sessionId: window.sessionId 
+            });
+            document.getElementById('feedback-container').classList.add('hidden');
+            document.getElementById('feedback-success').classList.remove('hidden');
+            sfx.nav();
+        }
+
+        function generateBadge() {
+            const name = (window.currentUserName || "Analyst").toUpperCase();
+            const badgeContainer = document.getElementById('badge-container');
+            if(badgeContainer) {
+                badgeContainer.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" class="mx-auto drop-shadow-xl">
+                  <circle cx="100" cy="100" r="90" fill="#357889" stroke="#ffffff" stroke-width="4"/>
+                  <path d="M100 20 L120 60 L160 60 L130 90 L145 130 L100 110 L55 130 L70 90 L40 60 L80 60 Z" fill="#D34716" stroke="white" stroke-width="2"/>
+                  <text x="100" y="160" font-family="Verdana" font-weight="bold" font-size="14" fill="white" text-anchor="middle">VERBAL SPRINT</text>
+                  <text x="100" y="180" font-family="Verdana" font-size="10" fill="white" text-anchor="middle">CERTIFIED</text>
+                </svg>`;
+            }
+        }
+        
+        window.downloadBadge = () => {
+             const svg = document.getElementById('badge-container').innerHTML;
+             const blob = new Blob([svg], { type: 'image/svg+xml' });
+             const url = URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = 'Verbal_Sprint_Badge.svg';
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+             sfx.success();
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            document.getElementById('startup-screen').addEventListener('click', function() { sfx.powerOn(); this.style.opacity = '0'; setTimeout(() => { this.style.display = 'none'; }, 700); });
+            document.body.addEventListener('click', (e) => {
+                const acc = e.target.closest('.accordion-toggle');
+                if(acc) {
+                    const c = acc.nextElementSibling;
+                    const i = acc.querySelector('.accordion-icon');
+                    const isOpen = !c.classList.contains('hidden');
+                    document.querySelectorAll('.accordion-content').forEach(el => el.classList.add('hidden'));
+                    document.querySelectorAll('.accordion-icon').forEach(el => el.classList.remove('rotate-180'));
+                    if(!isOpen) { c.classList.remove('hidden'); i.classList.add('rotate-180'); sfx.tick(); }
+                }
+                if(e.target.closest('#blueprint-toggle')) { document.getElementById('screen').classList.toggle('blueprint-mode'); sfx.tick(); }
+            });
+            document.getElementById('fullscreen-toggle').addEventListener('click', function() {
+                document.getElementById('tablet-frame-element').classList.toggle('expanded-mode');
+                this.classList.toggle('text-green-300');
+                sfx.tick();
+            });
+            
+            // MENU BUTTON WITH LOG OUT
+            document.getElementById('menu-toggle').addEventListener('click', () => {
+                const m = document.getElementById('menu-modal');
+                m.classList.remove('hidden-modal'); m.classList.add('visible-modal');
+                const t = document.getElementById('toc-list'); t.innerHTML = '';
+                const sections = ["Instructions", "Roadmap", "Junior Stage", "Review 1", "Associate Stage", "Review 2", "Director Stage", "Final Record", "Feedback"];
+                sections.forEach((x,i) => {
+                    t.innerHTML += `<button class="w-full text-left px-4 py-2 hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-bold font-body" onclick="showPage(${i});document.getElementById('menu-modal').classList.add('hidden-modal');document.getElementById('menu-modal').classList.remove('visible-modal');">${i+1}. ${x}</button>`;
+                });
+                // Divider and Log Out
+                t.innerHTML += `<div class="my-2 border-t border-gray-200"></div>`;
+                t.innerHTML += `<button class="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg text-sm font-bold font-body flex items-center" onclick="window.handleLogOut()"><i data-lucide="log-out" class="w-4 h-4 mr-2"></i>Log Out</button>`;
+                lucide.createIcons();
+            });
+            
+            document.getElementById('close-menu').addEventListener('click', () => { 
+                const m = document.getElementById('menu-modal');
+                m.classList.remove('visible-modal'); // Correct logic
+                m.classList.add('hidden-modal'); 
+            });
+            
+            // SIMPLIFIED HOME BUTTON LOGIC
+            const homeBtn = document.getElementById('home-button');
+            if (homeBtn) {
+                homeBtn.addEventListener('click', () => { 
+                    document.getElementById('home-prompt-modal').classList.remove('hidden-modal'); 
+                    sfx.tick(); 
+                });
+            }
+        });
+    </script>
+</body>
+</html>

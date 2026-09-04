@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Jodi's Schoolhouse: Finding Yourself</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    
+    <!-- FIREBASE SETUP -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, updateProfile, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko", authDomain: "allgood-academy.firebaseapp.com", projectId: "allgood-academy" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'allgood-academy';
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.auth = auth;
+        window.db = db;
+        window.authSignOut = () => signOut(auth);
+
+        window.currentUser = null;
+        window.currentUserName = "Agent Learner";
+        window.currentUserEmail = "";
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                window.currentUser = user;
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Agent Learner";
+                
+                if (finalName === "Seeker" || finalName === "Learner") {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists() && userDoc.data().displayName) finalName = userDoc.data().displayName;
+                    } catch(e) {}
+                }
+                
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                const welcomeText = document.getElementById('header-welcome-text');
+                if(welcomeText) welcomeText.textContent = `Welcome: ${finalName}`;
+                
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal && !loginModal.classList.contains('hidden-modal')) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                    // Auto-start session log if we just auto-logged in
+                    if(window.SessionManager) window.SessionManager.start(finalName, user.email);
+                }
+            } else {
+                window.currentUser = null;
+            }
+        });
+
+        window.ensureUserContainer = async (user, name, email) => {
+             const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+             try {
+                 await setDoc(userRef, { displayName: name, email: email || null, lastLogin: serverTimestamp(), lastActiveModule: document.title }, { merge: true });
+             } catch (e) { console.error(e); }
+        }
+
+        // --- SESSION + STREAM LOGGING ARCHITECTURE ---
+        window.logToFirestore = async (action, detail, payload = {}) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            // 1. Session Reference (The "Head" - Latest Status)
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            
+            // 2. Logs Collection (The "Stream" - History)
+            const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'logs');
+
+            // WRITE 1: Update Session Head
+            const sessionData = {
+                gameName: document.title,
+                lastUpdated: serverTimestamp(),
+                user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail },
+                last_action: action,
+                current_page: window.currentPageIndex || 0, 
+                percent_complete: window.progressPercent || 0
+            };
+            
+            if (payload.completed) sessionData.completed = true;
+            if (payload.badgeArtifact) sessionData.badgeArtifact = payload.badgeArtifact;
+
+            try {
+                await setDoc(sessionRef, sessionData, { merge: true });
+                
+                // WRITE 2: Append to Log Stream
+                await addDoc(logsRef, {
+                    action: action,
+                    detail: detail,
+                    payload: payload,
+                    timestamp: serverTimestamp(),
+                    page_context: window.currentPageIndex || 0
+                });
+            } catch (e) { console.error("[DB] Error:", e); }
+        }
+
+        // --- SESSION MANAGER WRAPPER ---
+        window.SessionManager = {
+            log: function(action, detail, payload = {}) {
+                window.logToFirestore(action, detail, payload);
+            },
+            start: function(name, email) { 
+                this.log("System", "Session Started", { startTime: new Date().toISOString() }); 
+            }
+        };
+
+        window.handleGuestLogin = async () => {
+            const nameInput = document.getElementById('user-name-input');
+            const emailInput = document.getElementById('user-email-input');
+            const name = nameInput ? nameInput.value.trim() : "Agent Learner";
+            const email = emailInput ? emailInput.value.trim() : "";
+            
+            const btn = document.getElementById('btn-guest-login');
+            if(btn) { btn.innerText = "Connecting..."; btn.disabled = true; }
+            
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                else if (!auth.currentUser) await signInAnonymously(auth);
+                
+                const user = auth.currentUser;
+                if (user) {
+                    await updateProfile(user, { displayName: name });
+                    await window.ensureUserContainer(user, name, email);
+                    window.currentUserName = name;
+                    window.currentUserEmail = email;
+                    localStorage.setItem('aa_username', name);
+                    
+                    window.SessionManager.start(name, email);
+                    
+                    const welcomeText = document.getElementById('header-welcome-text');
+                    if(welcomeText) welcomeText.textContent = `Welcome: ${name}`;
+                    
+                    const loginModal = document.getElementById('login-modal');
+                    if(loginModal) {
+                        loginModal.classList.add('hidden-modal');
+                        loginModal.classList.remove('visible-modal');
+                    }
+                    if(window.showPage) window.showPage(0);
+                    if(window.sfx) window.sfx.nav();
+                }
+            } catch (error) { 
+                console.error(error); 
+                alert("Connection failed. Please try again."); 
+            } finally { 
+                if(btn) { btn.innerText = "Begin Journey"; btn.disabled = false; }
+            }
+        };
+
+        window.handleGoogleLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                const finalName = user.displayName || "Agent Learner";
+                await window.ensureUserContainer(user, finalName, user.email);
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                localStorage.setItem('aa_username', finalName);
+                
+                window.SessionManager.start(finalName, user.email);
+
+                const welcomeText = document.getElementById('header-welcome-text');
+                if(welcomeText) welcomeText.textContent = `Welcome: ${finalName}`;
+                
+                const loginModal = document.getElementById('login-modal');
+                if(loginModal) {
+                    loginModal.classList.add('hidden-modal');
+                    loginModal.classList.remove('visible-modal');
+                }
+                if(window.showPage) window.showPage(0);
+                if(window.sfx) window.sfx.nav();
+            } catch (error) { alert("Google Sign-In failed."); }
+        };
+        
+        (async function initAuth() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) {}
+            }
+        })();
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'allgood-accent': '#2D6473',
+                        'jung-primary': '#4F46E5',
+                        'jung-secondary': '#10B981',
+                        'jung-accent': '#D97706',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: Verdana, sans-serif;
+            background-color: #1a1a1a;
+            background-image: url("https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?q=80&w=2070&auto=format&fit=crop");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 100vh; margin: 0; padding: 0;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+        
+        .tablet-frame {
+            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
+            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative; margin: 20px auto;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
+            transition: width 0.3s, height 0.3s;
+        }
+        .tablet-frame::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border-radius: 6px; background: #111; z-index: 0; }
+        .screen-container { width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1; overflow: hidden; display: flex; flex-direction: column; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+        
+        /* SCROLLBAR */
+        .content-column::-webkit-scrollbar { width: 10px; }
+        .content-column::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
+        .content-column::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 5px; border: 2px solid #e5e5e5; }
+        .content-column::-webkit-scrollbar-thumb:hover { background-color: #EB8D69; }
+
+        /* MODAL */
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        #flex-progress-bar { height: 4px; width: 100%; background-color: #eee; position: absolute; top: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+        
+        .split-layout { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
+        .sidebar-jodi {
+            width: 100%; height: auto; min-height: 140px;
+            background-color: #1F2937;
+            border-bottom: 2px solid #374151;
+            display: flex; align-items: flex-end; padding: 10px; position: relative; z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+        .content-column { flex: 1; overflow-y: auto; position: relative; background-color: #F9FAFB; padding-bottom: 20px; }
+
+        .page { width: 100%; height: auto; padding: 20px; position: relative; display: none; }
+        .page.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .jodi-wrapper { display: flex; flex-direction: row; align-items: center; width: 100%; max-width: 600px; margin: 0 auto; }
+        .jodi-avatar { width: 80px; height: 80px; flex-shrink: 0; margin-right: 15px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.3)); }
+        .jodi-bubble {
+            background: white; border: 2px solid #4F46E5; border-radius: 12px; border-bottom-left-radius: 0;
+            padding: 12px; font-size: 0.85rem; color: #444; line-height: 1.4; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative; flex: 1; transform-origin: bottom left; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .jodi-bubble.visible { opacity: 1; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        
+        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
+        .blueprint-mode .page, .blueprint-mode .content-column { background-color: #0f172a !important; }
+        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
+        .blueprint-mode .footer-content { background-color: #1e293b !important; border-top-color: #334155 !important; }
+        
+        .tablet-frame.focus-mode { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; aspect-ratio: unset !important; margin: 0 !important; padding: 0 !important; z-index: 99999 !important; border-radius: 0 !important; background: #F7F7F7 !important; }
+        .tablet-frame.focus-mode::before { display: none; }
+        
+        @media (min-width: 768px) {
+            .split-layout { flex-direction: row; }
+            .sidebar-jodi { width: 25%; height: 100%; border-bottom: none; border-right: 2px solid #374151; flex-direction: column; justify-content: flex-end; padding: 20px; }
+            .content-column { width: 75%; }
+            .jodi-wrapper { flex-direction: column-reverse; align-items: center; width: 100%; }
+            .jodi-avatar { width: 140px; height: 140px; margin-right: 0; margin-top: 15px; }
+            .jodi-bubble { border-radius: 12px; border-bottom-left-radius: 12px; border-bottom-right-radius: 0; margin-bottom: 10px; text-align: center; }
+            .jodi-bubble::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 8px solid #4F46E5; }
+        }
+
+        @media (max-width: 768px) {
+            html, body { position: fixed; width: 100%; height: 100dvh; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            main { padding: 0 !important; height: 100dvh !important; width: 100% !important; display: block; position: fixed; top: 0; left: 0; }
+            .tablet-frame { position: absolute !important; top: 0; left: 0; right: 0; bottom: 0; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #F7F7F7 !important; aspect-ratio: unset !important; }
+            .tablet-frame::before { display: none !important; }
+            .screen-container { border-radius: 0 !important; box-shadow: none !important; }
+            header.navbar-content { padding-top: max(env(safe-area-inset-top), 12px); height: auto; min-height: 60px; padding-bottom: 12px; }
+            
+            /* MOBILE FOOTER OVERRIDE */
+            footer.footer-content { 
+                position: absolute; bottom: 0; left: 0; width: 100%; 
+                padding-bottom: max(env(safe-area-inset-bottom), 10px); 
+                padding-top: 10px; 
+                height: auto; 
+                min-height: 60px; /* Reduced from 80px */
+                z-index: 100; 
+                background-color: white; 
+                border-top: 1px solid #e5e7eb; 
+            }
+            footer.footer-content button {
+                padding-top: 0.5rem; padding-bottom: 0.5rem;
+                font-size: 0.75rem; 
+            }
+            .content-column { padding-bottom: 100px !important; }
+        }
+
+        .navbar-content { flex: 0 0 60px; z-index: 50; }
+        .footer-content { flex: 0 0 60px; z-index: 50; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+
+        .flip-card { background-color: transparent; width: 100%; height: 200px; perspective: 1000px; cursor: pointer; }
+        .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .flip-card-front { background-color: white; border: 1px solid #e5e7eb; }
+        .flip-card-back { background-color: #1F2937; color: white; transform: rotateY(180deg); border: 2px solid #4F46E5; }
+        
+        .draggable-item { cursor: grab; transition: all 0.2s ease; user-select: none; }
+        .draggable-item.dragging { opacity: 0.5; transform: scale(1.05); cursor: grabbing; }
+        .drop-zone { transition: background-color 0.2s ease; }
+        .drop-zone.drag-over { background-color: #E0E7FF; border-color: #4F46E5; transform: scale(1.02); }
+        
+        .signature-font { font-family: 'Brush Script MT', cursive; font-size: 2rem; color: #4F46E5; }
+        .range-slider { -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none; }
+        .range-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #4F46E5; cursor: pointer; transition: background .15s ease-in-out; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @keyframes burnCard {
+            0% { transform: scale(1) rotate(0deg); box-shadow: 0 0 0 rgba(255, 69, 0, 0); }
+            20% { transform: scale(1.05) rotate(-2deg); background-color: #ff4500; color: #000; box-shadow: 0 0 20px #ff4500; }
+            40% { transform: scale(1.1) rotate(2deg); background-color: #333; color: #555; }
+            100% { transform: scale(0.8) translateY(-100px) rotate(10deg); opacity: 0; filter: blur(10px); }
+        }
+        .burning { animation: burnCard 0.8s forwards ease-in; pointer-events: none; }
+
+        @keyframes drawCrack { to { stroke-dashoffset: 0; } }
+        @keyframes glassFall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(50px) rotate(5deg) scale(0.9); opacity: 0; } }
+        @keyframes spacePan { 0% { background-position: 0% 0%; } 100% { background-position: 100% 100%; } }
+        .crack-path { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: drawCrack 0.5s forwards linear; }
+        .shattered-glass { animation: glassFall 0.8s forwards ease-in; pointer-events: none; }
+        .cosmos-bg { background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%); position: relative; overflow: hidden; }
+        .cosmos-stars { background-image: radial-gradient(white 1px, transparent 1px), radial-gradient(white 1px, transparent 1px); background-size: 50px 50px, 100px 100px; background-position: 0 0, 25px 25px; opacity: 0.5; animation: spacePan 60s linear infinite; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center py-8">
+        <div class="tablet-frame">
+            <div class="screen-container" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative">
+                                <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                <i data-lucide="compass" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"></i>
+                                <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
+                                <h1 class="text-5xl md:text-7xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm">Jodi's Schoolhouse</h1>
+                                <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">Module: Finding Yourself</p>
+                            </div>
+                            <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Header -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center shrink-0">
+                    <div class="w-full px-4 flex items-center justify-between h-full pt-[env(safe-area-inset-top)]">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Welcome: Agent Learner</div>
+                            <div class="hidden sm:flex items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                                <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Page</span>
+                                <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 23</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 mr-2"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="moon" class="w-5 h-5"></i></button>
+                            <button id="fullscreen-toggle" class="hidden md:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="maximize" class="w-5 h-5"></i></button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- MAIN SPLIT VIEW -->
+                <div class="flex-1 min-h-0 relative split-layout">
+                    
+                    <!-- LEFT COLUMN: MENTOR SIDEBAR -->
+                    <div class="sidebar-jodi shrink-0">
+                        <div class="jodi-wrapper">
+                            <div id="jodi-avatar-svg" class="jodi-avatar">
+                                <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-lg">
+                                    <circle cx="50" cy="50" r="45" fill="#fff" stroke="#4F46E5" stroke-width="3"/>
+                                    <path d="M20 50 Q50 90 80 50" fill="#f0f0f0" opacity="0.2"/>
+                                    <circle cx="50" cy="40" r="15" fill="#1F2937"/>
+                                    <path d="M30 80 Q50 60 70 80 V95 H30 Z" fill="#1F2937"/>
+                                    <g id="jodi-face">
+                                        <circle cx="45" cy="38" r="2" fill="white"/>
+                                        <circle cx="55" cy="38" r="2" fill="white"/>
+                                        <path d="M45 48 Q50 52 55 48" fill="none" stroke="white" stroke-width="1.5"/>
+                                    </g>
+                                </svg>
+                            </div>
+                            <div id="jodi-bubble" class="jodi-bubble">
+                                Welcome, Seeker. I'm Jodi. I'll be your guide through the archeology of your own mind.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: CONTENT SCROLL AREA -->
+                    <div class="content-column" id="content-column">
+
+                        <!-- P1: Cover -->
+                        <div class="page active" id="page-1">
+                            <div class="flex flex-col items-center justify-start h-full text-center px-6 pt-10">
+                                <div class="w-24 h-24 bg-jung-primary/10 rounded-full flex items-center justify-center mb-6 border border-jung-primary/20">
+                                    <i data-lucide="compass" class="w-12 h-12 text-jung-primary"></i>
+                                </div>
+                                <h1 class="text-4xl sm:text-5xl font-heading font-bold text-allgood-dark mb-2 leading-tight">Finding Yourself</h1>
+                                <h2 class="text-sm font-bold text-allgood-secondary uppercase tracking-[0.2em] mb-6">The Archeology of Self</h2>
+                                <p class="text-lg text-gray-600 mb-8 max-w-md italic">"You don’t become yourself by changing. You become yourself by remembering who you were before you forgot."</p>
+                                
+                                <div class="w-full max-w-lg text-left mx-auto space-y-4 mb-8">
+                                    <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
+                                        <button class="accordion-toggle w-full bg-white p-4 flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                            <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">About this module</span>
+                                            <i data-lucide="chevron-down" class="accordion-icon w-5 h-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary"></i>
+                                        </button>
+                                        <div class="hidden accordion-content bg-gray-50 border-t border-gray-200 p-5 text-gray-600 shadow-inner text-sm font-body">
+                                            <p class="mb-4 leading-relaxed"><strong>Objective:</strong> A guided excavation of the psyche. You will identify your Persona, confront your Shadow, and initiate the process of Individuation.</p>
+                                            <div class="flex items-center text-xs font-bold text-allgood-primary uppercase tracking-wide">
+                                                <i data-lucide="clock" class="w-4 h-4 mr-2"></i> 25 Minute Deep Dive
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
+                                        <button class="accordion-toggle w-full bg-white p-4 flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                            <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                            <i data-lucide="chevron-down" class="accordion-icon w-5 h-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary"></i>
+                                        </button>
+                                        <div class="hidden accordion-content bg-gray-50 border-t border-gray-200 p-5 text-gray-600 shadow-inner text-xs font-body">
+                                            <p class="mb-4 text-sm text-allgood-dark">Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P2: The Signal -->
+                        <div class="page" id="page-2">
+                            <div class="max-w-xl mx-auto pt-8 px-6 text-center relative h-full flex flex-col">
+                                <i data-lucide="radio" class="w-12 h-12 text-jung-primary mx-auto mb-4 opacity-80 animate-pulse"></i>
+                                <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-2">Signal Strength</h2>
+                                <p class="text-xs text-gray-400 mb-6 uppercase tracking-widest">Tune the frequency to clear the interference.</p>
+                                <div class="relative flex-grow bg-gray-100 rounded-lg border-2 border-gray-300 p-6 overflow-hidden shadow-inner mb-6 transition-colors duration-500" id="signal-screen">
+                                    <div id="signal-content" class="filter blur-md opacity-30 transition-all duration-300 select-none">
+                                        <h3 class="text-lg font-bold text-gray-800 mb-3">The Unsettling Realization</h3>
+                                        <p class="text-gray-700 leading-relaxed mb-4 text-left">Imagine waking up one day realizing the life you've been living is not truly your own. That every decision, belief, and desire may not have originated from you, but from the expectations of the world.</p>
+                                        <p class="text-gray-700 leading-relaxed text-left">How much of your identity is a reflection of your authentic self, and how much is a constructed mask?</p>
+                                    </div>
+                                    <div id="static-overlay" class="absolute inset-0 bg-repeat opacity-40 pointer-events-none" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIi8+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAiLz4KPC9zdmc+');"></div>
+                                </div>
+                                <div class="bg-gray-800 p-4 rounded-lg shadow-lg border-t-4 border-gray-600">
+                                    <div class="flex justify-between text-xs font-mono text-green-400 mb-1"><span>88.0</span><span id="freq-display" class="text-lg font-bold text-white">FM 88.0</span><span>108.0</span></div>
+                                    <input type="range" min="880" max="1080" value="880" class="range-slider mb-2" oninput="updateTuner(this.value)" style="background: #374151;">
+                                    <div class="h-1 w-full bg-gray-700 rounded overflow-hidden"><div id="tuner-bar" class="h-full bg-green-500 w-0 transition-all duration-100"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P3: The Evidence -->
+                        <div class="page" id="page-3">
+                            <div class="max-w-xl mx-auto pt-6 px-6">
+                                <h2 class="text-xl font-heading font-bold text-allgood-dark mb-4">Field Notes: Collective Unrest</h2>
+                                <p class="text-sm text-gray-500 mb-6">You are not alone in this feeling. This is a shared human struggle. Select the sentiment that resonates most deeply with you right now.</p>
+                                <div class="space-y-3">
+                                    <button onclick="selectEvidence(this)" class="w-full text-left p-4 bg-white border border-gray-200 rounded-lg hover:bg-jung-primary/5 hover:border-jung-primary transition-all group">
+                                        <div class="flex items-start">
+                                            <i data-lucide="quote" class="w-4 h-4 text-gray-300 mr-3 mt-1 group-hover:text-jung-primary"></i>
+                                            <p class="text-sm text-gray-600 italic">"I'm 27 and finally starting to 'see' myself for the first time. I have a long way to go."</p>
+                                        </div>
+                                    </button>
+                                    <button onclick="selectEvidence(this)" class="w-full text-left p-4 bg-white border border-gray-200 rounded-lg hover:bg-jung-primary/5 hover:border-jung-primary transition-all group">
+                                        <div class="flex items-start">
+                                            <i data-lucide="quote" class="w-4 h-4 text-gray-300 mr-3 mt-1 group-hover:text-jung-primary"></i>
+                                            <p class="text-sm text-gray-600 italic">"Despite money and power, I felt empty. It wasn't until I shared my true thoughts that I found joy."</p>
+                                        </div>
+                                    </button>
+                                    <button onclick="selectEvidence(this)" class="w-full text-left p-4 bg-white border border-gray-200 rounded-lg hover:bg-jung-primary/5 hover:border-jung-primary transition-all group">
+                                        <div class="flex items-start">
+                                            <i data-lucide="quote" class="w-4 h-4 text-gray-300 mr-3 mt-1 group-hover:text-jung-primary"></i>
+                                            <p class="text-sm text-gray-600 italic">"You don't become yourself by changing. You become yourself by remembering who you were before you forgot."</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P4: The Diagnosis -->
+                        <div class="page" id="page-4">
+                            <div class="max-w-xl mx-auto pt-8 px-6 text-center relative h-full">
+                                <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Conditioning</h2>
+                                <p class="text-xs text-gray-400 mb-6 uppercase tracking-widest">Peel away the labels to reveal the truth.</p>
+                                <div class="relative w-full h-80 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex items-center justify-center">
+                                    <div id="conditioning-reveal" class="absolute inset-0 p-8 flex flex-col items-center justify-center opacity-0 transition-opacity duration-1000">
+                                        <i data-lucide="book-open" class="w-10 h-10 text-jung-primary mb-4"></i>
+                                        <p class="text-gray-600 leading-relaxed text-left text-sm">From birth, we are conditioned. We are given names, roles, and rules. We adapt to survive. Over time, we suppress parts of ourselves that don't align with these expectations.<br><br><strong>This is the False Self.</strong></p>
+                                    </div>
+                                    <div id="sticker-container" class="absolute inset-0 z-10">
+                                        <button onclick="peelSticker(this)" class="absolute top-10 left-10 bg-yellow-300 text-yellow-900 px-4 py-2 rounded-sm shadow-md transform -rotate-6 font-bold font-hand text-sm hover:scale-110 transition-transform">"Be Nice"</button>
+                                        <button onclick="peelSticker(this)" class="absolute top-20 right-12 bg-blue-300 text-blue-900 px-4 py-2 rounded-sm shadow-md transform rotate-3 font-bold font-hand text-sm hover:scale-110 transition-transform">"Don't Cry"</button>
+                                        <button onclick="peelSticker(this)" class="absolute bottom-24 left-1/2 bg-green-300 text-green-900 px-6 py-3 rounded-sm shadow-md transform -translate-x-1/2 -rotate-2 font-bold font-hand text-lg hover:scale-110 transition-transform">"SUCCESS"</button>
+                                        <button onclick="peelSticker(this)" class="absolute top-1/2 left-8 bg-red-300 text-red-900 px-3 py-1 rounded-sm shadow-md transform rotate-12 font-bold font-hand text-xs hover:scale-110 transition-transform">"Boys don't cry"</button>
+                                        <button onclick="peelSticker(this)" class="absolute bottom-10 right-8 bg-purple-300 text-purple-900 px-4 py-2 rounded-sm shadow-md transform -rotate-3 font-bold font-hand text-sm hover:scale-110 transition-transform">"Be Realistic"</button>
+                                        <button onclick="peelSticker(this)" class="absolute top-1/3 right-1/4 bg-orange-300 text-orange-900 px-3 py-2 rounded-sm shadow-md transform rotate-6 font-bold font-hand text-xs hover:scale-110 transition-transform">"Sit Still"</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P5: Persona X-Ray -->
+                        <div class="page" id="page-5">
+                            <div class="flex flex-col items-center justify-start min-h-full px-4 pt-6 text-center">
+                                <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-2">The Persona Inspection</h2>
+                                <p class="text-sm text-gray-500 mb-4">Click specific features to X-Ray the psychological mechanism.</p>
+                                <div class="relative w-64 h-64 mb-6 mx-auto">
+                                    <svg viewBox="0 0 200 250" class="w-full h-full drop-shadow-2xl filter transition-all duration-500" id="persona-mask">
+                                        <defs>
+                                            <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FCD34D" /><stop offset="100%" stop-color="#D97706" /></linearGradient>
+                                        </defs>
+                                        <path d="M40,50 Q100,0 160,50 V150 Q160,220 100,240 Q40,220 40,150 Z" fill="url(#goldGradient)" stroke="#B45309" stroke-width="2" />
+                                        <path id="feature-eyes" d="M60,110 Q80,100 100,110 T140,110" fill="none" stroke="#78350F" stroke-width="3" class="transition-all duration-300" />
+                                        <path d="M100,110 V160 L90,170" fill="none" stroke="#92400E" stroke-width="2" opacity="0.5"/>
+                                        <path id="feature-smile" d="M70,190 Q100,210 130,190" fill="none" stroke="#78350F" stroke-width="3" class="transition-all duration-300" />
+                                        <path id="feature-armor" d="M45,60 Q100,30 155,60" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="10" class="transition-all duration-300" />
+                                    </svg>
+                                    <div class="absolute top-[20%] left-[10%] w-[80%] h-[20%] cursor-pointer hover:bg-white/10 rounded-full" onclick="inspectFeature('armor')" title="Inspect Armor"></div>
+                                    <div class="absolute top-[40%] left-[20%] w-[60%] h-[15%] cursor-pointer hover:bg-white/10 rounded-full" onclick="inspectFeature('eyes')" title="Inspect Eyes"></div>
+                                    <div class="absolute top-[70%] left-[30%] w-[40%] h-[15%] cursor-pointer hover:bg-white/10 rounded-full" onclick="inspectFeature('smile')" title="Inspect Smile"></div>
+                                </div>
+                                <div id="diagnostic-panel" class="w-full max-w-md bg-white border-l-4 border-gray-300 p-4 rounded shadow-sm text-left min-h-[120px] transition-all duration-300">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Status: Scanning...</h4>
+                                    <p class="text-sm text-gray-500 italic">Select a facial feature to analyze its defensive function.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P6: Script Shredder -->
+                        <div class="page" id="page-6">
+                             <div class="max-w-xl mx-auto pt-6 px-6 text-center relative h-full">
+                                 <h2 class="text-lg font-bold text-allgood-dark mb-4">Incinerate the Script</h2>
+                                 <p class="text-xs text-gray-500 mb-6">These are the viral programs running your life. Click to burn them out.</p>
+                                 <div id="source-code-terminal" class="absolute inset-x-6 top-24 bottom-10 bg-black rounded p-4 font-mono text-xs text-green-500 text-left overflow-hidden hidden shadow-inner border border-gray-700">
+                                     <p>> SYSTEM CHECK...</p><p>> VIRUS 'PPL_PLEASER' ... DELETED</p><p>> VIRUS 'FEAR_FAILURE' ... DELETED</p><p>> VIRUS 'SUPPRESS_EMOTION' ... DELETED</p><p class="mt-4 text-white animate-pulse">> CORE SELF ONLINE.</p>
+                                 </div>
+                                 <div class="grid grid-cols-2 gap-4 relative z-10" id="shredder-grid">
+                                     <div onclick="shredItem(this)" class="cursor-pointer bg-green-100 border-2 border-green-600 rounded-lg p-4 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col justify-center items-center h-32 relative group"><div class="absolute inset-0 border-2 border-green-600/20 m-1 rounded"></div><i data-lucide="dollar-sign" class="w-8 h-8 text-green-700 mb-2"></i><span class="font-heading font-bold text-green-900 text-sm">"Must be Rich"</span></div>
+                                     <div onclick="shredItem(this)" class="cursor-pointer bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col justify-center items-center h-32 relative group"><div class="absolute top-2 right-4 w-2 h-2 bg-blue-200 rounded-full opacity-50"></div><div class="absolute top-4 right-3 w-1.5 h-1.5 bg-blue-300 rounded-full opacity-60"></div><i data-lucide="droplet" class="w-8 h-8 text-blue-400 mb-2"></i><span class="font-body italic text-blue-800 text-sm">"Don't Cry"</span></div>
+                                     <div onclick="shredItem(this)" class="cursor-pointer bg-pink-50 border-2 border-pink-300 border-dotted rounded-xl p-4 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col justify-center items-center h-32"><i data-lucide="heart" class="w-8 h-8 text-pink-500 mb-2 fill-current"></i><span class="font-heading text-pink-700 text-sm font-bold">"Please Others"</span></div>
+                                     <div onclick="shredItem(this)" class="cursor-pointer bg-gray-100 border border-gray-400 rounded-sm p-4 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col justify-center items-center h-32 font-mono"><div class="w-full h-1 bg-gray-300 mb-1"></div><div class="w-full h-1 bg-gray-300 mb-2"></div><span class="text-gray-700 text-xs font-bold uppercase tracking-tighter">"Be Realistic"</span><div class="absolute bottom-2 right-2 w-4 h-4 border border-gray-400"></div></div>
+                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- P7: Sorter -->
+                        <div class="page" id="page-7">
+                            <div class="max-w-md mx-auto pt-6 px-6 relative h-full flex flex-col">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-4 text-center">Separate Role from Soul</h2>
+                                <p class="text-sm text-gray-600 mb-4 text-center">Drag attributes to their source. The Mask is rigid; the Soul is deep.</p>
+                                <div class="grid grid-cols-2 gap-4 mb-6 flex-shrink-0">
+                                    <div id="zone-mask" class="drop-zone bg-gray-100 border-4 border-double border-gray-400 rounded-sm h-32 flex flex-col items-center justify-center transition-all shadow-inner relative overflow-hidden group"><div class="absolute inset-0 bg-gray-200 opacity-0 group-hover:opacity-20 transition-opacity"></div><i data-lucide="shield" class="w-8 h-8 text-gray-400 mb-1"></i><span class="text-xs font-bold text-gray-500 uppercase tracking-widest">The Persona</span></div>
+                                    <div id="zone-self" class="drop-zone bg-teal-50 border-2 border-teal-300 rounded-full h-32 flex flex-col items-center justify-center transition-all shadow-[0_0_15px_rgba(20,184,166,0.1)] relative overflow-hidden group"><div class="absolute inset-0 bg-teal-100 opacity-0 group-hover:opacity-30 transition-opacity animate-pulse"></div><i data-lucide="sparkles" class="w-8 h-8 text-teal-500 mb-1"></i><span class="text-xs font-bold text-teal-600 uppercase tracking-widest">The Soul</span></div>
+                                </div>
+                                <div id="sorter-feedback" class="h-16 flex items-center justify-center text-center mb-4 transition-all duration-300 opacity-0 transform translate-y-2"><p class="text-sm font-bold text-teal-600"></p></div>
+                                <div id="drag-source" class="flex flex-wrap gap-3 justify-center content-start flex-grow">
+                                    <div class="draggable-item bg-white border border-gray-300 px-4 py-2 rounded shadow-sm text-xs font-bold cursor-grab flex items-center gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all" draggable="true" id="d1" data-target="zone-mask" data-wisdom="Correct. A job title is a role you play, not who you are."><span>👔</span> Job Title</div>
+                                    <div class="draggable-item bg-white border border-teal-200 px-4 py-2 rounded-full shadow-sm text-xs font-bold cursor-grab flex items-center gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all" draggable="true" id="d2" data-target="zone-self" data-wisdom="Yes. Curiosity is the compass of the True Self."><span>✨</span> Curiosity</div>
+                                    <div class="draggable-item bg-white border border-gray-300 px-4 py-2 rounded shadow-sm text-xs font-bold cursor-grab flex items-center gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all" draggable="true" id="d3" data-target="zone-mask" data-wisdom="Right. Salary measures market value, not human worth."><span>💰</span> Salary</div>
+                                    <div class="draggable-item bg-white border border-teal-200 px-4 py-2 rounded-full shadow-sm text-xs font-bold cursor-grab flex items-center gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all" draggable="true" id="d4" data-target="zone-self" data-wisdom="Correct. Core values are the bedrock of your soul."><span>🧭</span> Values</div>
+                                    <div class="draggable-item bg-white border border-gray-300 px-4 py-2 rounded shadow-sm text-xs font-bold cursor-grab flex items-center gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all" draggable="true" id="d5" data-target="zone-mask" data-wisdom="Exactly. Reputation is just a story others tell about you."><span>🎭</span> Reputation</div>
+                                    <div class="draggable-item bg-white border border-teal-200 px-4 py-2 rounded-full shadow-sm text-xs font-bold cursor-grab flex items-center gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all" draggable="true" id="d6" data-target="zone-self" data-wisdom="Profound. Your deepest fears point to your deepest wounds."><span>🌑</span> Inner Fears</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P8: Shadow Intro -->
+                        <div class="page" id="page-8">
+                             <div class="flex flex-col items-center justify-center min-h-full w-full py-20 px-12 bg-gray-900 text-white rounded-lg shadow-2xl relative overflow-hidden">
+                                <div class="absolute inset-0 opacity-20 bg-gradient-to-br from-gray-800 via-gray-900 to-black pointer-events-none"></div>
+                                <i data-lucide="moon" class="w-16 h-16 text-indigo-400 mb-8 relative z-10 drop-shadow-md"></i>
+                                <h2 class="text-3xl font-heading font-bold mb-6 relative z-10 tracking-wide text-indigo-100">The Shadow</h2>
+                                <p class="text-center text-gray-300 max-w-lg leading-relaxed mb-12 text-lg relative z-10">If the Persona is what we show, the <strong class="text-indigo-300">Shadow</strong> is what we hide. It is the repository of the rejected self.</p>
+                                <div class="grid grid-cols-3 gap-4 w-full max-w-md mb-12 relative z-10">
+                                    <div class="bg-gray-800/60 border border-gray-700 p-4 rounded-lg text-center backdrop-blur-sm"><i data-lucide="frown" class="w-6 h-6 mx-auto mb-2 text-indigo-300"></i><span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Fears</span></div>
+                                    <div class="bg-gray-800/60 border border-gray-700 p-4 rounded-lg text-center backdrop-blur-sm"><i data-lucide="flame" class="w-6 h-6 mx-auto mb-2 text-indigo-300"></i><span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Desires</span></div>
+                                    <div class="bg-gray-800/60 border border-gray-700 p-4 rounded-lg text-center backdrop-blur-sm"><i data-lucide="gem" class="w-6 h-6 mx-auto mb-2 text-indigo-300"></i><span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Strengths</span></div>
+                                </div>
+                                <p class="text-center text-gray-400 max-w-md text-sm leading-relaxed relative z-10 italic border-t border-gray-800 pt-6">"It does not disappear. It operates beneath the surface, driving your reactions from the dark."</p>
+                            </div>
+                        </div>
+
+                        <!-- P9: Warning -->
+                        <div class="page" id="page-9">
+                            <div class="max-w-md mx-auto pt-10 px-6">
+                                <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded shadow-sm cursor-pointer hover:bg-red-100 transition-colors" onclick="revealWarning(this)">
+                                    <div class="flex justify-between items-center mb-2"><h3 class="text-red-700 font-bold">⚠️ Classified Warning</h3><i data-lucide="lock" class="w-4 h-4 text-red-400"></i></div>
+                                    <p class="text-xs text-red-400 uppercase font-bold tracking-widest">Tap to Decrypt Message</p>
+                                    <div class="hidden mt-4 pt-4 border-t border-red-200"><p class="text-sm text-red-800 italic leading-relaxed font-serif">To enter the shadow is choosing to see,<br>The parts of yourself you’ve been longing to flee.<br><br>The start is a mountain that few care to climb,<br>And those who find conflict will run every time.<br><br>I hope you find victory, Seeker, I do—<br>But it’s a mad trek to reveal the real you.</p></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P10: Projection Mirror -->
+                        <div class="page" id="page-10">
+                            <div class="max-w-md mx-auto pt-6 px-6 text-center h-full flex flex-col">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-4">The Projection Mirror</h2>
+                                <div class="bg-white p-4 rounded-xl border-2 border-indigo-100 shadow-sm mb-6">
+                                    <div class="flex items-center justify-center space-x-3 text-sm font-bold text-gray-700"><div class="flex flex-col items-center group"><span class="text-2xl group-hover:scale-110 transition-transform">🤬</span><span class="text-[10px] uppercase mt-1 text-gray-400">Trigger</span></div><div class="text-indigo-300 font-serif text-xl">+</div><div class="flex flex-col items-center group"><span class="text-2xl group-hover:scale-110 transition-transform">🔥</span><span class="text-[10px] uppercase mt-1 text-gray-400">Heat</span></div><div class="text-indigo-300 font-serif text-xl">=</div><div class="flex flex-col items-center group"><span class="text-2xl group-hover:scale-110 transition-transform">🌑</span><span class="text-[10px] uppercase mt-1 text-gray-400">Shadow</span></div></div>
+                                    <p class="text-xs text-indigo-800 mt-3 font-medium bg-indigo-50 py-1 px-2 rounded-full inline-block">"If it triggers you, it belongs to you."</p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3 flex-grow pb-4">
+                                    <div class="flip-card h-32" onclick="this.classList.toggle('flipped'); if(window.sfx) window.sfx.tick()"><div class="flip-card-inner"><div class="flip-card-front"><span class="text-2xl mb-2">😤</span><h3 class="font-bold text-gray-700 text-xs">"They are<br>ARROGANT!"</h3></div><div class="flip-card-back bg-indigo-900 border-indigo-500"><i data-lucide="sun" class="w-5 h-5 text-indigo-300 mb-1"></i><h3 class="font-bold text-white text-xs">Suppressed Confidence</h3><p class="text-[10px] text-indigo-200 mt-1 leading-tight">You secretly want to shine but play small.</p></div></div></div>
+                                    <div class="flip-card h-32" onclick="this.classList.toggle('flipped'); if(window.sfx) window.sfx.tick()"><div class="flip-card-inner"><div class="flip-card-front"><span class="text-2xl mb-2">😴</span><h3 class="font-bold text-gray-700 text-xs">"They are<br>LAZY!"</h3></div><div class="flip-card-back bg-indigo-900 border-indigo-500"><i data-lucide="coffee" class="w-5 h-5 text-indigo-300 mb-1"></i><h3 class="font-bold text-white text-xs">Need for Rest</h3><p class="text-[10px] text-indigo-200 mt-1 leading-tight">You overwork and judge those who rest.</p></div></div></div>
+                                    <div class="flip-card h-32" onclick="this.classList.toggle('flipped'); if(window.sfx) window.sfx.tick()"><div class="flip-card-inner"><div class="flip-card-front"><span class="text-2xl mb-2">😒</span><h3 class="font-bold text-gray-700 text-xs">"They are<br>SELFISH!"</h3></div><div class="flip-card-back bg-indigo-900 border-indigo-500"><i data-lucide="shield" class="w-5 h-5 text-indigo-300 mb-1"></i><h3 class="font-bold text-white text-xs">Lack of Boundaries</h3><p class="text-[10px] text-indigo-200 mt-1 leading-tight">You give too much and resent self-care.</p></div></div></div>
+                                    <div class="flip-card h-32" onclick="this.classList.toggle('flipped'); if(window.sfx) window.sfx.tick()"><div class="flip-card-inner"><div class="flip-card-front"><span class="text-2xl mb-2">😭</span><h3 class="font-bold text-gray-700 text-xs">"They are<br>DRAMATIC!"</h3></div><div class="flip-card-back bg-indigo-900 border-indigo-500"><i data-lucide="cloud-rain" class="w-5 h-5 text-indigo-300 mb-1"></i><h3 class="font-bold text-white text-xs">Repressed Emotion</h3><p class="text-[10px] text-indigo-200 mt-1 leading-tight">You numb your feelings to appear strong.</p></div></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P11: Integration -->
+                        <div class="page" id="page-11">
+                             <div class="max-w-md mx-auto pt-10 px-6 text-center">
+                                <div class="relative w-32 h-32 mx-auto mb-6 cursor-pointer" onclick="integrateCircles(this)">
+                                    <div class="absolute inset-0 bg-gray-800 rounded-full opacity-80 transform -translate-x-4 transition-transform duration-1000" id="shadow-circle"></div>
+                                    <div class="absolute inset-0 bg-white border-2 border-gray-800 rounded-full opacity-80 transform translate-x-4 transition-transform duration-1000 flex items-center justify-center" id="light-circle"><span class="text-xs font-bold text-gray-800">Tap to Merge</span></div>
+                                </div>
+                                <h2 class="text-xl font-bold text-allgood-dark mb-4">Integration</h2>
+                                <div id="integration-text" class="hidden opacity-0 transition-opacity duration-500">
+                                    <p class="text-gray-600 text-sm leading-relaxed mb-4">Psychological growth is not about eliminating the shadow. It is about <strong>integrating</strong> it. It is about looking into the depths of your own unconscious and facing what you have denied.</p>
+                                    <p class="text-gray-600 text-sm leading-relaxed">The parts of yourself you've suppressed are not your enemies, but the missing pieces of your wholeness.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- P12: Archetypes -->
+                        <div class="page" id="page-12">
+                            <div class="max-w-md mx-auto pt-6 px-6 text-center h-full flex flex-col">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-2">The Inner Cast</h2>
+                                <p class="text-xs text-gray-500 mb-6">Swipe to meet the characters living in your psyche.</p>
+                                <div class="flex-grow flex items-center justify-center relative">
+                                    <button onclick="changeArchetype(-1)" class="absolute left-0 z-10 p-3 bg-white rounded-full shadow-lg border border-gray-100 hover:bg-gray-50 text-gray-600 hover:text-allgood-primary transition-colors active:scale-95"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                                    <div id="archetype-card" class="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-xl w-64 h-80 flex flex-col items-center justify-center transition-all duration-300 transform scale-100 opacity-100"></div>
+                                    <button onclick="changeArchetype(1)" class="absolute right-0 z-10 p-3 bg-white rounded-full shadow-lg border border-gray-100 hover:bg-gray-50 text-gray-600 hover:text-allgood-primary transition-colors active:scale-95"><i data-lucide="chevron-right" class="w-6 h-6"></i></button>
+                                </div>
+                                <div class="flex justify-center gap-2 mt-6 h-4" id="archetype-dots"></div>
+                            </div>
+                        </div>
+
+                        <!-- P13: Shadow Negotiation -->
+                        <div class="page" id="page-13">
+                            <div class="max-w-md mx-auto pt-6 px-6">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-4">Dialogue Simulator</h2>
+                                <p class="text-sm text-gray-600 mb-4">Have you ever had a moment when you knew you needed to change, but something inside resisted? That is the battle between the Hero and the Shadow.</p>
+                                <div class="bg-gray-100 p-4 rounded mb-4 border-l-4 border-gray-400"><p class="text-xs font-bold text-gray-500 uppercase">Saboteur says:</p><p class="text-sm italic text-gray-800">"Don't speak up in this meeting. You'll sound stupid."</p></div>
+                                <div class="space-y-2">
+                                    <button onclick="checkHero(this, false)" class="w-full text-left p-3 bg-white border border-gray-200 rounded text-sm hover:bg-red-50"><strong>Fight:</strong> "Shut up! I'm smart! I'm forcing myself to talk!"</button>
+                                    <button onclick="checkHero(this, true)" class="w-full text-left p-3 bg-white border border-gray-200 rounded text-sm hover:bg-green-50"><strong>Integrate:</strong> "I hear your fear. You're trying to protect me. But I'm prepared."</button>
+                                </div>
+                                <div id="hero-feedback" class="mt-4 text-xs font-bold text-center h-4"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- P14: Anima/Animus -->
+                        <div class="page" id="page-14">
+                            <div class="flex flex-col items-center justify-center min-h-full px-6 pt-6 text-center relative overflow-hidden h-full">
+                                <h2 class="text-xl font-bold text-allgood-dark mb-2 z-20">Anima & Animus</h2>
+                                <p class="text-xs text-gray-500 mb-8 z-20">Slide to merge the Logic (Sun) and Intuition (Moon).</p>
+                                <div class="relative w-full max-w-sm h-40 mb-8 flex items-center justify-center">
+                                    <div class="absolute w-px h-full bg-gray-200 z-0"></div>
+                                    <div id="celestial-sun" class="absolute left-0 w-20 h-20 bg-amber-400 rounded-full shadow-[0_0_20px_rgba(251,191,36,0.6)] flex items-center justify-center transition-transform duration-100 z-10 border-4 border-white" style="transform: translateX(0);"><i data-lucide="sun" class="w-8 h-8 text-amber-900"></i></div>
+                                    <div id="celestial-moon" class="absolute right-0 w-20 h-20 bg-indigo-500 rounded-full shadow-[0_0_20px_rgba(99,102,241,0.6)] flex items-center justify-center transition-transform duration-100 z-10 border-4 border-white mix-blend-multiply" style="transform: translateX(0);"><i data-lucide="moon" class="w-8 h-8 text-white"></i></div>
+                                    <div id="eclipse-glow" class="absolute w-24 h-24 bg-white rounded-full opacity-0 shadow-[0_0_40px_rgba(255,255,255,0.9)] transition-opacity duration-500 z-0"></div>
+                                </div>
+                                <div class="w-full max-w-xs z-20">
+                                    <div class="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2"><span>Separation</span><span>Integration</span></div>
+                                    <input type="range" min="0" max="100" value="0" class="range-slider" oninput="updateEclipse(this.value)">
+                                </div>
+                                <div id="eclipse-text" class="h-16 mt-6 flex items-center justify-center opacity-0 transition-opacity duration-500"><div><h3 class="text-lg font-bold text-allgood-primary">WHOLENESS</h3><p class="text-xs text-gray-500">Conflict ends when the two halves meet.</p></div></div>
+                            </div>
+                        </div>
+
+                        <!-- P15: Balance Slider -->
+                        <div class="page" id="page-15">
+                            <div class="max-w-md mx-auto pt-10 px-6 text-center">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-6">Find the Center</h2>
+                                <p class="text-sm text-gray-600 mb-6">To find yourself, you must embrace all parts of yourself. The light and the dark. The masculine and the feminine.</p>
+                                <div class="flex justify-between text-xs font-bold text-gray-400 mb-2"><span>Rigid Logic</span><span>Chaotic Emotion</span></div>
+                                <input type="range" min="0" max="100" value="0" class="range-slider mb-6" oninput="checkBalance(this.value)">
+                                <div id="balance-text" class="text-xl font-bold text-gray-300">Too Rigid...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- P16: The Ego Wall -->
+                        <div class="page" id="page-16">
+                             <div class="flex flex-col items-center justify-center h-full w-full relative min-h-[500px]">
+                                <div class="absolute inset-0 bg-gray-900 overflow-hidden z-0 rounded-lg">
+                                    <div class="absolute inset-0 opacity-60" style="background-image: radial-gradient(white 1px, transparent 1px); background-size: 30px 30px;"></div>
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <div class="text-center animate-pulse"><i data-lucide="infinity" class="w-24 h-24 text-white mx-auto mb-4"></i><h2 class="text-4xl font-heading font-bold text-white">The True Self</h2><p class="text-indigo-200 text-lg">Infinite. Limitless. Connected.</p></div>
+                                    </div>
+                                </div>
+                                <div id="ego-wall" class="absolute inset-0 z-10 grid grid-cols-4 grid-rows-5 gap-1 p-2 bg-gray-800/50 backdrop-blur-sm rounded-lg"></div>
+                                <div class="absolute top-2 left-0 w-full text-center z-20 pointer-events-none"><span class="bg-black/70 text-white px-4 py-1 rounded-full text-sm font-bold backdrop-blur-md border border-white/10 shadow-lg">Click bricks to dismantle the Ego</span></div>
+                            </div>
+                        </div>
+
+                        <!-- P17: True Self -->
+                        <div class="page" id="page-17">
+                            <div class="max-w-md mx-auto pt-6 px-6">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-4">The True Self</h2>
+                                <p class="text-sm text-gray-600 mb-6 leading-relaxed">But what if the person you think you are is just a fragment of something larger? Jung believed in the <strong>True Self</strong>—the totality of who you are beyond the illusions of identity.</p>
+                                <div class="bg-indigo-50 p-6 rounded-lg text-center border border-indigo-100"><i data-lucide="infinity" class="w-8 h-8 text-jung-primary mx-auto mb-2"></i><h4 class="font-bold text-jung-primary uppercase tracking-widest text-xs mb-2">The True Self</h4><p class="text-sm text-indigo-900">"You are a vast, interconnected field of consciousness."</p></div>
+                            </div>
+                        </div>
+                        
+                        <!-- P18: The Mirror Shatter -->
+                        <div class="page" id="page-18">
+                            <div class="flex flex-col items-center justify-center h-full w-full relative overflow-hidden">
+                                <div id="mirror-cosmos" class="absolute inset-0 cosmos-bg z-0 opacity-0 transition-opacity duration-1000 flex items-center justify-center">
+                                    <div class="absolute inset-0 cosmos-stars"></div>
+                                    <div class="text-center z-10 animate-fade-in delay-700"><i data-lucide="infinity" class="w-24 h-24 text-white mx-auto mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]"></i><h2 class="text-3xl font-heading font-bold text-white mb-2">The Infinite Self</h2><p class="text-indigo-200 text-lg">Beyond the construct.</p></div>
+                                </div>
+                                <div id="mirror-frame" class="relative w-64 h-80 bg-gradient-to-br from-gray-100 to-gray-300 border-8 border-gray-400 rounded-lg shadow-2xl flex items-center justify-center cursor-pointer transition-transform duration-100 z-10 group overflow-hidden" onclick="shatterMirror()">
+                                    <div class="absolute inset-0 bg-gradient-to-tr from-white/40 to-transparent pointer-events-none z-10"></div>
+                                    <div class="text-center opacity-60 group-hover:opacity-80 transition-opacity"><i data-lucide="user" class="w-16 h-16 text-gray-500 mx-auto mb-2"></i><p class="text-xs font-bold text-gray-500 uppercase tracking-widest">The Finite Self</p></div>
+                                    <svg id="mirror-cracks" class="absolute inset-0 w-full h-full pointer-events-none z-20" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+                                </div>
+                                <div id="mirror-instruction" class="absolute bottom-10 text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse z-20 pointer-events-none">Tap to Break the Illusion</div>
+                            </div>
+                        </div>
+
+                        <!-- P19: Tools -->
+                        <div class="page" id="page-19">
+                            <div class="max-w-md mx-auto pt-6 px-6 h-full flex flex-col">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-2">The Archeologist's Kit</h2>
+                                <p class="text-xs text-gray-600 mb-6">How do we access the unconscious? Jung offered three primary tools. Click to inspect the Field Guide.</p>
+                                <div class="grid grid-cols-3 gap-3 mb-4">
+                                    <button onclick="openTool('dreams', this)" class="tool-btn flex flex-col items-center p-3 bg-white border-2 border-transparent hover:border-purple-300 hover:bg-purple-50 rounded-lg shadow-sm transition-all group active:scale-95"><div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-2 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors"><i data-lucide="cloud-moon" class="w-5 h-5"></i></div><span class="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Dreams</span></button>
+                                    <button onclick="openTool('creativity', this)" class="tool-btn flex flex-col items-center p-3 bg-white border-2 border-transparent hover:border-pink-300 hover:bg-pink-50 rounded-lg shadow-sm transition-all group active:scale-95"><div class="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center mb-2 text-pink-600 group-hover:bg-pink-600 group-hover:text-white transition-colors"><i data-lucide="pen-tool" class="w-5 h-5"></i></div><span class="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Creativity</span></button>
+                                    <button onclick="openTool('introspection', this)" class="tool-btn flex flex-col items-center p-3 bg-white border-2 border-transparent hover:border-blue-300 hover:bg-blue-50 rounded-lg shadow-sm transition-all group active:scale-95"><div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-2 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors"><i data-lucide="eye" class="w-5 h-5"></i></div><span class="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Insight</span></button>
+                                </div>
+                                <div id="tool-detail" class="flex-grow bg-gray-50 border border-gray-200 rounded-lg p-5 relative overflow-hidden transition-all duration-300 shadow-inner"><div class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 pointer-events-none opacity-50"><i data-lucide="search" class="w-8 h-8 mb-2"></i><span class="text-xs uppercase tracking-widest">Select a Tool</span></div></div>
+                            </div>
+                        </div>
+
+                        <!-- P20: Dream Log -->
+                        <div class="page" id="page-20">
+                            <div class="max-w-md mx-auto pt-8 px-6">
+                                <h2 class="text-lg font-bold text-allgood-dark mb-4">Log a Symbol</h2>
+                                <p class="text-sm text-gray-600 mb-4">The unconscious speaks in symbols. Is there an image or theme that keeps appearing in your life or dreams?</p>
+                                <textarea class="w-full p-3 border border-gray-300 rounded text-sm mb-4 bg-white" placeholder="e.g. Water, Falling, Wolves, Being Chased..."></textarea>
+                                <button onclick="logDream(this)" class="bg-allgood-secondary text-white px-4 py-2 rounded text-sm font-bold w-full transition-colors hover:bg-allgood-accent">Save Entry</button>
+                            </div>
+                        </div>
+
+                        <!-- P21: The Manifesto (COMBINED 21-23) -->
+                        <div class="page" id="page-21">
+                             <div class="max-w-2xl mx-auto px-6 pb-20">
+                                <div class="text-center pt-10 mb-16 fade-in"><div class="w-16 h-16 mx-auto bg-allgood-dark text-white rounded-full flex items-center justify-center mb-4 shadow-lg"><i data-lucide="feather" class="w-8 h-8"></i></div><h2 class="text-3xl font-heading font-bold text-allgood-dark mb-2">The Realization</h2><p class="text-sm text-gray-500 uppercase tracking-widest">Scroll to internalize the truth</p></div>
+                                <div class="manifesto-section opacity-0 transform translate-y-10 transition-all duration-1000 mb-24 relative" id="man-1"><div class="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-jung-primary to-transparent opacity-30"></div><h3 class="text-2xl font-bold text-gray-800 mb-4">1. The Paradigm Shift</h3><p class="text-lg text-gray-600 leading-relaxed italic mb-4">"Life truly begins when you stop running from yourself."</p><p class="text-gray-500 text-sm leading-relaxed">The ultimate realization is that you were never truly lost. The deep, authentic self has always been within you, waiting to be remembered. You are not fixing a broken machine; you are uncovering a buried treasure.</p></div>
+                                <div class="manifesto-section opacity-0 transform translate-y-10 transition-all duration-1000 mb-24 relative" id="man-2"><div class="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-jung-secondary to-transparent opacity-30"></div><h3 class="text-2xl font-bold text-gray-800 mb-4">2. Embrace the Unknown</h3><p class="text-lg text-gray-600 leading-relaxed italic mb-4">"Certainty is the cage. Mystery is the door."</p><p class="text-gray-500 text-sm leading-relaxed">The Ego craves safety and prediction. The Self thrives in the unknown. Growth only happens when you step off the map. Stop asking "What will happen?" and start asking "Who will I become?"</p></div>
+                                <div class="manifesto-section opacity-0 transform translate-y-10 transition-all duration-1000 mb-10 relative" id="man-3"><div class="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-jung-accent to-transparent opacity-30"></div><h3 class="text-2xl font-bold text-gray-800 mb-4">3. Release the Labels</h3><p class="text-lg text-gray-600 leading-relaxed italic mb-4">"You are the sky, not the weather."</p><p class="text-gray-500 text-sm leading-relaxed">You are not your name. You are not your job, your trauma, or your bank account. These are just costumes you wear. When you strip them away, what remains is the infinite, observing presence. That is You.</p></div>
+                                <div class="text-center pt-10 pb-10 opacity-50"><i data-lucide="arrow-down" class="w-6 h-6 mx-auto animate-bounce text-gray-400"></i></div>
+                            </div>
+                        </div>
+                        
+                        <!-- P22: Contract -->
+                        <div class="page" id="page-22">
+                            <div class="max-w-md mx-auto pt-6 px-6">
+                                <div class="bg-white p-6 rounded shadow-lg border-2 border-jung-primary/20 text-center">
+                                    <h3 class="font-heading font-bold text-lg mb-4 text-gray-800">Surrender Contract</h3>
+                                    <p class="text-sm text-gray-600 mb-6 italic">"I hereby agree to drop the mask in one interaction today. I choose Wholeness over Perfection. I will step forward into the unknown."</p>
+                                    <div class="border-b-2 border-gray-300 pb-2 relative cursor-pointer group h-10" onclick="signContract(this)">
+                                        <span class="text-xs text-gray-400 uppercase font-bold absolute bottom-1 left-0">x Tap to Sign</span>
+                                        <div class="signature-font absolute bottom-2 left-10 opacity-0 transition-opacity duration-700 transform -rotate-2 text-xl" id="signature">Learner</div>
+                                    </div>
+                                </div>
+                                <div id="contract-feedback" class="mt-4 text-center hidden"><span class="bg-green-100 text-green-800 px-3 py-1 rounded text-xs font-bold">Sealed.</span></div>
+                            </div>
+                        </div>
+
+                        <!-- P23: Certification & Feedback -->
+                        <div class="page" id="page-23">
+                            <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-8 overflow-y-auto">
+                                <div class="mb-4 text-allgood-secondary font-bold tracking-widest uppercase text-xs">Mission Accomplished</div>
+                                <h2 class="text-3xl font-heading font-bold text-allgood-dark mb-6">Certification & Feedback</h2>
+
+                                <!-- Feedback Card -->
+                                <div id="feedback-container" class="w-full max-w-md bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8 text-left relative">
+                                    <h3 class="font-bold text-allgood-dark text-sm uppercase tracking-wide mb-4 text-center">Rate this Module</h3>
+                                    <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                        <button onclick="setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                        <button onclick="setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                        <button onclick="setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                        <button onclick="setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                        <button onclick="setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                    </div>
+                                    <label class="block text-xs font-bold text-gray-500 mb-2">Your feedback improves the Academy. Thoughts?</label>
+                                    <textarea id="feedback-text" rows="3" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50" placeholder="Optional: Share your thoughts..."></textarea>
+                                    <button onclick="submitFeedback()" class="w-full mt-4 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-sm">Submit Feedback & Unlock Badge</button>
+                                </div>
+
+                                <!-- Success State -->
+                                <div id="feedback-success" class="hidden w-full max-w-md bg-green-50 p-4 rounded-lg shadow-inner border border-green-200 mb-8 text-center animate-fade-in">
+                                    <i data-lucide="check-circle" class="w-8 h-8 text-green-600 mx-auto mb-2"></i>
+                                    <h3 class="font-bold text-green-800 text-sm">Feedback Received.</h3>
+                                </div>
+
+                                <!-- Badge Section (Locked State) -->
+                                <div id="badge-section" class="w-full max-w-md flex flex-col items-center justify-center opacity-50 pointer-events-none transition-all duration-500 filter grayscale">
+                                    <div id="badge-display" class="w-48 h-48 mb-4 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 border-4 border-white shadow-xl flex items-center justify-center">
+                                        <i data-lucide="award" class="w-24 h-24 text-gray-300"></i>
+                                    </div>
+                                    <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-1">Architect of Self</h2>
+                                    <p class="text-xs text-gray-500 mb-4">You have completed the Archeology of Identity.</p>
+                                    <button onclick="window.downloadBadge()" id="download-badge-btn" disabled class="bg-gray-300 text-white px-8 py-3 rounded-full font-bold shadow-none flex items-center cursor-not-allowed transition-all">
+                                        <i data-lucide="lock" class="mr-2 w-4 h-4"></i> Badge Locked
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <footer class="footer-content flex items-center justify-between px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
+                    <div id="flex-progress-bar" class="absolute top-0 left-0 h-1 bg-gray-200 w-full"><div id="flex-progress-fill" class="h-full bg-allgood-primary w-0 transition-all duration-300"></div></div>
+                    <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body" onclick="window.prevPage()">
+                        <i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Back
+                    </button>
+                    <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
+                    <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center font-body" onclick="window.nextPage()">
+                        <span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+                    </button>
+                </footer>
+
+                <!-- CONFIRM EXIT MODAL -->
+                <div id="exit-modal" class="hidden-modal absolute inset-0 z-[260] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-4 text-allgood-primary">
+                            <i data-lucide="log-out" class="w-12 h-12 mx-auto"></i>
+                        </div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Return to Dashboard?</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">You have completed this module. Your progress and badge have been saved.</p>
+                        
+                        <div class="space-y-3">
+                            <button onclick="window.location.href = 'https://allgoodacademy.com'" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] flex items-center justify-center">
+                                Yes, Return Home
+                            </button>
+                            <button onclick="document.getElementById('exit-modal').classList.add('hidden-modal'); document.getElementById('exit-modal').classList.remove('visible-modal');" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">
+                                Stay Here
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Login Modal & System Menus -->
+                <div id="login-modal" class="absolute inset-0 z-[200] bg-allgood-dark/95 flex items-center justify-center p-6 visible-modal modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+                        <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                        <h2 class="text-xl font-bold text-allgood-dark mb-2 font-heading">Welcome</h2>
+                        <div class="flex items-center justify-center gap-2 mb-6 relative">
+                            <p class="text-gray-500 text-sm font-body">Please sign in to start.</p>
+                            <button id="policy-trigger" class="group relative flex items-center text-allgood-primary hover:text-allgood-hover transition-colors focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                <span class="text-xs font-bold underline decoration-dotted underline-offset-2">Why?</span>
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-64 p-3 bg-gray-800 text-white text-xs text-left rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible transition-all duration-200 z-50 font-body leading-relaxed border border-gray-700 pointer-events-none">
+                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+                                    <strong class="block text-allgood-primary mb-1 uppercase tracking-wide text-[10px]">Why do we ask?</strong>
+                                    <p class="mb-2 text-gray-300">We use your name to personalize your badge. Performance data is logged in real-time. All personal data is kept confidential.</p>
+                                </div>
+                            </button>
+                        </div>
+                        <input type="text" id="user-name-input" placeholder="Your Name (Optional)" class="w-full border border-gray-300 rounded p-3 mb-3 focus:ring-2 focus:ring-allgood-primary outline-none transition-all font-body">
+                        <input type="email" id="user-email-input" placeholder="Your Email (Optional)" class="w-full border border-gray-300 rounded p-3 mb-6 focus:ring-2 focus:ring-allgood-primary outline-none transition-all font-body">
+                        <button id="btn-guest-login" onclick="window.handleGuestLogin()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Start Mission</button>
+                        <div class="mt-4 flex items-center justify-center space-x-2"><div class="h-px w-10 bg-gray-200"></div><p class="text-xs text-gray-500 uppercase font-bold">OR</p><div class="h-px w-10 bg-gray-200"></div></div>
+                        <button id="google-icon-container" onclick="window.handleGoogleLogin()" class="mt-4 p-2 rounded-full border border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 bg-white flex items-center justify-center mx-auto">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Menu Modal -->
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Journey Map</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                    </div>
+                </div>
+
+                <!-- System Menu Modal -->
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4"><i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
+                        <div class="space-y-3">
+                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm flex items-center justify-center"><i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out</button>
+                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm flex items-center justify-center"><i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard</button>
+                            <button onclick="document.getElementById('system-menu-modal').classList.add('hidden-modal'); document.getElementById('system-menu-modal').classList.remove('visible-modal');" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- LOGIC -->
+    <script>
+        // --- CONFIG & STATE ---
+        const totalPages = 23; 
+        let currentPage = 0;
+        // EXPOSE GLOBALS FOR LOGGER
+        window.currentPageIndex = 0;
+        window.progressPercent = 0;
+        let sortedItems = 0;
+        let maskClickCount = 0;
+        let mirrorTapCount = 0;
+        let userRating = 0;
+
+        // --- AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        
+        function initAudio() { 
+            try {
+                if (!AudioContext) return; 
+                if (!audioCtx) audioCtx = new AudioContext(); 
+                if (audioCtx.state === 'suspended') audioCtx.resume(); 
+            } catch(e) { console.warn("Audio Context Failed", e); }
+        }
+
+        function playTone(f,t,d,v=0.1) { 
+            try { 
+                initAudio(); 
+                if(!audioCtx) return;
+                const o=audioCtx.createOscillator(), g=audioCtx.createGain(); 
+                o.type=t; 
+                o.frequency.setValueAtTime(f,audioCtx.currentTime); 
+                o.connect(g); 
+                g.connect(audioCtx.destination); 
+                g.gain.setValueAtTime(0,audioCtx.currentTime); 
+                g.gain.linearRampToValueAtTime(v,audioCtx.currentTime+0.01); 
+                g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d); 
+                o.start(audioCtx.currentTime); 
+                o.stop(audioCtx.currentTime+d); 
+            } catch(e){ console.warn("PlayTone error", e); } 
+        }
+
+        const sfx = {
+            powerOn: () => {
+                try {
+                    initAudio(); 
+                    if(!audioCtx) return;
+                    const now=audioCtx.currentTime; 
+                    const o=audioCtx.createOscillator(); 
+                    const g=audioCtx.createGain(); 
+                    o.connect(g); 
+                    g.connect(audioCtx.destination); 
+                    o.type='triangle'; 
+                    o.frequency.setValueAtTime(110,now); 
+                    o.frequency.exponentialRampToValueAtTime(220,now+0.4); 
+                    g.gain.setValueAtTime(0,now); 
+                    g.gain.linearRampToValueAtTime(0.4,now+0.1); 
+                    g.gain.linearRampToValueAtTime(0,now+0.4); 
+                    o.start(now); 
+                    o.stop(now+0.4);
+                } catch(e) { console.warn("PowerOn SFX error", e); }
+            },
+            nav: () => playTone(200,'sine',0.1), 
+            tick: () => playTone(800,'sine',0.01), 
+            success: () => playTone(400,'sine',0.2), 
+            error: () => playTone(100,'sawtooth',0.2)
+        };
+        window.sfx = sfx;
+
+        // --- JODI ENGINE ---
+        const jodiScript = [
+            "Welcome, Seeker. I am Jodi. I will be your guide through the archeology of your own mind.", // P1
+            "I'm picking up a signal... a deep, unsettling feeling that something is missing. Let's tune into it.", // P2
+            "You aren't the only one feeling this. Look at the data. This is a collective human struggle.", // P3
+            "Who wrote your script? Society? Parents? Let's look at the source code of your conditioning.", // P4
+            "To survive the script, you built a Mask. A Persona. It's a useful tool, but it is not You.", // P5
+            "Time to do some damage. Let's shred the expectations that no longer serve you.", // P6
+            "Let's sort the artifacts. Which of these are your Role, and which are your Soul?", // P7
+            "We are entering the Shadow now. Don't look away. This is where your hidden gold lies.", // P8
+            "This is a warning. This work is not safe. It will change you. Are you ready?", // P9
+            "The Mirror never lies. What you hate in others is often what you repress in yourself.", // P10
+            "Integration is the goal. We don't kill the Shadow; we invite it to the table.", // P11
+            "Meet the cast of characters living in your head. The Hero and the Saboteur are eternal rivals.", // P12
+            "Listen closely. Your Saboteur is speaking. How will the Hero respond?", // P13
+            "Inside you are two energies: The Sun and the Moon. Logic and Intuition.", // P14
+            "Find the center point. Wholeness is not one extreme or the other. It is the balance.", // P15
+            "Here is the hardest truth: The 'You' that has a job and a bank account? That is just the Ego.", // P16
+            "The True Self is limitless. It is the observer behind the mask.", // P17
+            "Let's break the illusion. You are more than a construct.", // P18
+            "I'm giving you the Archeologist's Kit. Dreams and Creativity are your shovels.", // P19
+            "What symbols are appearing in your life? Log them. They are messages.", // P20
+            "This is the Manifesto of the True Self. Read it slowly. Let it sink in.", // P21 (Combined)
+            "I need a commitment. Sign the contract to drop the mask for just one moment today.", // P22 (Contract)
+            "You have done the work. You are now an Architect of Self. Well done." // P23 (Badge)
+        ];
+
+        window.updateJodi = (idx) => {
+             const bubble = document.getElementById('jodi-bubble');
+             if(bubble && jodiScript[idx]) {
+                 bubble.classList.remove('visible');
+                 setTimeout(() => {
+                     bubble.textContent = jodiScript[idx];
+                     bubble.classList.add('visible');
+                 }, 300);
+             }
+        };
+
+        // --- NAVIGATION ---
+        window.showPage = function(idx) {
+            if (idx < 0 || idx >= totalPages) return;
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${idx+1}`).classList.add('active');
+            currentPage = idx;
+            
+            // UPDATE GLOBALS
+            window.currentPageIndex = idx + 1;
+            window.progressPercent = Math.round(((idx + 1) / totalPages) * 100);
+            
+            document.getElementById('header-page-indicator').textContent = `${idx + 1} / ${totalPages}`;
+            document.getElementById('flex-progress-fill').style.width = `${window.progressPercent}%`;
+            
+            const backBtn = document.getElementById('back-button');
+            const nextBtn = document.getElementById('next-button');
+            
+            if(backBtn) { backBtn.disabled = (idx === 0); backBtn.classList.toggle('opacity-30', idx === 0); }
+            
+            // NEXT BUTTON LOGIC
+            if(nextBtn) {
+                // Reset to default state first
+                nextBtn.innerHTML = '<span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>';
+                nextBtn.onclick = window.nextPage;
+                nextBtn.disabled = false;
+                nextBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600', 'cursor-not-allowed');
+                nextBtn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+
+                if (idx === totalPages - 1) {
+                    // Final Page: Transform to "Return to Dashboard"
+                    nextBtn.innerHTML = '<span>Dashboard</span><i data-lucide="layout-grid" class="w-4 h-4 ml-1"></i>';
+                    nextBtn.onclick = () => {
+                        const exitModal = document.getElementById('exit-modal');
+                        if(exitModal) {
+                            exitModal.classList.remove('hidden-modal');
+                            exitModal.classList.add('visible-modal');
+                        }
+                    };
+                } else {
+                    // Normal Page: Ensure standard "Next" behavior
+                     nextBtn.onclick = window.nextPage;
+                }
+            }
+            
+            const scroll = document.getElementById('content-column');
+            if(scroll) scroll.scrollTop = 0;
+
+            window.updateJodi(idx);
+            if(window.sfx) window.sfx.nav();
+
+            // Log Page View
+            if(window.SessionManager) {
+                window.SessionManager.log('Page_View', `Mapsd to Page ${idx + 1}`, {
+                    page_title: `Page ${idx + 1}`,
+                    progress: window.progressPercent
+                });
+            }
+
+            // --- Init Special Pages ---
+            if(idx === 11) { // Page 12 (0-based 11)
+                setTimeout(window.renderArchetype, 100);
+            }
+            
+            if(idx === 15) { // Page 16
+                 setTimeout(buildEgoWall, 100);
+            }
+
+            if (idx === 17) { // Page 18
+                if (typeof window.resetMirror === 'function') window.resetMirror();
+            }
+
+            // Manifesto Scroll Animation (Page 21)
+            if (idx === 20) {
+                setTimeout(initManifesto, 100);
+            }
+        }
+
+        window.nextPage = () => window.showPage(currentPage + 1);
+        window.prevPage = () => window.showPage(currentPage - 1);
+
+        // --- INTERACTIONS ---
+        
+        // PAGE 18: MIRROR SHATTER LOGIC
+        window.shatterMirror = () => {
+            const frame = document.getElementById('mirror-frame');
+            const cracks = document.getElementById('mirror-cracks');
+            const cosmos = document.getElementById('mirror-cosmos');
+            const instruction = document.getElementById('mirror-instruction');
+            
+            mirrorTapCount++;
+            
+            const jolt = () => {
+                frame.style.transform = `scale(${0.98 + Math.random()*0.04}) rotate(${Math.random()*2 - 1}deg)`;
+                setTimeout(() => frame.style.transform = 'scale(1) rotate(0deg)', 100);
+            };
+
+            if (mirrorTapCount === 1) {
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("d", "M50,50 L20,10 M50,50 L80,90");
+                path.setAttribute("stroke", "rgba(0,0,0,0.6)");
+                path.setAttribute("stroke-width", "0.5");
+                path.setAttribute("fill", "none");
+                path.classList.add("crack-path");
+                cracks.appendChild(path);
+                
+                jolt();
+                if(window.sfx) window.sfx.error(); 
+                instruction.innerText = "Strike Harder";
+                
+            } else if (mirrorTapCount === 2) {
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("d", "M50,50 L10,60 M50,50 L90,20 M50,50 L40,95");
+                path.setAttribute("stroke", "rgba(0,0,0,0.7)");
+                path.setAttribute("stroke-width", "0.8");
+                path.setAttribute("fill", "none");
+                path.classList.add("crack-path");
+                cracks.appendChild(path);
+                
+                jolt();
+                if(window.sfx) window.sfx.error();
+                instruction.innerText = "One More Blow";
+
+            } else if (mirrorTapCount >= 3) {
+                if(window.sfx) {
+                    window.sfx.error(); 
+                    setTimeout(() => window.sfx.success(), 200); 
+                }
+                
+                frame.classList.add('shattered-glass');
+                instruction.style.opacity = '0';
+                
+                cosmos.classList.remove('opacity-0');
+                
+                if(window.SessionManager) {
+                    window.SessionManager.log('Breakthrough', 'Illusion_Shattered', { 
+                        context: 'Page 18 Mirror' 
+                    });
+                }
+                
+                const bubble = document.getElementById('jodi-bubble');
+                if(bubble) {
+                     bubble.textContent = "The barrier is gone. This... is what you really are.";
+                     bubble.classList.remove('visible');
+                     setTimeout(() => bubble.classList.add('visible'), 100);
+                }
+            }
+        };
+
+        window.resetMirror = () => {
+            const frame = document.getElementById('mirror-frame');
+            const cracks = document.getElementById('mirror-cracks');
+            const cosmos = document.getElementById('mirror-cosmos');
+            const instruction = document.getElementById('mirror-instruction');
+            
+            if(frame) {
+                mirrorTapCount = 0;
+                frame.classList.remove('shattered-glass');
+                frame.style.transform = 'scale(1) rotate(0deg)';
+                cracks.innerHTML = ''; 
+                cosmos.classList.add('opacity-0');
+                instruction.style.opacity = '1';
+                instruction.innerText = "Tap to Break the Illusion";
+            }
+        };
+
+        // PAGE 2: RADIO TUNER
+        window.updateTuner = (val) => {
+            const target = 935; // 93.5
+            const range = 15;   // Tolerance +/-
+            const content = document.getElementById('signal-content');
+            const screen = document.getElementById('signal-screen');
+            const display = document.getElementById('freq-display');
+            const bar = document.getElementById('tuner-bar');
+            
+            display.innerText = `FM ${(val/10).toFixed(1)}`;
+            const diff = Math.abs(val - target);
+            let strength = 0;
+            if (diff < range) { strength = 1 - (diff / range); }
+            
+            const blurAmount = 8 - (strength * 8); 
+            const opacity = 0.3 + (strength * 0.7); 
+            
+            content.style.filter = `blur(${blurAmount}px)`;
+            content.style.opacity = opacity;
+            bar.style.width = `${strength * 100}%`;
+            
+            if (strength > 0.9) {
+                content.classList.remove('select-none');
+                screen.classList.remove('bg-gray-100', 'border-gray-300');
+                screen.classList.add('bg-white', 'border-green-400');
+                if (screen.dataset.tuned !== 'true') {
+                    if(window.sfx) window.sfx.success();
+                    screen.dataset.tuned = 'true';
+                }
+            } else {
+                content.classList.add('select-none');
+                screen.classList.remove('bg-white', 'border-green-400');
+                screen.classList.add('bg-gray-100', 'border-gray-300');
+                screen.dataset.tuned = 'false';
+            }
+        };
+
+        window.selectEvidence = (btn) => {
+            btn.classList.add('bg-jung-primary', 'text-white', 'border-jung-primary');
+            btn.classList.remove('bg-white', 'hover:bg-jung-primary/5');
+            const icon = btn.querySelector('svg') || btn.querySelector('i');
+            if (icon) { icon.classList.remove('text-gray-300'); icon.classList.add('text-white'); }
+            const text = btn.querySelector('p');
+            if (text) { text.classList.remove('text-gray-600'); text.classList.add('text-white'); }
+            if(window.sfx) window.sfx.tick();
+        };
+
+        // PAGE 4: STICKER PEEL
+        window.peelSticker = (el) => {
+            el.style.transition = "transform 0.5s ease, opacity 0.5s ease";
+            el.style.transform = "scale(1.2) rotate(20deg) translateY(-50px)";
+            el.style.opacity = "0";
+            el.style.pointerEvents = "none"; 
+            if(window.sfx) window.sfx.tick();
+            
+            setTimeout(() => {
+                el.remove();
+                const container = document.getElementById('sticker-container');
+                if (container && container.children.length === 0) {
+                    const reveal = document.getElementById('conditioning-reveal');
+                    reveal.classList.remove('opacity-0');
+                    reveal.classList.add('animate-fade-in');
+                    if(window.sfx) window.sfx.success();
+                }
+            }, 500);
+        };
+        
+        window.inspectFeature = (feature) => {
+            const panel = document.getElementById('diagnostic-panel');
+            const eyes = document.getElementById('feature-eyes');
+            const smile = document.getElementById('feature-smile');
+            const armor = document.getElementById('feature-armor');
+            
+            eyes.setAttribute('stroke', '#78350F');
+            smile.setAttribute('stroke', '#78350F');
+            armor.setAttribute('stroke', 'rgba(255,255,255,0.4)');
+            panel.classList.remove('border-jung-primary', 'border-jung-secondary', 'border-jung-accent');
+            
+            let title, text, jodiText, colorClass, borderClass;
+            
+            if(feature === 'smile') {
+                title = "Mechanism: The People Pleaser";
+                text = "This fixed smile disarms threats by appearing harmless. It hides anger and enforces agreeableness at the cost of your own needs.";
+                jodiText = "Ah, the smile. A classic defense. 'If I am nice, you won't hurt me.' Keep digging.";
+                colorClass = "text-jung-accent";
+                borderClass = "border-jung-accent";
+                smile.setAttribute('stroke', '#D97706'); 
+            } else if (feature === 'eyes') {
+                title = "Mechanism: Dissociation";
+                text = "The eyes look outward, scanning for expectations, but never look inward. This prevents you from seeing your own pain.";
+                jodiText = "Notice how it scans the room? It's looking for a script to follow so it doesn't have to improvise.";
+                colorClass = "text-jung-secondary";
+                borderClass = "border-jung-secondary";
+                eyes.setAttribute('stroke', '#10B981'); 
+            } else if (feature === 'armor') {
+                title = "Mechanism: Intellectualization";
+                text = "The polished forehead represents the 'Perfect Professional.' It uses logic and achievement to shield the soft, vulnerable self.";
+                jodiText = "Thick armor. This one thinks if it's smart enough or successful enough, it will finally be safe.";
+                colorClass = "text-jung-primary";
+                borderClass = "border-jung-primary";
+                armor.setAttribute('stroke', '#4F46E5'); 
+            }
+
+            panel.innerHTML = `<h4 class="text-xs font-bold ${colorClass} uppercase tracking-widest mb-1">${title}</h4><p class="text-sm text-gray-800 leading-relaxed animate-fade-in">${text}</p>`;
+            panel.classList.add(borderClass, 'bg-gray-50');
+            
+            const bubble = document.getElementById('jodi-bubble');
+            bubble.textContent = jodiText;
+            bubble.classList.remove('visible');
+            setTimeout(() => bubble.classList.add('visible'), 100);
+            if(window.sfx) window.sfx.tick();
+        };
+
+        window.revealWarning = (el) => {
+            const content = el.querySelector('div.hidden');
+            if(content) {
+                content.classList.remove('hidden');
+                const currentIcon = el.querySelector('svg') || el.querySelector('i');
+                if (currentIcon) {
+                    const newIcon = document.createElement('i');
+                    newIcon.setAttribute('data-lucide', 'unlock');
+                    newIcon.className = 'w-4 h-4 text-red-400'; 
+                    currentIcon.replaceWith(newIcon);
+                    if(window.lucide) window.lucide.createIcons();
+                }
+                if(window.sfx) window.sfx.nav();
+            }
+        };
+
+        window.integrateCircles = (el) => {
+            const shadow = document.getElementById('shadow-circle');
+            const light = document.getElementById('light-circle');
+            const text = document.getElementById('integration-text');
+            
+            shadow.style.transform = 'translateX(0)';
+            light.style.transform = 'translateX(0)';
+            light.style.backgroundColor = '#10B981'; 
+            light.innerHTML = '<span class="text-white font-bold">Integrated</span>';
+            
+            if(window.sfx) window.sfx.success();
+            setTimeout(() => { text.classList.remove('hidden'); void text.offsetWidth; text.classList.remove('opacity-0'); }, 600);
+        };
+
+        window.shredItem = (btn) => {
+            btn.classList.add('burning');
+            if(window.sfx) { window.sfx.tick(); setTimeout(() => window.sfx.tick(), 100); setTimeout(() => window.sfx.tick(), 200); }
+
+            setTimeout(() => {
+                btn.remove();
+                if(document.getElementById('shredder-grid').children.length === 0) {
+                    const term = document.getElementById('source-code-terminal');
+                    if(term) {
+                        term.classList.remove('hidden');
+                        term.classList.add('animate-fade-in'); 
+                        if(window.sfx) window.sfx.success();
+                    }
+                }
+            }, 800);
+        };
+
+        // Init Drag & Drop (Generic)
+        const draggables = document.querySelectorAll('.draggable-item');
+        
+        // MOUSE EVENTS
+        draggables.forEach(draggable => {
+            draggable.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text', e.target.id);
+                if(e.target.dataset.wisdom) { e.dataTransfer.setData('wisdom', e.target.dataset.wisdom); }
+                if(window.sfx) window.sfx.tick();
+                draggable.classList.add('dragging');
+            });
+            draggable.addEventListener('dragend', () => { draggable.classList.remove('dragging'); });
+        });
+
+        // DROP ZONES (MOUSE)
+        document.addEventListener('dragover', (e) => {
+            const zone = e.target.closest('.drop-zone');
+            if(zone) { e.preventDefault(); zone.classList.add('drag-over'); }
+        });
+        document.addEventListener('dragleave', (e) => {
+            const zone = e.target.closest('.drop-zone');
+            if(zone) { zone.classList.remove('drag-over'); }
+        });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const zone = e.target.closest('.drop-zone');
+            if(zone) {
+                zone.classList.remove('drag-over');
+                const id = e.dataTransfer.getData('text');
+                const wisdom = e.dataTransfer.getData('wisdom'); 
+                const el = document.getElementById(id);
+                handleItemDrop(zone, el, wisdom);
+            }
+        });
+
+        // --- MOBILE TOUCH SUPPORT ---
+        let activeTouchItem = null;
+        let initialTouchX = 0;
+        let initialTouchY = 0;
+        let touchXOffset = 0;
+        let touchYOffset = 0;
+
+        function handleTouchStart(e) {
+            const item = e.target.closest('.draggable-item');
+            if (!item || item.getAttribute('draggable') === 'false') return;
+
+            activeTouchItem = item;
+            const touch = e.touches[0];
+            initialTouchX = touch.clientX;
+            initialTouchY = touch.clientY;
+            
+            const rect = item.getBoundingClientRect();
+            touchXOffset = initialTouchX - rect.left;
+            touchYOffset = initialTouchY - rect.top;
+
+            activeTouchItem.classList.add('dragging');
+            activeTouchItem.style.position = 'fixed';
+            activeTouchItem.style.zIndex = '1000';
+            activeTouchItem.style.left = (rect.left) + 'px';
+            activeTouchItem.style.top = (rect.top) + 'px';
+            activeTouchItem.style.width = rect.width + 'px';
+            
+            if(window.sfx) window.sfx.tick();
+        }
+
+        function handleTouchMove(e) {
+            if (!activeTouchItem) return;
+            e.preventDefault(); 
+
+            const touch = e.touches[0];
+            const currentX = touch.clientX;
+            const currentY = touch.clientY;
+
+            activeTouchItem.style.left = (currentX - touchXOffset) + 'px';
+            activeTouchItem.style.top = (currentY - touchYOffset) + 'px';
+            
+            const elemBelow = document.elementFromPoint(currentX, currentY);
+            const dropZone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+            
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+            if (dropZone) { dropZone.classList.add('drag-over'); }
+        }
+
+        function handleTouchEnd(e) {
+            if (!activeTouchItem) return;
+
+            const touch = e.changedTouches[0];
+            const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const dropZone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+
+            activeTouchItem.classList.remove('dragging');
+            activeTouchItem.style.position = '';
+            activeTouchItem.style.zIndex = '';
+            activeTouchItem.style.left = '';
+            activeTouchItem.style.top = '';
+            activeTouchItem.style.width = '';
+
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+
+            if (dropZone) {
+                const wisdom = activeTouchItem.dataset.wisdom;
+                handleItemDrop(dropZone, activeTouchItem, wisdom);
+            }
+            activeTouchItem = null;
+        }
+
+        // Attach Touch Listeners
+        draggables.forEach(item => {
+            item.addEventListener('touchstart', handleTouchStart, {passive: false});
+            item.addEventListener('touchmove', handleTouchMove, {passive: false});
+            item.addEventListener('touchend', handleTouchEnd);
+        });
+
+        // SHARED LOGIC (Extracted for both Mouse & Touch)
+        function handleItemDrop(zone, el, wisdom) {
+            if(el && el.dataset.target === zone.id) {
+                zone.appendChild(el);
+                el.draggable = false;
+                el.classList.add('bg-jung-secondary', 'border-green-500', 'text-white');
+                el.classList.remove('bg-white', 'text-gray-700', 'hover:shadow-md');
+                
+                el.removeEventListener('touchstart', handleTouchStart);
+                el.removeEventListener('touchmove', handleTouchMove);
+                el.removeEventListener('touchend', handleTouchEnd);
+                
+                if(window.sfx) window.sfx.success();
+                
+                sortedItems++; 
+                if(sortedItems === 6) { 
+                    if(window.SessionManager) {
+                        window.SessionManager.log('Artifact_Recovered', 'Role_vs_Soul_Sorted', {
+                             items_sorted: 6 
+                        });
+                    }
+                }
+
+                if (wisdom) {
+                    const feedbackEl = document.getElementById('sorter-feedback');
+                    if (feedbackEl) {
+                        if (window.feedbackTimer) clearTimeout(window.feedbackTimer);
+                        feedbackEl.querySelector('p').innerText = wisdom;
+                        feedbackEl.classList.remove('opacity-0', 'translate-y-2');
+                        window.feedbackTimer = setTimeout(() => {
+                             feedbackEl.classList.add('opacity-0', 'translate-y-2');
+                        }, 8000);
+                    }
+                }
+            } else {
+                if(window.sfx) window.sfx.error();
+            }
+        }
+
+        // PAGE 20: DREAM LOG
+        window.logDream = (btn) => {
+            const textarea = btn.previousElementSibling;
+            const symbol = textarea.value.trim();
+            
+            if(window.sfx) window.sfx.success(); 
+            btn.innerText='Logged'; 
+            btn.classList.add('bg-green-600');
+            btn.disabled = true; 
+            
+            if(symbol && window.SessionManager) {
+                window.SessionManager.log('Dream_Log', 'Symbol_Recorded', {
+                    user_input: symbol,
+                    privacy_level: 'confidential' 
+                });
+            }
+        };
+
+        // P8: Shadow Dialogue
+        window.checkHero = (btn, isCorrect) => {
+            const fb = document.getElementById('hero-feedback');
+            if(isCorrect) {
+                fb.textContent = "Correct. Validation disarms the shadow.";
+                fb.className = "mt-4 text-xs font-bold text-center h-4 text-green-600";
+                btn.classList.add('bg-green-50', 'border-green-500');
+                if(window.sfx) window.sfx.success();
+            } else {
+                fb.textContent = "Fighting creates resistance. Try again.";
+                fb.className = "mt-4 text-xs font-bold text-center h-4 text-red-500";
+                btn.classList.add('bg-red-50', 'border-red-500');
+                if(window.sfx) window.sfx.error();
+            }
+        };
+
+        // P10: Balance Slider
+        window.checkBalance = (val) => {
+            const txt = document.getElementById('balance-text');
+            if(val > 40 && val < 60) {
+                txt.textContent = "✨ Wholeness ✨";
+                txt.className = "text-center font-heading font-bold text-xl text-jung-primary transition-colors h-8";
+                if(txt.dataset.locked !== 'true') { 
+                    if(window.sfx) window.sfx.success(); 
+                    txt.dataset.locked = 'true'; 
+                }
+            } else if (val <= 40) {
+                txt.textContent = "Too Rigid (Animus Dominant)";
+                txt.className = "text-center font-heading font-bold text-xl text-gray-400 transition-colors h-8";
+            } else {
+                txt.textContent = "Too Chaotic (Anima Dominant)";
+                txt.className = "text-center font-heading font-bold text-xl text-gray-400 transition-colors h-8";
+            }
+        }
+
+        // P13: Contract
+        window.signContract = (el) => {
+            const sig = document.getElementById('signature');
+            if(sig.style.opacity !== '1') {
+                sig.textContent = window.currentUserName || "Agent Learner";
+                sig.style.opacity = '1';
+                document.getElementById('contract-feedback').classList.remove('hidden');
+                if(window.sfx) window.sfx.success();
+                
+                if(window.SessionManager) {
+                    window.SessionManager.log('Contract_Signed', 'Commitment_Made', {
+                        signer_name: window.currentUserName,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        }
+
+        // PAGE 14: ECLIPSE CONVERGENCE (SLIDER LOGIC)
+        window.updateEclipse = (val) => {
+            const sun = document.getElementById('celestial-sun');
+            const moon = document.getElementById('celestial-moon');
+            const glow = document.getElementById('eclipse-glow');
+            const text = document.getElementById('eclipse-text');
+            
+            const moveDistance = val * 1.1; 
+            
+            sun.style.transform = `translateX(${moveDistance}px)`;
+            moon.style.transform = `translateX(-${moveDistance}px)`;
+            
+            if (val > 95) {
+                if (text.style.opacity !== '1') {
+                    text.style.opacity = '1';
+                    glow.style.opacity = '1';
+                    sun.classList.add('bg-black', 'border-indigo-500'); 
+                    moon.classList.add('opacity-50');
+                    if(window.sfx) window.sfx.success();
+                }
+            } else {
+                text.style.opacity = '0';
+                glow.style.opacity = '0';
+                sun.classList.remove('bg-black', 'border-indigo-500');
+                moon.classList.remove('opacity-50');
+            }
+        };
+
+        // PAGE 16: EGO WALL GENERATOR
+        const buildEgoWall = () => {
+            const wall = document.getElementById('ego-wall');
+            if(!wall || wall.children.length > 0) return;
+            
+            const labels = [
+                "My Job Title", "My Salary", "My Past", "My Trauma", 
+                "My GPA", "My Age", "My Politics", "My Beliefs",
+                "My Body", "My IQ", "Failures", "Successes",
+                "Reputation", "Social Status", "My Anxiety", "My Pride",
+                "My Shame", "My Habits", "My Plans", "The Ego"
+            ];
+            
+            for(let i=0; i<20; i++) {
+                const brick = document.createElement('div');
+                brick.className = "bg-gray-700 hover:bg-gray-600 border-2 border-gray-500 flex items-center justify-center cursor-pointer transition-all duration-200 text-gray-200 font-bold text-xs sm:text-sm md:text-base text-center select-none shadow-md relative overflow-hidden group w-full h-full rounded-sm";
+                brick.innerHTML = `<span class="relative z-10 group-hover:scale-105 transition-transform px-1 leading-tight drop-shadow-md">${labels[i]}</span><div class="absolute inset-0 bg-gradient-to-br from-white/5 to-black/20 pointer-events-none"></div>`;
+                brick.onclick = function() {
+                    this.style.transform = `scale(0.95) rotate(${Math.random()*6 - 3}deg)`;
+                    this.style.opacity = "0";
+                    this.style.filter = "blur(10px)";
+                    this.style.pointerEvents = "none";
+                    if(window.sfx) window.sfx.tick();
+                    setTimeout(() => { this.style.visibility = "hidden"; }, 300);
+                };
+                wall.appendChild(brick);
+            }
+        };
+
+        // PAGE 12: ARCHETYPE CAROUSEL
+        const archetypes = [
+            { name: "The Hero", icon: "sword", color: "blue", desc: "Seeks to prove worth through action and mastery.", fear: "Weakness" },
+            { name: "The Saboteur", icon: "shield-alert", color: "gray", desc: "Uses fear and doubt to keep you safe from change.", fear: "Growth" },
+            { name: "The Sage", icon: "book-open", color: "amber", desc: "Seeks truth, knowledge, and understanding.", fear: "Deception" },
+            { name: "The Orphan", icon: "users", color: "teal", desc: "Seeks safety, belonging, and connection.", fear: "Abandonment" },
+            { name: "The Rebel", icon: "flame", color: "red", desc: "Seeks to overturn what isn't working.", fear: "Powerlessness" },
+            { name: "The Creator", icon: "pen-tool", color: "purple", desc: "Seeks to realize a vision and craft meaning.", fear: "Mediocrity" }
+        ];
+        let currentArchIndex = 0;
+
+        window.renderArchetype = () => {
+            const data = archetypes[currentArchIndex];
+            const card = document.getElementById('archetype-card');
+            const dots = document.getElementById('archetype-dots');
+            if(!card) return;
+
+            card.classList.remove('scale-100', 'opacity-100');
+            card.classList.add('scale-95', 'opacity-50');
+
+            setTimeout(() => {
+                const colors = {
+                    blue: { bg: 'bg-blue-50', text: 'text-blue-500', border: 'border-blue-200' },
+                    amber: { bg: 'bg-amber-50', text: 'text-amber-500', border: 'border-amber-200' },
+                    teal: { bg: 'bg-teal-50', text: 'text-teal-500', border: 'border-teal-200' },
+                    red: { bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-200' },
+                    purple: { bg: 'bg-purple-50', text: 'text-purple-500', border: 'border-purple-200' },
+                    gray: { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' }
+                };
+                const c = colors[data.color] || colors.blue; 
+
+                card.innerHTML = `
+                    <div class="w-20 h-20 ${c.bg} rounded-full flex items-center justify-center mb-6 ${c.border} border-2 shadow-inner">
+                        <i data-lucide="${data.icon}" class="w-10 h-10 ${c.text}"></i>
+                    </div>
+                    <h3 class="text-xl font-heading font-bold text-gray-800 mb-3">${data.name}</h3>
+                    <p class="text-sm text-gray-600 mb-6 leading-relaxed italic text-center px-4">${data.desc}</p>
+                    <div class="mt-auto border-t border-gray-100 w-full pt-4">
+                        <span class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Core Fear</span>
+                        <p class="text-xs font-bold text-red-400 uppercase tracking-wide">${data.fear}</p>
+                    </div>
+                `;
+                
+                if(window.lucide) window.lucide.createIcons();
+
+                dots.innerHTML = archetypes.map((_, i) => 
+                    `<div class="w-2 h-2 rounded-full transition-all duration-300 ${i === currentArchIndex ? 'bg-allgood-primary w-4' : 'bg-gray-300'}"></div>`
+                ).join('');
+
+                card.classList.remove('scale-95', 'opacity-50');
+                card.classList.add('scale-100', 'opacity-100');
+            }, 150);
+        };
+
+        window.changeArchetype = (dir) => {
+            currentArchIndex = (currentArchIndex + dir + archetypes.length) % archetypes.length;
+            window.renderArchetype();
+            if(window.sfx) window.sfx.tick();
+        };
+
+        // PAGE 21: MANIFESTO SCROLL
+        window.initManifesto = () => {
+            const scroller = document.getElementById('content-column');
+            const sects = [document.getElementById('man-1'), document.getElementById('man-2'), document.getElementById('man-3')];
+            
+            checkManifestoScroll();
+            if(scroller) scroller.onscroll = checkManifestoScroll;
+            
+            function checkManifestoScroll() {
+                if(currentPage !== 20) return;
+                sects.forEach((s, i) => {
+                    if(!s) return;
+                    const rect = s.getBoundingClientRect();
+                    const viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
+                    if (rect.top <= viewHeight * 0.85) {
+                        s.classList.remove('opacity-0', 'translate-y-10');
+                        s.classList.add('opacity-100', 'translate-y-0');
+                    }
+                });
+            }
+        };
+
+        // --- FEEDBACK & BADGE LOGIC ---
+        window.setRating = function(n) {
+            userRating = n;
+            for (let i = 1; i <= 5; i++) {
+                const star = document.getElementById(`star-${i}`);
+                if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
+            }
+            if(window.sfx) window.sfx.tick();
+        }
+
+        window.submitFeedback = function() {
+            if(userRating === 0) { alert("Please select a star rating first."); return; }
+            const feedbackText = document.getElementById('feedback-text').value;
+            
+            if(window.SessionManager) {
+                window.SessionManager.log('Feedback_Submitted', `Rating: ${userRating} Stars`, { 
+                    rating: userRating, 
+                    comments: feedbackText,
+                    completed: true // Signal completion here
+                });
+            }
+            
+            document.getElementById('feedback-container').classList.add('hidden');
+            const successMsg = document.getElementById('feedback-success');
+            if(successMsg) successMsg.classList.remove('hidden');
+            
+            const badgeSection = document.getElementById('badge-section');
+            if(badgeSection) {
+                badgeSection.classList.remove('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
+                badgeSection.classList.add('opacity-100', 'pointer-events-auto');
+            }
+            
+            const badgeIcon = document.querySelector('#badge-display i');
+            const badgeContainer = document.getElementById('badge-display');
+            if(badgeIcon && badgeContainer) {
+                badgeIcon.classList.remove('text-gray-300');
+                badgeIcon.classList.add('text-allgood-primary');
+                badgeContainer.classList.remove('from-gray-100', 'to-gray-200');
+                badgeContainer.classList.add('from-orange-50', 'to-orange-100', 'border-allgood-primary');
+            }
+
+            const badgeBtn = document.getElementById('download-badge-btn');
+            if(badgeBtn) {
+                badgeBtn.disabled = false;
+                badgeBtn.innerHTML = '<i data-lucide="download" class="mr-2 w-4 h-4"></i> Download Badge';
+                badgeBtn.classList.remove('bg-gray-300', 'cursor-not-allowed');
+                badgeBtn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover', 'shadow-lg', 'animate-pulse');
+            }
+            
+            if(window.lucide) window.lucide.createIcons();
+            if(window.sfx) window.sfx.success(); 
+        }
+
+        window.getBadgeSVG = (nameText, dateText) => {
+            return `
+            <svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+                <defs><pattern id="smallGrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E0E0E0" stroke-width="2"/></pattern></defs>
+                <rect width="100%" height="100%" fill="#F7F7F7"/>
+                <rect width="100%" height="100%" fill="url(#smallGrid)"/>
+                <rect x="30" y="30" width="1140" height="740" rx="20" ry="20" fill="none" stroke="#D34716" stroke-width="12"/>
+                <text x="600" y="120" font-family="Georgia, serif" font-weight="bold" font-size="48" fill="#357889" text-anchor="middle" letter-spacing="2">ALLGOOD ACADEMY</text>
+                <text x="600" y="170" font-family="Verdana, sans-serif" font-size="20" fill="#4C4C4C" text-anchor="middle" letter-spacing="6">ARCHITECT OF SELF</text>
+                <line x1="300" y1="200" x2="900" y2="200" stroke="#D34716" stroke-width="4"/>
+                <g transform="translate(600, 420)">
+                    <circle cx="0" cy="0" r="160" fill="white" stroke="#357889" stroke-width="6"/>
+                    <g transform="scale(3.5) translate(-12, -12)" stroke="#D34716" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                        <circle cx="12" cy="12" r="10" />
+                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+                    </g>
+                </g>
+                <g transform="translate(600, 680)">
+                    <text x="0" y="0" font-family="Verdana, sans-serif" font-size="24" fill="#357889" text-anchor="middle" font-weight="bold">${nameText}</text>
+                    <text x="0" y="40" font-family="Verdana, sans-serif" font-size="18" fill="#757575" text-anchor="middle">CERTIFIED: ${dateText}</text>
+                </g>
+                <text x="600" y="760" font-family="Georgia, serif" font-style="italic" font-size="16" fill="#4C4C4C" text-anchor="middle">"Life begins when you stop running from yourself."</text>
+            </svg>`;
+        };
+
+        window.downloadBadge = function() {
+            if (currentPage < totalPages - 1) { alert("You must complete the entire module to unlock this badge."); return; }
+
+            const nameText = (window.currentUserName || "LEARNER").toUpperCase();
+            const dateText = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).toUpperCase();
+            const badgeSVG = window.getBadgeSVG(nameText, dateText);
+
+            if(window.SessionManager) {
+                window.SessionManager.log('Mission_Complete', 'Badge_Downloaded', { 
+                    completed: true,
+                    badgeArtifact: badgeSVG,
+                    progress: 100 
+                });
+            }
+
+            const blob = new Blob([badgeSVG], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Allgood-ArchitectOfSelf-${nameText}.svg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            const btn = document.getElementById('download-badge-btn');
+            if(btn) {
+                btn.innerHTML = '<i data-lucide="check" class="mr-2 w-4 h-4"></i> Badge Saved';
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover', 'animate-pulse');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                if(window.lucide) window.lucide.createIcons();
+            }
+            if(window.sfx) window.sfx.success();
+        };
+
+        // --- PAGE 19: TOOLKIT LOGIC ---
+        const toolData = {
+            dreams: {
+                title: "Dreams: The Night Letter",
+                subtitle: "Unedited messages from the Self.",
+                color: "text-purple-600",
+                bg: "bg-purple-50",
+                border: "border-purple-200",
+                icon: "cloud-moon",
+                desc: "Dreams are the most direct door to the unconscious. They balance your conscious attitude. If you are too rigid, you might dream of chaos.",
+                examples: [
+                    { icon: "arrow-down", label: "Falling", text: "Often signals a loss of control or fear of letting go." },
+                    { icon: "footprints", label: "Being Chased", text: "You are running from a Shadow aspect you deny." },
+                    { icon: "user-x", label: "Teeth Falling Out", text: "Anxiety about powerlessness or major life transition." }
+                ]
+            },
+            creativity: {
+                title: "Creativity: Active Imagination",
+                subtitle: "Letting the hand speak for the mind.",
+                color: "text-pink-600",
+                bg: "bg-pink-50",
+                border: "border-pink-200",
+                icon: "pen-tool",
+                desc: "The unconscious is non-verbal. Art, dance, and play allow it to express itself without the censor of logic.",
+                examples: [
+                    { icon: "edit-3", label: "Automatic Writing", text: "Write fast without stopping. Don't think. Just flow." },
+                    { icon: "image", label: "Mandala Drawing", text: "Draw a circle and fill it. It represents the Self seeking order." },
+                    { icon: "music", label: "Play", text: "Do something with no goal. The ego hates it; the soul loves it." }
+                ]
+            },
+            introspection: {
+                title: "Insight: The Sacred Pause",
+                subtitle: "Catching the reaction before it becomes behavior.",
+                color: "text-blue-600",
+                bg: "bg-blue-50",
+                border: "border-blue-200",
+                icon: "eye",
+                desc: "Most people live on autopilot. Introspection is the act of stopping the machine to see who is driving.",
+                examples: [
+                    { icon: "zap", label: "The Trigger", text: "Why did that make me angry? What is it touching in me?" },
+                    { icon: "copy", label: "The Envy", text: "Envy is a map. It shows you what you want but repress." },
+                    { icon: "message-circle", label: "The Complaint", text: "What you complain about in others is often your own shadow." }
+                ]
+            }
+        };
+
+        window.openTool = (type, btn) => {
+            const data = toolData[type];
+            const detail = document.getElementById('tool-detail');
+            
+            document.querySelectorAll('.tool-btn').forEach(b => {
+                b.classList.remove('ring-2', 'ring-offset-2', 'ring-allgood-primary', 'bg-gray-50');
+                b.classList.add('bg-white');
+            });
+            btn.classList.remove('bg-white');
+            btn.classList.add(data.bg, 'ring-2', 'ring-offset-2', 'ring-allgood-primary');
+
+            const examplesHTML = data.examples.map(ex => `
+                <div class="flex items-start p-2 bg-white rounded border border-gray-100 shadow-sm mb-2">
+                    <div class="p-1.5 bg-gray-100 rounded mr-3 shrink-0 text-gray-500">
+                        <i data-lucide="${ex.icon}" class="w-3 h-3"></i>
+                    </div>
+                    <div>
+                        <strong class="text-xs font-bold text-gray-700 block">${ex.label}</strong>
+                        <p class="text-[10px] text-gray-500 leading-tight">${ex.text}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            detail.innerHTML = `
+                <div class="animate-fade-in h-full flex flex-col">
+                    <div class="flex items-center mb-3 pb-3 border-b ${data.border}">
+                        <i data-lucide="${data.icon}" class="w-6 h-6 ${data.color} mr-3"></i>
+                        <div>
+                            <h3 class="font-bold text-sm text-gray-800 leading-none">${data.title}</h3>
+                            <p class="text-[10px] text-gray-500 uppercase tracking-wide mt-1">${data.subtitle}</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed mb-4 italic">"${data.desc}"</p>
+                    <div class="overflow-y-auto flex-grow pr-1">
+                        <h4 class="text-[10px] font-bold text-gray-400 uppercase mb-2">Relatable Examples</h4>
+                        ${examplesHTML}
+                    </div>
+                </div>
+            `;
+            
+            if(window.lucide) window.lucide.createIcons();
+            if(window.sfx) window.sfx.tick();
+        };
+
+        // --- SYSTEM FUNCTIONS ---
+        window.closeSystemMenu = () => {
+             const sysMenu = document.getElementById('system-menu-modal');
+             if(sysMenu) {
+                 sysMenu.classList.add('hidden-modal');
+                 sysMenu.classList.remove('visible-modal');
+             }
+        };
+
+        window.handleLogOut = async () => {
+            if (window.authSignOut) await window.authSignOut();
+            localStorage.removeItem('aa_username');
+            window.currentUser = null;
+            window.currentUserName = "Agent Learner";
+            window.currentUserEmail = "";
+            
+            const nameInput = document.getElementById('user-name-input');
+            if(nameInput) nameInput.value = "";
+            const emailInput = document.getElementById('user-email-input');
+            if(emailInput) emailInput.value = "";
+            
+            window.closeSystemMenu();
+            const startup = document.getElementById('startup-screen');
+            if(startup) {
+                startup.style.display = 'flex';
+                setTimeout(() => startup.style.opacity = '1', 10);
+            }
+            window.showPage(0);
+            
+            const login = document.getElementById('login-modal');
+            if(login) {
+                login.classList.remove('hidden-modal');
+                login.classList.add('visible-modal');
+            }
+            
+            if(window.sfx) window.sfx.nav(); 
+        };
+
+        window.handleSystemExit = () => {
+            window.location.href = "https://www.allgoodacademy.com";
+        };
+
+        // --- INIT HOOKS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            if(window.lucide) window.lucide.createIcons();
+            
+            const startup = document.getElementById('startup-screen');
+            if(startup) {
+                startup.addEventListener('click', function() {
+                    try { if(window.sfx) window.sfx.powerOn(); } catch(e) { console.log("Audio warning", e); }
+                    this.style.opacity = '0'; 
+                    this.style.pointerEvents = 'none'; 
+                    setTimeout(() => { this.style.display = 'none'; }, 700);
+                    if(!window.currentUser) {
+                        const login = document.getElementById('login-modal');
+                        if(login) { login.classList.remove('hidden-modal'); login.classList.add('visible-modal'); }
+                    } else {
+                         if(window.SessionManager) window.SessionManager.start(window.currentUserName, window.currentUserEmail);
+                    }
+                });
+            }
+
+            document.body.addEventListener('click', (e) => {
+                const accBtn = e.target.closest('.accordion-toggle');
+                if (accBtn) {
+                    const content = accBtn.nextElementSibling;
+                    const icon = accBtn.querySelector('.accordion-icon');
+                    content.classList.toggle('hidden');
+                    if(icon) icon.classList.toggle('rotate-180');
+                    if(window.sfx) window.sfx.tick();
+                }
+            });
+
+            const homeBtn = document.getElementById('home-button');
+            let pressTimer;
+            let isLongPress = false;
+            
+            if(homeBtn) {
+                const startPress = () => {
+                    isLongPress = false;
+                    pressTimer = setTimeout(() => {
+                        isLongPress = true;
+                        document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                        document.getElementById('system-menu-modal').classList.add('visible-modal');
+                        if(window.sfx) window.sfx.nav();
+                    }, 2000);
+                };
+                const endPress = () => { clearTimeout(pressTimer); };
+
+                homeBtn.addEventListener('mousedown', startPress);
+                homeBtn.addEventListener('mouseup', endPress);
+                homeBtn.addEventListener('mouseleave', endPress);
+                homeBtn.addEventListener('touchstart', (e) => { startPress(); }, { passive: true });
+                homeBtn.addEventListener('touchend', endPress);
+                homeBtn.addEventListener('touchcancel', endPress);
+
+                homeBtn.addEventListener('click', (e) => {
+                    if (isLongPress) { e.preventDefault(); e.stopPropagation(); isLongPress = false; } else { window.showPage(0); }
+                });
+                homeBtn.addEventListener('contextmenu', e => { e.preventDefault(); return false; });
+            }
+
+            document.getElementById('menu-toggle').addEventListener('click', () => {
+                const m = document.getElementById('menu-modal');
+                m.classList.remove('hidden-modal'); m.classList.add('visible-modal');
+                const list = document.getElementById('toc-list');
+                list.innerHTML = '';
+                const titles = [
+                    "Cover", "Signal", "Evidence", "Diagnosis", "Persona", "Shred", "Sort", "Shadow", "Warning", "Mirror", "Integration", "Archetypes", "Dialogue", "Anima", "Balance", "Ego", "True Self", "Mirror", "Tools", "Log", "Manifesto", "Contract", "Badge"];
+                titles.forEach((t, i) => {
+                    list.innerHTML += `<button class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 rounded text-xs font-bold transition-colors" onclick="window.showPage(${i}); document.getElementById('menu-modal').classList.add('hidden-modal'); document.getElementById('menu-modal').classList.remove('visible-modal');">${i+1}. ${t}</button>`;
+                });
+            });
+            
+            document.getElementById('close-menu').addEventListener('click', () => {
+                document.getElementById('menu-modal').classList.add('hidden-modal'); document.getElementById('menu-modal').classList.remove('visible-modal');
+            });
+            
+            const fsBtn = document.getElementById('fullscreen-toggle');
+            if(fsBtn) {
+                fsBtn.addEventListener('click', () => {
+                    document.querySelector('.tablet-frame').classList.toggle('focus-mode');
+                    if(window.sfx) window.sfx.tick();
+                });
+            }
+            
+            const bpBtn = document.getElementById('blueprint-toggle');
+            if(bpBtn) {
+                bpBtn.addEventListener('click', () => {
+                    document.body.classList.toggle('blueprint-mode');
+                    if(window.sfx) window.sfx.tick();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
