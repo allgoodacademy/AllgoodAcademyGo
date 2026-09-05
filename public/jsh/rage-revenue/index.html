@@ -175,6 +175,89 @@
                 }
             }
         };
+
+        // DIRECT LINE TO HQ (shared messages collection via AuthCore)
+        window.openMessageModal = () => {
+            const modal = document.getElementById('message-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            if(window.sfx) window.sfx.click();
+            setTimeout(() => document.getElementById('message-input').focus(), 100);
+        };
+
+        window.closeMessageModal = () => {
+            const modal = document.getElementById('message-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+            if(window.sfx) window.sfx.click();
+        };
+
+        window.submitHQMessage = async () => {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            const btn = document.getElementById('btn-send-message');
+
+            if (!text) return;
+
+            const user = auth.currentUser;
+            if (!user) {
+                const originalText = btn.innerHTML;
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = "Please Sign In First";
+                if(window.sfx) window.sfx.powerOff();
+
+                setTimeout(() => {
+                    btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    btn.innerHTML = originalText;
+                    if(window.lucide) window.lucide.createIcons();
+                }, 2000);
+                return;
+            }
+
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+
+            try {
+                await window.AuthCore.sendMessage({ text, source: "Rage Revenue" });
+
+                if(window.sfx) window.sfx.confirm();
+                input.value = "";
+
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> Transmission Sent`;
+                if(window.lucide) window.lucide.createIcons();
+
+                setTimeout(() => {
+                    if(window.closeMessageModal) window.closeMessageModal();
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                        btn.innerHTML = originalText;
+                        if(window.lucide) window.lucide.createIcons();
+                    }, 500);
+                }, 1500);
+
+            } catch (e) {
+                console.error("Transmission failed", e);
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = "Transmission Failed";
+                if(window.sfx) window.sfx.powerOff();
+
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    btn.innerHTML = originalText;
+                    if(window.lucide) window.lucide.createIcons();
+                }, 3000);
+            }
+        };
     </script>
 
     <!-- Tailwind Config -->
@@ -348,31 +431,6 @@
         }
         @keyframes blink { 50% { border-color: transparent; } }
 
-        /* Blueprint Mode */
-        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
-        .blueprint-mode .page, .blueprint-mode .content-column { background-color: #0f172a !important; }
-        .blueprint-mode h1, .blueprint-mode h2, .blueprint-mode h3, .blueprint-mode strong { color: #38bdf8 !important; }
-        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
-        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
-        .blueprint-mode .bg-gray-100, .blueprint-mode .bg-gray-50 { background-color: #0f172a !important; border-color: #1e293b !important; }
-        .blueprint-mode .footer-content { background-color: #1e293b !important; border-top-color: #334155 !important; color: #94a3b8 !important; }
-        .blueprint-mode .footer-content a { color: #38bdf8 !important; }
-
-        /* Focus Mode */
-        .tablet-frame.focus-mode { 
-            position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; 
-            width: 100% !important; height: 100% !important;
-            aspect-ratio: auto !important; max-width: none !important; max-height: none !important; 
-            min-height: 0 !important;
-            margin: 0 !important; padding: 0 !important; 
-            background: #F7F7F7 !important; border: none !important; border-radius: 0 !important; 
-            box-shadow: none !important; z-index: 99999 !important; 
-            background-image: none !important;
-        }
-        .tablet-frame.focus-mode::before { display: none; }
-        .tablet-frame.focus-mode .screen-container { border-radius: 0; box-shadow: none; height: 100%; }
-        .tablet-frame.focus-mode .footer-content { padding-bottom: 0; }
-
         /* Desktop Breakpoint */
         @media (min-width: 768px) {
             .split-layout { flex-direction: row; }
@@ -473,11 +531,12 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-1 shrink-0 relative">
-                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 mr-2" title="Go Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 mr-2" title="Home"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
                             <div class="h-6 w-px bg-white/20 mx-1"></div>
-                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="moon" class="w-5 h-5"></i></button>
-                            <button id="fullscreen-toggle" class="text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="maximize" class="w-5 h-5"></i></button>
-                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                            <button id="message-toggle" onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ">
+                                <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+                            </button>
+                            <button id="menu-toggle" title="Menu" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
                         </div>
                     </div>
                 </header>
@@ -995,22 +1054,46 @@
                 <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
                     <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
                         <div class="mb-4">
-                            <i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i>
+                            <i data-lucide="home" class="w-12 h-12 mx-auto text-gray-400"></i>
                         </div>
-                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
-                        <p class="text-sm text-gray-500 mb-6 font-body">Select an option to proceed.</p>
-                        
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Home</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">Where do you want to go?</p>
+
                         <div class="space-y-3">
-                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center">
-                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out
+                            <button onclick="window.restartModule()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart This Module
                             </button>
-                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
-                                <i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard
+                            <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Go to Dashboard
                             </button>
                             <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">
                                 Cancel
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- MESSAGE MODAL -->
+                <div id="message-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeMessageModal()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeMessageModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+
+                        <div class="mb-4">
+                            <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i data-lucide="message-circle" class="w-6 h-6 text-allgood-primary"></i>
+                            </div>
+                            <h3 class="text-xl font-heading font-bold text-allgood-dark uppercase">Direct Line</h3>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">To: Allgood Academy HQ</p>
+                        </div>
+
+                        <div class="text-left mb-4">
+                            <p class="text-xs text-gray-500 italic mb-2">Agent, this is your direct line. Find a bug, disagree with a score, or have a thought? Drop it here.</p>
+                            <textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50 font-body placeholder-gray-400" placeholder="Type your message here..."></textarea>
+                        </div>
+
+                        <button id="btn-send-message" onclick="window.submitHQMessage()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">
+                            <i data-lucide="send" class="w-3 h-3"></i> Send Transmission
+                        </button>
                     </div>
                 </div>
 
@@ -1809,21 +1892,6 @@
                 });
             }
             
-            const blueprintToggle = document.getElementById('blueprint-toggle');
-            if(blueprintToggle) blueprintToggle.addEventListener('click', () => {
-                document.body.classList.toggle('blueprint-mode');
-                blueprintToggle.classList.toggle('text-cyan-300');
-                if(window.sfx) window.sfx.tick();
-            });
-
-            const fullscreenToggle = document.getElementById('fullscreen-toggle');
-            if(fullscreenToggle) fullscreenToggle.addEventListener('click', () => {
-                const frame = document.querySelector('.tablet-frame');
-                if(frame) frame.classList.toggle('focus-mode');
-                fullscreenToggle.classList.toggle('text-green-300');
-                if(window.sfx) window.sfx.tick();
-            });
-
             // MENU TOGGLE (HAMBURGER)
             const menuToggle = document.getElementById('menu-toggle');
             if(menuToggle) menuToggle.addEventListener('click', () => {
@@ -1845,54 +1913,27 @@
                  }
             });
 
-            // HOME BUTTON LOGIC (Long Press = System, Short Press = Page 1)
+            // HOME BUTTON — single tap now, no hidden hold gesture. Always opens the
+            // two-choice modal (Restart This Module / Go to Dashboard) so the available
+            // actions are visible rather than discovered by accident.
             const homeBtn = document.getElementById('home-button');
-            let pressTimer;
-            let isLongPress = false;
-
             if(homeBtn) {
-                const startPress = (e) => {
-                    isLongPress = false;
-                    pressTimer = setTimeout(() => {
-                        isLongPress = true;
-                        const sysMenu = document.getElementById('system-menu-modal');
-                        if(sysMenu) {
-                            sysMenu.classList.remove('hidden-modal');
-                            sysMenu.classList.add('visible-modal');
-                        }
-                        if(window.sfx) window.sfx.nav();
-                    }, 2000); // 2 seconds as requested
-                };
-
-                const endPress = (e) => {
-                    clearTimeout(pressTimer);
-                };
-
-                homeBtn.addEventListener('mousedown', startPress);
-                homeBtn.addEventListener('mouseup', endPress);
-                homeBtn.addEventListener('mouseleave', endPress);
-                
-                homeBtn.addEventListener('touchstart', (e) => {
-                    startPress();
-                }, { passive: true });
-                homeBtn.addEventListener('touchend', endPress);
-                homeBtn.addEventListener('touchcancel', endPress);
-
-                // Click handler deals with the short press
-                homeBtn.addEventListener('click', (e) => {
-                    if (isLongPress) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        isLongPress = false;
-                    } else {
-                        // Short press -> Go to Page 1 (Index 0)
-                        window.goToPage(0); 
+                homeBtn.addEventListener('click', () => {
+                    const sysMenu = document.getElementById('system-menu-modal');
+                    if(sysMenu) {
+                        sysMenu.classList.remove('hidden-modal');
+                        sysMenu.classList.add('visible-modal');
+                        if(window.lucide) window.lucide.createIcons();
                     }
+                    if(window.sfx) window.sfx.nav();
                 });
-                
-                // Prevent context menu
-                homeBtn.addEventListener('contextmenu', e => { e.preventDefault(); return false; });
             }
+
+            window.restartModule = () => {
+                window.closeSystemMenu();
+                window.goToPage(0);
+                if(window.sfx) window.sfx.nav();
+            };
 
             document.getElementById('current-year').innerText = new Date().getFullYear();
         });

@@ -1860,25 +1860,6 @@
             main { padding: 0 !important; }
         }
 
-        /* --- BLUEPRINT MODE --- */
-        .blueprint-mode .screen-container { background: #0f172a; color: #94a3b8; }
-        .blueprint-mode .mission-file { background-color: #1e293b; border-color: #334155; opacity: 1; backdrop-filter: none; }
-        .blueprint-mode h1, .blueprint-mode h2, .blueprint-mode h3, .blueprint-mode strong { color: #38bdf8 !important; }
-
-        /* --- FOCUS MODE --- */
-        .focus-mode .tablet-frame {
-            position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; 
-            width: 100% !important; height: 100% !important;
-            aspect-ratio: auto !important; max-width: none !important; max-height: none !important; 
-            min-height: 0 !important;
-            margin: 0 !important; padding: 0 !important; 
-            background: #f8fafc !important; border: none !important; border-radius: 0 !important; 
-            box-shadow: none !important; z-index: 99999 !important;
-            background-image: none !important;
-        }
-        .focus-mode .tablet-frame::before { display: none; }
-        .focus-mode .screen-container { border-radius: 0; box-shadow: none; height: 100%; }
-
         /* --- SCROLLBARS --- */
         .page::-webkit-scrollbar { width: 10px; }
         .page::-webkit-scrollbar-track { background: transparent; }
@@ -2277,22 +2258,15 @@
                     </div>
                     <!-- Control Cluster -->
                     <div class="flex items-center space-x-1 shrink-0 relative">
-                        <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home (Hold to Reset)">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                        <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home">
+                            <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                         </button>
                         <div class="h-6 w-px bg-white/20 mx-1"></div>
-                        <button id="btn-blueprint" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                        </button>
-                        <!-- ADDED: hidden on mobile, visible on small screens and up (sm:block) -->
-                        <button id="btn-fullscreen" class="hidden sm:block text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode">
-                            <i id="icon-fullscreen" data-lucide="maximize" class="w-5 h-5"></i>
-                        </button>
                         <button id="btn-message" class="text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ" onclick="window.openMessageModal()">
-                            <i data-lucide="message-square" class="w-5 h-5"></i>
+                            <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                         </button>
                         <button id="btn-menu" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                            <i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                         </button>
                     </div>
                 </header>
@@ -2928,55 +2902,13 @@
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
             
+            // Home is a single tap now — no hidden hold-to-logout gesture. Logging out
+            // stays reachable from the profile menu; this button just scrolls home.
             const homeBtn = document.getElementById('btn-home');
-            let homePressTimer;
-            let homeIsHold = false;
-            const startHomePress = (e) => {
-                e.preventDefault(); 
-                homeIsHold = false;
-                homePressTimer = setTimeout(() => {
-                    homeIsHold = true;
-                    if(window.handleLogout) { sfx.powerOff(); window.handleLogout(); }
-                }, 2000);
-            };
-            const endHomePress = (e) => {
-                clearTimeout(homePressTimer);
-                if(!homeIsHold) { sfx.tick(); document.getElementById('page-dashboard').scrollTop = 0; }
-            };
-
             if(homeBtn) {
-                homeBtn.addEventListener('mousedown', startHomePress);
-                homeBtn.addEventListener('touchstart', startHomePress);
-                homeBtn.addEventListener('mouseup', endHomePress);
-                homeBtn.addEventListener('touchend', endHomePress);
-                homeBtn.addEventListener('mouseleave', () => clearTimeout(homePressTimer));
-            }
-
-            const btnBlueprint = document.getElementById('btn-blueprint');
-            if(btnBlueprint) {
-                 btnBlueprint.addEventListener('click', () => {
-                    document.body.classList.toggle('blueprint-mode');
+                homeBtn.addEventListener('click', () => {
                     sfx.tick();
-                });
-            }
-
-            const fullscreenBtn = document.getElementById('btn-fullscreen');
-            if(fullscreenBtn) {
-                fullscreenBtn.addEventListener('click', () => {
-                    const body = document.body;
-                    const icon = document.getElementById('icon-fullscreen');
-
-                    if (body.classList.contains('focus-mode')) {
-                        body.classList.remove('focus-mode');
-                        fullscreenBtn.classList.remove('text-green-300', 'bg-white/10');
-                        if(icon) icon.setAttribute('data-lucide', 'maximize');
-                    } else {
-                        body.classList.add('focus-mode');
-                        fullscreenBtn.classList.add('text-green-300', 'bg-white/10');
-                        if(icon) icon.setAttribute('data-lucide', 'minimize');
-                    }
-                    lucide.createIcons();
-                    sfx.tick();
+                    document.getElementById('page-dashboard').scrollTop = 0;
                 });
             }
 

@@ -220,6 +220,89 @@
                 console.error("[Auth] Sign out error", error);
             }
         };
+
+        // 9. DIRECT LINE TO HQ (shared messages collection via AuthCore)
+        window.openMessageModal = () => {
+            const modal = document.getElementById('message-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            if(window.sfx) window.sfx.click();
+            setTimeout(() => document.getElementById('message-input').focus(), 100);
+        };
+
+        window.closeMessageModal = () => {
+            const modal = document.getElementById('message-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+            if(window.sfx) window.sfx.click();
+        };
+
+        window.submitHQMessage = async () => {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            const btn = document.getElementById('btn-send-message');
+
+            if (!text) return;
+
+            const user = auth.currentUser;
+            if (!user) {
+                const originalText = btn.innerHTML;
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = "Please Sign In First";
+                if(window.sfx) window.sfx.powerOff();
+
+                setTimeout(() => {
+                    btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    btn.innerHTML = originalText;
+                    if(window.lucide) window.lucide.createIcons();
+                }, 2000);
+                return;
+            }
+
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+
+            try {
+                await window.AuthCore.sendMessage({ text, source: "Jolene's Lemonade Challenge" });
+
+                if(window.sfx) window.sfx.confirm();
+                input.value = "";
+
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> Transmission Sent`;
+                if(window.lucide) window.lucide.createIcons();
+
+                setTimeout(() => {
+                    if(window.closeMessageModal) window.closeMessageModal();
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                        btn.innerHTML = originalText;
+                        if(window.lucide) window.lucide.createIcons();
+                    }, 500);
+                }, 1500);
+
+            } catch (e) {
+                console.error("Transmission failed", e);
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = "Transmission Failed";
+                if(window.sfx) window.sfx.powerOff();
+
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                    btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    btn.innerHTML = originalText;
+                    if(window.lucide) window.lucide.createIcons();
+                }, 3000);
+            }
+        };
     </script>
     
     <script>
@@ -294,12 +377,6 @@
         .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
         .page.active { display: block; }
 
-        .blueprint-mode { background-color: #0f172a !important; color: #94a3b8 !important; }
-        .blueprint-mode .page { background-color: #0f172a !important; }
-        .blueprint-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
-        .blueprint-mode .text-allgood-dark { color: #e2e8f0 !important; }
-        .blueprint-mode .choice-btn { background-color: #1e293b !important; border-color: #334155 !important; }
-        
         @media (max-width: 768px) {
             .tablet-frame { width: 100% !important; height: 100% !important; border: none; border-radius: 0; background-image: none; box-shadow: none; margin: 0; padding: 0; }
             .tablet-frame::before { display: none; }
@@ -381,11 +458,12 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-1 shrink-0 relative">
-                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" class="w-6 h-6"></i></button>
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
                             <div class="h-6 w-px bg-white/20 mx-1"></div>
-                            <button id="blueprint-toggle" class="text-gray-200 hover:text-cyan-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Blueprint Mode"><i data-lucide="moon" class="w-5 h-5"></i></button>
-                            <button id="fullscreen-toggle" class="text-gray-200 hover:text-green-300 transition-colors p-2 rounded-full hover:bg-white/10" title="Focus Mode"><i data-lucide="maximize" class="w-5 h-5"></i></button>
-                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" class="w-7 h-7"></i></button>
+                            <button id="message-toggle" onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ">
+                                <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+                            </button>
+                            <button id="menu-toggle" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
                         </div>
                     </div>
                 </header>
@@ -402,18 +480,42 @@
 
                 <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
                     <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
-                        <div class="mb-4"><i data-lucide="settings" class="w-12 h-12 mx-auto text-gray-400"></i></div>
-                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">System Menu</h2>
-                        <p class="text-sm text-gray-500 mb-6 font-body">Select an option to proceed.</p>
+                        <div class="mb-4"><i data-lucide="home" class="w-12 h-12 mx-auto text-gray-400"></i></div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Home</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">Where do you want to go?</p>
                         <div class="space-y-3">
-                            <button onclick="window.handleLogOut()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm transition-colors flex items-center justify-center">
-                                <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Log Out
+                            <button onclick="window.restartModule()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart This Module
                             </button>
-                            <button onclick="window.handleSystemExit()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
-                                <i data-lucide="external-link" class="w-4 h-4 mr-2"></i> Exit to Dashboard
+                            <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Go to Dashboard
                             </button>
                             <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- MESSAGE MODAL -->
+                <div id="message-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeMessageModal()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
+                        <button onclick="window.closeMessageModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+
+                        <div class="mb-4">
+                            <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i data-lucide="message-circle" class="w-6 h-6 text-allgood-primary"></i>
+                            </div>
+                            <h3 class="text-xl font-heading font-bold text-allgood-dark uppercase">Direct Line</h3>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">To: Allgood Academy HQ</p>
+                        </div>
+
+                        <div class="text-left mb-4">
+                            <p class="text-xs text-gray-500 italic mb-2">Agent, this is your direct line. Find a bug, disagree with a score, or have a thought? Drop it here.</p>
+                            <textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50 font-body placeholder-gray-400" placeholder="Type your message here..."></textarea>
+                        </div>
+
+                        <button id="btn-send-message" onclick="window.submitHQMessage()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">
+                            <i data-lucide="send" class="w-3 h-3"></i> Send Transmission
+                        </button>
                     </div>
                 </div>
 
@@ -451,9 +553,8 @@
                             <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
                                 <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home & Reset</strong><span class="text-gray-500 leading-snug">Click to return to cover. <strong>Hold for 2s</strong> to return to dashboard.</span></div></div>
-                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-cyan-600 shrink-0"><i data-lucide="moon" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Blueprint Mode</strong><span class="text-gray-500 leading-snug">Toggle high-contrast Dark Mode for low-light environments.</span></div></div>
-                                    <div class="hidden md:flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-green-600 shrink-0"><i data-lucide="maximize" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Focus Mode</strong><span class="text-gray-500 leading-snug">Maximize workspace. Removes the frame for mobile devices.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home</strong><span class="text-gray-500 leading-snug">Choose to restart this module or head back to the dashboard.</span></div></div>
+                                    <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary shrink-0"><i data-lucide="message-square" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Direct Line</strong><span class="text-gray-500 leading-snug">Got an idea or found a bug? Send it straight to Allgood Academy HQ.</span></div></div>
                                     <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark shrink-0"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
                                 </div>
                             </div>
@@ -1059,50 +1160,24 @@
             document.getElementById('close-menu').addEventListener('click', window.closeMenuModal);
             
             // --- HEADER LISTENERS ---
+            // Home is a single tap now — no hidden hold gesture. It always opens the
+            // same two-choice modal (Restart This Module / Go to Dashboard) so the
+            // available actions are visible rather than discovered by accident.
             const homeButton = document.getElementById('home-button');
-            let pressTimer = null;
             if(homeButton) {
-                const startLongPress = (e) => {
-                    // Prevent default to avoid context menus on mobile
-                    // e.preventDefault(); 
-                    pressTimer = setTimeout(() => { 
-                        document.getElementById('system-menu-modal').classList.remove('hidden-modal');
-                        document.getElementById('system-menu-modal').classList.add('visible-modal');
-                        sfx.nav(); 
-                        pressTimer = null; 
-                    }, 2000);
-                }
-                const cancelLongPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
-                const endLongPress = () => {
-                    if (pressTimer) { 
-                        clearTimeout(pressTimer); 
-                        pressTimer = null; 
-                        // Normal Click Behavior: Go to Page 0
-                        if (currentPageIndex !== 0) { window.showPage(0); sfx.nav(); } 
-                    }
-                }
-                homeButton.addEventListener('mousedown', startLongPress);
-                homeButton.addEventListener('mouseleave', cancelLongPress);
-                homeButton.addEventListener('mouseup', endLongPress);
-                homeButton.addEventListener('touchstart', startLongPress, {passive: true});
-                homeButton.addEventListener('touchend', endLongPress);
+                homeButton.addEventListener('click', () => {
+                    document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                    document.getElementById('system-menu-modal').classList.add('visible-modal');
+                    if(window.lucide) window.lucide.createIcons();
+                    sfx.nav();
+                });
             }
 
-            document.getElementById('blueprint-toggle').addEventListener('click', () => {
-                document.getElementById('screen').classList.toggle('blueprint-mode');
-                document.getElementById('blueprint-toggle').classList.toggle('text-cyan-300');
-                sfx.tick();
-            });
-
-            document.getElementById('fullscreen-toggle').addEventListener('click', () => {
-                const frame = document.querySelector('.tablet-frame');
-                frame.classList.toggle('focus-mode');
-                const isFocus = frame.classList.contains('focus-mode');
-                if (isFocus) { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }
-                else { if (document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }
-                document.getElementById('fullscreen-toggle').classList.toggle('text-green-300');
-                sfx.tick();
-            });
+            window.restartModule = () => {
+                window.closeSystemMenu();
+                window.showPage(0);
+                sfx.nav();
+            };
 
             document.getElementById('current-year').textContent = new Date().getFullYear();
             
