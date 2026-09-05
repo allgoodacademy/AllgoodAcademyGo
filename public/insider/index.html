@@ -299,39 +299,82 @@
             }
         }
 
+        // Two completely different sources feed this list:
+        //  1. feedback_inbox — the dashboard's "Send a Message" / Direct Line feature
+        //  2. game_scores — every course writes its own end-of-module star rating + comment
+        //     onto its score doc (fields: rating, feedback), not into feedback_inbox at all
         async function loadFeedback() {
             const container = document.getElementById('feedback-list');
+            const items = [];
+            let indexNeeded = false;
+
             try {
-                const q = query(collectionGroup(db, 'feedback_inbox'), orderBy('timestamp', 'desc'), limit(50));
-                const snap = await getDocs(q);
-
-                if (snap.empty) {
-                    container.innerHTML = '<p class="text-xs text-slate-400 italic">No feedback yet.</p>';
-                    return;
-                }
-
-                container.innerHTML = snap.docs.map(d => {
+                const msgSnap = await getDocs(query(collectionGroup(db, 'feedback_inbox'), orderBy('timestamp', 'desc'), limit(50)));
+                msgSnap.forEach(d => {
                     const f = d.data();
-                    const when = f.timestamp && f.timestamp.toDate ? f.timestamp.toDate().toLocaleString() : '—';
-                    return `
-                        <div class="border border-slate-100 rounded p-3">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="font-bold text-slate-700 text-xs">${escapeHtml(f.senderName || 'Anonymous')}</span>
-                                <span class="text-[10px] text-slate-400">${when}</span>
-                            </div>
-                            <p class="text-xs text-slate-500 mb-1">${escapeHtml(f.senderEmail || '')}</p>
-                            <p class="text-sm text-slate-700">${escapeHtml(f.message || '')}</p>
-                        </div>
-                    `;
-                }).join('');
+                    items.push({
+                        kind: 'message',
+                        name: f.senderName || 'Anonymous',
+                        email: f.senderEmail || '',
+                        text: f.message || '',
+                        rating: null,
+                        source: 'Direct Message',
+                        whenMs: f.timestamp && f.timestamp.toDate ? f.timestamp.toDate().getTime() : 0,
+                    });
+                });
             } catch (e) {
-                console.error('Failed to load feedback', e);
-                if (e.code === 'failed-precondition') {
-                    container.innerHTML = `<p class="text-xs text-amber-600 italic">This needs a one-time Firestore index. Open the browser console and click the link in the error to create it, then reload this page.</p>`;
-                } else {
-                    container.innerHTML = '<p class="text-xs text-red-400 italic">Couldn\'t load feedback.</p>';
-                }
+                console.error('Failed to load feedback_inbox', e);
+                if (e.code === 'failed-precondition') indexNeeded = true;
             }
+
+            try {
+                const scoreSnap = await getDocs(query(collectionGroup(db, 'game_scores'), orderBy('lastUpdated', 'desc'), limit(300)));
+                scoreSnap.forEach(d => {
+                    const s = d.data();
+                    if (!s.feedback) return;
+                    items.push({
+                        kind: 'course',
+                        name: (s.user && s.user.displayName) || 'Anonymous',
+                        email: '',
+                        text: s.feedback,
+                        rating: typeof s.rating === 'number' ? s.rating : null,
+                        source: s.gameName || 'Unknown module',
+                        whenMs: s.lastUpdated && s.lastUpdated.toDate ? s.lastUpdated.toDate().getTime() : 0,
+                    });
+                });
+            } catch (e) {
+                console.error('Failed to load game_scores feedback', e);
+                if (e.code === 'failed-precondition') indexNeeded = true;
+            }
+
+            if (items.length === 0) {
+                container.innerHTML = indexNeeded
+                    ? `<p class="text-xs text-amber-600 italic">This needs a one-time Firestore index. Open the browser console and click the link in the error to create it, then reload this page.</p>`
+                    : '<p class="text-xs text-slate-400 italic">No feedback yet.</p>';
+                return;
+            }
+
+            items.sort((a, b) => b.whenMs - a.whenMs);
+
+            container.innerHTML = items.slice(0, 80).map(f => {
+                const when = f.whenMs ? new Date(f.whenMs).toLocaleString() : '—';
+                const stars = f.rating ? `<span class="text-amber-400">${'★'.repeat(f.rating)}${'☆'.repeat(Math.max(0, 5 - f.rating))}</span>` : '';
+                const badgeClass = f.kind === 'course' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700';
+                return `
+                    <div class="border border-slate-100 rounded p-3">
+                        <div class="flex items-center justify-between mb-1 gap-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="font-bold text-slate-700 text-xs truncate">${escapeHtml(f.name)}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 ${badgeClass}">${escapeHtml(f.source)}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 shrink-0">${when}</span>
+                        </div>
+                        ${f.email ? `<p class="text-xs text-slate-500 mb-1">${escapeHtml(f.email)}</p>` : ''}
+                        ${stars ? `<p class="mb-1 text-sm">${stars}</p>` : ''}
+                        <p class="text-sm text-slate-700">${escapeHtml(f.text)}</p>
+                    </div>
+                `;
+            }).join('');
         }
 
         function escapeHtml(str) {
