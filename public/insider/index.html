@@ -126,13 +126,26 @@
                 <div id="course-feedback-list" class="p-4 space-y-4"></div>
             </div>
 
+            <!-- DELETION TOOL (data deletion requests) -->
+            <div class="bg-white rounded-lg shadow border-t-4 border-red-300">
+                <div class="p-4 border-b border-slate-100">
+                    <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wide">Delete a User's Data</h2>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Permanently deletes a user's profile, scores, launches, messages, and course feedback. Use this to fulfill a deletion request. This cannot be undone.</p>
+                </div>
+                <div class="p-4 flex flex-col sm:flex-row gap-3">
+                    <input id="delete-uid-input" type="text" placeholder="User UID (from the directory above)" class="flex-1 border border-slate-200 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-400">
+                    <button id="btn-delete-user" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-xs uppercase tracking-wide">Delete User's Data</button>
+                </div>
+                <p id="delete-status" class="px-4 pb-4 text-xs"></p>
+            </div>
+
         </main>
     </div>
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, getDocs, query, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getFirestore, doc, collection, getDocs, deleteDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
@@ -420,6 +433,55 @@
             div.textContent = str == null ? '' : String(str);
             return div.innerHTML;
         }
+
+        // Deletes a user's profile doc, every doc in its subcollections (game_scores,
+        // launches, any leftover feedback_inbox), and any messages/course_feedback records
+        // tied to that uid in the flat top-level collections. Used to fulfill a data
+        // deletion request end-to-end.
+        document.getElementById('btn-delete-user').onclick = async () => {
+            const uid = document.getElementById('delete-uid-input').value.trim();
+            const statusEl = document.getElementById('delete-status');
+            statusEl.className = 'px-4 pb-4 text-xs text-slate-400';
+
+            if (!uid) {
+                statusEl.textContent = 'Enter a UID first.';
+                statusEl.className = 'px-4 pb-4 text-xs text-red-500';
+                return;
+            }
+            if (!confirm(`Permanently delete ALL data for user ${uid}? This cannot be undone.`)) return;
+
+            statusEl.textContent = 'Deleting…';
+
+            try {
+                let deletedCount = 0;
+
+                for (const sub of ['game_scores', 'launches', 'feedback_inbox']) {
+                    const subSnap = await getDocs(collection(db, 'artifacts', appId, 'users', uid, sub));
+                    for (const d of subSnap.docs) {
+                        await deleteDoc(d.ref);
+                        deletedCount++;
+                    }
+                }
+
+                const msgSnap = await getDocs(query(collection(db, 'artifacts', appId, 'messages'), where('senderUid', '==', uid)));
+                for (const d of msgSnap.docs) { await deleteDoc(d.ref); deletedCount++; }
+
+                const feedbackSnap = await getDocs(query(collection(db, 'artifacts', appId, 'course_feedback'), where('uid', '==', uid)));
+                for (const d of feedbackSnap.docs) { await deleteDoc(d.ref); deletedCount++; }
+
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', uid));
+                deletedCount++;
+
+                statusEl.textContent = `Done — deleted ${deletedCount} record(s) for ${uid}.`;
+                statusEl.className = 'px-4 pb-4 text-xs text-emerald-600';
+                document.getElementById('delete-uid-input').value = '';
+                loadUsers();
+            } catch (e) {
+                console.error('Deletion failed', e);
+                statusEl.textContent = "Deletion failed — check the browser console.";
+                statusEl.className = 'px-4 pb-4 text-xs text-red-500';
+            }
+        };
 
         lucide.createIcons();
     </script>
