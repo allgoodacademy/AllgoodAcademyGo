@@ -43,6 +43,12 @@
         window.allModuleElements = {};
 
         // --- TEACHER / STUDENT ROLE STATE ---
+        // Persona system note: the user-facing term for this is "Task Force" (a Task Force
+        // Leader running a Task Force other Agent Learners join by code) — but the field
+        // name classroomCode, the 'classrooms' collection, and role:'teacher' all predate
+        // that rename and stay as-is on purpose, to avoid a data migration for what's
+        // purely a display-string change. Every "Classroom" you see below is that same
+        // underlying concept.
         function generateClassroomCode() {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
             let code = '';
@@ -56,18 +62,18 @@
         // archived (moved out of public/, no longer hosted) — this registry only lists what's
         // actually reachable, so a teacher can't accidentally assign a dead link.
         //
+        // Rage Revenue and Finding Yourself are archived too (moved to archive/jsh/) —
+        // they're being replaced by the four-lab Digital Decisions Lab set (Jodi's
+        // Schoolhouse shows an honest "coming soon" placeholder in the meantime), not kept
+        // alongside it. Re-add here if either is ever brought back on its own.
+        //
         // Completion rules below are confirmed against each module's actual Firestore writes,
-        // not guessed: DDC and Jolene's both gate on a finalScore threshold (no fake flags),
-        // the two Jodi's Schoolhouse pieces use an explicit `completed: true` signal.
+        // not guessed: DDC and Jolene's both gate on a finalScore threshold (no fake flags).
         const MODULE_REGISTRY = [
             { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
               gameNames: ['Digital Decisions Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 80 },
             { id: 'jolene', name: "Jolene's Lemonade", category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge',
               gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800 },
-            { id: 'rage', name: 'Rage Revenue', category: 'lesson', url: 'https://allgoodacademy.com/jsh/rage-revenue/',
-              gameNames: ['Rage Revenue'], isComplete: (d) => d.completed === true },
-            { id: 'finding', name: 'Finding Yourself', category: 'lesson', url: 'https://allgoodacademy.com/jsh/finding-yourself/',
-              gameNames: ["Jodi's Schoolhouse: Finding Yourself"], isComplete: (d) => d.completed === true },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
 
@@ -92,14 +98,19 @@
         // happens in AuthCore.studentSignIn / AuthCore.teacherSignIn (see /js/auth-core.js),
         // which is also what every other module page uses, so there's one place that decides
         // what gets stored for a student vs. a teacher.
-        function applyIdentityToUI(user, role, opts = {}) {
+        function applyIdentityToUI(user, account, opts = {}) {
             const silent = opts.silent === true;
+            const role = account.role;
             const name = user.displayName || 'Agent Learner';
 
             localStorage.setItem('aa_is_guest', user.isAnonymous);
             localStorage.setItem('aa_username', name);
             localStorage.setItem('aa_uid', user.uid);
             localStorage.setItem('aa_role', role);
+            if (account.ageTier) localStorage.setItem('aa_age_tier', account.ageTier);
+            else localStorage.removeItem('aa_age_tier');
+            if (account.avatar) localStorage.setItem('aa_avatar', account.avatar);
+            else localStorage.removeItem('aa_avatar');
 
             window.updateUI(name);
             document.getElementById('page-dashboard').classList.add('active');
@@ -123,9 +134,17 @@
             }
         }
 
-        async function roleOnRecord(uid) {
+        // Fetches both role and age tier in one read — used everywhere identity gets
+        // applied so the age-gate re-check (for accounts that predate it) has what it
+        // needs without a second round trip.
+        async function accountOnRecord(uid) {
             const snap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
-            return snap.exists() && snap.data().role ? snap.data().role : 'student';
+            const data = snap.exists() ? snap.data() : {};
+            return {
+                role: data.role || 'student',
+                ageTier: data.ageTier || null,
+                avatar: data.avatar || null,
+            };
         }
 
         // Called the instant someone powers up with no existing session — creates a real,
@@ -135,8 +154,8 @@
         window.silentSignIn = async () => {
             try {
                 const user = await window.AuthCore.studentSignIn();
-                const role = await roleOnRecord(user.uid);
-                applyIdentityToUI(user, role, { silent: true });
+                const account = await accountOnRecord(user.uid);
+                applyIdentityToUI(user, account, { silent: true });
             } catch (error) {
                 console.error("Silent sign-in failed:", error);
                 showStatusMessage("Connection failed. Check network or rules.", 'error');
@@ -158,7 +177,7 @@
         // but reads differently depending on whether you're already a teacher.
         window.applyRoleUI = (role) => {
             const label = document.getElementById('menu-classroom-label');
-            if (label) label.textContent = role === 'teacher' ? 'My Classroom' : 'Set Up a Classroom';
+            if (label) label.textContent = role === 'teacher' ? 'My Task Force' : 'Set Up a Task Force';
         };
 
         // Smart entry point: teachers land in their existing classroom, everyone else is
@@ -170,12 +189,22 @@
 
             if (role === 'teacher') {
                 window.openTeacherDashboard();
-            } else {
+                return;
+            }
+
+            // Task Force Leader is a 13+-only action — a Learner Recruit never sees the
+            // setup prompt, even though the menu item itself stays visible to everyone.
+            if (localStorage.getItem('aa_age_tier') === 'under13') {
                 const menu = document.getElementById('menu-modal');
                 if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
-                const modal = document.getElementById('become-teacher-modal');
-                if (modal) { modal.classList.remove('hidden-modal'); modal.classList.add('visible-modal'); }
+                showStatusMessage("Setting up a Task Force is available for Agent Learners (13+).", 'info');
+                return;
             }
+
+            const menu = document.getElementById('menu-modal');
+            if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
+            const modal = document.getElementById('become-teacher-modal');
+            if (modal) { modal.classList.remove('hidden-modal'); modal.classList.add('visible-modal'); }
         };
 
         window.closeBecomeTeacherModal = () => {
@@ -248,11 +277,11 @@
                 localStorage.setItem('aa_role', 'teacher');
                 window.applyRoleUI('teacher');
                 window.closeBecomeTeacherModal();
-                showStatusMessage("Classroom created!", 'info');
+                showStatusMessage("Task Force created!", 'info');
                 setTimeout(() => window.openTeacherDashboard(), 400);
             } catch (e) {
                 console.error("Failed to create classroom:", e);
-                showStatusMessage("Couldn't create your classroom — please try again.", 'error');
+                showStatusMessage("Couldn't create your Task Force — please try again.", 'error');
             }
         };
 
@@ -260,7 +289,73 @@
             const code = document.getElementById('admin-stat-code')?.textContent;
             if (code && code !== 'allgood.ac/tf/8821') {
                 navigator.clipboard.writeText(code);
-                showStatusMessage("Classroom code copied!", 'info');
+                showStatusMessage("Task Force code copied!", 'info');
+            }
+        };
+
+        // AGE GATE: the first question in the launch-time identify modal (three-tier
+        // persona system). Two modes:
+        //   'fresh'   — this browser has never identified itself. "No" signs in a Learner
+        //               Recruit on the spot (no further screens); "Yes" reveals the
+        //               existing student/teacher choice, unchanged.
+        //   'recheck' — an account identified before this age-gate existed and has no
+        //               tier on file. Answering just records the tier on the existing
+        //               account and resumes the launch — it never touches their name,
+        //               nickname, or role.
+        window.openAgeGate = (mode) => {
+            const modal = document.getElementById('login-modal');
+            if (!modal) return;
+            modal.dataset.mode = mode;
+            document.getElementById('login-age-gate').classList.remove('hidden');
+            document.getElementById('login-role-choice').classList.add('hidden');
+            document.getElementById('login-student-panel').classList.add('hidden');
+            document.getElementById('login-teacher-panel').classList.add('hidden');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+        };
+
+        window.answerAgeGate = async (isThirteenPlus) => {
+            sfx.click();
+            const modal = document.getElementById('login-modal');
+            const mode = (modal && modal.dataset.mode) || 'fresh';
+
+            if (mode === 'recheck') {
+                const uid = localStorage.getItem('aa_uid');
+                if (uid) {
+                    const tier = isThirteenPlus ? '13plus' : 'under13';
+                    await window.AuthCore.recordAgeTier(uid, tier);
+                    localStorage.setItem('aa_age_tier', tier);
+                }
+                closeLoginModal();
+                window.resumePendingLaunch();
+                return;
+            }
+
+            if (!isThirteenPlus) {
+                window.handleRecruitSignIn();
+                return;
+            }
+
+            document.getElementById('login-age-gate').classList.add('hidden');
+            document.getElementById('login-role-choice').classList.remove('hidden');
+        };
+
+        window.backToAgeGate = () => {
+            sfx.click();
+            document.getElementById('login-role-choice').classList.add('hidden');
+            document.getElementById('login-age-gate').classList.remove('hidden');
+        };
+
+        // LEARNER RECRUIT: under 13. Auto sign-in, auto nickname + avatar — no picker,
+        // no name/email field, nothing standing between "no" and their first course.
+        window.handleRecruitSignIn = async () => {
+            try {
+                const user = await window.AuthCore.recruitSignIn();
+                const account = await accountOnRecord(user.uid);
+                applyIdentityToUI(user, account);
+            } catch (error) {
+                console.error("Learner Recruit sign-in error:", error);
+                showStatusMessage("Connection failed. Check network or rules.", 'error');
             }
         };
 
@@ -280,6 +375,15 @@
             document.getElementById('login-teacher-panel').classList.add('hidden');
         };
 
+        // Resets the modal to its very first screen (the age gate) so it doesn't reopen
+        // mid-flow the next time someone triggers it.
+        function resetLoginModalToStart() {
+            document.getElementById('login-age-gate').classList.remove('hidden');
+            document.getElementById('login-role-choice').classList.add('hidden');
+            document.getElementById('login-student-panel').classList.add('hidden');
+            document.getElementById('login-teacher-panel').classList.add('hidden');
+        }
+
         window.fillRandomNickname = () => {
             document.getElementById('student-nickname-input').value = window.AuthCore.randomNickname();
         };
@@ -294,9 +398,11 @@
             btn.classList.add('opacity-70', 'cursor-wait');
 
             try {
-                const user = await window.AuthCore.studentSignIn(nickname || window.AuthCore.randomNickname());
-                const role = await roleOnRecord(user.uid);
-                applyIdentityToUI(user, role);
+                // Reached only after the age gate confirmed 13+, so this always records
+                // the Agent Learner tier.
+                const user = await window.AuthCore.studentSignIn(nickname || window.AuthCore.randomNickname(), '13plus');
+                const account = await accountOnRecord(user.uid);
+                applyIdentityToUI(user, account);
             } catch (error) {
                 console.error("Student sign-in error:", error);
                 showStatusMessage("Connection failed. Check network or rules.", 'error');
@@ -316,8 +422,8 @@
 
             try {
                 const user = await window.AuthCore.teacherSignIn();
-                const role = await roleOnRecord(user.uid);
-                applyIdentityToUI(user, role);
+                const account = await accountOnRecord(user.uid);
+                applyIdentityToUI(user, account);
             } catch (error) {
                 console.error("Google Sign-In Error:", error);
                 let message = "Sign-in failed. Please try again.";
@@ -332,24 +438,21 @@
 
         // LAUNCH TRANSITIONS: each named module gets its signature "power-in" cover
         // animation (ported from allgoodtransitionconcepts.html) before same-tab
-        // navigation. Rage Revenue + Finding Yourself intentionally share the "jodi"
-        // treatment — both are Jodi's Schoolhouse lessons and meant to feel like one
-        // consistent identity. Any module not listed here keeps the old new-tab launch.
+        // navigation. Any module not listed here keeps the old new-tab launch. (Rage
+        // Revenue and Finding Yourself used to share a "jodi" treatment here — removed
+        // along with their dashboard cards when both modules were archived.)
         const LAUNCH_TRANSITIONS = {
             'Digital Decisions': 'ddc',
             'Jolenes Lemonade': 'jolene',
-            'Rage Revenue': 'jodi',
-            'Finding Yourself': 'jodi'
         };
         const LAUNCH_TRANSITION_IDS = {
             ddc: ['t-ddc-bg', 't-ddc-scan', 't-ddc-ring', 't-ddc-label'],
             jolene: ['t-jolene-bg', 't-jolene-page', 't-jolene-icon'],
-            jodi: ['t-jodi-bg', 't-jodi-door', 't-jodi-label']
         };
         // Matches the prototype's fire()->land() timeouts exactly: navigation fires
         // right as each treatment reaches its peak cover, masking the destination
         // page's load jank behind the still-animating overlay.
-        const LAUNCH_TRANSITION_DURATIONS = { ddc: 1500, jolene: 1150, jodi: 1750 };
+        const LAUNCH_TRANSITION_DURATIONS = { ddc: 1500, jolene: 1150 };
 
         function playLaunchTransition(which, destinationUrl) {
             const overlay = document.getElementById('launch-transition');
@@ -368,16 +471,15 @@
 
         window.launchCourse = async (courseName, url, element) => {
             const isIdentified = localStorage.getItem('aa_identified') === 'true';
+            // An account identified before the age-gate existed has no tier on file yet —
+            // ask once, at this same launch-time moment, rather than assuming 13+.
+            const needsAgeCheck = isIdentified && !localStorage.getItem('aa_age_tier');
 
-            if (!auth.currentUser || !isIdentified) {
+            if (!auth.currentUser || !isIdentified || needsAgeCheck) {
                 // Stash what they were trying to do so it resumes automatically once they
                 // answer the "who's launching this?" prompt — feels like one motion, not two.
                 window._pendingLaunch = { courseName, url, element };
-                const loginModal = document.getElementById('login-modal');
-                if (loginModal) {
-                    loginModal.classList.remove('hidden-modal');
-                    loginModal.classList.add('visible-modal');
-                }
+                window.openAgeGate(needsAgeCheck ? 'recheck' : 'fresh');
                 return;
             }
 
@@ -525,6 +627,8 @@
             localStorage.removeItem('aa_jlc_complete');
             localStorage.removeItem('aa_intel_sent');
             localStorage.removeItem('aa_finding_complete'); // NEW: Clear Finding status
+            localStorage.removeItem('aa_age_tier');
+            localStorage.removeItem('aa_avatar');
 
             launchCount = 0; 
             
@@ -628,7 +732,23 @@
             const nameInput = document.getElementById('profile-name-input');
             if(nameDisplay) nameDisplay.textContent = storedName;
             if(nameInput) nameInput.value = storedName;
-            
+
+            // Avatar (Learner Recruit / any guest account — auto-assigned at sign-in,
+            // customizable here). Task Force Leaders sign in with Google and never get one.
+            const storedAvatar = localStorage.getItem('aa_avatar');
+            const avatarDisplay = document.getElementById('profile-avatar-display');
+            const avatarFallback = document.getElementById('profile-avatar-fallback-icon');
+            if (avatarDisplay && avatarFallback) {
+                if (storedAvatar) {
+                    avatarDisplay.textContent = storedAvatar;
+                    avatarDisplay.classList.remove('hidden');
+                    avatarFallback.classList.add('hidden');
+                } else {
+                    avatarDisplay.classList.add('hidden');
+                    avatarFallback.classList.remove('hidden');
+                }
+            }
+
             // Stats
             const statLaunches = document.getElementById('profile-stat-launches');
             if(statLaunches) statLaunches.textContent = launches;
@@ -679,42 +799,83 @@
             if(window.sfx) window.sfx.click();
         }
 
+        window._selectedAvatar = null;
+
+        window.selectProfileAvatar = (emoji) => {
+            window._selectedAvatar = emoji;
+            document.querySelectorAll('#profile-avatar-picker button').forEach(btn => {
+                btn.classList.toggle('ring-2', btn.dataset.emoji === emoji);
+                btn.classList.toggle('ring-allgood-secondary', btn.dataset.emoji === emoji);
+            });
+        }
+
         window.toggleProfileEdit = (isEditing) => {
             const viewMode = document.getElementById('profile-view-name');
             const editMode = document.getElementById('profile-edit-name');
-            
+            const picker = document.getElementById('profile-avatar-picker');
+
             if (isEditing) {
                 viewMode.classList.add('hidden');
                 editMode.classList.remove('hidden');
+
+                // Avatar picker only makes sense for a guest (anonymous) account.
+                const user = auth.currentUser;
+                if (picker && user && user.isAnonymous) {
+                    window._selectedAvatar = localStorage.getItem('aa_avatar') || null;
+                    picker.innerHTML = window.AuthCore.AVATARS.map(emoji => `
+                        <button type="button" data-emoji="${emoji}" onclick="window.selectProfileAvatar('${emoji}')"
+                            class="w-8 h-8 rounded-full bg-white border border-gray-200 text-lg flex items-center justify-center hover:border-allgood-secondary transition-all ${emoji === window._selectedAvatar ? 'ring-2 ring-allgood-secondary' : ''}">${emoji}</button>
+                    `).join('');
+                    picker.classList.remove('hidden');
+                    picker.classList.add('flex');
+                } else if (picker) {
+                    picker.classList.add('hidden');
+                    picker.classList.remove('flex');
+                }
+
                 const input = document.getElementById('profile-name-input');
                 if(input) input.focus();
             } else {
                 viewMode.classList.remove('hidden');
                 editMode.classList.add('hidden');
+                if (picker) { picker.classList.add('hidden'); picker.classList.remove('flex'); }
             }
         }
 
         window.saveProfileIdentity = async () => {
             const input = document.getElementById('profile-name-input');
             const newName = input.value.trim();
-            
-            if (!newName) return; 
-            
+
+            if (!newName) return;
+
             if(window.sfx) window.sfx.confirm();
-            
+
             // 1. Update UI immediately
             const nameDisplay = document.getElementById('profile-name-display');
             if(nameDisplay) nameDisplay.textContent = newName;
             localStorage.setItem('aa_username', newName);
-            window.updateUI(newName); 
-            
+            window.updateUI(newName);
+
+            const newAvatar = window._selectedAvatar;
+            if (newAvatar) {
+                localStorage.setItem('aa_avatar', newAvatar);
+                const avatarDisplay = document.getElementById('profile-avatar-display');
+                const avatarFallback = document.getElementById('profile-avatar-fallback-icon');
+                if (avatarDisplay && avatarFallback) {
+                    avatarDisplay.textContent = newAvatar;
+                    avatarDisplay.classList.remove('hidden');
+                    avatarFallback.classList.add('hidden');
+                }
+            }
+
             // 2. Update Firebase (NOW HAS ACCESS TO IMPORTS)
             const user = auth.currentUser;
             if (user) {
                 try {
                     await updateProfile(user, { displayName: newName });
                     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
-                        displayName: newName
+                        displayName: newName,
+                        ...(newAvatar ? { avatar: newAvatar } : {})
                     }, { merge: true });
                 } catch (e) {
                     console.error("Failed to save identity to cloud", e);
@@ -738,11 +899,11 @@
             try {
                 const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
                 if (!classroomSnap.exists()) {
-                    if (statusEl) { statusEl.textContent = "Code not found — double check with your teacher."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+                    if (statusEl) { statusEl.textContent = "Code not found — double check with your Task Force Leader."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
                     return;
                 }
                 await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
-                if (statusEl) { statusEl.textContent = "Joined! Your teacher can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
+                if (statusEl) { statusEl.textContent = "Joined! Your Task Force Leader can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
                 if (window.sfx) window.sfx.confirm();
             } catch (e) {
                 console.error("Failed to join classroom:", e);
@@ -1202,8 +1363,8 @@
                 modal.classList.add('hidden-modal');
                 modal.classList.remove('visible-modal');
             }
-            // Reset to the role-choice screen so it doesn't reopen mid-flow next time.
-            window.backToLoginRoleChoice();
+            // Reset to the first screen (age gate) so it doesn't reopen mid-flow next time.
+            resetLoginModalToStart();
         }
         
         function showStatusMessage(message, type = 'info') {
@@ -1361,7 +1522,7 @@
             const code = userData ? userData.classroomCode : null;
 
             if (!code) {
-                showStatusMessage("No classroom code on file for this account yet.", 'error');
+                showStatusMessage("No Task Force code on file for this account yet.", 'error');
                 return;
             }
 
@@ -1371,11 +1532,11 @@
             adminPage.style.display = 'block';
             adminPage.classList.add('active');
 
-            document.getElementById('admin-page-title').textContent = 'My Classroom';
-            document.getElementById('admin-page-subtitle').innerHTML = `Classroom Code: <span class="text-allgood-secondary font-mono">${code}</span>`;
+            document.getElementById('admin-page-title').textContent = 'My Task Force';
+            document.getElementById('admin-page-subtitle').innerHTML = `Task Force Code: <span class="text-allgood-secondary font-mono">${code}</span>`;
             document.getElementById('admin-stat1-label').textContent = 'Total Students';
             document.getElementById('admin-stat2-label').textContent = 'Avg. Assigned Completion';
-            document.getElementById('admin-stat3-label').textContent = 'Classroom Code';
+            document.getElementById('admin-stat3-label').textContent = 'Task Force Code';
             document.getElementById('admin-stat-code').textContent = code;
             document.getElementById('admin-roster-title').textContent = 'Student Roster';
 
@@ -2069,30 +2230,6 @@
         .t-jolene-icon.on { animation: fadeQuick 0.5s ease 0.15s forwards; }
         @keyframes fadeQuick { to { opacity: 1; } }
 
-        /* --- Jodi: door of warm light (shared by Rage Revenue + Finding Yourself) --- */
-        .t-jodi-bg {
-            position: absolute; inset: 0; background: #12181a;
-            opacity: 0; transition: opacity 0.2s ease;
-        }
-        .t-jodi-bg.on { opacity: 1; }
-        .t-jodi-door {
-            position: absolute; width: 6px; height: 6px; border-radius: 50%;
-            background: radial-gradient(circle, #FFF3D6 0%, #FFD98E 30%, rgba(255,217,142,0) 70%);
-            opacity: 0;
-        }
-        .t-jodi-door.on { animation: doorOpen 1.7s cubic-bezier(0.3,0.1,0.2,1) forwards; }
-        @keyframes doorOpen {
-            0% { opacity: 0; width: 6px; height: 6px; }
-            25% { opacity: 1; }
-            100% { opacity: 1; width: 240vmax; height: 240vmax; }
-        }
-        .t-jodi-label {
-            position: relative; z-index: 2; font-family: Georgia, serif; font-style: italic;
-            font-size: 15px; color: #5c4a2e; opacity: 0;
-        }
-        .t-jodi-label.on { animation: labelSoft 1.7s ease forwards; }
-        @keyframes labelSoft { 0% { opacity: 0; } 45% { opacity: 0; } 65% { opacity: 1; } 100% { opacity: 1; } }
-
     </style>
 </head>
 <body class="flex flex-col min-h-screen text-allgood-dark font-body">
@@ -2107,10 +2244,6 @@
 
         <div class="t-jolene-bg" id="t-jolene-bg"></div>
         <div class="t-jolene-page" id="t-jolene-page"><span class="t-jolene-icon" id="t-jolene-icon">&#127819;</span></div>
-
-        <div class="t-jodi-bg" id="t-jodi-bg"></div>
-        <div class="t-jodi-door" id="t-jodi-door"></div>
-        <div class="t-jodi-label" id="t-jodi-label">Come on in.</div>
     </div>
 
     <!-- ORBITAL LINK: Static Feed Injection -->
@@ -2149,9 +2282,25 @@
                     <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
                         <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
 
-                        <!-- ROLE CHOICE: shown first, always. Routes students away from any
+                        <!-- AGE GATE: shown first, always — before any name/email/nickname
+                             field. "No" leads straight into a fully PII-free Learner
+                             Recruit sign-in; "Yes" reveals the role choice below. This
+                             same screen also serves a 'recheck' mode (see script) for
+                             accounts identified before this question existed. -->
+                        <div id="login-age-gate">
+                            <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Are you 13 or older?</h2>
+                            <p class="text-gray-500 text-xs mb-6 font-body">Just an honest yes or no — no birthdate needed.</p>
+                            <button onclick="window.answerAgeGate(true)" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase mb-3">
+                                Yes, I'm 13 or older
+                            </button>
+                            <button onclick="window.answerAgeGate(false)" class="w-full bg-white border-2 border-allgood-secondary text-allgood-secondary hover:bg-allgood-secondary hover:text-white font-bold py-3 rounded shadow-sm transition-all font-body uppercase">
+                                No, I'm under 13
+                            </button>
+                        </div>
+
+                        <!-- ROLE CHOICE: shown after confirming 13+. Routes students away from any
                              flow that could capture a real name or email. -->
-                        <div id="login-role-choice">
+                        <div id="login-role-choice" class="hidden">
                             <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Who's launching this?</h2>
                             <p class="text-gray-500 text-xs mb-6 font-body">Pick one to continue.</p>
                             <button onclick="window.selectLoginRole('student')" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase mb-3">
@@ -2160,6 +2309,7 @@
                             <button onclick="window.selectLoginRole('teacher')" class="w-full bg-white border-2 border-allgood-secondary text-allgood-secondary hover:bg-allgood-secondary hover:text-white font-bold py-3 rounded shadow-sm transition-all font-body uppercase">
                                 I'm a Teacher / Staff Member
                             </button>
+                            <button onclick="window.backToAgeGate()" class="text-xs text-gray-400 hover:text-gray-600 font-bold uppercase font-body mt-4">Back</button>
                         </div>
 
                         <!-- STUDENT PANEL: nickname only. No name field, no email field, ever. -->
@@ -2210,8 +2360,8 @@
                     <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
                         <button onclick="window.closeBecomeTeacherModal()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
                         <i data-lucide="graduation-cap" class="w-10 h-10 text-allgood-secondary mx-auto mb-3"></i>
-                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Set Up a Classroom?</h3>
-                        <p class="text-xs text-gray-500 mb-5">This gives you a classroom code to share with students, and a roster where you can see their progress. You can do this anytime — no rush.</p>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Set Up a Task Force?</h3>
+                        <p class="text-xs text-gray-500 mb-5">This gives you a Task Force code to share with students, and a roster where you can see their progress. You can do this anytime — no rush.</p>
                         <button onclick="window.beginClassroomSetup()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide mb-2">Yes, Set It Up</button>
                         <button onclick="window.closeBecomeTeacherModal()" class="w-full text-gray-400 hover:text-gray-600 text-xs font-bold uppercase py-2">Not Right Now</button>
                     </div>
@@ -2221,7 +2371,7 @@
                      created. Records a timestamped acceptance — this is the compliance record. -->
                 <div id="teacher-consent-modal" class="hidden-modal absolute inset-0 z-[3700] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
                     <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-left border-t-4 border-allgood-secondary relative">
-                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-3 text-center">Before You Set Up a Classroom</h3>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-3 text-center">Before You Set Up a Task Force</h3>
                         <div class="text-xs text-gray-600 leading-relaxed space-y-2 mb-4 bg-slate-50 border border-slate-100 rounded p-3">
                             <p><strong class="text-allgood-dark">What we collect from your students:</strong> a nickname they choose (never a real name or email), their scores, and their activity in the lessons you assign. That's it.</p>
                             <p><strong class="text-allgood-dark">Why:</strong> so you can see their progress and so we can run the lessons themselves.</p>
@@ -2300,7 +2450,7 @@
                             <!-- CLASSROOM ENTRY: always visible. Smart destination - teachers land in their
                                  classroom, everyone else gets the option to set one up. -->
                             <button id="menu-btn-classroom" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openClassroomEntry()">
-                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i><span id="menu-classroom-label">Set Up a Classroom</span>
+                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i><span id="menu-classroom-label">Set Up a Task Force</span>
                             </button>
                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openAboutModal()">
                                 <i data-lucide="info" class="w-4 h-4 mr-3 text-slate-500"></i>About Us
@@ -2334,7 +2484,7 @@
                         </div>
                         <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
                             <div>
-                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">4</span>
+                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">2</span>
                                 <span class="text-[10px] uppercase text-slate-400 font-bold">MODULES</span>
                             </div>
                             <div>
@@ -2346,20 +2496,20 @@
 
                     <!-- TAB NAVIGATION: COMMAND RAIL (Mobile Optimized) -->
                     <div class="bg-white/40 backdrop-blur-md p-1.5 rounded-xl border border-white/60 shadow-sm flex space-x-2 mb-6 mx-auto max-w-3xl">
-                        <button id="tab-btn-challenges" onclick="switchTab('challenges')" 
-                            class="tab-btn active-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
-                            <i data-lucide="target" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i> 
+                        <button id="tab-btn-challenges" onclick="switchTab('challenges')"
+                            class="tab-btn inactive-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
+                            <i data-lucide="target" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i>
                             <span class="hidden sm:inline">Challenges</span>
                         </button>
-                        <button id="tab-btn-courses" onclick="switchTab('courses')" 
-                            class="tab-btn inactive-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
-                            <i data-lucide="graduation-cap" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i> 
+                        <button id="tab-btn-courses" onclick="switchTab('courses')"
+                            class="tab-btn active-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
+                            <i data-lucide="graduation-cap" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i>
                             <span class="hidden sm:inline">Jodi's Schoolhouse</span>
                         </button>
                     </div>
 
                     <!-- TAB 1: CHALLENGES -->
-                    <div id="tab-challenges" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="tab-challenges" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
                         <div onclick="window.launchCourse('Jolenes Lemonade', 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge', this)" 
                              class="mission-file status-ready p-5 flex items-start gap-4 group">
                              <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
@@ -2390,36 +2540,18 @@
                         </div>
                     </div>
 
-                    <!-- TAB 2: JODI'S SCHOOLHOUSE -->
-                    <div id="tab-courses" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
-                         <!-- Replaced Placeholder 1: Rage Revenue -->
-                        <div onclick="window.launchCourse('Rage Revenue', 'https://allgoodacademy.com/jsh/rage-revenue/', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                            <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 flex-shrink-0 group-hover:bg-red-50 transition-colors">
-                                <span class="text-3xl emoji-badge">🔥</span>
+                    <!-- TAB 2: JODI'S SCHOOLHOUSE — Rage Revenue and Finding Yourself have been
+                         archived (see archive/jsh/); they're being replaced by the four-lab
+                         Digital Decisions Lab set, which ships together once all four are
+                         done rather than wiring pieces in as they're finished. This is an
+                         honest "not here yet" placeholder, not a broken or empty tab. -->
+                    <div id="tab-courses" class="tab-content">
+                        <div class="bg-white/60 backdrop-blur-md border border-white/50 rounded-lg shadow-sm p-10 text-center max-w-xl mx-auto">
+                            <div class="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 mb-4">
+                                <i data-lucide="lock" class="w-7 h-7 text-slate-400"></i>
                             </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Rage Revenue</h3>
-                                    <span class="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Design an ethical social media algorithm that balances profit and user trust.</p>
-                            </div>
-                        </div>
-
-                        <!-- Finding Yourself Module -->
-                        <div onclick="window.launchCourse('Finding Yourself', 'https://allgoodacademy.com/jsh/finding-yourself/', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                             <div class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100 flex-shrink-0 group-hover:bg-amber-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🧭</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Finding Yourself</h3>
-                                    <span class="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Excavate your personal history to reclaim your authentic self.</p>
-                            </div>
+                            <h3 class="font-heading font-bold text-slate-700 text-lg uppercase mb-2">Coming Soon</h3>
+                            <p class="text-sm text-slate-500 leading-relaxed">The Digital Decisions Lab is being built — check back soon.</p>
                         </div>
                     </div>
 
@@ -2568,10 +2700,10 @@
                     <div class="flex items-center justify-between mb-8">
                         <div>
                             <div class="flex items-center gap-3">
-                                <h1 id="admin-page-title" class="text-2xl font-heading font-bold text-allgood-dark uppercase">My Classroom</h1>
+                                <h1 id="admin-page-title" class="text-2xl font-heading font-bold text-allgood-dark uppercase">My Task Force</h1>
                                 <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-emerald-200">Active</span>
                             </div>
-                            <p id="admin-page-subtitle" class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Loading classroom...</p>
+                            <p id="admin-page-subtitle" class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Loading Task Force...</p>
                         </div>
                         <div class="flex items-center gap-2">
                              <button onclick="window.closeTeacherDashboard()" class="text-slate-500 hover:text-allgood-primary px-4 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2">
@@ -2709,19 +2841,23 @@
                     <div class="w-full md:w-2/5 bg-slate-50 border-b md:border-b-0 md:border-r border-gray-200 p-6 flex flex-col items-center text-center">
                         <div class="w-24 h-24 rounded-full bg-white border-4 border-white shadow-md mb-4 overflow-hidden relative group">
                             <div class="absolute inset-0 bg-allgood-secondary/10 flex items-center justify-center">
-                                <i data-lucide="user" class="w-10 h-10 text-allgood-secondary"></i>
+                                <i id="profile-avatar-fallback-icon" data-lucide="user" class="w-10 h-10 text-allgood-secondary"></i>
+                                <span id="profile-avatar-display" class="text-4xl hidden"></span>
                             </div>
                         </div>
-                        
+
                         <!-- VIEW MODE: NAME -->
                         <div id="profile-view-name" class="w-full">
                             <h3 class="text-xl font-heading font-bold text-slate-800" id="profile-name-display">Agent Name</h3>
                             <button onclick="window.toggleProfileEdit(true)" class="text-[10px] uppercase font-bold text-allgood-primary hover:text-allgood-hover underline decoration-dotted mt-1">Edit Identity</button>
                         </div>
 
-                        <!-- EDIT MODE: NAME -->
+                        <!-- EDIT MODE: NAME + AVATAR. The avatar picker only matters for guest
+                             (anonymous) accounts — a Task Force Leader's real Google identity
+                             doesn't use an avatar. -->
                         <div id="profile-edit-name" class="w-full hidden">
                             <input type="text" id="profile-name-input" class="w-full text-center border border-allgood-secondary rounded p-1 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" placeholder="Enter Alias">
+                            <div id="profile-avatar-picker" class="hidden flex-wrap justify-center gap-1 mb-2"></div>
                             <div class="flex gap-2 justify-center">
                                 <button onclick="window.saveProfileIdentity()" class="bg-allgood-secondary text-white px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent">Save</button>
                                 <button onclick="window.toggleProfileEdit(false)" class="bg-gray-200 text-gray-500 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-gray-300">Cancel</button>
@@ -2738,7 +2874,7 @@
                         <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup -->
                         <div class="mt-3 w-full">
                             <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
-                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Classroom Code?</p>
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Task Force Code?</p>
                                 <div class="flex gap-2">
                                     <input type="text" id="profile-classroom-input" placeholder="e.g. 2RP878" maxlength="8" class="flex-1 min-w-0 border border-gray-300 rounded p-2 text-xs uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50">
                                     <button onclick="window.joinClassroom()" class="bg-allgood-secondary text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent shrink-0">Join</button>

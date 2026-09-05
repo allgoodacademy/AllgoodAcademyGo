@@ -75,12 +75,66 @@ function randomNickname() {
     return `${a} ${n} ${num}`;
 }
 
+// Avatars for the under-13 "Learner Recruit" tier — assigned automatically, never chosen
+// at signup, since that tier gets zero form fields before their first course starts.
+// Customizing this later from the profile screen just picks a different entry here.
+const AVATARS = ['🦊', '🦉', '🐺', '🦅', '🦁', '🐨', '🐼', '🐢', '🦔', '🐝', '🦋', '🐙'];
+
+function randomAvatar() {
+    return AVATARS[Math.floor(Math.random() * AVATARS.length)];
+}
+
 function userRef(uid) {
     return doc(db, 'artifacts', appId, 'users', uid);
 }
 
-// --- STUDENT FLOW: anonymous identity, nickname only, no email ever ---
-async function studentSignIn(nickname) {
+// --- AGE TIER: three-tier persona system (Learner Recruit / Agent Learner / Task Force
+// Leader). ageTier is 'under13' or '13plus', recorded once at the age-gate question and
+// never re-asked for that account. role stays 'student' | 'teacher' underneath — that
+// enum (and the classroomCode field name, below) predates this system and isn't worth a
+// data migration just to rename, so age tier is deliberately a separate field layered on
+// top rather than a replacement for role.
+async function recordAgeTier(uid, ageTier) {
+    await setDoc(userRef(uid), { ageTier }, { merge: true });
+}
+
+// --- LEARNER RECRUIT FLOW: under 13. Fully COPPA-compliant — no name/email field, ever,
+// and no picker screen either: nickname + avatar are both auto-assigned so nothing blocks
+// their first course launch. Both stay editable later from their profile.
+async function recruitSignIn() {
+    const cred = await signInAnonymously(auth);
+    const user = cred.user;
+    const nickname = randomNickname();
+    const avatar = randomAvatar();
+
+    await updateProfile(user, { displayName: nickname });
+
+    const ref = userRef(user.uid);
+    const existing = await getDoc(ref);
+    const existingData = existing.exists() ? existing.data() : null;
+    const role = (existingData && existingData.role) ? existingData.role : 'student';
+
+    const payload = {
+        displayName: (existingData && existingData.displayName) || nickname,
+        avatar: (existingData && existingData.avatar) || avatar,
+        email: null,
+        isGuest: true,
+        role,
+        ageTier: 'under13',
+        lastLogin: serverTimestamp(),
+    };
+    if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
+
+    await setDoc(ref, payload, { merge: true });
+    return user;
+}
+
+// --- STUDENT FLOW: anonymous identity, nickname only, no email ever. Used by the 13+
+// "Agent Learner" path (ageTier defaults to '13plus' — this function is also what the
+// invisible power-up silent sign-in calls, which never asks age, so a fresh silent
+// sign-in intentionally lands here with no ageTier yet; the launch-time age-gate fills
+// that in before the account is ever used to identify a real launch). ---
+async function studentSignIn(nickname, ageTier) {
     const cred = await signInAnonymously(auth);
     const user = cred.user;
     const safeNick = String(nickname || randomNickname()).slice(0, 30).trim() || randomNickname();
@@ -100,12 +154,14 @@ async function studentSignIn(nickname) {
         lastLogin: serverTimestamp(),
     };
     if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
+    if (ageTier && !(existingData && existingData.ageTier)) payload.ageTier = ageTier;
 
     await setDoc(ref, payload, { merge: true });
     return user;
 }
 
-// --- TEACHER/STAFF FLOW: real Google identity, since they're the consenting adult ---
+// --- TEACHER/STAFF FLOW: real Google identity, since they're the consenting adult.
+// Always 13+ by definition, so this always records the '13plus' tier. ---
 async function teacherSignIn() {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
@@ -122,6 +178,7 @@ async function teacherSignIn() {
         email: user.email || null,
         isGuest: false,
         role,
+        ageTier: '13plus',
         lastLogin: serverTimestamp(),
     };
     if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
@@ -209,7 +266,8 @@ async function loadModuleProgress(moduleSlug) {
 
 window.AuthCore = {
     auth, db, appId,
-    studentSignIn, teacherSignIn, randomNickname,
+    studentSignIn, teacherSignIn, recruitSignIn, randomNickname, randomAvatar, AVATARS,
+    recordAgeTier,
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
     saveModuleProgress, loadModuleProgress,
