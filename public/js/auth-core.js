@@ -170,11 +170,49 @@ async function submitCourseFeedback({ gameName, rating, feedback }) {
     });
 }
 
+// --- MODULE PROGRESS: one canonical doc per student per module, so a returning
+// visit (new tab, next day) can restore real progress instead of starting cold.
+// Deliberately NOT per-session — the existing game_scores/{sessionId} docs are a
+// fresh doc every page load, which is fine as a visit log but useless as "what
+// has this student actually finished," since it never accumulates across visits.
+// This is the same flat/canonical pattern already used for messages and
+// course_feedback, for the same reason: one doc to read, no per-module rule or
+// query gymnastics as more modules get this treatment.
+function moduleProgressRef(uid, moduleSlug) {
+    return doc(db, 'artifacts', appId, 'users', uid, 'module_progress', moduleSlug);
+}
+
+async function saveModuleProgress(moduleSlug, progress) {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+        await setDoc(moduleProgressRef(user.uid, moduleSlug), {
+            ...progress,
+            lastUpdated: serverTimestamp(),
+        }, { merge: true });
+    } catch (e) {
+        console.error('[AuthCore] saveModuleProgress failed', e);
+    }
+}
+
+async function loadModuleProgress(moduleSlug) {
+    const user = auth.currentUser;
+    if (!user) return null;
+    try {
+        const snap = await getDoc(moduleProgressRef(user.uid, moduleSlug));
+        return snap.exists() ? snap.data() : null;
+    } catch (e) {
+        console.error('[AuthCore] loadModuleProgress failed', e);
+        return null;
+    }
+}
+
 window.AuthCore = {
     auth, db, appId,
     studentSignIn, teacherSignIn, randomNickname,
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
+    saveModuleProgress, loadModuleProgress,
     onAuthStateChanged, signOut,
     skipPowerUp,
 };

@@ -52,6 +52,16 @@
                     // Auto-start session log if we just auto-logged in
                     if(window.SessionManager) window.SessionManager.start(finalName, user.email);
                 }
+
+                // Restore real progress for a returning visit (new tab, next day) instead
+                // of starting cold — the existing per-session game_scores docs never
+                // accumulate across visits, so this reads the one canonical progress doc.
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('finding-yourself');
+                    if (progress && typeof progress.lastPageIndex === 'number' && progress.lastPageIndex > 0 && window.showPage) {
+                        window.showPage(progress.lastPageIndex);
+                    }
+                }
             } else {
                 window.currentUser = null;
             }
@@ -1233,7 +1243,12 @@
             }
         }
 
-        window.nextPage = () => window.showPage(currentPage + 1);
+        window.nextPage = () => {
+            window.showPage(currentPage + 1);
+            if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                window.AuthCore.saveModuleProgress('finding-yourself', { lastPageIndex: currentPage });
+            }
+        };
         window.prevPage = () => window.showPage(currentPage - 1);
 
         // --- INTERACTIONS ---

@@ -63,6 +63,16 @@
                 }
                 
                 if(window.SessionManager) window.SessionManager.start(finalName, user.email);
+
+                // Restore real progress for a returning visit (new tab, next day) instead
+                // of starting cold — the existing per-session game_scores docs never
+                // accumulate across visits, so this reads the one canonical progress doc.
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('rage-revenue');
+                    if (progress && typeof progress.lastPageIndex === 'number' && progress.lastPageIndex > 0 && window.goToPage) {
+                        window.goToPage(progress.lastPageIndex);
+                    }
+                }
             }
         });
 
@@ -1210,7 +1220,16 @@
             if(window.lucide) window.lucide.createIcons();
         }
 
-        window.nextPage = () => { if(currentPage < totalPages - 1) { currentPage++; window.updatePage(); if(window.sfx && window.sfx.nav) window.sfx.nav(); } };
+        window.nextPage = () => {
+            if(currentPage < totalPages - 1) {
+                currentPage++;
+                window.updatePage();
+                if(window.sfx && window.sfx.nav) window.sfx.nav();
+                if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                    window.AuthCore.saveModuleProgress('rage-revenue', { lastPageIndex: currentPage });
+                }
+            }
+        };
         window.prevPage = () => { if(currentPage > 0) { currentPage--; window.updatePage(); if(window.sfx && window.sfx.nav) window.sfx.nav(); } };
         
         // Navigation Helper

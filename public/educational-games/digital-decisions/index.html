@@ -49,6 +49,14 @@
                 window.currentUserEmail = user.email;
                 if(window.updateUserDisplay) window.updateUserDisplay(finalName);
 
+                // Restore real progress for a returning visit (new tab, next day) instead
+                // of starting cold — the existing per-session game_scores docs never
+                // accumulate across visits, so this reads the one canonical progress doc.
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('digital-decisions');
+                    if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
+                }
+
                 const loginModal = document.getElementById('login-modal');
                 if (loginModal && !loginModal.classList.contains('hidden-modal')) {
                     loginModal.classList.add('hidden-modal');
@@ -845,6 +853,22 @@
             const startupScreen = document.getElementById('startup-screen');
             const loginModal = document.getElementById('login-modal');
 
+            // Called once auth resolves with real progress from Firestore (see the
+            // module script's onAuthStateChanged). Hydrates in-memory state so
+            // startCategory()'s existing "answered vs. next-unanswered" rendering
+            // reflects a returning student's real history instead of starting cold.
+            window.restoreModuleProgress = (data) => {
+                if (!data) return;
+                if (data.answeredScenarioScores && typeof data.answeredScenarioScores === 'object') {
+                    answeredScenarioScores = { ...data.answeredScenarioScores };
+                }
+                if (typeof data.totalChallengeScore === 'number') {
+                    totalChallengeScore = data.totalChallengeScore;
+                }
+                updateHUDDisplay();
+                updateTOC();
+            };
+
             // --- MENU & MODAL FUNCTIONS ---
             window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); sfx.tick(); }
             window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); sfx.tick(); }
@@ -1434,10 +1458,17 @@
                         question: data.title
                     });
 
-                    window.logFinalScoreToFirestore({ 
-                        finalScore: totalChallengeScore, 
-                        sessionId: window.sessionId 
+                    window.logFinalScoreToFirestore({
+                        finalScore: totalChallengeScore,
+                        sessionId: window.sessionId
                     });
+
+                    if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                        window.AuthCore.saveModuleProgress('digital-decisions', {
+                            answeredScenarioScores,
+                            totalChallengeScore,
+                        });
+                    }
                 }
 
                 // Re-render just this block in its answered state — the rest of the feed stays untouched.

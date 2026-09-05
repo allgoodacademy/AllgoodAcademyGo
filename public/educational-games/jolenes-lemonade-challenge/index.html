@@ -53,10 +53,18 @@
 
                 window.currentUserName = finalName;
                 window.currentUserEmail = user.email;
-                
+
                 // Update UI
                 window.updateUserDisplay(finalName);
-                
+
+                // Restore real progress for a returning visit (new tab, next day) instead
+                // of starting cold — the existing per-session game_scores docs never
+                // accumulate across visits, so this reads the one canonical progress doc.
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('jolenes-lemonade');
+                    if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
+                }
+
                 // Hide login modal if present (this handles the SSO case)
                 const loginModal = document.getElementById('login-modal');
                 if (loginModal && !loginModal.classList.contains('hidden-modal')) {
@@ -750,6 +758,34 @@
             const startupScreen = document.getElementById('startup-screen');
             const loginModal = document.getElementById('login-modal');
 
+            // Called once auth resolves with real progress from Firestore (see the
+            // module script's onAuthStateChanged). Re-renders every page against the
+            // restored scores (same helper the hard-reset path uses) and jumps to the
+            // first unanswered scenario instead of leaving the student on page 0.
+            window.restoreModuleProgress = (data) => {
+                if (!data) return;
+                if (data.answeredScenarioScores && typeof data.answeredScenarioScores === 'object') {
+                    answeredScenarioScores = { ...data.answeredScenarioScores };
+                }
+                if (typeof data.totalChallengeScore === 'number') {
+                    totalChallengeScore = data.totalChallengeScore;
+                    const bankEl = document.getElementById('bank-balance');
+                    if (bankEl) bankEl.textContent = `$${totalChallengeScore}`;
+                }
+
+                pages.forEach(p => { const idx = parseInt(p.getAttribute('data-scenario-index')); if(idx) renderScenarioPage(p, idx); });
+                updateTOC();
+
+                const answeredCount = Object.keys(answeredScenarioScores).length;
+                if (answeredCount > 0 && answeredCount < TOTAL_SCENARIOS) {
+                    let firstUnanswered = -1;
+                    for (let sIdx = 1; sIdx <= TOTAL_SCENARIOS; sIdx++) {
+                        if (answeredScenarioScores[sIdx] === undefined) { firstUnanswered = sIdx; break; }
+                    }
+                    if (firstUnanswered !== -1) window.showPage(firstUnanswered + 1); // +1: page 1 is the cover
+                }
+            };
+
             // --- MENU FUNCTIONS ---
             window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); sfx.tick(); }
             window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); sfx.tick(); }
@@ -1016,6 +1052,13 @@
                         effectiveness: chosen.effectiveness,
                         question: data.title
                     });
+
+                    if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                        window.AuthCore.saveModuleProgress('jolenes-lemonade', {
+                            answeredScenarioScores,
+                            totalChallengeScore,
+                        });
+                    }
                 }
                 window.showPage(currentPageIndex); // Re-render to show feedback inline
                 
