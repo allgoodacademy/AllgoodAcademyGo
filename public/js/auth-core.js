@@ -79,7 +79,23 @@ function randomNickname() {
 // Avatars for the under-13 "Learner Recruit" tier — assigned automatically, never chosen
 // at signup, since that tier gets zero form fields before their first course starts.
 // Customizing this later from the profile screen just picks a different entry here.
-const AVATARS = ['🦊', '🦉', '🐺', '🦅', '🦁', '🐨', '🐼', '🐢', '🦔', '🐝', '🦋', '🐙'];
+// Keys (not emoji) into the "Op-Squad" icon set rendered by index.html.
+const AVATARS = ['frog', 'owl', 'wolf', 'panda', 'koala', 'bee', 'turtle', 'hedgehog', 'octopus', 'eagle'];
+
+// Accounts created before the Op-Squad icon set replaced the plain-animal-emoji set had
+// their avatar stored as a raw emoji. Maps each retired emoji to its closest surviving
+// icon so those accounts don't end up with an avatar nothing can render.
+const LEGACY_AVATAR_MAP = {
+    '🦊': 'wolf', '🦁': 'wolf', '🦋': 'bee',
+    '🦉': 'owl', '🐺': 'wolf', '🦅': 'eagle', '🐨': 'koala',
+    '🐼': 'panda', '🐢': 'turtle', '🦔': 'hedgehog', '🐝': 'bee', '🐙': 'octopus',
+};
+
+function normalizeAvatar(value) {
+    if (!value) return value || null;
+    if (AVATARS.includes(value)) return value;
+    return LEGACY_AVATAR_MAP[value] || null;
+}
 
 function randomAvatar() {
     return AVATARS[Math.floor(Math.random() * AVATARS.length)];
@@ -183,7 +199,7 @@ async function recruitSignIn() {
     let code = existingData && existingData.recruitCode;
     const isNewCode = !code;
     let displayName = existingData && existingData.displayName;
-    let avatar = (existingData && existingData.avatar) || randomAvatar();
+    let avatar = normalizeAvatar(existingData && existingData.avatar) || randomAvatar();
 
     if (!code) {
         code = await generateUniqueRecruitCode();
@@ -244,6 +260,7 @@ async function redeemRecruitCode(rawCode) {
     const codeData = codeSnap.data();
 
     const displayName = codeData.displayName || codeToDisplayName(code);
+    const avatar = normalizeAvatar(codeData.avatar);
     await updateProfile(user, { displayName });
 
     const ref = userRef(user.uid);
@@ -252,7 +269,7 @@ async function redeemRecruitCode(rawCode) {
 
     await setDoc(ref, {
         displayName,
-        avatar: codeData.avatar || null,
+        avatar,
         email: null,
         isGuest: true,
         role: (existingData && existingData.role) ? existingData.role : 'student',
@@ -271,7 +288,7 @@ async function redeemRecruitCode(rawCode) {
 
     await setDoc(codeRef, { uid: user.uid, updatedAt: serverTimestamp() }, { merge: true });
 
-    return { ok: true, displayName, avatar: codeData.avatar || null };
+    return { ok: true, displayName, avatar };
 }
 
 // Mirrors one module's progress onto the recruit's code document (in addition to the
@@ -393,7 +410,7 @@ async function getAccount(uid) {
     return {
         role: data.role || 'student',
         ageTier: data.ageTier || null,
-        avatar: data.avatar || null,
+        avatar: normalizeAvatar(data.avatar),
         recruitCode: data.recruitCode || null,
         displayName: data.displayName || null,
     };
@@ -481,7 +498,7 @@ window.AuthCore = {
     silentSignIn, recruitSignIn, redeemRecruitCode,
     googleSignIn, createAccountWithEmail, signInWithEmail,
     getAccount,
-    randomNickname, randomAvatar, AVATARS,
+    randomNickname, randomAvatar, normalizeAvatar, AVATARS,
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
     saveModuleProgress, loadModuleProgress,
