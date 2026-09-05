@@ -298,27 +298,25 @@
     <style>
         body {
             font-family: Verdana, sans-serif;
-            background-color: #1a1a1a;
-            background-image: url("https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?q=80&w=2070&auto=format&fit=crop");
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
+            background-color: #F7F7F7;
             min-height: 100vh; margin: 0; padding: 0;
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
         }
         input, textarea { -webkit-user-select: text; user-select: text; }
         h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
-        
-        .tablet-frame {
-            height: 80vh; width: auto; aspect-ratio: 16/10; max-width: 1100px; max-height: 95vh;
-            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
-            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative; margin: 20px auto;
-            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
-            transition: width 0.3s, height 0.3s;
+
+        /* App shell replaces the old tablet-frame + screen-container pairing.
+           Full-bleed, edge to edge, at every screen size. */
+        .app-shell {
+            width: 100%;
+            height: 100dvh;
+            background-color: #F7F7F7;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
-        .tablet-frame::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border-radius: 6px; background: #111; z-index: 0; }
-        .screen-container { width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1; overflow: hidden; display: flex; flex-direction: column; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
-        
+
         /* SCROLLBAR */
         .content-column::-webkit-scrollbar { width: 10px; }
         .content-column::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d1d5db; }
@@ -367,12 +365,16 @@
             .jodi-bubble::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 8px solid #4F46E5; }
         }
 
+        /* Flex children default to min-height:auto, which stops them from shrinking below their
+           content size — this is what let tall page content push past the fixed app-shell
+           height and create a second outer scrollbar. min-h-0 lets each level shrink and hand
+           scrolling to the one true scroll region (.content-column). */
+        .app-shell { min-height: 0; }
+
         @media (max-width: 768px) {
-            html, body { position: fixed; width: 100%; height: 100dvh; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
-            main { padding: 0 !important; height: 100dvh !important; width: 100% !important; display: block; position: fixed; top: 0; left: 0; }
-            .tablet-frame { position: absolute !important; top: 0; left: 0; right: 0; bottom: 0; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #F7F7F7 !important; aspect-ratio: unset !important; }
-            .tablet-frame::before { display: none !important; }
-            .screen-container { border-radius: 0 !important; box-shadow: none !important; }
+            html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            body > main { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; padding: 0 !important; display: block; }
+            .app-shell { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; max-width: none !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; border: none !important; }
             header.navbar-content { padding-top: max(env(safe-area-inset-top), 12px); height: auto; min-height: 60px; padding-bottom: 12px; }
             
             /* MOBILE FOOTER OVERRIDE */
@@ -434,9 +436,8 @@
 </head>
 <body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
 
-    <main class="flex-grow flex items-center justify-center py-8">
-        <div class="tablet-frame">
-            <div class="screen-container" id="screen">
+    <main class="flex-grow flex items-center justify-center h-[100dvh] w-full">
+        <div class="app-shell" id="screen">
 
                 <!-- 1. STARTUP SCREEN -->
                 <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
@@ -1045,7 +1046,6 @@
                     </div>
                 </div>
 
-            </div>
         </div>
     </main>
 

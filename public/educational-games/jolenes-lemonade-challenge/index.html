@@ -336,26 +336,16 @@
         body { font-family: Verdana, sans-serif; background-color: #1a1a1a; min-height: 100vh; margin: 0; padding: 0; }
         h1, h2, h3, h4 { font-family: Georgia, serif; }
 
-        .tablet-frame {
-            /* Compact Cap Fix */
-            height: min(80vh, 750px);
-            max-width: 95vw;
-            width: auto;
-            aspect-ratio: 16/10;
-            
-            background-image: radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%), linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
-            border-radius: 12px; padding: 12px; border: 1px solid #333; position: relative;
-            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.6), 0 30px 60px -12px rgba(0,0,0,0.8);
-            margin: 0 auto; /* Center alignment safety */
-        }
-        .tablet-frame::before {
-            content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
-            border-radius: 6px; background: #111; z-index: 0;
-        }
-        .screen-container {
-            width: 100%; height: 100%; background-color: #F7F7F7; position: relative; z-index: 1;
-            overflow: hidden; display: flex; flex-direction: column; border-radius: 4px;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        /* App shell replaces the old tablet-frame + screen-container pairing.
+           Full-bleed, edge to edge, at every screen size. */
+        .app-shell {
+            width: 100%;
+            height: 100dvh;
+            background-color: #F7F7F7;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
@@ -385,19 +375,26 @@
         .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
         .page.active { display: block; }
 
+        /* Flex children default to min-height:auto, which stops them from shrinking below their
+           content size — this is what let tall page content push past the fixed app-shell
+           height and create a second outer scrollbar. min-h-0 lets each level shrink and hand
+           scrolling to the one true scroll region (.page-container). */
+        .app-shell { min-height: 0; }
+
         @media (max-width: 768px) {
-            .tablet-frame { width: 100% !important; height: 100% !important; border: none; border-radius: 0; background-image: none; box-shadow: none; margin: 0; padding: 0; }
-            .tablet-frame::before { display: none; }
-            .screen-container { border-radius: 0; }
-            html, body, main { height: 100%; overflow: hidden; padding: 0; }
+            html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            body > main { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; padding: 0 !important; display: block; }
+            .app-shell { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; max-width: none !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; border: none !important; }
+            header.navbar-content { flex-shrink: 0; padding-top: max(env(safe-area-inset-top), 12px); height: auto; min-height: 60px; padding-bottom: 12px; z-index: 50; }
+            .page-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+            .page { flex: 1 1 auto; overflow-y: visible; padding-bottom: 30px !important; }
         }
     </style>
 </head>
 <body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
 
-    <main class="flex-grow flex items-center justify-center py-8">
-        <div class="tablet-frame">
-            <div class="screen-container" id="screen">
+    <main class="flex-grow flex items-center justify-center h-[100dvh] w-full">
+        <div class="app-shell" id="screen">
 
                 <!-- 1. STARTUP SCREEN -->
                 <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-slate-900">
@@ -538,6 +535,7 @@
                 </div>
 
                 <!-- --- PAGES --- -->
+                <div class="flex-1 relative overflow-y-auto page-container">
                 <div class="page active" id="page-1">
                     <!-- FIXED: Added min-h-full and pb-24 for scroll space -->
                     <div class="flex flex-col items-center justify-start min-h-full text-center px-2 pt-12 pb-24">
@@ -652,6 +650,7 @@
                         </div>
                     </div>
                 </div>
+                </div>
 
                 <!-- Footer -->
                 <footer class="footer-content flex items-center justify-between px-6">
@@ -661,7 +660,6 @@
                     <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body"><span>Next</span><i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></button>
                 </footer>
 
-            </div>
         </div>
     </main>
 
