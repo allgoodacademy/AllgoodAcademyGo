@@ -1633,13 +1633,16 @@
                 setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
             };
 
+            // The click listener is always attached — not just when the initial
+            // auto-skip below doesn't fire — since logging out re-shows this screen
+            // later in the SAME page load, and it needs to still be clickable then.
+            startupScreen.addEventListener('click', () => powerUp(false));
+
             // Someone actively moving between pages within the last hour shouldn't
             // see this screen again — it's a one-time-per-session thing, not a
             // per-page ritual.
             if (window.AuthCore && window.AuthCore.skipPowerUp) {
                 powerUp(true);
-            } else {
-                startupScreen.addEventListener('click', () => powerUp(false));
             }
         }
     </script>

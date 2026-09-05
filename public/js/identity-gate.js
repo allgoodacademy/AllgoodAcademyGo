@@ -43,13 +43,17 @@ function isFullyIdentified(user, account) {
 
 const TEMPLATE = `
 <div id="ag-modal" class="absolute inset-0 z-[9999] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
-    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary">
+    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary relative">
+        <button id="ag-btn-close" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors" title="Close" aria-label="Close">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
         <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
 
         <!-- ROOT: age question and path choice merged into one decision. -->
         <div id="ag-root">
             <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Let's get you in.</h2>
             <p class="text-gray-500 text-xs mb-6 font-body">First — are you 13 or older?</p>
+            <p id="ag-root-error" class="text-red-500 text-xs mb-2 hidden font-body"></p>
             <button id="ag-btn-13plus" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase mb-3">
                 I'm 13 or older &mdash; Sign In
             </button>
@@ -165,6 +169,7 @@ function openGate(onResolved) {
     const redeemInput = document.getElementById('ag-redeem-input');
     const redeemSubmitBtn = document.getElementById('ag-btn-redeem-submit');
     const redeemError = document.getElementById('ag-redeem-error');
+    const rootError = document.getElementById('ag-root-error');
     const codeDisplay = document.getElementById('ag-recruit-code-display');
 
     let emailMode = 'create'; // 'create' | 'signin'
@@ -183,22 +188,32 @@ function openGate(onResolved) {
     onEnterSubmit(passwordInput, 'ag-btn-email-submit');
     onEnterSubmit(redeemInput, 'ag-btn-redeem-submit');
 
-    function resolveAndClose() {
+    function resolveAndClose(cancelled) {
         modal.classList.add('hidden-modal');
         modal.classList.remove('visible-modal');
-        onResolved();
+        onResolved(cancelled === true);
     }
 
     function open() {
         showPanel('ag-root');
         hideError(signinError);
         hideError(redeemError);
+        hideError(rootError);
         if (emailInput) emailInput.value = '';
         if (passwordInput) passwordInput.value = '';
         if (redeemInput) redeemInput.value = '';
         modal.classList.remove('hidden-modal');
         modal.classList.add('visible-modal');
     }
+
+    // Backing out entirely (not just "Back" a panel) resolves as cancelled rather than
+    // re-checking auth state — the caller (ensureIdentified) then correctly treats this
+    // as "still not identified" instead of mistaking the pre-existing anonymous session
+    // for a real answer.
+    document.getElementById('ag-btn-close').onclick = () => {
+        playSfx('click');
+        resolveAndClose(true);
+    };
 
     document.getElementById('ag-btn-13plus').onclick = () => {
         playSfx('click');
@@ -283,6 +298,7 @@ function openGate(onResolved) {
 
     document.getElementById('ag-btn-under13').onclick = async () => {
         playSfx('click');
+        hideError(rootError);
         const btn = document.getElementById('ag-btn-under13');
         setBusy(btn, 'Setting you up...', true);
         try {
@@ -297,6 +313,7 @@ function openGate(onResolved) {
             }
         } catch (e) {
             console.error('Recruit sign-in failed', e);
+            showError(rootError, 'Something went wrong setting up your account. Please try again.');
         } finally {
             setBusy(btn, null, false);
         }
@@ -359,7 +376,8 @@ async function ensureIdentified() {
         if (isFullyIdentified(user, account)) return { user, account };
     }
     return new Promise((resolve) => {
-        openGate(async () => {
+        openGate(async (cancelled) => {
+            if (cancelled) { resolve({ user: null, account: null }); return; }
             const freshUser = window.AuthCore.auth.currentUser;
             const account = freshUser ? await window.AuthCore.getAccount(freshUser.uid) : null;
             resolve({ user: freshUser, account });
