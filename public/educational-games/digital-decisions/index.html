@@ -125,8 +125,9 @@
             btn.textContent = "Sending...";
 
             try {
-                const targetCollection = collection(db, 'artifacts', appId, 'users', user.uid, 'feedback_inbox');
+                const targetCollection = collection(db, 'artifacts', appId, 'messages');
                 await addDoc(targetCollection, {
+                    senderUid: user.uid,
                     senderName: user.displayName || "Guest Agent",
                     senderEmail: user.email || "Anonymous",
                     message: text,
@@ -1864,14 +1865,19 @@
             }
             window.submitFeedback = function() {
                 const feedbackText = document.getElementById('feedback-text').value;
-                
-                window.logFinalScoreToFirestore({ 
-                    feedback: feedbackText, 
-                    rating: currentStarRating,
-                    rank: "Feedback", 
-                    sessionId: window.sessionId 
-                });
-                
+                const user = auth.currentUser;
+
+                if (user) {
+                    addDoc(collection(db, 'artifacts', appId, 'course_feedback'), {
+                        uid: user.uid,
+                        name: user.displayName || "Guest Agent",
+                        gameName: "Digital Decisions Challenge",
+                        rating: currentStarRating,
+                        feedback: feedbackText,
+                        timestamp: serverTimestamp(),
+                    }).catch(e => console.error("Course feedback write failed", e));
+                }
+
                 document.getElementById('feedback-container').classList.add('hidden');
                 document.getElementById('feedback-success').classList.remove('hidden');
                 

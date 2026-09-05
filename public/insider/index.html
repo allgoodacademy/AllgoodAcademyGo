@@ -132,7 +132,7 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, collectionGroup, getDocs, query, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getFirestore, collection, getDocs, query, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
@@ -310,12 +310,14 @@
         }
 
         // Message HQ: every portal (dashboard, DDC, and any future module that adopts the
-        // same pattern) writes into the sender's own feedback_inbox with {senderName,
-        // senderEmail, message, source, timestamp} — "source" is which portal it came from.
+        // same pattern) writes directly into this flat top-level collection with
+        // {senderUid, senderName, senderEmail, message, source, timestamp} — "source" is
+        // which portal it came from. Flat (not nested per-user), so this is a plain query,
+        // not a collectionGroup — no per-module rules changes ever needed for this.
         async function loadMessages() {
             const container = document.getElementById('message-list');
             try {
-                const snap = await getDocs(query(collectionGroup(db, 'feedback_inbox'), orderBy('timestamp', 'desc'), limit(100)));
+                const snap = await getDocs(query(collection(db, 'artifacts', appId, 'messages'), orderBy('timestamp', 'desc'), limit(100)));
 
                 if (snap.empty) {
                     container.innerHTML = '<p class="text-xs text-slate-400 italic">No messages yet.</p>';
@@ -347,26 +349,25 @@
             }
         }
 
-        // End-of-module feedback lives on the game_scores doc itself (fields: rating,
-        // feedback), not in feedback_inbox — each module opts into this by writing those two
-        // fields when it collects feedback. Only Digital Decisions does today; any other
-        // module that adopts the same fields will show up here automatically.
+        // End-of-module feedback lives in this flat top-level collection (uid, name,
+        // gameName, rating, feedback, timestamp) — separate from game_scores, which stays
+        // focused on progress/completion. Only Digital Decisions writes here today; any
+        // future module that adopts the same shape will show up here automatically.
         async function loadCourseFeedback() {
             const container = document.getElementById('course-feedback-list');
             try {
-                const snap = await getDocs(query(collectionGroup(db, 'game_scores'), orderBy('lastUpdated', 'desc'), limit(500)));
+                const snap = await getDocs(query(collection(db, 'artifacts', appId, 'course_feedback'), orderBy('timestamp', 'desc'), limit(500)));
 
                 const byCourse = {};
                 snap.forEach(d => {
                     const s = d.data();
-                    if (!s.feedback && typeof s.rating !== 'number') return;
                     const course = s.gameName || 'Unknown module';
                     if (!byCourse[course]) byCourse[course] = [];
                     byCourse[course].push({
-                        name: (s.user && s.user.displayName) || 'Anonymous',
+                        name: s.name || 'Anonymous',
                         text: s.feedback || '',
                         rating: typeof s.rating === 'number' ? s.rating : null,
-                        whenMs: s.lastUpdated && s.lastUpdated.toDate ? s.lastUpdated.toDate().getTime() : 0,
+                        whenMs: s.timestamp && s.timestamp.toDate ? s.timestamp.toDate().getTime() : 0,
                     });
                 });
 

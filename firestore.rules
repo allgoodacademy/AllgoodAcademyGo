@@ -59,14 +59,18 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/artifacts/$(appId)/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
-    // 7. NEW — Collection-group reads for Insider's cross-user views (Message Inbox, Course
-    //    Feedback). A nested wildcard rule like #2 above does NOT extend to collectionGroup()
-    //    queries — Firestore requires this specific "{path=**}/collectionId/{doc}" shape for
-    //    a rule to apply across every parent path when querying by collection group.
-    match /{path=**}/feedback_inbox/{msgId} {
+    // 7. NEW — Message HQ. Flat top-level collection (not nested per-user) so any portal —
+    //    dashboard, DDC, or any future module — writes here directly and Insider reads it
+    //    with a plain query, no collectionGroup gymnastics or per-module rule changes needed.
+    match /artifacts/{appId}/messages/{msgId} {
+      allow create: if request.auth != null && request.resource.data.senderUid == request.auth.uid;
       allow read: if isAllowlistedAdmin();
     }
-    match /{path=**}/game_scores/{scoreId} {
+
+    // 8. NEW — Course feedback (end-of-module rating + comment), also flat and top-level,
+    //    kept separate from game_scores so that collection stays focused on progress/completion.
+    match /artifacts/{appId}/course_feedback/{feedbackId} {
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow read: if isAllowlistedAdmin();
     }
 

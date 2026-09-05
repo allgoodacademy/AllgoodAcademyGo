@@ -414,9 +414,10 @@
             btn.textContent = "Sending...";
 
             try {
-                const targetCollection = collection(db, 'artifacts', appId, 'users', user.uid, 'feedback_inbox');
-                
+                const targetCollection = collection(db, 'artifacts', appId, 'messages');
+
                 await addDoc(targetCollection, {
+                    senderUid: user.uid,
                     senderName: user.displayName || "Guest Agent",
                     senderEmail: user.email || "Anonymous",
                     message: text,
