@@ -557,6 +557,14 @@
             if(nameDisplay) nameDisplay.textContent = storedName;
             if(nameInput) nameInput.value = storedName;
 
+            // Sign-in prompt: only for a session that hasn't been through the identify
+            // gate yet (no ageTier on file means still the invisible power-up placeholder).
+            const signinPrompt = document.getElementById('profile-signin-prompt');
+            if (signinPrompt) {
+                const ageTier = localStorage.getItem('aa_age_tier');
+                signinPrompt.classList.toggle('hidden', !!ageTier);
+            }
+
             // Avatar (Learner Recruit / any guest account — auto-assigned at sign-in,
             // customizable here). Task Force Leaders sign in with Google and never get one.
             const storedAvatar = localStorage.getItem('aa_avatar');
@@ -622,6 +630,16 @@
             window.toggleProfileEdit(false);
             if(window.sfx) window.sfx.click();
         }
+
+        // Lets someone reach the identify gate straight from their Profile — the only
+        // proactive path to it now that a course launch isn't the sole trigger.
+        window.openSignInFromProfile = async () => {
+            const { user, account } = await window.AuthGate.ensureIdentified();
+            if (user && account) {
+                applyIdentityToUI(user, account);
+                window.openProfileModal();
+            }
+        };
 
         window._selectedAvatar = null;
 
@@ -2159,6 +2177,10 @@
                     </div>
                     <!-- Control Cluster -->
                     <div class="flex items-center space-x-1 shrink-0 relative">
+                        <button id="btn-profile" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Profile" onclick="window.openProfileModal()">
+                            <i data-lucide="user" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+                        </button>
+                        <div class="h-6 w-px bg-white/20 mx-1"></div>
                         <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home">
                             <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                         </button>
@@ -2590,6 +2612,14 @@
                         <div id="profile-view-name" class="w-full">
                             <h3 class="text-xl font-heading font-bold text-slate-800" id="profile-name-display">Agent Name</h3>
                             <button onclick="window.toggleProfileEdit(true)" class="text-[10px] uppercase font-bold text-allgood-primary hover:text-allgood-hover underline decoration-dotted mt-1">Edit Identity</button>
+                        </div>
+
+                        <!-- SIGN-IN PROMPT: shown only when this session hasn't gone through
+                             the identify gate yet (still the invisible power-up placeholder) —
+                             reaching this modal directly from the navbar is the point where
+                             someone can start that without needing to launch a course first. -->
+                        <div id="profile-signin-prompt" class="w-full mt-3 hidden">
+                            <button onclick="window.openSignInFromProfile()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2 rounded shadow-md text-xs uppercase tracking-wide">Sign In</button>
                         </div>
 
                         <!-- EDIT MODE: NAME + AVATAR. The avatar picker only matters for guest

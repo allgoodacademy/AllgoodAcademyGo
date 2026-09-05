@@ -15,7 +15,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
 import {
     getAuth, signInAnonymously, onAuthStateChanged, updateProfile, signOut,
-    GoogleAuthProvider, signInWithPopup, linkWithPopup, linkWithCredential,
+    GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithPopup, linkWithCredential,
     EmailAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
@@ -292,27 +292,6 @@ async function mirrorRecruitProgress(uid, moduleSlug, progress) {
     }
 }
 
-// --- 13+ SIGN-IN: Google or email/password, always a real account — no anonymous path
-// remains for this tier. If the device already has a silent anonymous session (from
-// power-up), this upgrades that SAME account via Firebase's credential-linking instead
-// of creating a separate one, so nothing written under it is orphaned. If linking fails
-// because the credential already belongs to a real existing account (a returning user
-// signing in on a new device), it falls back to signing straight into that account.
-async function upgradeOrSignIn(linkAction, directAction) {
-    const current = auth.currentUser;
-    if (current && current.isAnonymous) {
-        try {
-            return await linkAction(current);
-        } catch (e) {
-            if (e.code === 'auth/credential-already-in-use' || e.code === 'auth/email-already-in-use') {
-                return await directAction();
-            }
-            throw e;
-        }
-    }
-    return await directAction();
-}
-
 async function finalizeThirteenPlusAccount(user) {
     const ref = userRef(user.uid);
     const existing = await getDoc(ref);
@@ -343,20 +322,61 @@ async function finalizeThirteenPlusAccount(user) {
     return user;
 }
 
+// --- 13+ SIGN-IN: Google or email/password, always a real account — no anonymous path
+// remains for this tier. If the device already has a silent anonymous session (from
+// power-up), this upgrades that SAME account via Firebase's credential-linking instead
+// of creating a separate one, so nothing written under it is orphaned.
 async function googleSignIn() {
     const provider = new GoogleAuthProvider();
-    const user = await upgradeOrSignIn(
-        (current) => linkWithPopup(current, provider).then(r => r.user),
-        () => signInWithPopup(auth, provider).then(r => r.user)
-    );
+    const current = auth.currentUser;
+    let user;
+
+    if (current && current.isAnonymous) {
+        try {
+            user = (await linkWithPopup(current, provider)).user;
+        } catch (e) {
+            if (e.code === 'auth/credential-already-in-use') {
+                // This Google account already belongs to a real, existing account (e.g.
+                // signing in on a new device) — sign into THAT account instead. Reuse the
+                // credential from the popup interaction that just happened rather than
+                // opening a second popup: browsers commonly block a popup that isn't a
+                // direct, synchronous response to the click that triggered it, and by
+                // this point (after an awaited failed link) it usually isn't anymore.
+                const cred = GoogleAuthProvider.credentialFromError(e);
+                user = (await signInWithCredential(auth, cred)).user;
+            } else {
+                throw e;
+            }
+        }
+    } else {
+        user = (await signInWithPopup(auth, provider)).user;
+    }
+
     return finalizeThirteenPlusAccount(user);
 }
 
 async function createAccountWithEmail(email, password) {
-    const user = await upgradeOrSignIn(
-        (current) => linkWithCredential(current, EmailAuthProvider.credential(email, password)).then(r => r.user),
-        () => createUserWithEmailAndPassword(auth, email, password).then(r => r.user)
-    );
+    const current = auth.currentUser;
+    let user;
+
+    if (current && current.isAnonymous) {
+        try {
+            user = (await linkWithCredential(current, EmailAuthProvider.credential(email, password))).user;
+        } catch (e) {
+            if (e.code === 'auth/email-already-in-use' || e.code === 'auth/credential-already-in-use') {
+                // A real account already exists for this email — the password they just
+                // typed is a sign-in attempt against it, not a second "create", so try
+                // signing in rather than creating again (which would just re-throw the
+                // same "already in use" error).
+                user = (await signInWithEmailAndPassword(auth, email, password)).user;
+            } else {
+                throw e;
+            }
+        }
+    } else {
+        user = (await createUserWithEmailAndPassword(auth, email, password)).user;
+    }
+
     return finalizeThirteenPlusAccount(user);
 }
 

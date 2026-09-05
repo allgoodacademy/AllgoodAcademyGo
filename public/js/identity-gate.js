@@ -233,8 +233,13 @@ function openGate(onResolved) {
             resolveAndClose();
         } catch (e) {
             console.error('Google sign-in failed', e);
+            const messages = {
+                'auth/popup-blocked': 'Your browser blocked the sign-in popup — please allow popups for this site and try again.',
+                'auth/unauthorized-domain': "This site isn't authorized for Google sign-in yet — contact the site admin.",
+                'auth/cancelled-popup-request': 'Sign-in was interrupted. Please try again.',
+            };
             if (e && e.code !== 'auth/popup-closed-by-user') {
-                showError(signinError, 'Sign-in failed. Please try again.');
+                showError(signinError, messages[e && e.code] || 'Sign-in failed. Please try again.');
             }
         } finally {
             setBusy(btn, null, false);
