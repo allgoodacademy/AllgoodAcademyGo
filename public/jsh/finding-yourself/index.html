@@ -180,11 +180,19 @@
         };
 
         // DIRECT LINE TO HQ (shared messages collection via AuthCore)
+        // Not every module's sfx object defines the same sound names — guard by
+        // actual function presence rather than assuming a shared shape, so a missing
+        // sound effect never turns into a swallowed exception that looks like a
+        // failed send.
+        function playSfx(name) {
+            if (window.sfx && typeof window.sfx[name] === 'function') window.sfx[name]();
+        }
+
         window.openMessageModal = () => {
             const modal = document.getElementById('message-modal');
             modal.classList.remove('hidden-modal');
             modal.classList.add('visible-modal');
-            if(window.sfx) window.sfx.click();
+            playSfx('click');
             setTimeout(() => document.getElementById('message-input').focus(), 100);
         };
 
@@ -192,7 +200,7 @@
             const modal = document.getElementById('message-modal');
             modal.classList.add('hidden-modal');
             modal.classList.remove('visible-modal');
-            if(window.sfx) window.sfx.click();
+            playSfx('click');
         };
 
         window.submitHQMessage = async () => {
@@ -208,7 +216,7 @@
                 btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
                 btn.classList.add('bg-red-600', 'hover:bg-red-700');
                 btn.textContent = "Please Sign In First";
-                if(window.sfx) window.sfx.powerOff();
+                playSfx('powerOff');
 
                 setTimeout(() => {
                     btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
@@ -226,7 +234,7 @@
             try {
                 await window.AuthCore.sendMessage({ text, source: "Finding Yourself" });
 
-                if(window.sfx) window.sfx.confirm();
+                playSfx('confirm');
                 input.value = "";
 
                 btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
@@ -250,7 +258,7 @@
                 btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
                 btn.classList.add('bg-red-600', 'hover:bg-red-700');
                 btn.textContent = "Transmission Failed";
-                if(window.sfx) window.sfx.powerOff();
+                playSfx('powerOff');
 
                 setTimeout(() => {
                     btn.disabled = false;
