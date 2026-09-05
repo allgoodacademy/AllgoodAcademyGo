@@ -15,7 +15,8 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
 import {
     getAuth, signInAnonymously, onAuthStateChanged, updateProfile, signOut,
-    GoogleAuthProvider, signInWithPopup,
+    GoogleAuthProvider, signInWithPopup, linkWithPopup, linkWithCredential,
+    EmailAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
     getFirestore, doc, setDoc, getDoc, addDoc, collection, serverTimestamp,
@@ -88,24 +89,20 @@ function userRef(uid) {
     return doc(db, 'artifacts', appId, 'users', uid);
 }
 
-// --- AGE TIER: three-tier persona system (Learner Recruit / Agent Learner / Task Force
-// Leader). ageTier is 'under13' or '13plus', recorded once at the age-gate question and
-// never re-asked for that account. role stays 'student' | 'teacher' underneath — that
-// enum (and the classroomCode field name, below) predates this system and isn't worth a
-// data migration just to rename, so age tier is deliberately a separate field layered on
-// top rather than a replacement for role.
-async function recordAgeTier(uid, ageTier) {
-    await setDoc(userRef(uid), { ageTier }, { merge: true });
+function moduleProgressRef(uid, moduleSlug) {
+    return doc(db, 'artifacts', appId, 'users', uid, 'module_progress', moduleSlug);
 }
 
-// --- LEARNER RECRUIT FLOW: under 13. Fully COPPA-compliant — no name/email field, ever,
-// and no picker screen either: nickname + avatar are both auto-assigned so nothing blocks
-// their first course launch. Both stay editable later from their profile.
-async function recruitSignIn() {
+// --- SILENT POWER-UP SIGN-IN: an anonymous identity with a random nickname, created
+// invisibly the instant someone powers up with no existing session — before any age or
+// identify question. This is the ONE remaining anonymous-with-no-real-identify path;
+// everything past this point requires going through the actual gate (Sign In for 13+,
+// a Recruit Code for under-13) before a real launch is allowed. Never sets ageTier —
+// that only gets recorded once the gate itself is answered.
+async function silentSignIn() {
     const cred = await signInAnonymously(auth);
     const user = cred.user;
     const nickname = randomNickname();
-    const avatar = randomAvatar();
 
     await updateProfile(user, { displayName: nickname });
 
@@ -116,65 +113,224 @@ async function recruitSignIn() {
 
     const payload = {
         displayName: (existingData && existingData.displayName) || nickname,
-        avatar: (existingData && existingData.avatar) || avatar,
+        email: null,
+        isGuest: true,
+        role,
+        lastLogin: serverTimestamp(),
+    };
+    if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
+
+    await setDoc(ref, payload, { merge: true });
+    return user;
+}
+
+// --- RECRUIT CODE: a memorable three-word passphrase (descriptor + animal + flavor
+// word — e.g. "arctic-fox-trot") assigned to every Learner Recruit instead of a random
+// alphanumeric string. It does three jobs at once: it's their display name from the
+// first second (no separate nickname-then-avatar setup), it's simple enough for a young
+// child to remember and retype, and it's the reconnection point that lets them reclaim
+// their progress on a different device — something a same-device-only anonymous session
+// can't do on its own. Lists are lightly curated (positive/neutral descriptors, common
+// kid-friendly animals, movement-themed flavor words) so no combination lands on
+// anything awkward. Combined space is ~20*20*15 = 6000 combos; uniqueness is still
+// checked against Firestore rather than trusted to the random draw.
+const RECRUIT_DESCRIPTORS = ['Arctic', 'Shadow', 'Golden', 'Silver', 'Crimson', 'Midnight', 'Storm', 'Sunny', 'Frosty', 'Rusty', 'Jolly', 'Brave', 'Swift', 'Clever', 'Mighty', 'Cosmic', 'Electric', 'Velvet', 'Turbo', 'Lucky'];
+const RECRUIT_ANIMALS = ['Fox', 'Wolf', 'Bear', 'Hawk', 'Otter', 'Panther', 'Falcon', 'Tiger', 'Owl', 'Lynx', 'Badger', 'Dolphin', 'Eagle', 'Panda', 'Raccoon', 'Rabbit', 'Koala', 'Penguin', 'Shark', 'Dragon'];
+const RECRUIT_FLAVORS = ['Trot', 'Dash', 'Blanco', 'Run', 'Hop', 'Zoom', 'Bolt', 'Glide', 'Spin', 'Flash', 'Drift', 'Leap', 'Sprint', 'Wander', 'Roam'];
+
+function randomFrom(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+function recruitCodeRef(code) {
+    return doc(db, 'artifacts', appId, 'recruit_codes', code);
+}
+
+// "arctic-fox-trot" -> "Arctic Fox Trot" — the code IS the display name, just cased
+// for reading rather than typing.
+function codeToDisplayName(code) {
+    return code.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// Forgiving on the way back in: case, extra spaces, and space-vs-hyphen typing all
+// normalize to the same stored key, since a young child is retyping this from memory.
+function normalizeRecruitCode(raw) {
+    return String(raw || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '');
+}
+
+async function generateUniqueRecruitCode() {
+    for (let i = 0; i < 20; i++) {
+        const code = [randomFrom(RECRUIT_DESCRIPTORS), randomFrom(RECRUIT_ANIMALS), randomFrom(RECRUIT_FLAVORS)].join('-').toLowerCase();
+        const snap = await getDoc(recruitCodeRef(code));
+        if (!snap.exists()) return code;
+    }
+    // 20 collisions in a ~6000-word space would mean something is wrong upstream, but
+    // this guarantees termination rather than looping forever.
+    return [randomFrom(RECRUIT_DESCRIPTORS), randomFrom(RECRUIT_ANIMALS), randomFrom(RECRUIT_FLAVORS), Math.floor(Math.random() * 90 + 10)].join('-').toLowerCase();
+}
+
+// --- LEARNER RECRUIT FLOW: under 13. Fully COPPA-compliant — no name/email field, ever,
+// and no picker screen either: nickname + avatar are both auto-assigned so nothing blocks
+// their first course launch. The nickname now comes from their Recruit Code rather than
+// being a separate random word-pair; both nickname and avatar stay editable later from
+// their profile (a rename, not a required first-time setup step).
+async function recruitSignIn() {
+    const cred = await signInAnonymously(auth);
+    const user = cred.user;
+
+    const ref = userRef(user.uid);
+    const existing = await getDoc(ref);
+    const existingData = existing.exists() ? existing.data() : null;
+
+    let code = existingData && existingData.recruitCode;
+    const isNewCode = !code;
+    let displayName = existingData && existingData.displayName;
+    let avatar = (existingData && existingData.avatar) || randomAvatar();
+
+    if (!code) {
+        code = await generateUniqueRecruitCode();
+        displayName = codeToDisplayName(code);
+        await setDoc(recruitCodeRef(code), {
+            uid: user.uid,
+            displayName,
+            avatar,
+            progress: {},
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+    }
+
+    await updateProfile(user, { displayName });
+
+    const role = (existingData && existingData.role) ? existingData.role : 'student';
+    const payload = {
+        displayName,
+        avatar,
         email: null,
         isGuest: true,
         role,
         ageTier: 'under13',
+        recruitCode: code,
         lastLogin: serverTimestamp(),
     };
     if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
 
     await setDoc(ref, payload, { merge: true });
-    return user;
+    return { user, code, displayName, avatar, isNewCode };
 }
 
-// --- STUDENT FLOW: anonymous identity, nickname only, no email ever. Used by the 13+
-// "Agent Learner" path (ageTier defaults to '13plus' — this function is also what the
-// invisible power-up silent sign-in calls, which never asks age, so a fresh silent
-// sign-in intentionally lands here with no ageTier yet; the launch-time age-gate fills
-// that in before the account is ever used to identify a real launch). ---
-async function studentSignIn(nickname, ageTier) {
-    const cred = await signInAnonymously(auth);
-    const user = cred.user;
-    const safeNick = String(nickname || randomNickname()).slice(0, 30).trim() || randomNickname();
+// --- RECRUIT CODE REDEMPTION: reclaims a Learner Recruit's identity + progress on a
+// device that doesn't already have it — the actual cross-device reconnection. Firebase's
+// anonymous auth has no built-in way to resume a specific old anonymous session from a
+// code alone, so this doesn't try to; instead the code's document IS the portable copy
+// of identity + progress, and this merges that copy onto whatever anonymous session this
+// device currently has (or creates a fresh one). The code's uid pointer then moves to
+// this device, same "whoever holds the code owns it next" trust model already used for
+// an Allgood classroom code — see the recruit_codes rule in firestore.rules.
+async function redeemRecruitCode(rawCode) {
+    const code = normalizeRecruitCode(rawCode);
+    if (!code) return { ok: false, reason: 'empty' };
 
-    await updateProfile(user, { displayName: safeNick });
+    // The recruit_codes read below requires a signed-in session (see firestore.rules) —
+    // establish one FIRST, since a direct module visit with no prior power-up on this
+    // browser can reach this path with nobody signed in yet at all.
+    let user = auth.currentUser;
+    if (!user || !user.isAnonymous) {
+        const cred = await signInAnonymously(auth);
+        user = cred.user;
+    }
+
+    const codeRef = recruitCodeRef(code);
+    const codeSnap = await getDoc(codeRef);
+    if (!codeSnap.exists()) return { ok: false, reason: 'not_found' };
+    const codeData = codeSnap.data();
+
+    const displayName = codeData.displayName || codeToDisplayName(code);
+    await updateProfile(user, { displayName });
 
     const ref = userRef(user.uid);
     const existing = await getDoc(ref);
     const existingData = existing.exists() ? existing.data() : null;
-    const role = (existingData && existingData.role) ? existingData.role : 'student';
 
-    const payload = {
-        displayName: safeNick,
+    await setDoc(ref, {
+        displayName,
+        avatar: codeData.avatar || null,
         email: null,
         isGuest: true,
-        role,
+        role: (existingData && existingData.role) ? existingData.role : 'student',
+        ageTier: 'under13',
+        recruitCode: code,
         lastLogin: serverTimestamp(),
-    };
-    if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
-    if (ageTier && !(existingData && existingData.ageTier)) payload.ageTier = ageTier;
+    }, { merge: true });
 
-    await setDoc(ref, payload, { merge: true });
-    return user;
+    // Copy each module's mirrored progress into this device's own module_progress
+    // subcollection, so the existing resume-where-you-left-off logic (loadModuleProgress)
+    // works unchanged for whichever module they open next.
+    const progress = codeData.progress || {};
+    for (const [slug, data] of Object.entries(progress)) {
+        await setDoc(moduleProgressRef(user.uid, slug), { ...data, lastUpdated: serverTimestamp() }, { merge: true });
+    }
+
+    await setDoc(codeRef, { uid: user.uid, updatedAt: serverTimestamp() }, { merge: true });
+
+    return { ok: true, displayName, avatar: codeData.avatar || null };
 }
 
-// --- TEACHER/STAFF FLOW: real Google identity, since they're the consenting adult.
-// Always 13+ by definition, so this always records the '13plus' tier. ---
-async function teacherSignIn() {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
+// Mirrors one module's progress onto the recruit's code document (in addition to the
+// normal per-uid module_progress write in saveModuleProgress below) so it survives a
+// device switch. A no-op for 13+ accounts, which reconnect via their real Google/email
+// sign-in instead and don't need this.
+async function mirrorRecruitProgress(uid, moduleSlug, progress) {
+    try {
+        const snap = await getDoc(userRef(uid));
+        const code = snap.exists() ? snap.data().recruitCode : null;
+        if (!code) return;
+        await setDoc(recruitCodeRef(code), {
+            [`progress.${moduleSlug}`]: progress,
+            updatedAt: serverTimestamp(),
+        }, { merge: true });
+    } catch (e) {
+        console.error('[AuthCore] mirrorRecruitProgress failed', e);
+    }
+}
 
+// --- 13+ SIGN-IN: Google or email/password, always a real account — no anonymous path
+// remains for this tier. If the device already has a silent anonymous session (from
+// power-up), this upgrades that SAME account via Firebase's credential-linking instead
+// of creating a separate one, so nothing written under it is orphaned. If linking fails
+// because the credential already belongs to a real existing account (a returning user
+// signing in on a new device), it falls back to signing straight into that account.
+async function upgradeOrSignIn(linkAction, directAction) {
+    const current = auth.currentUser;
+    if (current && current.isAnonymous) {
+        try {
+            return await linkAction(current);
+        } catch (e) {
+            if (e.code === 'auth/credential-already-in-use' || e.code === 'auth/email-already-in-use') {
+                return await directAction();
+            }
+            throw e;
+        }
+    }
+    return await directAction();
+}
+
+async function finalizeThirteenPlusAccount(user) {
     const ref = userRef(user.uid);
     const existing = await getDoc(ref);
     const existingData = existing.exists() ? existing.data() : null;
-    // Never downgrade an existing teacher back to student on a later login.
+    // Never downgrade an existing Task Force Leader back to a plain account on a later login.
     const role = (existingData && existingData.role) ? existingData.role : 'student';
 
+    const displayName = user.displayName || (existingData && existingData.displayName) || (user.email ? user.email.split('@')[0] : 'Agent Learner');
+    // Email/password sign-in never sets a Firebase Auth displayName on its own (unlike
+    // Google) — keep the live auth object in sync so every page reading user.displayName
+    // (not just this Firestore doc) sees the same name instead of falling back to a
+    // generic placeholder.
+    if (user.displayName !== displayName) {
+        try { await updateProfile(user, { displayName }); } catch (e) { console.error('[AuthCore] updateProfile failed', e); }
+    }
+
     const payload = {
-        displayName: user.displayName || 'Teacher',
+        displayName,
         email: user.email || null,
         isGuest: false,
         role,
@@ -185,6 +341,42 @@ async function teacherSignIn() {
 
     await setDoc(ref, payload, { merge: true });
     return user;
+}
+
+async function googleSignIn() {
+    const provider = new GoogleAuthProvider();
+    const user = await upgradeOrSignIn(
+        (current) => linkWithPopup(current, provider).then(r => r.user),
+        () => signInWithPopup(auth, provider).then(r => r.user)
+    );
+    return finalizeThirteenPlusAccount(user);
+}
+
+async function createAccountWithEmail(email, password) {
+    const user = await upgradeOrSignIn(
+        (current) => linkWithCredential(current, EmailAuthProvider.credential(email, password)).then(r => r.user),
+        () => createUserWithEmailAndPassword(auth, email, password).then(r => r.user)
+    );
+    return finalizeThirteenPlusAccount(user);
+}
+
+async function signInWithEmail(email, password) {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    return finalizeThirteenPlusAccount(result.user);
+}
+
+// Single read of the fields the identify gate (and anything else) needs to decide
+// whether an account is fully identified yet — see /js/identity-gate.js.
+async function getAccount(uid) {
+    const snap = await getDoc(userRef(uid));
+    const data = snap.exists() ? snap.data() : {};
+    return {
+        role: data.role || 'student',
+        ageTier: data.ageTier || null,
+        avatar: data.avatar || null,
+        recruitCode: data.recruitCode || null,
+        displayName: data.displayName || null,
+    };
 }
 
 async function hasAcceptedTeacherConsent(uid) {
@@ -235,10 +427,6 @@ async function submitCourseFeedback({ gameName, rating, feedback }) {
 // This is the same flat/canonical pattern already used for messages and
 // course_feedback, for the same reason: one doc to read, no per-module rule or
 // query gymnastics as more modules get this treatment.
-function moduleProgressRef(uid, moduleSlug) {
-    return doc(db, 'artifacts', appId, 'users', uid, 'module_progress', moduleSlug);
-}
-
 async function saveModuleProgress(moduleSlug, progress) {
     const user = auth.currentUser;
     if (!user) return;
@@ -247,6 +435,10 @@ async function saveModuleProgress(moduleSlug, progress) {
             ...progress,
             lastUpdated: serverTimestamp(),
         }, { merge: true });
+        // Learner Recruits also get their progress mirrored onto their Recruit Code
+        // document, so it's there to reclaim on a different device. No-op for anyone
+        // without a recruitCode on file (13+ accounts reconnect via real sign-in instead).
+        mirrorRecruitProgress(user.uid, moduleSlug, progress);
     } catch (e) {
         console.error('[AuthCore] saveModuleProgress failed', e);
     }
@@ -266,8 +458,10 @@ async function loadModuleProgress(moduleSlug) {
 
 window.AuthCore = {
     auth, db, appId,
-    studentSignIn, teacherSignIn, recruitSignIn, randomNickname, randomAvatar, AVATARS,
-    recordAgeTier,
+    silentSignIn, recruitSignIn, redeemRecruitCode,
+    googleSignIn, createAccountWithEmail, signInWithEmail,
+    getAccount,
+    randomNickname, randomAvatar, AVATARS,
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
     saveModuleProgress, loadModuleProgress,

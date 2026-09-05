@@ -80,6 +80,30 @@ service cloud.firestore {
       allow delete: if isAllowlistedAdmin();
     }
 
+    // 9. NEW — Recruit Codes: a Learner Recruit's memorable passphrase (e.g.
+    //    "arctic-fox-trot"), doubling as the portable copy of their identity + progress
+    //    used to reclaim their account on a different device (Firebase's anonymous auth
+    //    has no built-in way to resume a specific old anonymous session from a code alone).
+    //    Deliberately the SAME trust model as a classroom code above: knowing the exact
+    //    passphrase is treated as sufficient proof of ownership, not a cryptographic
+    //    secret — that's why `update` is open to any signed-in user rather than gated to
+    //    the current uid on the doc, unlike classroom's update rule. Redeeming a code on a
+    //    new device is *itself* a legitimate ownership change (the new device's uid isn't
+    //    the one already on the document), so an owner-gated update would block the exact
+    //    thing this collection exists to do.
+    //    - GET: anyone signed in can look up a code (needed to validate uniqueness when
+    //      generating a new one, and to redeem an existing one)
+    //    - CREATE: only naming yourself as the code's initial owner
+    //    - UPDATE: open to any signed-in user — covers both redemption (uid pointer moves
+    //      to the new device) and ongoing progress mirroring from whichever uid is active
+    //    - LIST: admin allowlist only, same as classrooms — codes aren't meant to be browsed
+    match /artifacts/{appId}/recruit_codes/{code} {
+      allow get: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null;
+      allow list: if isAllowlistedAdmin();
+    }
+
     // 3. Safety Catch: Deny everything else
     match /{document=**} {
       allow read, write: if false;
