@@ -1154,20 +1154,20 @@
                 const warmUp = () => { if(window.initAudio) window.initAudio(); };
                 startupScreen.addEventListener('mousedown', warmUp, { once: true });
                 startupScreen.addEventListener('touchstart', warmUp, { once: true, passive: true });
-                
+
                 let startupTriggered = false;
-                const handleStartup = (e) => {
-                    if (e.type === 'touchend') e.preventDefault(); // Prioritize immediate touch
+                const handleStartup = (e, skipSound) => {
+                    if (e && e.type === 'touchend') e.preventDefault(); // Prioritize immediate touch
                     if (startupTriggered) return;
                     startupTriggered = true;
-                    
-                    if(window.sfx) window.sfx.powerOn();
-                    
+
+                    if(!skipSound && window.sfx) window.sfx.powerOn();
+
                     if (window.currentUser) {
-                        window.logFinalScoreToFirestore({ 
-                            finalScore: 0, 
-                            rank: "Session Started", 
-                            sessionId: window.sessionId 
+                        window.logFinalScoreToFirestore({
+                            finalScore: 0,
+                            rank: "Session Started",
+                            sessionId: window.sessionId
                         });
                         window.showPage(0);
                         startupScreen.style.opacity = '0';
@@ -1182,6 +1182,17 @@
 
                 startupScreen.addEventListener('click', handleStartup);
                 startupScreen.addEventListener('touchend', handleStartup);
+
+                // Someone actively moving between pages within the last hour shouldn't
+                // see this screen again. Wait for the first real auth resolution (not
+                // just DOMContentLoaded) so the signed-in-vs-not branch above is
+                // actually correct instead of racing Firebase's async auth check.
+                if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                    const unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
+                        unsub();
+                        handleStartup(null, true);
+                    });
+                }
             }
 
             // --- SCENARIO LOGIC ---

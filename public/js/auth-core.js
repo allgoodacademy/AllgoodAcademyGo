@@ -36,6 +36,35 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// --- SESSION ACTIVITY: skip the power-up screen on every page while someone is
+// actively moving around the site. A shared localStorage key (this domain only)
+// means the dashboard and every module all read/write the same rolling
+// timestamp — no cross-page syncing needed. Deliberately a rolling window, not
+// a calendar-day reset or literal tab-close detection: someone bouncing between
+// the dashboard and a module never sees it twice, but walking away for over an
+// hour brings it back.
+const ACTIVITY_KEY = 'aa_last_activity';
+const ACTIVITY_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function wasRecentlyActive() {
+    try {
+        const last = parseInt(localStorage.getItem(ACTIVITY_KEY), 10);
+        return !!last && (Date.now() - last) < ACTIVITY_WINDOW_MS;
+    } catch (e) {
+        return false;
+    }
+}
+
+function markActivity() {
+    try { localStorage.setItem(ACTIVITY_KEY, String(Date.now())); } catch (e) { /* ignore */ }
+}
+
+// Decide BEFORE this visit updates the timestamp, so "was I already active
+// coming into this page load" is answered honestly rather than always true.
+const skipPowerUp = wasRecentlyActive();
+markActivity();
+document.addEventListener('click', markActivity, { passive: true });
+
 const ADJECTIVES = ['Swift', 'Brave', 'Clever', 'Quiet', 'Bold', 'Curious', 'Bright', 'Calm', 'Sharp', 'Steady'];
 const ANIMALS = ['Falcon', 'Otter', 'Panther', 'Fox', 'Owl', 'Wolf', 'Hawk', 'Lynx', 'Heron', 'Badger'];
 
@@ -147,4 +176,5 @@ window.AuthCore = {
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
     onAuthStateChanged, signOut,
+    skipPowerUp,
 };

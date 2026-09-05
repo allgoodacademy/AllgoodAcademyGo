@@ -817,10 +817,14 @@
                 const warmUp = () => { if(window.initAudio) window.initAudio(); };
                 startupScreen.addEventListener('mousedown', warmUp, { once: true });
                 startupScreen.addEventListener('touchstart', warmUp, { once: true });
-                
-                startupScreen.addEventListener('click', () => {
-                    if(window.sfx) window.sfx.powerOn();
-                    
+
+                let startupTriggered = false;
+                const handleStartup = (skipSound) => {
+                    if (startupTriggered) return;
+                    startupTriggered = true;
+
+                    if(!skipSound && window.sfx) window.sfx.powerOn();
+
                     if (window.currentUser) {
                         // User exists (SSO/Auth)
                         window.logFinalScoreToFirestore({ finalScore: 200, rank: "Session Started", sessionId: window.sessionId });
@@ -834,7 +838,20 @@
                         startupScreen.style.opacity = '0';
                         setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
                     }
-                });
+                };
+
+                startupScreen.addEventListener('click', () => handleStartup(false));
+
+                // Someone actively moving between pages within the last hour shouldn't
+                // see this screen again. Wait for the first real auth resolution (not
+                // just DOMContentLoaded) so the signed-in-vs-not branch above is
+                // actually correct instead of racing Firebase's async auth check.
+                if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                    const unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
+                        unsub();
+                        handleStartup(true);
+                    });
+                }
             }
 
             // --- SCENARIO LOGIC ---

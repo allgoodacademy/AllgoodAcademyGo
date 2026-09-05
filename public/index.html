@@ -1620,21 +1620,23 @@
 
         const startupScreen = document.getElementById('startup-screen');
         if(startupScreen) {
-            startupScreen.addEventListener('click', () => {
-                if(window.sfx && window.sfx.powerOn) {
-                    window.sfx.powerOn(); 
-                } else if (window.initAudio) {
-                    window.initAudio();
+            const powerUp = (skipSound) => {
+                if (!skipSound) {
+                    if(window.sfx && window.sfx.powerOn) {
+                        window.sfx.powerOn();
+                    } else if (window.initAudio) {
+                        window.initAudio();
+                    }
                 }
-                
+
                 startupScreen.style.opacity = '0';
-                
+
                 const storedUID = localStorage.getItem('aa_uid');
                 const storedName = localStorage.getItem('aa_username');
-                
+
                 if (storedName && storedUID) {
                     window.restoreSessionState();
-                    window.initDashboard(); 
+                    window.initDashboard();
                 } else {
                     // New visitor: no form, no interruption — sign in silently and go
                     // straight to the dashboard. Their real name is asked for later,
@@ -1642,9 +1644,18 @@
                     window.silentSignIn();
                     window.initDashboard();
                 }
-                
+
                 setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
-            });
+            };
+
+            // Someone actively moving between pages within the last hour shouldn't
+            // see this screen again — it's a one-time-per-session thing, not a
+            // per-page ritual.
+            if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                powerUp(true);
+            } else {
+                startupScreen.addEventListener('click', () => powerUp(false));
+            }
         }
     </script>
     

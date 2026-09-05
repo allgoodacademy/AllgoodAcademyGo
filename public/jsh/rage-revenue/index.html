@@ -1851,10 +1851,14 @@
                 const warmUp = () => { if(window.initAudio) window.initAudio(); };
                 startup.addEventListener('mousedown', warmUp, { once: true });
                 startup.addEventListener('touchstart', warmUp, { once: true });
-                
-                startup.addEventListener('click', () => {
-                    if(window.sfx) window.sfx.powerOn();
-                    
+
+                let startupTriggered = false;
+                const handleStartup = (skipSound) => {
+                    if (startupTriggered) return;
+                    startupTriggered = true;
+
+                    if(!skipSound && window.sfx) window.sfx.powerOn();
+
                     if (window.currentUser) {
                         window.updatePage();
                         startup.style.opacity = '0';
@@ -1867,7 +1871,20 @@
                         startup.style.opacity = '0';
                         setTimeout(() => { startup.style.display = 'none'; }, 700);
                     }
-                });
+                };
+
+                startup.addEventListener('click', () => handleStartup(false));
+
+                // Someone actively moving between pages within the last hour shouldn't
+                // see this screen again. Wait for the first real auth resolution (not
+                // just DOMContentLoaded) so the signed-in-vs-not branch above is
+                // actually correct instead of racing Firebase's async auth check.
+                if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                    const unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
+                        unsub();
+                        handleStartup(true);
+                    });
+                }
             }
             
             // MENU TOGGLE (HAMBURGER)

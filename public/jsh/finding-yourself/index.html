@@ -2034,18 +2034,37 @@
             
             const startup = document.getElementById('startup-screen');
             if(startup) {
-                startup.addEventListener('click', function() {
-                    try { if(window.sfx) window.sfx.powerOn(); } catch(e) { console.log("Audio warning", e); }
-                    this.style.opacity = '0'; 
-                    this.style.pointerEvents = 'none'; 
-                    setTimeout(() => { this.style.display = 'none'; }, 700);
+                let startupTriggered = false;
+                const handleStartup = (skipSound) => {
+                    if (startupTriggered) return;
+                    startupTriggered = true;
+
+                    if (!skipSound) {
+                        try { if(window.sfx) window.sfx.powerOn(); } catch(e) { console.log("Audio warning", e); }
+                    }
+                    startup.style.opacity = '0';
+                    startup.style.pointerEvents = 'none';
+                    setTimeout(() => { startup.style.display = 'none'; }, 700);
                     if(!window.currentUser) {
                         const login = document.getElementById('login-modal');
                         if(login) { login.classList.remove('hidden-modal'); login.classList.add('visible-modal'); }
                     } else {
                          if(window.SessionManager) window.SessionManager.start(window.currentUserName, window.currentUserEmail);
                     }
-                });
+                };
+
+                startup.addEventListener('click', () => handleStartup(false));
+
+                // Someone actively moving between pages within the last hour shouldn't
+                // see this screen again. Wait for the first real auth resolution (not
+                // just DOMContentLoaded) so the signed-in-vs-not branch above is
+                // actually correct instead of racing Firebase's async auth check.
+                if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                    const unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
+                        unsub();
+                        handleStartup(true);
+                    });
+                }
             }
 
             document.body.addEventListener('click', (e) => {
