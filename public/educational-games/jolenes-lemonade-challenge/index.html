@@ -16,6 +16,8 @@
          /js/identity-gate.js. Runs the same gate whether this module is reached from the
          dashboard or opened directly by a bookmarked/shared link. -->
     <script type="module" src="/js/identity-gate.js"></script>
+    <!-- Shared learning-analytics telemetry (sessions + events for Insider) — see /js/telemetry.js. -->
+    <script type="module" src="/js/telemetry.js"></script>
     <script src="/js/message-hq.js" data-message-source="Jolene's Lemonade Challenge"></script>
 
     <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js. -->
@@ -26,6 +28,9 @@
         const appId = window.AuthCore.appId;
         const auth = window.AuthCore.auth;
         const db = window.AuthCore.db;
+
+        // Telemetry: one "step" = one page of the 19-page challenge (see TOTAL_PAGES below).
+        if (window.Telemetry) window.Telemetry.init({ module: 'jolenes-lemonade', gameName: 'Jolenes Lemonade Challenge', stepsTotal: 19 });
 
         // 3. GLOBAL STATE
         window.currentUser = null;
@@ -90,7 +95,9 @@
         window.logScenarioAttempt = async (data) => {
             const user = auth.currentUser;
             if (!user) return;
-            
+
+            if (window.Telemetry) window.Telemetry.choice({ scenarioIndex: data.scenarioIndex, choiceIndex: data.choiceIndex, score: data.score, cashImpact: data.cashImpact, effectiveness: data.effectiveness || null, question: data.question || null });
+
             // Path: artifacts/allgood-academy/users/{uid}/game_scores/{sessionId}/scenario_attempts/{scenarioIndex}
             const attemptRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'scenario_attempts', `scenario_${data.scenarioIndex}`);
             
@@ -605,6 +612,7 @@
                 pages[index].classList.add('active');
                 currentPageIndex = index;
                 pages[index].scrollTop = 0;
+                if (window.Telemetry) window.Telemetry.step(index + 1);
 
                 backButton.disabled = (index === 0);
                 backButton.classList.toggle('opacity-0', index === 0);
@@ -961,8 +969,9 @@
                     isCertified: isCertified, 
                     complete: isComplete, 
                     earnedBadge: isCertified ? "Certified Entrepreneur" : null, // Added Badge Field
-                    sessionId: window.sessionId 
+                    sessionId: window.sessionId
                 });
+                if (window.Telemetry) window.Telemetry.complete({ finalScore: currentScore, maxScore: MAX_SCORE, percentage: percentage, rank: rank, isCertified: isCertified });
                 lucide.createIcons();
             }
 

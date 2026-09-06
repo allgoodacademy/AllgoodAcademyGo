@@ -11,7 +11,8 @@ original local folder, added separately).
 ```
 public/
   index.html                                     # Allgood Academy dashboard (home page)
-  insider/index.html                             # Insider (internal agent/intel view)
+  insider/index.html                             # Insider (owner BI dashboard: users, courses, classrooms, inbox, tools)
+  js/telemetry.js                                # Shared learning-analytics telemetry (sessions + events) — see docs/insider-analytics.md
   educational-games/                              # conflict-resolution, digital-decisions,
                                                     # jolenes-lemonade-challenge, master-your-story,
                                                     # purposeful-communicator
