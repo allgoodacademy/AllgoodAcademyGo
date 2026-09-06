@@ -93,6 +93,19 @@ for (const c of courses) {
 }
 for (const r of rows) if (!courses.find(c => c.name === r.name)) fail(`docs/insider-analytics.md: row "${r.name}" has no Insider COURSES entry`);
 
+// --- Message HQ: loading message-hq.js with no navbar button wired to it is a silent no-op
+// (Privacy & Security shipped this way once already, and Professional Brand repeated it —
+// the checklist item existed but nothing enforced it). A module that never loads the script
+// at all is out of scope here; one that loads it MUST also call openMessageModal() somewhere.
+for (const lab of dashLabs) {
+  const page = modulePages[lab.id];
+  if (!page) continue;
+  const src = read(page);
+  const loadsMessageHQ = /src="\/js\/message-hq\.js"/.test(src);
+  const callsOpenModal = /window\.openMessageModal\(\)/.test(src);
+  if (loadsMessageHQ && !callsOpenModal) fail(`${page}: loads message-hq.js but no navbar button calls window.openMessageModal() — Message HQ is unreachable`);
+}
+
 if (problems.length) {
   console.error(`check-modules: ${problems.length} problem(s)\n - ` + problems.join('\n - '));
   process.exit(1);

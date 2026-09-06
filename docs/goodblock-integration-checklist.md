@@ -101,7 +101,13 @@ copied it forward. It's now standardized in `/js/message-hq.js`.
   as `window` functions.
 - [ ] Add a navbar button that calls `window.openMessageModal()` (copy the icon/button
   markup from an existing module, e.g. Social Intelligence's navbar — the button itself
-  isn't shared since navbar layout/theming differs per module).
+  isn't shared since navbar layout/theming differs per module). **This step was written
+  down here already and still got skipped shipping Professional Brand** — the script tag
+  was added, the button never was, so the feature was silently unreachable. Run
+  `node scripts/check-modules.js` before calling any module done: it now fails if a module
+  loads `message-hq.js` without a matching `window.openMessageModal()` call anywhere on
+  the page. A checklist item nobody re-checks doesn't catch this; a script that runs before
+  ship does.
 - [ ] **Don't** re-implement the modal, the send handler, or the identity check —
   `data-message-source` is the only per-module config. If a fix is needed (styling, copy,
   a new field to capture), fix it once in `message-hq.js`, not in each module.
