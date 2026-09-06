@@ -59,6 +59,10 @@
             const { user } = await window.AuthGate.ensureIdentified();
             if (!user) return;
         }
+        // Lets a page clear its own "unread" hint (e.g. a notification dot on the
+        // navbar icon) the moment a visitor actually opens Message HQ, rather than
+        // only after they successfully send something.
+        document.dispatchEvent(new CustomEvent('messagehq:opened', { detail: { source: source } }));
         injectModal();
         // Close any other open modal on the page (system menu, case menu, etc.) so
         // only one shows at a time — the page's own modals just need a shared

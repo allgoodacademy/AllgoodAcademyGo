@@ -217,10 +217,6 @@
                             <!-- THE MESSAGING PORTAL BUTTON -->
                             <button id="message-toggle" onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ">
                                 <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
-                                <span id="message-notification" class="absolute top-1 right-1 flex h-2.5 w-2.5">
-                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                                </span>
                             </button>
 
                             <button id="menu-toggle" title="Menu" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
@@ -673,22 +669,9 @@
             // --- MENU & MODAL FUNCTIONS ---
             window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); sfx.tick(); }
             window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); sfx.tick(); }
-            // --- MESSAGE PORTAL CONTROLS ---
-            // openMessageModal/closeMessageModal/submitHQMessage are provided by
-            // /js/message-hq.js. This page only wraps the opener to clear its own
-            // notification-dot state, which is specific to this module.
-            (function () {
-                const sharedOpen = window.openMessageModal;
-                window.openMessageModal = () => {
-                    const notif = document.getElementById('message-notification');
-                    if (notif) {
-                        notif.style.display = 'none';
-                        localStorage.setItem('aa_ddc_msg_seen', 'true');
-                    }
-                    if (window.sfx) window.sfx.click();
-                    sharedOpen();
-                };
-            })();
+            // openMessageModal/closeMessageModal/submitHQMessage are standardized in
+            // /js/message-hq.js. The notification-dot hint on this button was
+            // dashboard-only by design and has moved there — see public/index.html.
 
             window.updateUserDisplay = (name) => {
                 currentUserName = name;
@@ -1592,12 +1575,6 @@
                     sfx.tick();
                 });
             });
-
-            // Initialize Message Notification State
-            const msgNotif = document.getElementById('message-notification');
-            if (msgNotif && localStorage.getItem('aa_ddc_msg_seen') === 'true') {
-                msgNotif.style.display = 'none';
-            }
 
             // Initial Render
             window.showPage(0);
