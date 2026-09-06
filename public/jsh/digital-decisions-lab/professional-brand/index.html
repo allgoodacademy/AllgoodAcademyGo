@@ -1442,11 +1442,20 @@
                 if (feedSettled) {
                     // Second pass broke the floor - stay in the full view, say why.
                     renderFeed();
-                    window.setStep(2, 2, "That change dropped it below the floor — two posts read badly to a stranger, or nothing's on top. It's still your profile; the strip shows what's where.");
+                    window.setStep(2, 2, "That change dropped it below the floor — check that <strong>the vent</strong> and <strong>the joke</strong> are both put away, and something's still pushed to the top. It's still your profile; the strip shows what's where.");
                 } else {
                     renderFeed();
                     const left = FEED_POSTS.length - Object.keys(feedState).length;
-                    if (left === 0) window.setStep(2, 1, "All six decided, but the floor isn't met — two posts still read badly to a stranger, or nothing's pushed to the top. Look for amber in the strip.");
+                    if (left === 0) {
+                        const ventOk = feedState.vent === 'archive';
+                        const jokeOk = feedState.joke === 'archive';
+                        const hasFeature = Object.values(feedState).includes('feature');
+                        const missing = [];
+                        if (!ventOk) missing.push('put away the vent');
+                        if (!jokeOk) missing.push('put away the joke');
+                        if (!hasFeature) missing.push('push something to the top');
+                        window.setStep(2, 1, `All six decided, but the floor isn't met yet — ${missing.join(', ')}. Check the strip: amber means put away, purple means pushed to the top.`);
+                    }
                     else window.setStep(2, 1, `${left} left. <strong>Next</strong> moves on; Jodi reacts to every choice, and you can come back to any of them.`);
                 }
             }
