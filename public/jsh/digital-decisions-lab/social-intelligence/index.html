@@ -1338,13 +1338,9 @@
 
                     // Same gate the dashboard uses, run right here — reached directly by a
                     // bookmarked or shared link, this GoodBlock can't rely on the Lab Pack
-                    // hub's own launchCourse having already checked this.
-                    const { user } = await window.AuthGate.ensureIdentified();
-                    if (!user) return;
-                    if (window.logModuleCompletion) {
-                        // Marks a session as started; finalizeCaseRating() below flips
-                        // `completed` to true once the student actually reaches Case 7.
-                    }
+                    // hub's own launchLab having already checked this. Completion itself is
+                    // written later, by finalizeCaseRating() once Case 7 is actually reached.
+                    await window.AuthGate.ensureIdentified();
                 };
                 startup.addEventListener('click', handleStartup);
 
