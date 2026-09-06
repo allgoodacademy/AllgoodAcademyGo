@@ -104,6 +104,15 @@ until a user reported it after cases were already live.
 - [ ] Verify every new Lucide icon name via web search ("lucide icons `[name]`") before
   using it — a wrong or renamed icon fails silently (no error, just missing icon), and this
   has happened more than once.
+- [ ] `data-lucide` is only safe for markup **present at page load**. Anything injected into
+  the DOM *after* load (a dynamically-rendered checkmark, a badge added on the fly) should be
+  hand-drawn inline SVG instead — Privacy & Security shipped checkboxes that rendered as
+  empty boxes on a real device this way, with static checks finding nothing wrong. Relatedly,
+  `createIcons()` replaces an `<i data-lucide>` with a rendered `<svg>`, so mutating
+  `data-lucide` on that element later doesn't reliably re-render it — rewrite the container's
+  `innerHTML` instead if an icon must change after load. Keep the retry ladder
+  (100/400/1000/2000ms `createIcons()` calls after `DOMContentLoaded`) regardless — it's cheap
+  insurance against an unrelated CDN load-timing race.
 
 ## Before calling a GoodBlock's integration done
 
