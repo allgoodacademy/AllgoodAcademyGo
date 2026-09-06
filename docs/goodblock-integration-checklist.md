@@ -126,6 +126,44 @@ copied it forward. It's now standardized in `/js/message-hq.js`.
   Console → Firestore Database → Rules and publish it directly, since CI failing silently
   here means the rule is simply never live.
 
+## Chrome sizing & mobile viewport
+
+The header/footer chassis every module shares used to be two 60px strips, and on phones the
+footer (which holds nothing but a copyright line in the Jodi's Schoolhouse labs) sat
+mid-screen with a dead band under it. Root cause: `<body>` carries Tailwind's
+`min-h-screen overflow-y-auto`, and on iOS `100vh` is the toolbar-collapsed height, so the
+document could scroll by the toolbar height and push the header off the top. The fix
+shipped across all five live modules at once. A new GoodBlock should copy the chassis from
+one of the three labs (Social Intelligence, Privacy & Security, Digital Citizenship), not
+from an older reference, and check:
+
+- [ ] `.navbar-content` is `flex: 0 0 48px; position: relative` and `.footer-content` is
+  `flex: 0 0 36px` (labs, copyright-only footer) or `52px` (challenges, whose footer carries
+  the Back / Next buttons). Don't go back to 60px. The Lab Pack hub and the main dashboard
+  keep their own 60px headers on purpose - they scroll normally and aren't on this chassis.
+- [ ] `#flex-progress-bar` lives **inside the `<header>`** as its first child, pinned to the
+  bottom edge (`position: absolute; bottom: 0`), not in the footer. That's what lets the
+  footer be hidden on phones without losing the bar. The JS that sets `#flex-progress-fill`'s
+  width is unchanged.
+- [ ] Phone block, labs (`@media (max-width: 767px)`): pin the document (`html, body {
+  position: fixed; ... overflow: hidden !important }`, `.app-shell { position: absolute;
+  inset: 0 }`), hide the footer (`footer.footer-content { display: none !important }`), and
+  keep the header at `.navbar-content { flex: 0 0 auto; min-height: 52px; padding-top:
+  env(safe-area-inset-top) }`. The copyright line is therefore not rendered on phones in the
+  labs; the challenges already hid theirs below `sm`, so this is parity.
+- [ ] Phone block, challenges (`@media (max-width: 768px)`): same pinned document (DDC and
+  Jolene's had it first), `header.navbar-content { flex: 0 0 auto; min-height: 48px;
+  padding-top: max(env(safe-area-inset-top), 4px); padding-bottom: 4px }`. DDC hides its
+  footer (its mobile HUD pill supplies Next); Jolene's keeps it because Back / Next live
+  there. Apply the safe-area inset **once**, on the header rule - not also as a
+  `pt-[env(...)]` class on the inner div, and never with a fixed `flex-basis` that would
+  make the padded header overflow instead of grow.
+- [ ] Never put a control (Next, Back, submit) in the footer of a lab - on phones it's gone.
+  In-page continue prompts are the pattern.
+- [ ] After any chassis edit, confirm on a real phone that the header stays put when the
+  browser toolbar collapses/expands, and that the page cannot be rubber-band scrolled to
+  reveal background under the shell.
+
 ## Assets & icons
 
 - [ ] Reuse Jodi's mood SVGs from `public/assets/jodi/*.svg` by URL — don't re-embed them
