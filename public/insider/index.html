@@ -12,6 +12,20 @@
         ::-webkit-scrollbar { width: 10px; height: 10px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background-color: #357889; border-radius: 6px; }
+        .nav-link.active { background: rgba(255,255,255,0.14); color: #fff; }
+        .nav-link { color: rgba(255,255,255,0.72); }
+        .nav-link:hover { color: #fff; background: rgba(255,255,255,0.08); }
+        .chip.active { background: #357889; color: #fff; border-color: #357889; }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: #357889; }
+        .bar:hover { fill: #2b616f; }
+        .hbar:hover { fill: #2b616f; }
+        #tooltip { pointer-events: none; }
+        html, body { overflow-x: hidden; }
+        .drawer { transition: transform .25s ease, visibility 0s linear 0s; }
+        .drawer.closed { transform: translateX(100%); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s; }
+        .skeleton { background: linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 37%,#f1f5f9 63%); background-size: 400% 100%; animation: shimmer 1.4s infinite; }
+        @keyframes shimmer { 0% {background-position: 100% 0} 100% {background-position: 0 0} }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-700 min-h-screen">
@@ -42,110 +56,62 @@
         </div>
     </div>
 
-    <!-- MAIN VIEW -->
-    <div id="main-view" class="hidden">
-        <header class="bg-[#357889] text-white px-6 py-4 flex items-center justify-between shadow-md">
-            <div class="font-bold text-lg tracking-tight uppercase">Allgood Academy <span class="opacity-60 font-normal text-sm">| Insider</span></div>
-            <div class="flex items-center gap-4">
-                <span id="whoami" class="text-xs opacity-80 hidden sm:inline"></span>
-                <button id="btn-signout" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded uppercase tracking-wide">Sign Out</button>
+    <!-- MAIN APP -->
+    <div id="main-view" class="hidden min-h-screen md:flex">
+
+        <!-- SIDEBAR -->
+        <aside class="bg-[#2b616f] text-white md:w-56 md:min-h-screen md:sticky md:top-0 md:self-start flex md:flex-col shrink-0">
+            <div class="px-5 py-4 border-b border-white/10 hidden md:block">
+                <div class="font-bold text-base tracking-tight uppercase leading-tight">Allgood Academy</div>
+                <div class="text-[10px] uppercase tracking-widest opacity-60 mt-0.5">Insider · Owner BI</div>
             </div>
-        </header>
-
-        <main class="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
-
-            <!-- STATS -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-white rounded-lg shadow p-4">
-                    <p class="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Total Accounts</p>
-                    <p id="stat-total" class="text-2xl font-bold text-slate-800 mt-1">—</p>
-                </div>
-                <div class="bg-white rounded-lg shadow p-4">
-                    <p class="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Real Named Users</p>
-                    <p id="stat-named" class="text-2xl font-bold text-slate-800 mt-1">—</p>
-                </div>
-                <div class="bg-white rounded-lg shadow p-4">
-                    <p class="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Active (24h)</p>
-                    <p id="stat-active" class="text-2xl font-bold text-slate-800 mt-1">—</p>
-                </div>
-                <div class="bg-white rounded-lg shadow p-4">
-                    <p class="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Classrooms</p>
-                    <p id="stat-classrooms" class="text-2xl font-bold text-slate-800 mt-1">—</p>
-                </div>
+            <nav id="nav" class="flex md:flex-col md:p-3 md:gap-1 overflow-x-auto w-full">
+                <a href="#/overview" data-route="overview" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>Overview</a>
+                <a href="#/users" data-route="users" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="users" class="w-4 h-4"></i>Users</a>
+                <a href="#/courses" data-route="courses" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="book-open" class="w-4 h-4"></i>Courses</a>
+                <a href="#/classrooms" data-route="classrooms" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="school" class="w-4 h-4"></i>Classrooms</a>
+                <a href="#/inbox" data-route="inbox" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="inbox" class="w-4 h-4"></i>Inbox</a>
+                <a href="#/feedback" data-route="feedback" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="star" class="w-4 h-4"></i>Feedback</a>
+                <a href="#/tools" data-route="tools" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="wrench" class="w-4 h-4"></i>Tools</a>
+            </nav>
+            <div class="mt-auto px-5 py-4 border-t border-white/10 hidden md:block">
+                <p id="whoami" class="text-[10px] opacity-70 truncate"></p>
+                <button id="btn-signout" class="mt-2 text-[10px] bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded uppercase tracking-wide">Sign Out</button>
             </div>
+        </aside>
 
-            <!-- USER DIRECTORY -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-                    <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wide">User Directory</h2>
-                    <input id="user-search" type="text" placeholder="Search name or email…" class="border border-slate-200 rounded px-3 py-1.5 text-xs w-full sm:w-64 focus:outline-none focus:border-[#357889]">
+        <!-- CONTENT -->
+        <div class="flex-1 min-w-0">
+            <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 sticky top-0 z-20">
+                <h1 id="page-title" class="font-bold text-slate-800 text-sm uppercase tracking-wide mr-auto">Overview</h1>
+                <div class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide" id="range-picker">
+                    <span class="text-slate-400 mr-1">Range</span>
+                    <button data-range="7" class="chip border border-slate-200 rounded px-2 py-1">7d</button>
+                    <button data-range="30" class="chip border border-slate-200 rounded px-2 py-1 active">30d</button>
+                    <button data-range="90" class="chip border border-slate-200 rounded px-2 py-1">90d</button>
+                    <button data-range="0" class="chip border border-slate-200 rounded px-2 py-1">All</button>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs">
-                        <thead class="bg-slate-50 text-slate-400 uppercase tracking-wide">
-                            <tr>
-                                <th class="text-left font-bold px-4 py-2">Name</th>
-                                <th class="text-left font-bold px-4 py-2">Email</th>
-                                <th class="text-left font-bold px-4 py-2">Role</th>
-                                <th class="text-left font-bold px-4 py-2">Classroom</th>
-                                <th class="text-left font-bold px-4 py-2">Last Login</th>
-                            </tr>
-                        </thead>
-                        <tbody id="user-table-body"></tbody>
-                    </table>
-                </div>
-                <div class="p-3 flex items-center justify-between text-[10px] text-slate-400">
-                    <span id="user-count-label"></span>
-                    <button id="btn-load-more" class="hidden text-[#357889] font-bold uppercase tracking-wide hover:underline">Show more</button>
-                </div>
-            </div>
+                <button id="btn-refresh" class="text-[10px] font-bold uppercase tracking-wide border border-slate-200 rounded px-2 py-1 flex items-center gap-1 hover:border-[#357889] hover:text-[#357889]"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Refresh</button>
+                <span id="loaded-at" class="text-[10px] text-slate-400 hidden sm:inline"></span>
+                <button id="btn-signout-mobile" class="md:hidden text-[10px] font-bold uppercase tracking-wide text-slate-400">Sign out</button>
+            </header>
 
-            <!-- CLASSROOMS -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-4 border-b border-slate-100">
-                    <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wide">Classrooms</h2>
-                </div>
-                <div id="classrooms-list" class="p-4 space-y-2"></div>
-            </div>
+            <div id="loading-strip" class="px-4 sm:px-6 py-2 text-[10px] text-slate-500 bg-amber-50 border-b border-amber-100 hidden"></div>
 
-            <!-- MESSAGE INBOX (Message HQ, from any portal) -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-4 border-b border-slate-100">
-                    <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wide">Message Inbox</h2>
-                    <p class="text-[10px] text-slate-400 mt-0.5">Messages sent via Message HQ, from the dashboard or any module</p>
-                </div>
-                <div id="message-list" class="p-4 space-y-3"></div>
-            </div>
-
-            <!-- COURSE FEEDBACK (end-of-module ratings) -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-4 border-b border-slate-100">
-                    <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wide">Course Feedback</h2>
-                    <p class="text-[10px] text-slate-400 mt-0.5">End-of-module ratings, grouped by course — only shows up for modules that ask for feedback (Digital Decisions today)</p>
-                </div>
-                <div id="course-feedback-list" class="p-4 space-y-4"></div>
-            </div>
-
-            <!-- DELETION TOOL (data deletion requests) -->
-            <div class="bg-white rounded-lg shadow border-t-4 border-red-300">
-                <div class="p-4 border-b border-slate-100">
-                    <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wide">Delete a User's Data</h2>
-                    <p class="text-[10px] text-slate-400 mt-0.5">Permanently deletes a user's profile, scores, launches, messages, and course feedback. Use this to fulfill a deletion request. This cannot be undone.</p>
-                </div>
-                <div class="p-4 flex flex-col sm:flex-row gap-3">
-                    <input id="delete-uid-input" type="text" placeholder="User UID (from the directory above)" class="flex-1 border border-slate-200 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-400">
-                    <button id="btn-delete-user" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-xs uppercase tracking-wide">Delete User's Data</button>
-                </div>
-                <p id="delete-status" class="px-4 pb-4 text-xs"></p>
-            </div>
-
-        </main>
+            <main id="page" class="p-4 sm:p-6 max-w-7xl mx-auto"></main>
+        </div>
     </div>
+
+    <!-- USER DETAIL DRAWER -->
+    <div id="drawer-backdrop" class="fixed inset-0 bg-slate-900/40 z-30 hidden"></div>
+    <div id="drawer" class="drawer closed fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl z-40 overflow-y-auto"></div>
+
+    <div id="tooltip" class="fixed z-50 hidden bg-slate-800 text-white text-[11px] rounded px-2 py-1 shadow-lg"></div>
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, doc, collection, getDocs, deleteDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getFirestore, doc, collection, collectionGroup, getDocs, deleteDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
@@ -157,333 +123,904 @@
             measurementId: "G-EN4M7T3BLQ"
         };
         const appId = 'allgood-academy';
-
         const ALLOWED_EMAILS = ['balgood93@gmail.com', 'learning@allgoodacademy.com'];
+        const BRAND = '#357889';
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        const signinScreen = document.getElementById('signin-screen');
-        const deniedScreen = document.getElementById('denied-screen');
-        const mainView = document.getElementById('main-view');
+        // ------------------------------------------------------------------
+        // COURSE REGISTRY — mirrors MODULE_REGISTRY on the dashboard, plus the
+        // extra names each data source uses for the same module:
+        //   gameNames   : game_scores.gameName / course_feedback.gameName
+        //   launchNames : users/{uid}/launches.courseName (dashboard launch button)
+        //   slug        : module_progress/{slug} and telemetry sessions.module
+        // ------------------------------------------------------------------
+        const COURSES = [
+            {
+                id: 'digital-decisions', name: 'Digital Decisions Challenge', category: 'Challenge',
+                gameNames: ['Digital Decisions Challenge'], launchNames: ['Digital Decisions'],
+                stepsTotal: 30, stepLabel: 'scenarios answered', stepBucket: 5, scored: true,
+                isComplete: d => typeof d.finalScore === 'number' && d.finalScore >= 80,
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: p => Object.keys(p.answeredScenarioScores || {}).length,
+            },
+            {
+                id: 'jolenes-lemonade', name: "Jolene's Lemonade Challenge", category: 'Challenge',
+                gameNames: ['Jolenes Lemonade Challenge', "Jolene's Lemonade"], launchNames: ['Jolenes Lemonade'],
+                stepsTotal: 19, stepLabel: 'pages reached', stepBucket: 1, scored: true,
+                isComplete: d => d.complete === true || d.completed === true || (typeof d.finalScore === 'number' && d.finalScore >= 800),
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: p => Object.keys(p.answeredScenarioScores || {}).length,
+            },
+            {
+                id: 'social-intelligence', name: 'Social Intelligence', category: "Jodi's Schoolhouse lab",
+                gameNames: ['Social Intelligence'], launchNames: [],
+                stepsTotal: 7, stepLabel: 'cases reached', stepBucket: 1, scored: false,
+                isComplete: d => d.completed === true,
+                scoreOf: () => null,
+                progressStep: p => (typeof p.highestUnlocked === 'number' ? p.highestUnlocked + 1 : 0),
+            },
+            {
+                id: 'privacy-security', name: 'Privacy & Security', category: "Jodi's Schoolhouse lab",
+                gameNames: ['Privacy & Security'], launchNames: [],
+                stepsTotal: 6, stepLabel: 'cases reached', stepBucket: 1, scored: false,
+                isComplete: d => d.completed === true,
+                scoreOf: () => null,
+                progressStep: p => (typeof p.highestUnlocked === 'number' ? p.highestUnlocked + 1 : 0),
+            },
+        ];
+        const courseByGameName = {};
+        const courseByLaunchName = {};
+        const courseBySlug = {};
+        COURSES.forEach(c => {
+            c.gameNames.forEach(n => courseByGameName[n] = c);
+            c.launchNames.forEach(n => courseByLaunchName[n] = c);
+            courseBySlug[c.id] = c;
+        });
 
-        let allUsers = [];
-        let renderedCount = 0;
-        const PAGE_SIZE = 50;
-
-        document.getElementById('btn-google-signin').onclick = async () => {
-            const errEl = document.getElementById('signin-error');
-            errEl.classList.add('hidden');
-            try {
-                await signInWithPopup(auth, new GoogleAuthProvider());
-            } catch (e) {
-                console.error('Sign-in failed', e);
-                errEl.textContent = 'Sign-in failed — please try again.';
-                errEl.classList.remove('hidden');
-            }
+        // ------------------------------------------------------------------
+        // STATE
+        // ------------------------------------------------------------------
+        const D = {                 // raw data
+            users: [], classrooms: [], messages: [], feedback: [],
+            launches: [], scores: [], attempts: [], progress: [], sessions: [], events: [],
+            errors: {}, loadedAt: null,
         };
+        let userIndex = {};         // uid -> computed user record
+        let rangeDays = 30;
+        let usersView = { filter: 'all', sort: 'lastActive', dir: 'desc', search: '' };
+        let inboxView = { source: 'all', search: '' };
+        let feedbackView = { course: 'all' };
 
-        document.getElementById('btn-signout').onclick = () => signOut(auth);
-        document.getElementById('btn-denied-signout').onclick = () => signOut(auth);
+        const $ = id => document.getElementById(id);
+        const signinScreen = $('signin-screen'), deniedScreen = $('denied-screen'), mainView = $('main-view');
+
+        // ------------------------------------------------------------------
+        // AUTH
+        // ------------------------------------------------------------------
+        $('btn-google-signin').onclick = async () => {
+            const errEl = $('signin-error');
+            errEl.classList.add('hidden');
+            try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+            catch (e) { console.error('Sign-in failed', e); errEl.textContent = 'Sign-in failed — please try again.'; errEl.classList.remove('hidden'); }
+        };
+        $('btn-signout').onclick = () => signOut(auth);
+        $('btn-signout-mobile').onclick = () => signOut(auth);
+        $('btn-denied-signout').onclick = () => signOut(auth);
 
         onAuthStateChanged(auth, async (user) => {
             [signinScreen, deniedScreen, mainView].forEach(el => el.classList.add('hidden'));
-
-            if (!user) {
-                signinScreen.classList.remove('hidden');
-                return;
-            }
-
+            if (!user) { signinScreen.classList.remove('hidden'); return; }
             const email = (user.email || '').toLowerCase();
             if (!ALLOWED_EMAILS.map(e => e.toLowerCase()).includes(email)) {
-                deniedScreen.classList.remove('hidden');
-                lucide.createIcons();
-                return;
+                deniedScreen.classList.remove('hidden'); if (window.lucide) lucide.createIcons(); return;
             }
-
             mainView.classList.remove('hidden');
-            document.getElementById('whoami').textContent = user.email;
-            lucide.createIcons();
+            $('whoami').textContent = user.email;
+            if (window.lucide) lucide.createIcons();
             await loadEverything();
+            route();
         });
+
+        // ------------------------------------------------------------------
+        // HELPERS
+        // ------------------------------------------------------------------
+        const DAY = 24 * 60 * 60 * 1000;
+        function esc(str) { const div = document.createElement('div'); div.textContent = str == null ? '' : String(str); return div.innerHTML; }
+        function toMs(ts) {
+            if (!ts) return 0;
+            if (typeof ts === 'number') return ts;
+            if (ts.toDate) return ts.toDate().getTime();
+            if (ts.seconds) return ts.seconds * 1000;
+            return 0;
+        }
+        function fmtDate(ms) { return ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'; }
+        function fmtDateTime(ms) { return ms ? new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'; }
+        function fmtAgo(ms) {
+            if (!ms) return '—';
+            const diff = Date.now() - ms;
+            if (diff < 60e3) return 'just now';
+            if (diff < 3600e3) return Math.round(diff / 60e3) + 'm ago';
+            if (diff < DAY) return Math.round(diff / 3600e3) + 'h ago';
+            if (diff < 30 * DAY) return Math.round(diff / DAY) + 'd ago';
+            return fmtDate(ms);
+        }
+        function fmtDuration(ms) {
+            if (!ms || ms < 1000) return '0m';
+            const m = Math.round(ms / 60000);
+            if (m < 1) return '<1m';
+            if (m < 60) return m + 'm';
+            return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+        }
+        function pct(n, d) { return d ? Math.round((n / d) * 100) : 0; }
+        function median(arr) {
+            if (!arr.length) return 0;
+            const s = [...arr].sort((a, b) => a - b);
+            const mid = Math.floor(s.length / 2);
+            return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+        }
+        function mean(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0; }
+        function rangeStart() { return rangeDays ? Date.now() - rangeDays * DAY : 0; }
+        function inRange(ms) { return ms >= rangeStart(); }
+        function rangeLabel() { return rangeDays ? `last ${rangeDays} days` : 'all time'; }
+        function stars(r) { return r ? `<span class="text-amber-400">${'★'.repeat(r)}${'☆'.repeat(Math.max(0, 5 - r))}</span>` : '<span class="text-slate-300 italic">no rating</span>'; }
+
+        const GENERIC_NAMES = ['Agent Learner', 'Guest', 'Learner', 'Agent', 'Anonymous'];
+        function userType(u) {
+            if (u.role === 'teacher') return 'Teacher';
+            if (u.ageTier === 'under13') return 'Learner Recruit';
+            if (u.ageTier === '13plus' || (u.email && !u.isGuest)) return '13+ Account';
+            return 'Guest';
+        }
+        const TYPE_STYLE = {
+            'Teacher': 'bg-indigo-100 text-indigo-700',
+            'Learner Recruit': 'bg-emerald-100 text-emerald-700',
+            '13+ Account': 'bg-sky-100 text-sky-700',
+            'Guest': 'bg-slate-100 text-slate-500',
+        };
+        function typeBadge(t) { return `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap ${TYPE_STYLE[t] || TYPE_STYLE.Guest}">${esc(t)}</span>`; }
+        function statusChip(status) {
+            if (status === 'completed') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-100 text-emerald-700"><i data-lucide="check-circle-2" class="w-3 h-3"></i>Completed</span>';
+            if (status === 'in_progress') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-100 text-amber-700"><i data-lucide="clock" class="w-3 h-3"></i>In progress</span>';
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-100 text-slate-400"><i data-lucide="circle" class="w-3 h-3"></i>Not started</span>';
+        }
+        function card(title, body, extra = '') {
+            return `<div class="bg-white rounded-lg shadow"><div class="p-4 border-b border-slate-100 flex items-center justify-between gap-2 flex-wrap"><h2 class="font-bold text-slate-800 text-xs uppercase tracking-wide">${title}</h2>${extra}</div><div class="p-4">${body}</div></div>`;
+        }
+        function tile(label, value, sub = '') {
+            return `<div class="bg-white rounded-lg shadow p-4"><p class="text-[10px] uppercase tracking-wide text-slate-400 font-bold">${label}</p><p class="text-2xl font-bold text-slate-800 mt-1">${value}</p>${sub ? `<p class="text-[10px] text-slate-400 mt-0.5">${sub}</p>` : ''}</div>`;
+        }
+        function emptyMsg(text) { return `<p class="text-xs text-slate-400 italic">${text}</p>`; }
+
+        // Tooltip shared by every chart.
+        const tip = $('tooltip');
+        document.addEventListener('mousemove', (e) => {
+            const t = e.target.closest && e.target.closest('[data-tip]');
+            if (t) {
+                tip.textContent = t.getAttribute('data-tip');
+                tip.classList.remove('hidden');
+                tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, e.clientX + 12) + 'px';
+                tip.style.top = (e.clientY + 14) + 'px';
+            } else tip.classList.add('hidden');
+        });
+
+        // ------------------------------------------------------------------
+        // CHARTS — single-series, one brand hue, thin marks, recessive axes.
+        // ------------------------------------------------------------------
+        // Fixed 400-unit-wide viewBox scaled uniformly, so text never stretches.
+        function barChart({ series, labels, tips, height = 130, yLabel = '' }) {
+            const n = series.length;
+            if (!n) return emptyMsg('No data yet.');
+            const max = Math.max(1, ...series);
+            const W = 400, padB = 16, padT = 14, plotH = height - padB;
+            const gap = Math.max(1.5, Math.min(6, 120 / n)), bw = W / n;
+            const maxIdx = series.indexOf(max);
+            let bars = '', xl = '';
+            const every = n > 16 ? Math.ceil(n / 8) : (n > 8 ? 2 : 1);
+            series.forEach((v, i) => {
+                const h = (v / max) * (plotH - padT);
+                const x = i * bw + gap / 2, y = plotH - h, w = Math.max(1, bw - gap);
+                bars += `<rect class="bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${BRAND}" data-tip="${esc(tips[i])}"></rect>`;
+                if (i === maxIdx && v > 0) bars += `<text x="${(x + w / 2).toFixed(1)}" y="${(y - 3).toFixed(1)}" font-size="9" text-anchor="middle" fill="#334155" font-weight="700">${v}</text>`;
+                if (i % every === 0 || i === n - 1) xl += `<text x="${(x + w / 2).toFixed(1)}" y="${height - 4}" font-size="8" text-anchor="middle" fill="#94a3b8">${esc(labels[i])}</text>`;
+            });
+            const grid = [0.25, 0.5, 0.75].map(f => { const y = (plotH - f * (plotH - padT)).toFixed(1); return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="#e2e8f0" stroke-width="0.8"></line>`; }).join('');
+            return `<div class="w-full"><svg viewBox="0 0 ${W} ${height}" class="w-full h-auto">${grid}<line x1="0" x2="${W}" y1="${plotH}" y2="${plotH}" stroke="#cbd5e1" stroke-width="1"></line>${bars}${xl}</svg>${yLabel ? `<p class="text-[10px] text-slate-400 mt-1">${yLabel}</p>` : ''}</div>`;
+        }
+
+        // Horizontal funnel: % of learners who reached each step.
+        function funnelChart(rows) {
+            if (!rows.length) return emptyMsg('No step data yet.');
+            const max = Math.max(1, ...rows.map(r => r.count));
+            return `<div class="space-y-1.5">${rows.map(r => `
+                <div class="flex items-center gap-2 text-[11px]">
+                    <div class="w-28 shrink-0 text-slate-500 truncate" title="${esc(r.label)}">${esc(r.label)}</div>
+                    <div class="flex-1 bg-slate-100 rounded h-4 overflow-hidden"><div class="hbar h-4 rounded" style="width:${pct(r.count, max)}%;background:${BRAND}" data-tip="${esc(r.tip)}"></div></div>
+                    <div class="w-20 shrink-0 text-right text-slate-600 font-bold">${r.count} <span class="text-slate-400 font-normal">(${r.pct}%)</span></div>
+                </div>`).join('')}</div>`;
+        }
+
+        // Rating distribution 1–5 as tiny horizontal bars.
+        function ratingBars(dist, total) {
+            return `<div class="space-y-1">${[5, 4, 3, 2, 1].map(r => `
+                <div class="flex items-center gap-2 text-[11px]"><span class="w-6 text-amber-500 font-bold">${r}★</span>
+                <div class="flex-1 bg-slate-100 rounded h-2.5 overflow-hidden"><div class="h-2.5 rounded" style="width:${pct(dist[r] || 0, total)}%;background:${BRAND}"></div></div>
+                <span class="w-8 text-right text-slate-500">${dist[r] || 0}</span></div>`).join('')}</div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // DATA LOADING
+        // ------------------------------------------------------------------
+        function setLoading(msg) {
+            const el = $('loading-strip');
+            if (!msg) { el.classList.add('hidden'); return; }
+            el.textContent = msg; el.classList.remove('hidden');
+        }
+
+        async function safe(name, fn) {
+            try { const r = await fn(); delete D.errors[name]; return r; }
+            catch (e) {
+                console.error(`[Insider] ${name} failed`, e);
+                D.errors[name] = e.code === 'permission-denied'
+                    ? 'Permission denied — the latest firestore.rules (collection-group + telemetry rules) may not be deployed yet.'
+                    : e.code === 'failed-precondition'
+                        ? 'Needs a one-time Firestore index — open the browser console for the link, create it, then Refresh.'
+                        : (e.message || String(e));
+                return [];
+            }
+        }
 
         async function loadEverything() {
-            await Promise.all([loadUsers(), loadMessages(), loadCourseFeedback()]);
+            setLoading('Loading data…');
+            $('page').innerHTML = `<div class="space-y-4">${[1, 2, 3].map(() => '<div class="skeleton rounded-lg h-24"></div>').join('')}</div>`;
+
+            const [users, classrooms, messages, feedback, launches, scores, attempts, progress, sessions, events] = await Promise.all([
+                safe('users', async () => (await getDocs(collection(db, 'artifacts', appId, 'users'))).docs.map(d => ({ uid: d.id, ...d.data() }))),
+                safe('classrooms', async () => (await getDocs(collection(db, 'artifacts', appId, 'classrooms'))).docs.map(d => ({ code: d.id, ...d.data() }))),
+                safe('messages', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'messages'), orderBy('timestamp', 'desc'), limit(300)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+                safe('course_feedback', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'course_feedback'), orderBy('timestamp', 'desc'), limit(1000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+                safe('launches', async () => (await getDocs(collectionGroup(db, 'launches'))).docs.map(d => ({ uid: d.ref.parent.parent.id, ...d.data() }))),
+                safe('game_scores', async () => (await getDocs(collectionGroup(db, 'game_scores'))).docs.map(d => ({ uid: d.ref.parent.parent.id, sessionId: d.id, ...d.data() }))),
+                safe('scenario_attempts', async () => (await getDocs(collectionGroup(db, 'scenario_attempts'))).docs.map(d => ({ uid: d.ref.parent.parent.parent.parent.id, sessionId: d.ref.parent.parent.id, ...d.data() }))),
+                safe('module_progress', async () => (await getDocs(collectionGroup(db, 'module_progress'))).docs.map(d => ({ uid: d.ref.parent.parent.id, slug: d.id, ...d.data() }))),
+                safe('sessions', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), orderBy('startedAt', 'desc'), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+                safe('events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), orderBy('ts', 'desc'), limit(3000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+            ]);
+
+            Object.assign(D, { users, classrooms, messages, feedback, launches, scores, attempts, progress, sessions, events, loadedAt: Date.now() });
+
+            // Normalise timestamps once.
+            D.users.forEach(u => { u.lastLoginMs = toMs(u.lastLogin); u.name = u.displayName || '—'; u.isGeneric = !u.displayName || GENERIC_NAMES.includes(u.displayName); });
+            D.launches.forEach(l => { l.ms = toMs(l.timestamp); l.course = courseByLaunchName[l.courseName] || null; });
+            D.scores.forEach(s => { s.ms = toMs(s.lastUpdated); s.course = courseByGameName[s.gameName] || null; });
+            D.attempts.forEach(a => { a.ms = toMs(a.timestamp); });
+            D.progress.forEach(p => { p.ms = toMs(p.lastUpdated); p.course = courseBySlug[p.slug] || null; });
+            D.sessions.forEach(s => { s.startMs = toMs(s.startedAt); s.lastMs = toMs(s.lastSeenAt); s.course = courseBySlug[s.module] || courseByGameName[s.gameName] || null; });
+            D.events.forEach(e => { e.ms = toMs(e.ts) || e.clientTs || 0; });
+            D.messages.forEach(m => { m.ms = toMs(m.timestamp); });
+            D.feedback.forEach(f => { f.ms = toMs(f.timestamp); f.course = courseByGameName[f.gameName] || null; });
+
+            // Attach a gameName to legacy scenario attempts via their parent game_scores doc.
+            const scoreBySession = {};
+            D.scores.forEach(s => scoreBySession[s.uid + '|' + s.sessionId] = s);
+            D.attempts.forEach(a => { const s = scoreBySession[a.uid + '|' + a.sessionId]; a.course = s ? s.course : null; });
+
+            buildUserIndex();
+            setLoading('');
+            $('loaded-at').textContent = 'Loaded ' + new Date(D.loadedAt).toLocaleTimeString();
         }
 
-        async function loadUsers() {
-            try {
-                const snap = await getDocs(collection(db, 'artifacts', appId, 'users'));
-                const now = Date.now();
-                const DAY = 24 * 60 * 60 * 1000;
+        // Per-user rollup across every source. Done once per load, not per render.
+        function buildUserIndex() {
+            userIndex = {};
+            D.users.forEach(u => {
+                userIndex[u.uid] = {
+                    ...u, type: userType(u),
+                    launches: [], scores: [], sessions: [], progress: [], messages: [], feedback: [],
+                    courseStatus: {}, totalActiveMs: 0, completedCount: 0, startedCount: 0, lastActiveMs: u.lastLoginMs || 0,
+                };
+            });
+            const ensure = (uid) => {
+                if (!userIndex[uid]) userIndex[uid] = { uid, name: '(deleted or unknown user)', email: '—', role: 'student', type: 'Guest', isGeneric: true, orphan: true, launches: [], scores: [], sessions: [], progress: [], messages: [], feedback: [], courseStatus: {}, totalActiveMs: 0, completedCount: 0, startedCount: 0, lastActiveMs: 0, lastLoginMs: 0 };
+                return userIndex[uid];
+            };
+            D.launches.forEach(l => { const u = ensure(l.uid); u.launches.push(l); u.lastActiveMs = Math.max(u.lastActiveMs, l.ms); });
+            D.scores.forEach(s => { const u = ensure(s.uid); u.scores.push(s); u.lastActiveMs = Math.max(u.lastActiveMs, s.ms); });
+            D.progress.forEach(p => { const u = ensure(p.uid); u.progress.push(p); u.lastActiveMs = Math.max(u.lastActiveMs, p.ms); });
+            D.sessions.forEach(s => { const u = ensure(s.uid); u.sessions.push(s); u.totalActiveMs += (s.activeMs || 0); u.lastActiveMs = Math.max(u.lastActiveMs, s.lastMs, s.startMs); });
+            D.messages.forEach(m => { if (m.senderUid) ensure(m.senderUid).messages.push(m); });
+            D.feedback.forEach(f => { if (f.uid) ensure(f.uid).feedback.push(f); });
 
-                allUsers = snap.docs.map(d => {
-                    const data = d.data();
-                    const lastLoginMs = data.lastLogin && data.lastLogin.toDate ? data.lastLogin.toDate().getTime() : 0;
-                    const isGenericName = !data.displayName || ['Agent Learner', 'Guest', 'Learner', 'Agent'].includes(data.displayName);
-                    return {
-                        uid: d.id,
-                        name: data.displayName || '—',
-                        email: data.email || '—',
-                        role: data.role || 'student',
-                        classroomCode: data.classroomCode || '',
-                        lastLoginMs,
-                        lastLoginLabel: lastLoginMs ? new Date(lastLoginMs).toLocaleString() : '—',
-                        isReal: !isGenericName,
-                        activeRecently: (now - lastLoginMs) < DAY,
-                    };
-                }).sort((a, b) => b.lastLoginMs - a.lastLoginMs);
+            Object.values(userIndex).forEach(u => {
+                COURSES.forEach(c => {
+                    const st = { status: 'not_started', bestScore: null, furthestStep: 0, sessions: 0, activeMs: 0, lastMs: 0, launches: 0 };
+                    u.launches.forEach(l => { if (l.course === c) { st.launches++; st.lastMs = Math.max(st.lastMs, l.ms); } });
+                    u.scores.forEach(s => {
+                        if (s.course !== c) return;
+                        st.status = st.status === 'completed' ? 'completed' : 'in_progress';
+                        if (c.isComplete(s)) st.status = 'completed';
+                        const sc = c.scoreOf(s); if (sc !== null) st.bestScore = st.bestScore === null ? sc : Math.max(st.bestScore, sc);
+                        st.lastMs = Math.max(st.lastMs, s.ms);
+                    });
+                    u.progress.forEach(p => {
+                        if (p.course !== c) return;
+                        if (st.status === 'not_started') st.status = 'in_progress';
+                        st.furthestStep = Math.max(st.furthestStep, c.progressStep(p));
+                        st.lastMs = Math.max(st.lastMs, p.ms);
+                    });
+                    u.sessions.forEach(s => {
+                        if (s.course !== c) return;
+                        st.sessions++; st.activeMs += (s.activeMs || 0);
+                        if (st.status === 'not_started') st.status = 'in_progress';
+                        if (s.completed) st.status = 'completed';
+                        st.furthestStep = Math.max(st.furthestStep, s.maxStep || 0);
+                        st.lastMs = Math.max(st.lastMs, s.lastMs, s.startMs);
+                    });
+                    if (st.status === 'completed') st.furthestStep = c.stepsTotal;
+                    u.courseStatus[c.id] = st;
+                    if (st.status === 'completed') u.completedCount++;
+                    if (st.status !== 'not_started') u.startedCount++;
+                });
+            });
+        }
 
-                document.getElementById('stat-total').textContent = allUsers.length;
-                document.getElementById('stat-named').textContent = allUsers.filter(u => u.isReal).length;
-                document.getElementById('stat-active').textContent = allUsers.filter(u => u.activeRecently).length;
+        // ------------------------------------------------------------------
+        // COURSE ANALYTICS (respects the date range for time-stamped activity)
+        // ------------------------------------------------------------------
+        function courseStats(c) {
+            const start = rangeStart();
+            const launches = D.launches.filter(l => l.course === c && l.ms >= start);
+            const sessions = D.sessions.filter(s => s.course === c && s.startMs >= start);
+            const scores = D.scores.filter(s => s.course === c && s.ms >= start);
+            const feedback = D.feedback.filter(f => f.course === c && f.ms >= start);
+            const attempts = D.attempts.filter(a => a.course === c && a.ms >= start);
 
-                renderedCount = 0;
-                renderUsers(allUsers);
-                await loadClassrooms(allUsers);
-            } catch (e) {
-                console.error('Failed to load users', e);
-                document.getElementById('user-table-body').innerHTML =
-                    '<tr><td colspan="5" class="px-4 py-6 text-center text-red-400 italic">Couldn\'t load users — check that firestore.rules has been deployed.</td></tr>';
+            // Learners = anyone with any activity on this course (all time, so status is fair),
+            // narrowed to those active in range for the range-based numbers.
+            const learnersAll = Object.values(userIndex).filter(u => u.courseStatus[c.id] && u.courseStatus[c.id].status !== 'not_started');
+            const activeUids = new Set([...launches.map(l => l.uid), ...sessions.map(s => s.uid), ...scores.map(s => s.uid)]);
+            const learnersInRange = learnersAll.filter(u => activeUids.has(u.uid) || (u.courseStatus[c.id].lastMs >= start));
+            const completed = learnersAll.filter(u => u.courseStatus[c.id].status === 'completed');
+            const completedInRange = learnersInRange.filter(u => u.courseStatus[c.id].status === 'completed');
+
+            // Visits: telemetry sessions (new) ∪ legacy per-visit game_scores docs not covered by a session.
+            const sessionIds = new Set(sessions.map(s => s.sessionId || s.id));
+            const legacyVisits = scores.filter(s => !sessionIds.has(s.sessionId));
+            const visits = sessions.length + legacyVisits.length;
+
+            const timed = sessions.filter(s => (s.activeMs || 0) > 0).map(s => s.activeMs);
+            const timedCompleted = sessions.filter(s => s.completed && (s.activeMs || 0) > 0).map(s => s.activeMs);
+
+            const bestScores = learnersAll.map(u => u.courseStatus[c.id].bestScore).filter(v => v !== null);
+            const rated = feedback.filter(f => typeof f.rating === 'number');
+            const dist = {}; rated.forEach(f => dist[f.rating] = (dist[f.rating] || 0) + 1);
+
+            // Funnel: furthest step reached per learner (all-time), bucketed for long modules.
+            const bucket = c.stepBucket || 1;
+            const steps = [];
+            for (let s = bucket; s <= c.stepsTotal; s += bucket) steps.push(s);
+            if (steps[steps.length - 1] !== c.stepsTotal) steps.push(c.stepsTotal);
+            const funnel = steps.map(s => {
+                const count = learnersAll.filter(u => u.courseStatus[c.id].furthestStep >= s).length;
+                return { label: (bucket === 1 ? `Step ${s}` : `≥ ${s}`) + (s === c.stepsTotal ? ' (end)' : ''), count, pct: pct(count, learnersAll.length), tip: `${count} of ${learnersAll.length} learners reached ${s} ${c.stepLabel}` };
+            });
+            funnel.unshift({ label: 'Started', count: learnersAll.length, pct: 100, tip: `${learnersAll.length} learners have opened this module` });
+
+            // Hardest scenarios (games only): lowest average score per scenarioIndex.
+            const byScenario = {};
+            attempts.forEach(a => {
+                if (typeof a.scenarioIndex !== 'number') return;
+                const k = a.scenarioIndex;
+                if (!byScenario[k]) byScenario[k] = { idx: k, question: a.question || `Scenario ${k}`, n: 0, sum: 0 };
+                byScenario[k].n++; byScenario[k].sum += (typeof a.score === 'number' ? a.score : 0);
+            });
+            const scenarioRows = Object.values(byScenario).map(r => ({ ...r, avg: r.n ? r.sum / r.n : 0 })).sort((a, b) => a.avg - b.avg);
+
+            // Entry + device mix.
+            const entry = {}, device = {};
+            sessions.forEach(s => { entry[s.entry || 'unknown'] = (entry[s.entry || 'unknown'] || 0) + 1; device[s.device || 'unknown'] = (device[s.device || 'unknown'] || 0) + 1; });
+
+            return {
+                launches: launches.length, sessions: sessions.length, visits, legacyVisits: legacyVisits.length,
+                learnersAll: learnersAll.length, learnersInRange: learnersInRange.length,
+                completed: completed.length, completedInRange: completedInRange.length,
+                completionRate: pct(completed.length, learnersAll.length),
+                avgScore: bestScores.length ? Math.round(mean(bestScores)) : null, scoredCount: bestScores.length,
+                medianTime: median(timed), meanTime: mean(timed), medianTimeCompleted: median(timedCompleted), timedCount: timed.length,
+                rating: rated.length ? (mean(rated.map(f => f.rating))).toFixed(1) : null, ratingCount: rated.length, dist, feedback,
+                funnel, scenarioRows, entry, device,
+            };
+        }
+
+        // Weekly buckets (last N weeks) of a list of ms timestamps.
+        function weeklySeries(msList, weeks = 12) {
+            const now = Date.now();
+            const series = new Array(weeks).fill(0), labels = [], tips = [];
+            for (let i = 0; i < weeks; i++) {
+                const end = now - (weeks - 1 - i) * 7 * DAY;
+                const d = new Date(end - 6 * DAY);
+                labels.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
             }
+            msList.forEach(ms => {
+                if (!ms) return;
+                const idx = weeks - 1 - Math.floor((now - ms) / (7 * DAY));
+                if (idx >= 0 && idx < weeks) series[idx]++;
+            });
+            series.forEach((v, i) => tips.push(`Week of ${labels[i]}: ${v}`));
+            return { series, labels, tips };
+        }
+        function dailySeries(msList, days = 30) {
+            const now = Date.now();
+            const series = new Array(days).fill(0), labels = [], tips = [];
+            for (let i = 0; i < days; i++) {
+                const d = new Date(now - (days - 1 - i) * DAY);
+                labels.push(d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }));
+            }
+            msList.forEach(ms => {
+                if (!ms) return;
+                const idx = days - 1 - Math.floor((now - ms) / DAY);
+                if (idx >= 0 && idx < days) series[idx]++;
+            });
+            series.forEach((v, i) => tips.push(`${labels[i]}: ${v}`));
+            return { series, labels, tips };
         }
 
-        function renderUsers(list) {
-            const tbody = document.getElementById('user-table-body');
-            const slice = list.slice(0, renderedCount + PAGE_SIZE);
-            renderedCount = slice.length;
-
-            tbody.innerHTML = slice.map(u => `
-                <tr class="border-t border-slate-50 hover:bg-slate-50">
-                    <td class="px-4 py-2 font-bold text-slate-700">${escapeHtml(u.name)}</td>
-                    <td class="px-4 py-2 text-slate-500">${escapeHtml(u.email)}</td>
-                    <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${u.role === 'teacher' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}">${u.role}</span></td>
-                    <td class="px-4 py-2 font-mono text-slate-500">${escapeHtml(u.classroomCode) || '—'}</td>
-                    <td class="px-4 py-2 text-slate-400">${u.lastLoginLabel}</td>
-                </tr>
-            `).join('');
-
-            document.getElementById('user-count-label').textContent = `Showing ${slice.length} of ${list.length}`;
-            document.getElementById('btn-load-more').classList.toggle('hidden', renderedCount >= list.length);
+        // ------------------------------------------------------------------
+        // ROUTER
+        // ------------------------------------------------------------------
+        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
+        function route() {
+            if (mainView.classList.contains('hidden')) return;
+            const hash = location.hash.replace(/^#\/?/, '');
+            const [section, arg] = hash.split('/');
+            const page = TITLES[section] ? section : 'overview';
+            document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === page));
+            $('page-title').textContent = TITLES[page];
+            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
+            const out = typeof render === 'function' ? render() : '';
+            $('page').innerHTML = typeof out === 'function' ? out() : out;
+            if (window.lucide) lucide.createIcons();
+            bindPage(page, arg);
+            if (page === 'users' && arg) openUserDrawer(arg); else closeDrawer();
         }
-
-        document.getElementById('btn-load-more').onclick = () => {
-            const term = document.getElementById('user-search').value.trim().toLowerCase();
-            const filtered = term ? filterUsers(term) : allUsers;
-            renderUsers(filtered);
-        };
-
-        function filterUsers(term) {
-            return allUsers.filter(u =>
-                u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
-            );
-        }
-
-        let searchDebounce;
-        document.getElementById('user-search').addEventListener('input', (e) => {
-            clearTimeout(searchDebounce);
-            searchDebounce = setTimeout(() => {
-                const term = e.target.value.trim().toLowerCase();
-                renderedCount = 0;
-                renderUsers(term ? filterUsers(term) : allUsers);
-            }, 200);
+        window.addEventListener('hashchange', route);
+        $('btn-refresh').onclick = async () => { await loadEverything(); route(); };
+        $('range-picker').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-range]'); if (!b) return;
+            rangeDays = parseInt(b.dataset.range, 10);
+            document.querySelectorAll('#range-picker .chip').forEach(c => c.classList.toggle('active', c === b));
+            route();
         });
 
-        async function loadClassrooms(usersList) {
-            const container = document.getElementById('classrooms-list');
-            try {
-                const snap = await getDocs(collection(db, 'artifacts', appId, 'classrooms'));
-                document.getElementById('stat-classrooms').textContent = snap.size;
+        function errorStrip() {
+            const keys = Object.keys(D.errors);
+            if (!keys.length) return '';
+            return `<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 mb-4"><p class="font-bold uppercase tracking-wide text-[10px] mb-1">Some data sources didn't load</p>${keys.map(k => `<p><span class="font-mono font-bold">${esc(k)}</span> — ${esc(D.errors[k])}</p>`).join('')}</div>`;
+        }
 
-                if (snap.empty) {
-                    container.innerHTML = '<p class="text-xs text-slate-400 italic">No classrooms yet.</p>';
-                    return;
-                }
+        // ------------------------------------------------------------------
+        // PAGE: OVERVIEW
+        // ------------------------------------------------------------------
+        function renderOverview() {
+            const now = Date.now(), start = rangeStart();
+            const users = Object.values(userIndex).filter(u => !u.orphan);
+            const active24 = users.filter(u => now - u.lastActiveMs < DAY).length;
+            const active7 = users.filter(u => now - u.lastActiveMs < 7 * DAY).length;
+            const newInRange = users.filter(u => u.lastLoginMs >= start).length;
+            const sessionsInRange = D.sessions.filter(s => s.startMs >= start);
+            const launchesInRange = D.launches.filter(l => l.ms >= start);
+            const completionsInRange = D.scores.filter(s => s.course && s.course.isComplete(s) && s.ms >= start).length + D.sessions.filter(s => s.completed && s.startMs >= start && !D.scores.some(sc => sc.sessionId === s.sessionId)).length;
+            const rated = D.feedback.filter(f => typeof f.rating === 'number' && f.ms >= start);
+            const activeMs = sessionsInRange.reduce((a, s) => a + (s.activeMs || 0), 0);
 
-                container.innerHTML = snap.docs.map(d => {
-                    const c = d.data();
-                    const studentCount = usersList.filter(u => u.classroomCode === d.id).length;
-                    const created = c.createdAt && c.createdAt.toDate ? c.createdAt.toDate().toLocaleDateString() : '—';
-                    const modules = (c.assignedModules || []).join(', ') || 'None assigned';
-                    return `
-                        <div class="border border-slate-100 rounded p-3 flex items-center justify-between">
-                            <div>
-                                <p class="font-bold text-slate-700 text-sm">${escapeHtml(c.teacherName || 'Unknown')} <span class="font-mono text-xs text-slate-400">(${d.id})</span></p>
-                                <p class="text-[10px] text-slate-400 mt-0.5">Created ${created} · Modules: ${escapeHtml(modules)}</p>
-                            </div>
-                            <span class="text-xs font-bold text-[#357889]">${studentCount} student${studentCount === 1 ? '' : 's'}</span>
+            const daily = dailySeries([...sessionsInRange.map(s => s.startMs), ...D.launches.filter(l => l.ms >= start && !sessionsInRange.some(s => s.uid === l.uid && Math.abs(s.startMs - l.ms) < 5 * 60e3)).map(l => l.ms)], rangeDays && rangeDays <= 30 ? rangeDays : 30);
+
+            const courseRows = COURSES.map(c => ({ c, s: courseStats(c) }));
+            const latestMessages = D.messages.slice(0, 5);
+
+            return `
+                ${errorStrip()}
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    ${tile('Total accounts', users.length, `${users.filter(u => !u.isGeneric).length} with a real name`)}
+                    ${tile('Active (7d)', active7, `${active24} in the last 24h`)}
+                    ${tile('Module visits', sessionsInRange.length + launchesInRange.length, `${rangeLabel()} · ${fmtDuration(activeMs)} of active learning`)}
+                    ${tile('Completions', completionsInRange, `${rangeLabel()} · avg rating ${rated.length ? (mean(rated.map(f => f.rating)).toFixed(1) + '★') : '—'}`)}
+                </div>
+                <div class="grid lg:grid-cols-3 gap-4 mb-6">
+                    <div class="lg:col-span-2">${card(`Activity by day · ${rangeDays && rangeDays <= 30 ? rangeLabel() : 'last 30 days'}`, barChart({ ...daily, height: 110, yLabel: 'Module visits per day (telemetry sessions + dashboard launches)' }))}</div>
+                    ${card('Who is here', `<div class="space-y-2 text-xs">${['Learner Recruit', '13+ Account', 'Teacher', 'Guest'].map(t => { const n = users.filter(u => u.type === t).length; return `<div class="flex items-center justify-between"><span>${typeBadge(t)}</span><span class="font-bold text-slate-700">${n} <span class="text-slate-400 font-normal">(${pct(n, users.length)}%)</span></span></div>`; }).join('')}<div class="flex items-center justify-between pt-2 border-t border-slate-100"><span class="text-slate-500">New sign-ins ${rangeLabel()}</span><span class="font-bold text-slate-700">${newInRange}</span></div><div class="flex items-center justify-between"><span class="text-slate-500">Classrooms</span><span class="font-bold text-slate-700">${D.classrooms.length}</span></div></div>`)}
+                </div>
+                ${card('Courses at a glance', `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-2 pr-4">Course</th><th class="text-right font-bold py-2 px-2">Learners</th><th class="text-right font-bold py-2 px-2">Completed</th><th class="text-right font-bold py-2 px-2">Rate</th><th class="text-right font-bold py-2 px-2">Avg score</th><th class="text-right font-bold py-2 px-2">Median time</th><th class="text-right font-bold py-2 px-2">Rating</th><th class="text-right font-bold py-2 pl-2">Visits (${rangeLabel()})</th></tr></thead><tbody>${courseRows.map(({ c, s }) => `
+                    <tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" onclick="location.hash='#/courses/${c.id}'">
+                        <td class="py-2 pr-4 font-bold text-slate-700">${esc(c.name)}<span class="block text-[10px] text-slate-400 font-normal">${esc(c.category)}</span></td>
+                        <td class="py-2 px-2 text-right">${s.learnersAll}</td>
+                        <td class="py-2 px-2 text-right">${s.completed}</td>
+                        <td class="py-2 px-2 text-right font-bold">${s.completionRate}%</td>
+                        <td class="py-2 px-2 text-right">${s.avgScore !== null ? s.avgScore + '%' : '<span class="text-slate-300">n/a</span>'}</td>
+                        <td class="py-2 px-2 text-right">${s.timedCount ? fmtDuration(s.medianTime) : '<span class="text-slate-300">—</span>'}</td>
+                        <td class="py-2 px-2 text-right">${s.rating ? s.rating + '★ <span class="text-slate-400">(' + s.ratingCount + ')</span>' : '<span class="text-slate-300">—</span>'}</td>
+                        <td class="py-2 pl-2 text-right">${s.visits + s.launches}</td>
+                    </tr>`).join('')}</tbody></table></div>`, `<a href="#/courses" class="text-[10px] font-bold uppercase tracking-wide text-[#357889] hover:underline">Open Courses →</a>`)}
+                <div class="grid lg:grid-cols-2 gap-4 mt-6">
+                    ${card('Latest messages', latestMessages.length ? latestMessages.map(m => messageRow(m)).join('') : emptyMsg('No messages yet.'), `<a href="#/inbox" class="text-[10px] font-bold uppercase tracking-wide text-[#357889] hover:underline">Inbox →</a>`)}
+                    ${card('Recent activity', recentActivity(), '<span class="text-[10px] text-slate-400">telemetry event stream</span>')}
+                </div>`;
+        }
+
+        function recentActivity() {
+            const rows = D.events.slice(0, 12);
+            if (!rows.length) return emptyMsg('No telemetry events yet — they start flowing once a learner opens a module after this deploy.');
+            const label = { module_open: 'opened', step: 'reached step', choice: 'answered a scenario in', module_complete: 'completed' };
+            return `<div class="space-y-1.5">${rows.map(e => {
+                const u = userIndex[e.uid];
+                const c = courseBySlug[e.module] || courseByGameName[e.gameName];
+                const stepTxt = e.event === 'step' && e.meta && e.meta.step ? ` ${e.meta.step}` : '';
+                return `<div class="text-xs flex items-center justify-between gap-2"><span class="truncate"><a href="#/users/${esc(e.uid)}" class="font-bold text-slate-700 hover:underline">${esc(u ? u.name : 'Unknown')}</a> <span class="text-slate-500">${label[e.event] || esc(e.event)}${stepTxt}</span> <span class="text-slate-700">${esc(c ? c.name : (e.gameName || e.module || ''))}</span></span><span class="text-[10px] text-slate-400 shrink-0">${fmtAgo(e.ms)}</span></div>`;
+            }).join('')}</div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: USERS
+        // ------------------------------------------------------------------
+        const USER_FILTERS = [
+            ['all', 'All'], ['Learner Recruit', 'Learner Recruits'], ['13+ Account', '13+ Accounts'], ['Teacher', 'Teachers'], ['Guest', 'Guests'],
+            ['classroom', 'In a classroom'], ['active7', 'Active 7d'], ['completed', 'Completed something'],
+        ];
+        const USER_SORTS = {
+            lastActive: ['Last active', u => u.lastActiveMs],
+            launches: ['Most launches', u => u.launches.length + u.sessions.length],
+            completed: ['Most completions', u => u.completedCount],
+            time: ['Most time on task', u => u.totalActiveMs],
+            name: ['Name', u => (u.name || '').toLowerCase()],
+            lastLogin: ['Last login', u => u.lastLoginMs],
+        };
+        function filteredUsers() {
+            const now = Date.now();
+            let list = Object.values(userIndex).filter(u => !u.orphan);
+            const f = usersView.filter;
+            if (f === 'classroom') list = list.filter(u => !!u.classroomCode);
+            else if (f === 'active7') list = list.filter(u => now - u.lastActiveMs < 7 * DAY);
+            else if (f === 'completed') list = list.filter(u => u.completedCount > 0);
+            else if (f !== 'all') list = list.filter(u => u.type === f);
+            const term = usersView.search.trim().toLowerCase();
+            if (term) list = list.filter(u => (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term) || u.uid.toLowerCase().includes(term) || (u.recruitCode || '').includes(term) || (u.classroomCode || '').toLowerCase().includes(term));
+            const key = USER_SORTS[usersView.sort][1];
+            list.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * (usersView.dir === 'asc' ? 1 : -1); });
+            return list;
+        }
+        function renderUsers() {
+            const list = filteredUsers();
+            const cols = [['name', 'Name'], ['type', 'Type'], ['classroomCode', 'Classroom'], ['launches', 'Visits'], ['started', 'Started'], ['completed', 'Completed'], ['time', 'Time on task'], ['lastActive', 'Last active']];
+            return `
+                ${errorStrip()}
+                <div class="bg-white rounded-lg shadow">
+                    <div class="p-4 border-b border-slate-100 flex flex-col lg:flex-row gap-3 lg:items-center">
+                        <div class="flex flex-wrap gap-1" id="user-filters">${USER_FILTERS.map(([k, l]) => `<button data-filter="${k}" class="chip border border-slate-200 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${usersView.filter === k ? 'active' : ''}">${l}</button>`).join('')}</div>
+                        <div class="flex gap-2 lg:ml-auto">
+                            <select id="user-sort" class="border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#357889]">${Object.entries(USER_SORTS).map(([k, [l]]) => `<option value="${k}" ${usersView.sort === k ? 'selected' : ''}>Sort: ${l}</option>`).join('')}</select>
+                            <input id="user-search" type="text" value="${esc(usersView.search)}" placeholder="Search name, email, uid, code…" class="border border-slate-200 rounded px-3 py-1.5 text-xs w-full lg:w-56 focus:outline-none focus:border-[#357889]">
+                            <button id="btn-export-users" class="text-[10px] font-bold uppercase tracking-wide border border-slate-200 rounded px-2 py-1 hover:border-[#357889] hover:text-[#357889] whitespace-nowrap">CSV</button>
                         </div>
-                    `;
-                }).join('');
-            } catch (e) {
-                console.error('Failed to load classrooms', e);
-                container.innerHTML = '<p class="text-xs text-red-400 italic">Couldn\'t load classrooms.</p>';
-            }
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 text-slate-400 uppercase tracking-wide text-[10px]"><tr>${cols.map(([k, l]) => `<th class="text-left font-bold px-4 py-2 whitespace-nowrap">${l}</th>`).join('')}</tr></thead>
+                            <tbody>${list.slice(0, 200).map(u => `
+                                <tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-uid="${esc(u.uid)}">
+                                    <td class="px-4 py-2"><span class="font-bold text-slate-700">${esc(u.name)}</span><span class="block text-[10px] text-slate-400">${esc(u.email || (u.recruitCode ? 'code: ' + u.recruitCode : 'anonymous'))}</span></td>
+                                    <td class="px-4 py-2">${typeBadge(u.type)}</td>
+                                    <td class="px-4 py-2 font-mono text-slate-500">${esc(u.classroomCode) || '—'}</td>
+                                    <td class="px-4 py-2 text-slate-600">${u.launches.length + u.sessions.length}</td>
+                                    <td class="px-4 py-2 text-slate-600">${u.startedCount}<span class="text-slate-300">/${COURSES.length}</span></td>
+                                    <td class="px-4 py-2 font-bold ${u.completedCount ? 'text-emerald-600' : 'text-slate-400'}">${u.completedCount}</td>
+                                    <td class="px-4 py-2 text-slate-600">${u.totalActiveMs ? fmtDuration(u.totalActiveMs) : '<span class="text-slate-300">—</span>'}</td>
+                                    <td class="px-4 py-2 text-slate-400 whitespace-nowrap" title="${fmtDateTime(u.lastActiveMs)}">${fmtAgo(u.lastActiveMs)}</td>
+                                </tr>`).join('') || `<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400 italic">No users match.</td></tr>`}</tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 text-[10px] text-slate-400">Showing ${Math.min(200, list.length)} of ${list.length} · click a row for the full profile</div>
+                </div>`;
         }
 
-        // Message HQ: every portal (dashboard, DDC, and any future module that adopts the
-        // same pattern) writes directly into this flat top-level collection with
-        // {senderUid, senderName, senderEmail, message, source, timestamp} — "source" is
-        // which portal it came from. Flat (not nested per-user), so this is a plain query,
-        // not a collectionGroup — no per-module rules changes ever needed for this.
-        async function loadMessages() {
-            const container = document.getElementById('message-list');
-            try {
-                const snap = await getDocs(query(collection(db, 'artifacts', appId, 'messages'), orderBy('timestamp', 'desc'), limit(100)));
+        function courseStatusTable(u) {
+            return `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Course</th><th class="text-left font-bold py-1">Status</th><th class="text-right font-bold py-1">Progress</th><th class="text-right font-bold py-1">Best</th><th class="text-right font-bold py-1">Time</th><th class="text-right font-bold py-1">Last</th></tr></thead><tbody>${COURSES.map(c => { const st = u.courseStatus[c.id]; return `
+                <tr class="border-t border-slate-50"><td class="py-1.5 pr-2 font-bold text-slate-700">${esc(c.name)}</td><td class="py-1.5 pr-2">${statusChip(st.status)}</td><td class="py-1.5 text-right text-slate-600">${st.furthestStep}/${c.stepsTotal}</td><td class="py-1.5 text-right text-slate-600">${st.bestScore !== null ? st.bestScore + '%' : '—'}</td><td class="py-1.5 text-right text-slate-600">${st.activeMs ? fmtDuration(st.activeMs) : '—'}</td><td class="py-1.5 text-right text-slate-400">${fmtAgo(st.lastMs)}</td></tr>`; }).join('')}</tbody></table>`;
+        }
 
-                if (snap.empty) {
-                    container.innerHTML = '<p class="text-xs text-slate-400 italic">No messages yet.</p>';
-                    return;
-                }
-
-                container.innerHTML = snap.docs.map(d => {
-                    const f = d.data();
-                    const when = f.timestamp && f.timestamp.toDate ? f.timestamp.toDate().toLocaleString() : '—';
-                    return `
-                        <div class="border border-slate-100 rounded p-3">
-                            <div class="flex items-center justify-between mb-1 gap-2">
-                                <div class="flex items-center gap-2 min-w-0">
-                                    <span class="font-bold text-slate-700 text-xs truncate">${escapeHtml(f.senderName || 'Anonymous')}</span>
-                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 bg-blue-100 text-blue-700">${escapeHtml(f.source || 'Unknown portal')}</span>
-                                </div>
-                                <span class="text-[10px] text-slate-400 shrink-0">${when}</span>
-                            </div>
-                            <p class="text-xs text-slate-500 mb-1">${escapeHtml(f.senderEmail || '')}</p>
-                            <p class="text-sm text-slate-700">${escapeHtml(f.message || '')}</p>
+        function openUserDrawer(uid) {
+            const u = userIndex[uid];
+            const drawer = $('drawer');
+            if (!u) { drawer.innerHTML = `<div class="p-6 text-xs text-slate-400">No user with uid ${esc(uid)}.</div>`; }
+            else {
+                const sessions = [...u.sessions].sort((a, b) => b.startMs - a.startMs).slice(0, 10);
+                const scores = [...u.scores].sort((a, b) => b.ms - a.ms).slice(0, 10);
+                drawer.innerHTML = `
+                    <div class="p-5 border-b border-slate-100 flex items-start justify-between gap-3 sticky top-0 bg-white z-10">
+                        <div class="min-w-0">
+                            <h2 class="font-bold text-slate-800 text-lg leading-tight truncate">${esc(u.name)}</h2>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">${typeBadge(u.type)}<span class="text-[10px] text-slate-400">${esc(u.role)}</span>${u.classroomCode ? `<span class="text-[10px] font-mono text-slate-500">classroom ${esc(u.classroomCode)}</span>` : ''}</div>
                         </div>
-                    `;
-                }).join('');
-            } catch (e) {
-                console.error('Failed to load messages', e);
-                container.innerHTML = e.code === 'failed-precondition'
-                    ? `<p class="text-xs text-amber-600 italic">This needs a one-time Firestore index — check the browser console for a link to create it, then reload.</p>`
-                    : '<p class="text-xs text-red-400 italic">Couldn\'t load messages.</p>';
-            }
-        }
-
-        // End-of-module feedback lives in this flat top-level collection (uid, name,
-        // gameName, rating, feedback, timestamp) — separate from game_scores, which stays
-        // focused on progress/completion. Only Digital Decisions writes here today; any
-        // future module that adopts the same shape will show up here automatically.
-        async function loadCourseFeedback() {
-            const container = document.getElementById('course-feedback-list');
-            try {
-                const snap = await getDocs(query(collection(db, 'artifacts', appId, 'course_feedback'), orderBy('timestamp', 'desc'), limit(500)));
-
-                const byCourse = {};
-                snap.forEach(d => {
-                    const s = d.data();
-                    const course = s.gameName || 'Unknown module';
-                    if (!byCourse[course]) byCourse[course] = [];
-                    byCourse[course].push({
-                        name: s.name || 'Anonymous',
-                        text: s.feedback || '',
-                        rating: typeof s.rating === 'number' ? s.rating : null,
-                        whenMs: s.timestamp && s.timestamp.toDate ? s.timestamp.toDate().getTime() : 0,
-                    });
-                });
-
-                const courses = Object.keys(byCourse);
-                if (courses.length === 0) {
-                    container.innerHTML = '<p class="text-xs text-slate-400 italic">No course feedback yet.</p>';
-                    return;
-                }
-
-                container.innerHTML = courses.map(course => {
-                    const entries = byCourse[course].sort((a, b) => b.whenMs - a.whenMs);
-                    const rated = entries.filter(e => e.rating !== null);
-                    const avg = rated.length ? (rated.reduce((s, e) => s + e.rating, 0) / rated.length).toFixed(1) : null;
-
-                    return `
-                        <div>
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide">${escapeHtml(course)}</h3>
-                                <span class="text-[10px] text-slate-400">${entries.length} response${entries.length === 1 ? '' : 's'}${avg ? ` · avg ${avg}★` : ''}</span>
-                            </div>
-                            <div class="space-y-2">
-                                ${entries.map(e => {
-                                    const when = e.whenMs ? new Date(e.whenMs).toLocaleString() : '—';
-                                    const stars = e.rating ? `<span class="text-amber-400">${'★'.repeat(e.rating)}${'☆'.repeat(Math.max(0, 5 - e.rating))}</span>` : '<span class="text-slate-300 text-xs italic">No rating</span>';
-                                    return `
-                                        <div class="border border-slate-100 rounded p-3">
-                                            <div class="flex items-center justify-between mb-1">
-                                                <span class="font-bold text-slate-700 text-xs">${escapeHtml(e.name)}</span>
-                                                <span class="text-[10px] text-slate-400">${when}</span>
-                                            </div>
-                                            <p class="text-sm mb-1">${stars}</p>
-                                            ${e.text ? `<p class="text-sm text-slate-700">${escapeHtml(e.text)}</p>` : ''}
-                                        </div>
-                                    `;
-                                }).join('')}
-                            </div>
+                        <button id="drawer-close" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div class="p-5 space-y-5">
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div><p class="text-[10px] uppercase text-slate-400 font-bold">Email</p><p class="text-slate-700 break-all">${esc(u.email || '—')}</p></div>
+                            <div><p class="text-[10px] uppercase text-slate-400 font-bold">Recruit code</p><p class="font-mono text-slate-700">${esc(u.recruitCode || '—')}</p></div>
+                            <div><p class="text-[10px] uppercase text-slate-400 font-bold">Last login</p><p class="text-slate-700">${fmtDateTime(u.lastLoginMs)}</p></div>
+                            <div><p class="text-[10px] uppercase text-slate-400 font-bold">Last active</p><p class="text-slate-700">${fmtDateTime(u.lastActiveMs)}</p></div>
+                            <div><p class="text-[10px] uppercase text-slate-400 font-bold">Total time on task</p><p class="text-slate-700">${fmtDuration(u.totalActiveMs)} <span class="text-slate-400">across ${u.sessions.length} tracked session${u.sessions.length === 1 ? '' : 's'}</span></p></div>
+                            <div><p class="text-[10px] uppercase text-slate-400 font-bold">Dashboard launches</p><p class="text-slate-700">${u.launches.length}</p></div>
+                            <div class="col-span-2"><p class="text-[10px] uppercase text-slate-400 font-bold">UID</p><p class="font-mono text-[10px] text-slate-500 break-all">${esc(u.uid)}</p></div>
                         </div>
-                    `;
-                }).join('<hr class="border-slate-100 my-4">');
-            } catch (e) {
-                console.error('Failed to load course feedback', e);
-                container.innerHTML = e.code === 'failed-precondition'
-                    ? `<p class="text-xs text-amber-600 italic">This needs a one-time Firestore index — check the browser console for a link to create it, then reload.</p>`
-                    : '<p class="text-xs text-red-400 italic">Couldn\'t load course feedback.</p>';
+                        <div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Course progress</h3>${courseStatusTable(u)}</div>
+                        <div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Recent sessions</h3>${sessions.length ? `<div class="space-y-1">${sessions.map(s => `<div class="text-xs flex items-center justify-between gap-2 border border-slate-100 rounded px-2 py-1.5"><span class="truncate"><span class="font-bold text-slate-700">${esc(s.course ? s.course.name : s.module)}</span> <span class="text-slate-400">· ${esc(s.entry || '')} · ${esc(s.device || '')}</span></span><span class="text-slate-500 shrink-0">${fmtDuration(s.activeMs)} · step ${s.maxStep || 0}/${s.stepsTotal || '?'}${s.completed ? ' · ✓' : ''}</span><span class="text-[10px] text-slate-400 shrink-0">${fmtAgo(s.startMs)}</span></div>`).join('')}</div>` : emptyMsg('No telemetry sessions yet (recorded from this deploy onward).')}</div>
+                        <div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Score history</h3>${scores.length ? `<div class="space-y-1">${scores.map(s => `<div class="text-xs flex items-center justify-between gap-2 border border-slate-100 rounded px-2 py-1.5"><span class="font-bold text-slate-700 truncate">${esc(s.gameName)}</span><span class="text-slate-500 shrink-0">${[typeof s.percentage === 'number' ? s.percentage + '%' : (typeof s.finalScore === 'number' ? s.finalScore + ' pts' : ''), s.rank ? esc(s.rank) : '', (s.completed || s.complete) ? 'completed ✓' : ''].filter(Boolean).join(' · ')}</span><span class="text-[10px] text-slate-400 shrink-0">${fmtAgo(s.ms)}</span></div>`).join('')}</div>` : emptyMsg('No score records.')}</div>
+                        ${u.messages.length ? `<div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Messages sent (${u.messages.length})</h3>${u.messages.slice(0, 5).map(m => messageRow(m)).join('')}</div>` : ''}
+                        ${u.feedback.length ? `<div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Feedback given (${u.feedback.length})</h3>${u.feedback.slice(0, 5).map(f => feedbackRow(f)).join('')}</div>` : ''}
+                        <div class="border-t-4 border-red-200 rounded-lg p-3 bg-red-50/40">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-red-600">Danger zone</p>
+                            <p class="text-[11px] text-slate-500 mt-1">Permanently deletes this user's profile, scores, launches, progress, sessions, events, messages and feedback. For deletion requests only.</p>
+                            <button class="mt-2 bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded text-[10px] uppercase tracking-wide" id="drawer-delete" data-uid="${esc(u.uid)}">Delete this user's data</button>
+                            <p id="drawer-delete-status" class="text-[11px] mt-2"></p>
+                        </div>
+                    </div>`;
+            }
+            drawer.classList.remove('closed');
+            $('drawer-backdrop').classList.remove('hidden');
+            if (window.lucide) lucide.createIcons();
+            const closeBtn = $('drawer-close'); if (closeBtn) closeBtn.onclick = closeDrawer;
+            const del = $('drawer-delete'); if (del) del.onclick = () => deleteUserData(del.dataset.uid, $('drawer-delete-status'));
+        }
+        function closeDrawer() {
+            $('drawer').classList.add('closed');
+            $('drawer-backdrop').classList.add('hidden');
+            if (location.hash.startsWith('#/users/')) history.replaceState(null, '', '#/users');
+        }
+        $('drawer-backdrop').onclick = closeDrawer;
+
+        // ------------------------------------------------------------------
+        // PAGE: COURSES
+        // ------------------------------------------------------------------
+        function renderCourses() {
+            return `${errorStrip()}<div class="grid md:grid-cols-2 gap-4">${COURSES.map(c => {
+                const s = courseStats(c);
+                const trend = weeklySeries([...D.sessions.filter(x => x.course === c).map(x => x.startMs), ...D.launches.filter(l => l.course === c).map(l => l.ms)], 12);
+                return `<a href="#/courses/${c.id}" class="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow block">
+                    <div class="flex items-start justify-between gap-2"><div><h2 class="font-bold text-slate-800 text-sm">${esc(c.name)}</h2><p class="text-[10px] text-slate-400 uppercase tracking-wide">${esc(c.category)}</p></div><span class="text-[10px] font-bold uppercase tracking-wide text-[#357889]">Details →</span></div>
+                    <div class="grid grid-cols-4 gap-2 mt-3 text-center">
+                        <div><p class="text-lg font-bold text-slate-800">${s.learnersAll}</p><p class="text-[9px] uppercase text-slate-400 font-bold">Learners</p></div>
+                        <div><p class="text-lg font-bold text-slate-800">${s.completionRate}%</p><p class="text-[9px] uppercase text-slate-400 font-bold">Complete</p></div>
+                        <div><p class="text-lg font-bold text-slate-800">${s.timedCount ? fmtDuration(s.medianTime) : '—'}</p><p class="text-[9px] uppercase text-slate-400 font-bold">Median time</p></div>
+                        <div><p class="text-lg font-bold text-slate-800">${s.rating ? s.rating + '★' : '—'}</p><p class="text-[9px] uppercase text-slate-400 font-bold">Rating</p></div>
+                    </div>
+                    <div class="mt-3">${barChart({ ...trend, height: 70 })}<p class="text-[10px] text-slate-400">Visits per week · last 12 weeks</p></div>
+                </a>`;
+            }).join('')}</div>`;
+        }
+
+        function renderCourseDetail(id) {
+            const c = courseBySlug[id];
+            if (!c) return `<p class="text-xs text-slate-400">Unknown course.</p>`;
+            const s = courseStats(c);
+            const trend = weeklySeries([...D.sessions.filter(x => x.course === c).map(x => x.startMs), ...D.launches.filter(l => l.course === c).map(l => l.ms)], 12);
+            const learners = Object.values(userIndex).filter(u => u.courseStatus[c.id].status !== 'not_started').sort((a, b) => b.courseStatus[c.id].lastMs - a.courseStatus[c.id].lastMs);
+            const mix = (obj) => { const total = Object.values(obj).reduce((a, b) => a + b, 0); const keys = Object.keys(obj).sort((a, b) => obj[b] - obj[a]); return keys.length ? keys.map(k => `<span class="inline-block mr-3"><span class="font-bold text-slate-700">${esc(k)}</span> <span class="text-slate-500">${obj[k]} (${pct(obj[k], total)}%)</span></span>`).join('') : '<span class="text-slate-300">no telemetry sessions yet</span>'; };
+            return `
+                ${errorStrip()}
+                <a href="#/courses" class="text-[10px] font-bold uppercase tracking-wide text-slate-400 hover:text-[#357889]">← All courses</a>
+                <div class="flex items-end justify-between gap-3 flex-wrap mt-1 mb-4"><div><h2 class="font-bold text-slate-800 text-xl">${esc(c.name)}</h2><p class="text-[10px] text-slate-400 uppercase tracking-wide">${esc(c.category)} · ${c.stepsTotal} ${esc(c.stepLabel.replace(' reached', '').replace(' answered', ''))}</p></div><button id="btn-export-course" class="text-[10px] font-bold uppercase tracking-wide border border-slate-200 rounded px-2 py-1 hover:border-[#357889] hover:text-[#357889]">Export learners CSV</button></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
+                    ${tile('Learners', s.learnersAll, 'all time, any activity')}
+                    ${tile('Completed', s.completed, `${s.completionRate}% completion rate`)}
+                    ${tile('Visits', s.visits + s.launches, `${rangeLabel()}`)}
+                    ${tile('Active in range', s.learnersInRange, `${s.completedInRange} finished`)}
+                    ${tile('Avg best score', s.avgScore !== null ? s.avgScore + '%' : 'n/a', c.scored ? `${s.scoredCount} scored learners` : 'not a scored module')}
+                    ${tile('Median time', s.timedCount ? fmtDuration(s.medianTime) : '—', s.timedCount ? `${s.timedCount} timed sessions · ${fmtDuration(s.medianTimeCompleted)} to finish` : 'needs telemetry sessions')}
+                    ${tile('Rating', s.rating ? s.rating + '★' : '—', `${s.ratingCount} rating${s.ratingCount === 1 ? '' : 's'} ${rangeLabel()}`)}
+                    ${tile('Feedback', s.feedback.filter(f => f.feedback).length, 'written comments')}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-4">
+                    ${card('Visits per week · last 12 weeks', barChart({ ...trend, height: 110, yLabel: 'Telemetry sessions + dashboard launches' }))}
+                    ${card(`Progress funnel · ${esc(c.stepLabel)}`, funnelChart(s.funnel) + `<p class="text-[10px] text-slate-400 mt-2">Share of all-time learners whose furthest point reached each step. The biggest drop between two rows is where people quit.</p>`)}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-4">
+                    ${card('How learners arrive', `<p class="text-xs mb-2"><span class="text-[10px] uppercase text-slate-400 font-bold block mb-1">Entry point</span>${mix(s.entry)}</p><p class="text-xs"><span class="text-[10px] uppercase text-slate-400 font-bold block mb-1">Device</span>${mix(s.device)}</p>`)}
+                    ${card('Ratings', s.ratingCount ? `<div class="flex items-center gap-4"><div class="text-center"><p class="text-3xl font-bold text-slate-800">${s.rating}</p><p class="text-[10px] text-slate-400 uppercase font-bold">avg of ${s.ratingCount}</p></div><div class="flex-1">${ratingBars(s.dist, s.ratingCount)}</div></div>` : emptyMsg(c.id === 'digital-decisions' ? 'No ratings in this range.' : 'This module does not ask for an end-of-module rating yet — add the shared feedback prompt to start collecting one.'))}
+                </div>
+                ${c.scored ? card('Hardest scenarios · lowest average score', s.scenarioRows.length ? `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1 pr-2">#</th><th class="text-left font-bold py-1 pr-2">Scenario</th><th class="text-right font-bold py-1 px-2">Attempts</th><th class="text-right font-bold py-1 pl-2">Avg score</th></tr></thead><tbody>${s.scenarioRows.slice(0, 8).map(r => `<tr class="border-t border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${r.idx}</td><td class="py-1.5 pr-2 text-slate-700">${esc(r.question)}</td><td class="py-1.5 px-2 text-right">${r.n}</td><td class="py-1.5 pl-2 text-right font-bold ${r.avg < 1.5 ? 'text-red-500' : r.avg < 2.5 ? 'text-amber-600' : 'text-emerald-600'}">${r.avg.toFixed(2)}</td></tr>`).join('')}</tbody></table></div><p class="text-[10px] text-slate-400 mt-2">Scores per choice are 0–3 as written by the module. A consistently low scenario is either genuinely hard or ambiguously written — worth a look either way.</p>` : emptyMsg('No scenario attempts in this range.')) + '<div class="mb-4"></div>' : ''}
+                ${card(`Learners · ${learners.length}`, learners.length ? `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1 pr-2">Learner</th><th class="text-left font-bold py-1 pr-2">Status</th><th class="text-right font-bold py-1 px-2">Progress</th><th class="text-right font-bold py-1 px-2">Best</th><th class="text-right font-bold py-1 px-2">Time</th><th class="text-right font-bold py-1 pl-2">Last</th></tr></thead><tbody>${learners.slice(0, 100).map(u => { const st = u.courseStatus[c.id]; return `<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" onclick="location.hash='#/users/${esc(u.uid)}'"><td class="py-1.5 pr-2"><span class="font-bold text-slate-700">${esc(u.name)}</span> ${typeBadge(u.type)}</td><td class="py-1.5 pr-2">${statusChip(st.status)}</td><td class="py-1.5 px-2 text-right">${st.furthestStep}/${c.stepsTotal}</td><td class="py-1.5 px-2 text-right">${st.bestScore !== null ? st.bestScore + '%' : '—'}</td><td class="py-1.5 px-2 text-right">${st.activeMs ? fmtDuration(st.activeMs) : '—'}</td><td class="py-1.5 pl-2 text-right text-slate-400">${fmtAgo(st.lastMs)}</td></tr>`; }).join('')}</tbody></table></div>` : emptyMsg('Nobody has opened this module yet.'))}
+                <div class="mt-4">${card('Written feedback', s.feedback.filter(f => f.feedback).length ? s.feedback.filter(f => f.feedback).slice(0, 20).map(f => feedbackRow(f)).join('') : emptyMsg('No written feedback in this range.'))}</div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: CLASSROOMS
+        // ------------------------------------------------------------------
+        function renderClassrooms() {
+            if (!D.classrooms.length) return errorStrip() + card('Classrooms', emptyMsg('No classrooms yet.'));
+            return errorStrip() + `<div class="space-y-4">${D.classrooms.map(cl => {
+                const students = Object.values(userIndex).filter(u => u.classroomCode === cl.code && u.role !== 'teacher');
+                const modules = cl.assignedModules || [];
+                return card(`${esc(cl.teacherName || 'Unknown teacher')} <span class="font-mono text-slate-400 normal-case">(${esc(cl.code)})</span>`, `
+                    <p class="text-[10px] text-slate-400 mb-3">Created ${fmtDate(toMs(cl.createdAt))} · Assigned: ${modules.length ? modules.map(m => `<span class="font-bold text-slate-600">${esc(m)}</span>`).join(', ') : 'none'}</p>
+                    ${students.length ? `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1 pr-2">Student</th>${COURSES.map(c => `<th class="text-left font-bold py-1 px-2 whitespace-nowrap">${esc(c.name.replace(' Challenge', ''))}</th>`).join('')}<th class="text-right font-bold py-1 pl-2">Time</th><th class="text-right font-bold py-1 pl-2">Last active</th></tr></thead><tbody>${students.map(u => `<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" onclick="location.hash='#/users/${esc(u.uid)}'"><td class="py-1.5 pr-2 font-bold text-slate-700">${esc(u.name)}</td>${COURSES.map(c => `<td class="py-1.5 px-2">${statusChip(u.courseStatus[c.id].status)}</td>`).join('')}<td class="py-1.5 pl-2 text-right">${u.totalActiveMs ? fmtDuration(u.totalActiveMs) : '—'}</td><td class="py-1.5 pl-2 text-right text-slate-400">${fmtAgo(u.lastActiveMs)}</td></tr>`).join('')}</tbody></table></div>` : emptyMsg('No students have joined with this code yet.')}
+                `, `<span class="text-xs font-bold text-[#357889]">${students.length} student${students.length === 1 ? '' : 's'}</span>`);
+            }).join('')}</div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: INBOX
+        // ------------------------------------------------------------------
+        function messageRow(m) {
+            return `<div class="border border-slate-100 rounded p-3 mb-2">
+                <div class="flex items-center justify-between mb-1 gap-2">
+                    <div class="flex items-center gap-2 min-w-0"><a href="#/users/${esc(m.senderUid || '')}" class="font-bold text-slate-700 text-xs truncate hover:underline">${esc(m.senderName || 'Anonymous')}</a><span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 bg-blue-100 text-blue-700">${esc(m.source || 'Unknown portal')}</span></div>
+                    <span class="text-[10px] text-slate-400 shrink-0" title="${fmtDateTime(m.ms)}">${fmtAgo(m.ms)}</span>
+                </div>
+                ${m.senderEmail ? `<p class="text-[10px] text-slate-400 mb-1">${esc(m.senderEmail)}</p>` : ''}
+                <p class="text-sm text-slate-700 whitespace-pre-wrap">${esc(m.message || '')}</p>
+            </div>`;
+        }
+        function renderInbox() {
+            const sources = [...new Set(D.messages.map(m => m.source || 'Unknown portal'))].sort();
+            const term = inboxView.search.trim().toLowerCase();
+            const list = D.messages.filter(m => (inboxView.source === 'all' || (m.source || 'Unknown portal') === inboxView.source) && (!term || (m.message || '').toLowerCase().includes(term) || (m.senderName || '').toLowerCase().includes(term) || (m.senderEmail || '').toLowerCase().includes(term)));
+            return errorStrip() + card(`Message Inbox · ${list.length}`, list.length ? list.map(messageRow).join('') : emptyMsg('No messages match.'), `
+                <div class="flex gap-2 flex-wrap"><select id="inbox-source" class="border border-slate-200 rounded px-2 py-1 text-xs"><option value="all">All portals</option>${sources.map(s => `<option value="${esc(s)}" ${inboxView.source === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select><input id="inbox-search" type="text" value="${esc(inboxView.search)}" placeholder="Search messages…" class="border border-slate-200 rounded px-3 py-1 text-xs w-48 focus:outline-none focus:border-[#357889]"></div>`);
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: FEEDBACK
+        // ------------------------------------------------------------------
+        function feedbackRow(f) {
+            return `<div class="border border-slate-100 rounded p-3 mb-2">
+                <div class="flex items-center justify-between mb-1 gap-2"><span class="truncate"><a href="#/users/${esc(f.uid || '')}" class="font-bold text-slate-700 text-xs hover:underline">${esc(f.name || 'Anonymous')}</a> <span class="text-[10px] text-slate-400">· ${esc(f.gameName || '')}</span></span><span class="text-[10px] text-slate-400 shrink-0" title="${fmtDateTime(f.ms)}">${fmtAgo(f.ms)}</span></div>
+                <p class="text-sm mb-1">${stars(f.rating)}</p>
+                ${f.feedback ? `<p class="text-sm text-slate-700 whitespace-pre-wrap">${esc(f.feedback)}</p>` : ''}
+            </div>`;
+        }
+        function renderFeedback() {
+            const names = [...new Set(D.feedback.map(f => f.gameName || 'Unknown module'))].sort();
+            const list = D.feedback.filter(f => f.ms >= rangeStart() && (feedbackView.course === 'all' || (f.gameName || 'Unknown module') === feedbackView.course));
+            const rated = list.filter(f => typeof f.rating === 'number');
+            const dist = {}; rated.forEach(f => dist[f.rating] = (dist[f.rating] || 0) + 1);
+            const byCourse = names.map(n => { const r = D.feedback.filter(f => f.gameName === n && typeof f.rating === 'number' && f.ms >= rangeStart()); return { n, count: r.length, avg: r.length ? mean(r.map(f => f.rating)).toFixed(1) : null }; });
+            return errorStrip() + `
+                <div class="grid lg:grid-cols-3 gap-4 mb-4">
+                    ${card('Overall rating', rated.length ? `<div class="flex items-center gap-4"><div class="text-center"><p class="text-3xl font-bold text-slate-800">${mean(rated.map(f => f.rating)).toFixed(1)}</p><p class="text-[10px] text-slate-400 uppercase font-bold">${rated.length} ratings · ${rangeLabel()}</p></div><div class="flex-1">${ratingBars(dist, rated.length)}</div></div>` : emptyMsg('No ratings in this range.'))}
+                    <div class="lg:col-span-2">${card('By course', byCourse.length ? `<div class="grid sm:grid-cols-2 gap-2">${byCourse.map(b => `<div class="border border-slate-100 rounded p-3 flex items-center justify-between"><span class="text-xs font-bold text-slate-700">${esc(b.n)}</span><span class="text-xs text-slate-500">${b.avg ? b.avg + '★' : '—'} <span class="text-slate-400">(${b.count})</span></span></div>`).join('')}</div><p class="text-[10px] text-slate-400 mt-3">Only modules that show the end-of-module rating prompt appear here (Digital Decisions today). Wiring the same prompt into Jolene's and the labs would fill the rest in.</p>` : emptyMsg('No course feedback yet.'))}</div>
+                </div>
+                ${card(`Comments · ${list.length}`, list.length ? list.map(feedbackRow).join('') : emptyMsg('No feedback matches.'), `<select id="feedback-course" class="border border-slate-200 rounded px-2 py-1 text-xs"><option value="all">All courses</option>${names.map(n => `<option value="${esc(n)}" ${feedbackView.course === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: TOOLS
+        // ------------------------------------------------------------------
+        function renderTools() {
+            const src = (name, n) => `<div class="flex items-center justify-between text-xs border-b border-slate-50 py-1.5"><span class="font-mono text-slate-600">${name}</span><span>${D.errors[name] ? `<span class="text-amber-600 font-bold">error</span>` : `<span class="text-slate-700 font-bold">${n}</span> <span class="text-slate-400">docs</span>`}</span></div>`;
+            return errorStrip() + `
+                <div class="grid lg:grid-cols-2 gap-4">
+                    ${card('Export to your BI tool', `
+                        <p class="text-xs text-slate-500 mb-3">Each button downloads a CSV you can drop into Google Sheets, Looker Studio, Excel or any BI tool. Column names match the Firestore fields.</p>
+                        <div class="flex flex-wrap gap-2">
+                            ${[['users', 'Users (with rollups)'], ['sessions', 'Sessions (time on task)'], ['events', 'Events (raw stream)'], ['scores', 'Scores'], ['attempts', 'Scenario attempts'], ['launches', 'Launches'], ['feedback', 'Course feedback'], ['messages', 'Messages']].map(([k, l]) => `<button data-export="${k}" class="text-[10px] font-bold uppercase tracking-wide border border-slate-200 rounded px-3 py-1.5 hover:border-[#357889] hover:text-[#357889]">${l}</button>`).join('')}
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-3">For live, always-on dashboards instead of exports, see <span class="font-mono">docs/insider-analytics.md</span> in the repo — it walks through the Firestore → BigQuery → Looker Studio path.</p>`)}
+                    ${card('Data sources loaded', `${src('users', D.users.length)}${src('classrooms', D.classrooms.length)}${src('launches', D.launches.length)}${src('game_scores', D.scores.length)}${src('scenario_attempts', D.attempts.length)}${src('module_progress', D.progress.length)}${src('sessions', D.sessions.length)}${src('events', D.events.length)}${src('messages', D.messages.length)}${src('course_feedback', D.feedback.length)}<p class="text-[10px] text-slate-400 mt-3">Loaded ${D.loadedAt ? new Date(D.loadedAt).toLocaleString() : '—'}. Sessions and events are capped at the most recent 5,000 / 3,000.</p>`)}
+                </div>
+                <div class="mt-4">${card('Delete a user\'s data', `
+                    <p class="text-[11px] text-slate-500 mb-3">Permanently deletes a user's profile, scores, launches, progress, continuity bank, telemetry sessions/events, messages, feedback and recruit code. Use only to fulfil a deletion request — this cannot be undone. You can also do this from any user's profile drawer.</p>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input id="delete-uid-input" type="text" placeholder="User UID" class="flex-1 border border-slate-200 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-400">
+                        <button id="btn-delete-user" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-xs uppercase tracking-wide">Delete user's data</button>
+                    </div>
+                    <p id="delete-status" class="text-xs mt-3"></p>`)}</div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // CSV EXPORT
+        // ------------------------------------------------------------------
+        function toCSV(rows, columns) {
+            const q = v => { if (v == null) return ''; const s = typeof v === 'object' ? JSON.stringify(v) : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+            return [columns.join(','), ...rows.map(r => columns.map(c => q(typeof r[c] === 'function' ? r[c]() : r[c])).join(','))].join('\n');
+        }
+        function download(name, text) {
+            const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        }
+        const iso = ms => ms ? new Date(ms).toISOString() : '';
+        function usersCSVRows(list) {
+            return list.map(u => {
+                const row = { uid: u.uid, name: u.name, email: u.email || '', type: u.type, role: u.role, ageTier: u.ageTier || '', classroomCode: u.classroomCode || '', recruitCode: u.recruitCode || '', lastLogin: iso(u.lastLoginMs), lastActive: iso(u.lastActiveMs), dashboardLaunches: u.launches.length, sessions: u.sessions.length, totalActiveMinutes: Math.round(u.totalActiveMs / 60000), modulesStarted: u.startedCount, modulesCompleted: u.completedCount };
+                COURSES.forEach(c => { const st = u.courseStatus[c.id]; row[c.id + '_status'] = st.status; row[c.id + '_step'] = st.furthestStep; row[c.id + '_bestScore'] = st.bestScore == null ? '' : st.bestScore; row[c.id + '_minutes'] = Math.round(st.activeMs / 60000); });
+                return row;
+            });
+        }
+        function exportData(kind) {
+            const stamp = new Date().toISOString().slice(0, 10);
+            let rows, cols;
+            switch (kind) {
+                case 'users': rows = usersCSVRows(Object.values(userIndex).filter(u => !u.orphan)); cols = Object.keys(rows[0] || { uid: 1 }); break;
+                case 'sessions': rows = D.sessions.map(s => ({ sessionId: s.sessionId || s.id, uid: s.uid, module: s.module, gameName: s.gameName, role: s.role, ageTier: s.ageTier, isGuest: s.isGuest, startedAt: iso(s.startMs), lastSeenAt: iso(s.lastMs), activeMinutes: Math.round((s.activeMs || 0) / 60000 * 10) / 10, maxStep: s.maxStep, stepsTotal: s.stepsTotal, completed: s.completed, device: s.device, entry: s.entry })); cols = ['sessionId', 'uid', 'module', 'gameName', 'role', 'ageTier', 'isGuest', 'startedAt', 'lastSeenAt', 'activeMinutes', 'maxStep', 'stepsTotal', 'completed', 'device', 'entry']; break;
+                case 'events': rows = D.events.map(e => ({ ts: iso(e.ms), uid: e.uid, module: e.module, gameName: e.gameName, sessionId: e.sessionId, event: e.event, step: e.step, meta: e.meta, device: e.device, entry: e.entry })); cols = ['ts', 'uid', 'module', 'gameName', 'sessionId', 'event', 'step', 'meta', 'device', 'entry']; break;
+                case 'scores': rows = D.scores.map(s => ({ uid: s.uid, sessionId: s.sessionId, gameName: s.gameName, finalScore: s.finalScore, maxScore: s.maxScore, percentage: s.percentage, rank: s.rank, completed: s.completed || s.complete || '', isCertified: s.isCertified || '', lastUpdated: iso(s.ms) })); cols = ['uid', 'sessionId', 'gameName', 'finalScore', 'maxScore', 'percentage', 'rank', 'completed', 'isCertified', 'lastUpdated']; break;
+                case 'attempts': rows = D.attempts.map(a => ({ uid: a.uid, sessionId: a.sessionId, gameName: a.course ? a.course.name : '', scenarioIndex: a.scenarioIndex, question: a.question, choiceIndex: a.choiceIndex, score: a.score, effectiveness: a.effectiveness, cashImpact: a.cashImpact, timestamp: iso(a.ms) })); cols = ['uid', 'sessionId', 'gameName', 'scenarioIndex', 'question', 'choiceIndex', 'score', 'effectiveness', 'cashImpact', 'timestamp']; break;
+                case 'launches': rows = D.launches.map(l => ({ uid: l.uid, courseName: l.courseName, targetUrl: l.targetUrl, timestamp: iso(l.ms) })); cols = ['uid', 'courseName', 'targetUrl', 'timestamp']; break;
+                case 'feedback': rows = D.feedback.map(f => ({ uid: f.uid, name: f.name, gameName: f.gameName, rating: f.rating, feedback: f.feedback, timestamp: iso(f.ms) })); cols = ['uid', 'name', 'gameName', 'rating', 'feedback', 'timestamp']; break;
+                case 'messages': rows = D.messages.map(m => ({ senderUid: m.senderUid, senderName: m.senderName, senderEmail: m.senderEmail, source: m.source, message: m.message, isGuest: m.isGuest, timestamp: iso(m.ms) })); cols = ['senderUid', 'senderName', 'senderEmail', 'source', 'message', 'isGuest', 'timestamp']; break;
+                default: return;
+            }
+            download(`insider-${kind}-${stamp}.csv`, toCSV(rows, cols));
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE EVENT BINDING
+        // ------------------------------------------------------------------
+        function bindPage(page, arg) {
+            const p = $('page');
+            if (page === 'users') {
+                p.querySelector('#user-filters').addEventListener('click', (e) => { const b = e.target.closest('[data-filter]'); if (!b) return; usersView.filter = b.dataset.filter; route(); });
+                p.querySelector('#user-sort').addEventListener('change', (e) => { usersView.sort = e.target.value; usersView.dir = e.target.value === 'name' ? 'asc' : 'desc'; route(); });
+                let t; p.querySelector('#user-search').addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { usersView.search = e.target.value; const pos = e.target.selectionStart; route(); const inp = $('user-search'); inp.focus(); inp.setSelectionRange(pos, pos); }, 250); });
+                p.querySelector('#btn-export-users').onclick = () => { const rows = usersCSVRows(filteredUsers()); download(`insider-users-${usersView.filter}-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(rows, Object.keys(rows[0] || { uid: 1 }))); };
+                p.querySelectorAll('tr[data-uid]').forEach(tr => tr.onclick = () => { location.hash = '#/users/' + tr.dataset.uid; });
+            }
+            if (page === 'courses' && arg) {
+                const b = p.querySelector('#btn-export-course');
+                if (b) b.onclick = () => { const c = courseBySlug[arg]; const rows = usersCSVRows(Object.values(userIndex).filter(u => u.courseStatus[c.id].status !== 'not_started')); download(`insider-${c.id}-learners-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(rows, Object.keys(rows[0] || { uid: 1 }))); };
+            }
+            if (page === 'inbox') {
+                p.querySelector('#inbox-source').addEventListener('change', (e) => { inboxView.source = e.target.value; route(); });
+                let t; p.querySelector('#inbox-search').addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { inboxView.search = e.target.value; const pos = e.target.selectionStart; route(); const inp = $('inbox-search'); inp.focus(); inp.setSelectionRange(pos, pos); }, 250); });
+            }
+            if (page === 'feedback') {
+                p.querySelector('#feedback-course').addEventListener('change', (e) => { feedbackView.course = e.target.value; route(); });
+            }
+            if (page === 'tools') {
+                p.querySelectorAll('[data-export]').forEach(b => b.onclick = () => exportData(b.dataset.export));
+                p.querySelector('#btn-delete-user').onclick = () => deleteUserData($('delete-uid-input').value.trim(), $('delete-status'));
             }
         }
 
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str == null ? '' : String(str);
-            return div.innerHTML;
-        }
-
-        // Deletes a user's profile doc, every doc in its subcollections (game_scores,
-        // launches, any leftover feedback_inbox), and any messages/course_feedback records
-        // tied to that uid in the flat top-level collections. Used to fulfill a data
-        // deletion request end-to-end.
-        document.getElementById('btn-delete-user').onclick = async () => {
-            const uid = document.getElementById('delete-uid-input').value.trim();
-            const statusEl = document.getElementById('delete-status');
-            statusEl.className = 'px-4 pb-4 text-xs text-slate-400';
-
-            if (!uid) {
-                statusEl.textContent = 'Enter a UID first.';
-                statusEl.className = 'px-4 pb-4 text-xs text-red-500';
-                return;
-            }
-            if (!confirm(`Permanently delete ALL data for user ${uid}? This cannot be undone.`)) return;
-
+        // ------------------------------------------------------------------
+        // DELETION-REQUEST TOOL: removes every record tied to a uid.
+        // ------------------------------------------------------------------
+        async function deleteUserData(uid, statusEl) {
+            statusEl.className = 'text-xs mt-2 text-slate-400';
+            if (!uid) { statusEl.textContent = 'Enter a UID first.'; statusEl.className = 'text-xs mt-2 text-red-500'; return; }
+            const u = userIndex[uid];
+            if (!confirm(`Permanently delete ALL data for ${u ? u.name + ' (' + uid + ')' : uid}? This cannot be undone.`)) return;
             statusEl.textContent = 'Deleting…';
-
             try {
-                let deletedCount = 0;
-
-                for (const sub of ['game_scores', 'launches', 'feedback_inbox']) {
+                let n = 0;
+                const wipe = async (snap) => { for (const d of snap.docs) { await deleteDoc(d.ref); n++; } };
+                for (const sub of ['game_scores', 'launches', 'feedback_inbox', 'module_progress', 'continuity_bank']) {
                     const subSnap = await getDocs(collection(db, 'artifacts', appId, 'users', uid, sub));
                     for (const d of subSnap.docs) {
-                        await deleteDoc(d.ref);
-                        deletedCount++;
+                        if (sub === 'game_scores') await wipe(await getDocs(collection(d.ref, 'scenario_attempts')));
+                        await deleteDoc(d.ref); n++;
                     }
                 }
-
-                const msgSnap = await getDocs(query(collection(db, 'artifacts', appId, 'messages'), where('senderUid', '==', uid)));
-                for (const d of msgSnap.docs) { await deleteDoc(d.ref); deletedCount++; }
-
-                const feedbackSnap = await getDocs(query(collection(db, 'artifacts', appId, 'course_feedback'), where('uid', '==', uid)));
-                for (const d of feedbackSnap.docs) { await deleteDoc(d.ref); deletedCount++; }
-
-                await deleteDoc(doc(db, 'artifacts', appId, 'users', uid));
-                deletedCount++;
-
-                statusEl.textContent = `Done — deleted ${deletedCount} record(s) for ${uid}.`;
-                statusEl.className = 'px-4 pb-4 text-xs text-emerald-600';
-                document.getElementById('delete-uid-input').value = '';
-                loadUsers();
+                await wipe(await getDocs(query(collection(db, 'artifacts', appId, 'messages'), where('senderUid', '==', uid))));
+                await wipe(await getDocs(query(collection(db, 'artifacts', appId, 'course_feedback'), where('uid', '==', uid))));
+                await wipe(await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('uid', '==', uid))));
+                await wipe(await getDocs(query(collection(db, 'artifacts', appId, 'events'), where('uid', '==', uid))));
+                if (u && u.recruitCode) { try { await deleteDoc(doc(db, 'artifacts', appId, 'recruit_codes', u.recruitCode)); n++; } catch (e) { console.warn('recruit code delete failed', e); } }
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', uid)); n++;
+                statusEl.textContent = `Done — deleted ${n} record(s) for ${uid}. Reloading…`;
+                statusEl.className = 'text-xs mt-2 text-emerald-600';
+                closeDrawer();
+                await loadEverything(); route();
             } catch (e) {
                 console.error('Deletion failed', e);
-                statusEl.textContent = "Deletion failed — check the browser console.";
-                statusEl.className = 'px-4 pb-4 text-xs text-red-500';
+                statusEl.textContent = 'Deletion failed — check the browser console.';
+                statusEl.className = 'text-xs mt-2 text-red-500';
             }
-        };
+        }
 
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
     </script>
 </body>
 </html>

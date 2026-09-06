@@ -18,6 +18,8 @@
          /js/identity-gate.js. Runs the same gate whether this module is reached from the
          dashboard or opened directly by a bookmarked/shared link. -->
     <script type="module" src="/js/identity-gate.js"></script>
+    <!-- Shared learning-analytics telemetry (sessions + events for Insider) — see /js/telemetry.js. -->
+    <script type="module" src="/js/telemetry.js"></script>
     <script src="/js/message-hq.js" data-message-source="Digital Decisions Challenge"></script>
 
     <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js. -->
@@ -30,6 +32,10 @@
         const db = window.AuthCore.db;
 
         window.authSignOut = () => signOut(auth);
+
+        // Telemetry: one "step" here = one scenario answered (30 total), which is the
+        // meaningful unit of progress for a scenario feed — not the 4 page containers.
+        if (window.Telemetry) window.Telemetry.init({ module: 'digital-decisions', gameName: 'Digital Decisions Challenge', stepsTotal: 30 });
 
         window.currentUser = null;
         window.currentUserName = "Anonymous";
@@ -77,6 +83,7 @@
         window.logScenarioAttempt = async (data) => {
             const user = auth.currentUser;
             if (!user) return;
+            if (window.Telemetry) window.Telemetry.choice({ scenarioIndex: data.scenarioIndex, choiceIndex: data.choiceIndex, score: data.score, effectiveness: data.effectiveness || null, question: data.question || null });
             const attemptRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'scenario_attempts', `scenario_${data.scenarioIndex}`);
             try { await setDoc(attemptRef, { ...data, timestamp: serverTimestamp() }); } catch (e) { console.error("Attempt log failed", e); }
         };
@@ -1247,6 +1254,8 @@
                         sessionId: window.sessionId
                     });
 
+                    if (window.Telemetry) window.Telemetry.step(Object.keys(answeredScenarioScores).length);
+
                     if (window.AuthCore && window.AuthCore.saveModuleProgress) {
                         window.AuthCore.saveModuleProgress('digital-decisions', {
                             answeredScenarioScores,
@@ -1402,13 +1411,14 @@
                      if (certSection) certSection.classList.remove('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
                 }
                 
-                window.logFinalScoreToFirestore({ 
-                    finalScore: currentScore, 
-                    maxScore: MAX_SCORE, 
-                    percentage: percentage, 
+                window.logFinalScoreToFirestore({
+                    finalScore: currentScore,
+                    maxScore: MAX_SCORE,
+                    percentage: percentage,
                     rank: rank,
-                    sessionId: window.sessionId 
+                    sessionId: window.sessionId
                 });
+                if (window.Telemetry) window.Telemetry.complete({ finalScore: currentScore, maxScore: MAX_SCORE, percentage: percentage, rank: rank });
             };
 
             // --- TOC LOGIC ---

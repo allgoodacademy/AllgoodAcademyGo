@@ -20,6 +20,8 @@
          /js/identity-gate.js. Runs the same gate whether this GoodBlock is reached from
          the Lab Pack hub or opened directly by a bookmarked/shared link. -->
     <script type="module" src="/js/identity-gate.js"></script>
+    <!-- Shared learning-analytics telemetry (sessions + events for Insider) — see /js/telemetry.js. -->
+    <script type="module" src="/js/telemetry.js"></script>
     <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: Privacy &amp; Security"></script>
 
     <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js. -->
@@ -34,6 +36,12 @@
         window.currentUserName = "Agent Learner";
         window.currentUserEmail = "";
         window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        // Telemetry: one "step" = one Case (6 total). Case 1 is open the moment the lab loads.
+        if (window.Telemetry) {
+            window.Telemetry.init({ module: 'privacy-security', gameName: 'Privacy & Security', stepsTotal: 6 });
+            window.Telemetry.step(1);
+        }
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -55,6 +63,7 @@
         // not_started status for this GoodBlock. No numeric score here (this is a lab, not
         // a graded quiz), so completion is just a flag, set once Case 6 is actually reached.
         window.logModuleCompletion = async () => {
+            if (window.Telemetry) window.Telemetry.complete();
             const user = auth.currentUser;
             if (!user) return;
             try {
@@ -1132,6 +1141,7 @@
                 pageCompletion[pageNum - 1] = true;
                 window.renderLocks();
                 window.playPageIntro(pageNum);
+                if (window.Telemetry) window.Telemetry.step(pageNum + 1);
                 if (window.AuthCore && window.AuthCore.saveModuleProgress) {
                     window.AuthCore.saveModuleProgress('privacy-security', {
                         highestUnlocked, pageCompletion,

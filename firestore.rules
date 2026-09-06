@@ -102,6 +102,50 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow update: if request.auth != null;
       allow list: if isAllowlistedAdmin();
+      // Deletion-request fulfilment: Insider removes the code doc along with the rest
+      // of a Learner Recruit's data, otherwise their mirrored progress would linger.
+      allow delete: if isAllowlistedAdmin();
+    }
+
+    // 10. NEW — Telemetry sessions (see /js/telemetry.js). One doc per module visit:
+    //     uid, module, startedAt/lastSeenAt, activeMs, maxStep/stepsTotal, completed,
+    //     device, entry. Flat and top-level for the same reason as messages: Insider
+    //     reads the whole thing with one plain query.
+    //     - CREATE: only naming yourself as the session's uid
+    //     - UPDATE: only your own session, and the uid on it can never be reassigned
+    //     - READ/LIST/DELETE: admin allowlist only
+    match /artifacts/{appId}/sessions/{sessionId} {
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid;
+      allow read, delete: if isAllowlistedAdmin();
+    }
+
+    // 11. NEW — Telemetry events (append-only stream: module_open, step, choice,
+    //     module_complete, ...). Nobody but the admin allowlist can read them back,
+    //     and nothing can edit one after the fact.
+    match /artifacts/{appId}/events/{eventId} {
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read, delete: if isAllowlistedAdmin();
+    }
+
+    // 12. NEW — Collection-group reads for Insider. Rule #2 already lets the admin
+    //     allowlist read any one user's subcollections, but a collectionGroup() query
+    //     (every user's launches / game_scores / ... in ONE read, instead of one round
+    //     trip per user) is only permitted by a rule written against the collection
+    //     id with a {path=**} prefix. Admin-only, read-only — no new write paths.
+    match /{path=**}/launches/{docId} {
+      allow read: if isAllowlistedAdmin();
+    }
+    match /{path=**}/game_scores/{docId} {
+      allow read: if isAllowlistedAdmin();
+    }
+    match /{path=**}/scenario_attempts/{docId} {
+      allow read: if isAllowlistedAdmin();
+    }
+    match /{path=**}/module_progress/{docId} {
+      allow read: if isAllowlistedAdmin();
     }
 
     // 3. Safety Catch: Deny everything else
