@@ -86,6 +86,35 @@ until a user reported it after cases were already live.
   threshold) — these three things silently drift out of sync if written in different
   sessions without cross-checking.
 
+## Message HQ ("Direct Line")
+
+This used to be ~100 lines of copy-pasted button/modal/JS in every single module —
+which is exactly how Privacy & Security shipped with **no** Message HQ at all: nobody
+copied it forward. It's now standardized in `/js/message-hq.js`.
+
+- [ ] Add one script tag, after `identity-gate.js`:
+  ```html
+  <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: <Module Name>"></script>
+  ```
+  That's it — no modal markup, no `openMessageModal`/`closeMessageModal`/`submitHQMessage`
+  to write. The script injects the modal into the DOM at runtime and defines all three
+  as `window` functions.
+- [ ] Add a navbar button that calls `window.openMessageModal()` (copy the icon/button
+  markup from an existing module, e.g. Social Intelligence's navbar — the button itself
+  isn't shared since navbar layout/theming differs per module).
+- [ ] **Don't** re-implement the modal, the send handler, or the identity check —
+  `data-message-source` is the only per-module config. If a fix is needed (styling, copy,
+  a new field to capture), fix it once in `message-hq.js`, not in each module.
+- [ ] If a page needs a side effect on successful send (the main dashboard unlocks an
+  "Intel Badge" this way), listen for the `messagehq:sent` event on `document` rather than
+  editing the shared send logic:
+  ```js
+  document.addEventListener('messagehq:sent', () => { /* page-specific side effect */ });
+  ```
+- [ ] The shared `openMessageModal` already gates on `window.AuthGate.ensureIdentified()`
+  when identity-gate.js is loaded (it is on every module) — a signed-out visitor is asked
+  to sign in before the modal opens, not after typing a message and hitting send.
+
 ## Firestore rules
 
 - [ ] If this GoodBlock writes to a new top-level collection (rare — `game_scores`,
