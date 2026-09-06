@@ -68,17 +68,22 @@
         // actually reachable, so a teacher can't accidentally assign a dead link.
         //
         // Rage Revenue and Finding Yourself are archived too (moved to archive/jsh/) —
-        // they're being replaced by the four-lab Digital Decisions Lab set (Jodi's
-        // Schoolhouse shows an honest "coming soon" placeholder in the meantime), not kept
-        // alongside it. Re-add here if either is ever brought back on its own.
+        // they're being replaced by the four-lab Digital Decisions Lab Pack. Social
+        // Intelligence is the first of those four to actually ship; the other three still
+        // show as honest "coming soon" placeholders on the Lab Pack hub itself, not here.
+        // Re-add Rage Revenue/Finding Yourself here if either is ever brought back on its own.
         //
         // Completion rules below are confirmed against each module's actual Firestore writes,
         // not guessed: DDC and Jolene's both gate on a finalScore threshold (no fake flags).
+        // Social Intelligence is a lab, not a graded quiz — no numeric score, just a
+        // completed:true flag written once a student reaches its final case.
         const MODULE_REGISTRY = [
             { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
               gameNames: ['Digital Decisions Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 80 },
             { id: 'jolene', name: "Jolene's Lemonade", category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge',
               gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800 },
+            { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', url: '/jsh/digital-decisions-lab/social-intelligence/index.html',
+              gameNames: ['Social Intelligence'], isComplete: (d) => d.completed === true },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
 
@@ -2270,7 +2275,7 @@
                         </div>
                         <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
                             <div>
-                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">2</span>
+                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">3</span>
                                 <span class="text-[10px] uppercase text-slate-400 font-bold">MODULES</span>
                             </div>
                             <div>
@@ -2328,16 +2333,24 @@
 
                     <!-- TAB 2: JODI'S SCHOOLHOUSE — Rage Revenue and Finding Yourself have been
                          archived (see archive/jsh/); they're being replaced by the four-lab
-                         Digital Decisions Lab set, which ships together once all four are
-                         done rather than wiring pieces in as they're finished. This is an
-                         honest "not here yet" placeholder, not a broken or empty tab. -->
-                    <div id="tab-courses" class="tab-content">
-                        <div class="bg-white/60 backdrop-blur-md border border-white/50 rounded-lg shadow-sm p-10 text-center max-w-xl mx-auto">
-                            <div class="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 mb-4">
-                                <i data-lucide="lock" class="w-7 h-7 text-slate-400"></i>
+                         Digital Decisions Lab Pack. Social Intelligence is the first of those
+                         four to actually ship, so this tab now opens onto the real Lab Pack
+                         hub instead of the old "coming soon" placeholder — the other three
+                         labs still show as honest "coming soon" cards on the hub itself. -->
+                    <div id="tab-courses" class="tab-content grid grid-cols-1 gap-4">
+                        <div onclick="window.launchCourse('Digital Decisions Lab Pack', '/jsh/digital-decisions-lab/index.html', this)"
+                             class="mission-file status-active p-5 flex items-start gap-4 group max-w-xl w-full mx-auto">
+                            <div class="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center border border-orange-100 flex-shrink-0 group-hover:bg-orange-100 transition-colors shadow-sm">
+                                <i data-lucide="radar" class="w-7 h-7 text-allgood-primary"></i>
                             </div>
-                            <h3 class="font-heading font-bold text-slate-700 text-lg uppercase mb-2">Coming Soon</h3>
-                            <p class="text-sm text-slate-500 leading-relaxed">The Digital Decisions Lab is being built — check back soon.</p>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Decisions Lab Pack</h3>
+                                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Social Intelligence Live</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Short labs with Jodi that build the skills the Digital Decisions Challenge tests.</p>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-wide">4 labs planned &bull; 1 live &bull; 3 coming soon</p>
+                            </div>
                         </div>
                     </div>
 

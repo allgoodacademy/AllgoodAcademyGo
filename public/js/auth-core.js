@@ -109,6 +109,31 @@ function moduleProgressRef(uid, moduleSlug) {
     return doc(db, 'artifacts', appId, 'users', uid, 'module_progress', moduleSlug);
 }
 
+// One doc per student per module — same shape as module_progress, just a different
+// subcollection — holding what that student told Jodi during that module, for a later
+// GoodBlock to deliberately reference back (see jodi-character-bible.md's "callbacks are
+// load-bearing, not decorative" trait). Already covered by the existing owner read/write
+// rule on artifacts/{appId}/users/{userId}/{document=**}, so no firestore.rules change is
+// needed to add this. Nothing reads it yet — Social Intelligence is the first GoodBlock to
+// write here — but the path needs to exist now rather than be retrofitted once a second
+// GoodBlock needs to read it.
+function continuityBankRef(uid, moduleSlug) {
+    return doc(db, 'artifacts', appId, 'users', uid, 'continuity_bank', moduleSlug);
+}
+
+async function recordContinuityEntry(moduleSlug, key, value) {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+        await setDoc(continuityBankRef(user.uid, moduleSlug), {
+            [key]: value,
+            lastUpdated: serverTimestamp(),
+        }, { merge: true });
+    } catch (e) {
+        console.error('[AuthCore] recordContinuityEntry failed', e);
+    }
+}
+
 // --- SILENT POWER-UP SIGN-IN: an anonymous identity with a random nickname, created
 // invisibly the instant someone powers up with no existing session — before any age or
 // identify question. This is the ONE remaining anonymous-with-no-real-identify path;
@@ -502,6 +527,7 @@ window.AuthCore = {
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
     saveModuleProgress, loadModuleProgress,
+    recordContinuityEntry,
     onAuthStateChanged, signOut,
     skipPowerUp,
 };

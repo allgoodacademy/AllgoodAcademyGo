@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Allgood Academy | Digital Decisions Lab Pack</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Shared identity/login module + identify gate — see /js/auth-core.js and
+         /js/identity-gate.js. Needed here only for the Direct Line (Message HQ) icon,
+         which requires a real signed-in session to write; launching a lab from one of
+         the cards below hands off to that lab's own gate, same as every other module. -->
+    <script type="module" src="/js/auth-core.js"></script>
+    <script type="module" src="/js/identity-gate.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'jodi-warmth': '#FBF6EE',
+                        'jodi-border': '#E8DFCE'
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body { font-family: Verdana, sans-serif; background-color: #FBF6EE; margin: 0; min-height: 100vh; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .lab-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .lab-card.live:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body class="text-allgood-dark font-body">
+
+    <!-- HEADER — same Home / Message / Menu pattern as every GoodBlock (see
+         allgood-icon-system.md), not a one-off design for this hub. -->
+    <header class="bg-allgood-secondary shadow-md flex items-center h-[60px] sticky top-0 z-30">
+        <div class="w-full px-4 flex items-center justify-between h-full">
+            <div class="flex items-center overflow-hidden">
+                <div class="flex shrink-0 items-center bg-allgood-primary rounded-full px-3 py-1 shadow-sm">
+                    <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[220px]">Digital Decisions Lab Pack</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-1 shrink-0">
+                <a href="/index.html" title="Dashboard" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 inline-flex"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></a>
+                <button onclick="window.openMessageModal()" title="Direct Line to HQ" class="text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                <button onclick="window.openLabMenu()" title="Jump to a Lab" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+
+        <!-- HERO — Jodi's Schoolhouse identity (warm, illustrated), not a reskin of DDC's
+             own dark "power up" splash. The DDC nod lives in one line of copy + the flagship
+             card below, not in copying its layout or palette. -->
+        <section class="text-center mb-12">
+            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Jodi's Schoolhouse</span>
+            <h1 class="text-3xl sm:text-5xl font-heading font-bold text-allgood-dark mt-2 mb-4">The Digital Decisions <span class="text-allgood-primary">Lab Pack</span></h1>
+            <p class="text-sm sm:text-base text-gray-600 max-w-xl mx-auto leading-relaxed">
+                Five short labs with Jodi, each one building a real skill before you ever hit the flagship
+                <strong class="text-allgood-dark">Digital Decisions Challenge</strong> — think of this as the practice field for the real game.
+            </p>
+        </section>
+
+        <!-- LIVE + FLAGSHIP -->
+        <section id="labs" class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+
+            <!-- SOCIAL INTELLIGENCE — live -->
+            <div onclick="window.launchLab('Social Intelligence', '/jsh/digital-decisions-lab/social-intelligence/index.html')"
+                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center shadow-sm">
+                        <i data-lucide="radar" class="w-7 h-7 text-allgood-primary"></i>
+                    </div>
+                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Social Intelligence</h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Read the room before you react — audiences, scripts, allyship, and the three-second pause that changes an outcome.</p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+
+            <!-- DDC — live, the flagship this pack leads toward -->
+            <div onclick="window.launchLab('Digital Decisions', '/educational-games/digital-decisions/index.html')"
+                 class="lab-card live cursor-pointer bg-slate-900 rounded-2xl border border-slate-800 shadow-sm p-6 flex flex-col text-white relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/5 rounded-full pointer-events-none"></div>
+                <div class="flex items-start justify-between mb-4 relative z-10">
+                    <div class="w-14 h-14 rounded-full bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shadow-sm">
+                        <span class="text-2xl">⚖️</span>
+                    </div>
+                    <span class="bg-white/10 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-white/10">Flagship Challenge</span>
+                </div>
+                <h3 class="font-bold text-white text-lg mb-1 uppercase relative z-10">Digital Decisions Challenge</h3>
+                <p class="text-xs text-slate-300 leading-relaxed flex-grow relative z-10">The real test — 30 high-stakes scenarios. Everything in this Lab Pack is built to prepare you for it.</p>
+                <span class="mt-4 text-[11px] font-bold text-white uppercase tracking-wide flex items-center gap-1 relative z-10">Jump In <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+        </section>
+
+        <!-- COMING SOON — honest placeholders, same "not here yet" pattern already used
+             elsewhere in this project (see Jodi's Schoolhouse tab on the dashboard). -->
+        <section class="mb-4">
+            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center mb-4">More Labs on the Way</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div class="bg-white/60 rounded-2xl border border-jodi-border p-6 text-center opacity-70">
+                    <div class="w-12 h-12 mx-auto bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 mb-3">
+                        <i data-lucide="lock" class="w-5 h-5 text-slate-400"></i>
+                    </div>
+                    <h3 class="font-heading font-bold text-slate-600 text-sm uppercase mb-1">Privacy &amp; Security</h3>
+                    <p class="text-[11px] text-slate-400">Coming Soon</p>
+                </div>
+                <div class="bg-white/60 rounded-2xl border border-jodi-border p-6 text-center opacity-70">
+                    <div class="w-12 h-12 mx-auto bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 mb-3">
+                        <i data-lucide="lock" class="w-5 h-5 text-slate-400"></i>
+                    </div>
+                    <h3 class="font-heading font-bold text-slate-600 text-sm uppercase mb-1">Professional Brand</h3>
+                    <p class="text-[11px] text-slate-400">Coming Soon</p>
+                </div>
+                <div class="bg-white/60 rounded-2xl border border-jodi-border p-6 text-center opacity-70">
+                    <div class="w-12 h-12 mx-auto bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 mb-3">
+                        <i data-lucide="lock" class="w-5 h-5 text-slate-400"></i>
+                    </div>
+                    <h3 class="font-heading font-bold text-slate-600 text-sm uppercase mb-1">Digital Citizenship</h3>
+                    <p class="text-[11px] text-slate-400">Coming Soon</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="mt-12 mb-4 text-center">
+            <p class="text-[10px] text-slate-400 font-mono tracking-widest uppercase opacity-80">
+                ALLGOOD OS <span class="mx-2">•</span> GOODBLOCK™
+            </p>
+        </div>
+    </main>
+
+    <!-- LAB MENU: jump to any live lab or the flagship challenge -->
+    <div id="lab-menu-modal" class="hidden-modal fixed inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+        <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-allgood-secondary">
+            <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Lab</h2>
+            <p class="text-xs text-gray-500 mb-4 font-body">Only what's actually live is clickable.</p>
+            <div class="space-y-2">
+                <button onclick="window.closeLabMenu(); window.launchLab('Social Intelligence', '/jsh/digital-decisions-lab/social-intelligence/index.html')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-allgood-secondary text-xs font-bold flex items-center justify-between">
+                    <span>Social Intelligence</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <button onclick="window.closeLabMenu(); window.launchLab('Digital Decisions', '/educational-games/digital-decisions/index.html')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-allgood-secondary text-xs font-bold flex items-center justify-between">
+                    <span>Digital Decisions Challenge</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <div class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
+                    <span>Privacy &amp; Security, Professional Brand, Digital Citizenship</span><i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                </div>
+            </div>
+            <button onclick="window.closeLabMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+        </div>
+    </div>
+
+    <!-- MESSAGE MODAL: Direct Line to HQ, same shared inbox every portal writes to -->
+    <div id="message-modal" class="hidden-modal fixed inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeMessageModal()">
+        <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
+            <button onclick="window.closeMessageModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <div class="mb-4">
+                <div class="w-12 h-12 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="message-circle" class="w-6 h-6 text-allgood-secondary"></i>
+                </div>
+                <h3 class="text-xl font-heading font-bold text-allgood-dark uppercase">Direct Line</h3>
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">To: Allgood Academy HQ</p>
+            </div>
+            <div class="text-left mb-4">
+                <p class="text-xs text-gray-500 italic mb-2">Got an idea for a new lesson or game? Tell us.</p>
+                <textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-secondary focus:border-allgood-secondary outline-none resize-none bg-white font-body placeholder-gray-400" placeholder="Type your message here..."></textarea>
+            </div>
+            <button id="btn-send-message" onclick="window.submitHQMessage()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-3 h-3"></i> Send Transmission
+            </button>
+        </div>
+    </div>
+
+    <script>
+        window.openLabMenu = () => {
+            document.getElementById('lab-menu-modal').classList.remove('hidden-modal');
+            document.getElementById('lab-menu-modal').classList.add('visible-modal');
+            if (window.lucide) window.lucide.createIcons();
+        };
+        window.closeLabMenu = () => {
+            document.getElementById('lab-menu-modal').classList.add('hidden-modal');
+            document.getElementById('lab-menu-modal').classList.remove('visible-modal');
+        };
+
+        // Every lab (this hub included) runs its own identify gate at its own power-up
+        // moment — see /js/identity-gate.js — so a direct/bookmarked visit to a lab still
+        // gets gated. Checking again here just means someone clicking a card from an
+        // already-identified session never sees the gate twice.
+        window.launchLab = async (name, url) => {
+            const { user } = await window.AuthGate.ensureIdentified();
+            if (!user) return;
+            if (typeof gtag === 'function') gtag('event', 'launch_module', { module_name: name });
+            window.location.href = url;
+        };
+
+        window.openMessageModal = async () => {
+            const { user } = await window.AuthGate.ensureIdentified();
+            if (!user) return;
+            const modal = document.getElementById('message-modal');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+            setTimeout(() => document.getElementById('message-input')?.focus(), 100);
+        };
+        window.closeMessageModal = () => {
+            document.getElementById('message-modal').classList.add('hidden-modal');
+            document.getElementById('message-modal').classList.remove('visible-modal');
+        };
+
+        window.submitHQMessage = async () => {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            const btn = document.getElementById('btn-send-message');
+            if (!text) return;
+
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+            try {
+                await window.AuthCore.sendMessage({ text, source: "Digital Decisions Lab Pack Hub" });
+                input.value = "";
+                btn.classList.remove('bg-allgood-primary', 'hover:bg-allgood-hover');
+                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> Transmission Sent`;
+                if (window.lucide) window.lucide.createIcons();
+                setTimeout(() => {
+                    window.closeMessageModal();
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.classList.add('bg-allgood-primary', 'hover:bg-allgood-hover');
+                        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                        btn.innerHTML = originalText;
+                        if (window.lucide) window.lucide.createIcons();
+                    }, 500);
+                }, 1500);
+            } catch (e) {
+                console.error("[Lab Pack Hub] Message send failed", e);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) window.lucide.createIcons();
+            [100, 400, 1000].forEach((delay) => setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay));
+        });
+    </script>
+</body>
+</html>
