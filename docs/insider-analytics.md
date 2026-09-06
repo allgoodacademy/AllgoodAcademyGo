@@ -41,6 +41,7 @@ the moments that matter. Steps per module:
 | Social Intelligence | cases reached | 7 |
 | Privacy & Security | cases reached | 6 |
 | Digital Citizenship | cases reached | 7 |
+| Professional Brand | cases reached | 7 |
 
 A 20-minute visit costs roughly 25 to 30 Firestore writes (one session rewrite per 45s plus
 the events), which is well inside the free tier at current traffic.
