@@ -365,6 +365,22 @@
             window.updateBadges();
         });
 
+        // Message HQ notification dot: a one-time "you haven't tried this yet" hint
+        // on this page's icon only (not on any module's copy of the button) that
+        // disappears the moment the visitor actually opens the modal, whether or not
+        // they end up sending anything.
+        (function () {
+            const dot = document.getElementById('message-notification');
+            if (dot && localStorage.getItem('aa_dashboard_msg_seen') === 'true') {
+                dot.style.display = 'none';
+            }
+        })();
+        document.addEventListener('messagehq:opened', () => {
+            localStorage.setItem('aa_dashboard_msg_seen', 'true');
+            const dot = document.getElementById('message-notification');
+            if (dot) dot.style.display = 'none';
+        });
+
         window.handleLogout = async () => {
             sfx.powerOff();
             localStorage.removeItem('aa_username');
@@ -2133,8 +2149,12 @@
                             <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                         </button>
                         <div class="h-6 w-px bg-white/20 mx-1"></div>
-                        <button id="btn-message" class="text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ" onclick="window.openMessageModal()">
+                        <button id="btn-message" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ" onclick="window.openMessageModal()">
                             <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+                            <span id="message-notification" class="absolute top-1 right-1 flex h-2.5 w-2.5">
+                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                            </span>
                         </button>
                         <button id="btn-menu" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Menu">
                             <i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
