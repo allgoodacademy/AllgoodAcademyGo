@@ -1,0 +1,18 @@
+# Fails the build when the hand-maintained module lists disagree: dashboard MODULE_REGISTRY,
+# Insider COURSES, Lab Pack hub cards, each module's Telemetry.init and the docs table.
+# See "Publishing a module" in docs/goodblock-integration-checklist.md.
+name: Module registry check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-modules.js

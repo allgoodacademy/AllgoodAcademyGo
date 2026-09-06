@@ -121,10 +121,12 @@ copied it forward. It's now standardized in `/js/message-hq.js`.
   `course_feedback`, and the per-uid `module_progress` subcollection already cover most
   needs), add a rule for it in `firestore.rules` and confirm the deploy actually reached
   production: check the `Deploy Firestore Rules` GitHub Actions run succeeded. That
-  pipeline has had a real, unresolved-as-of-writing permission failure (403 on the Rules
-  API) — if it fails, the fallback is to manually paste `firestore.rules` into Firebase
-  Console → Firestore Database → Rules and publish it directly, since CI failing silently
-  here means the rule is simply never live.
+  pipeline's first run failed with a 403 on the Rules API (service account lacked
+  permission); the permission was fixed and the re-run on 2026-09-06 released the rules
+  (including the telemetry `sessions` / `events` rules) successfully. If it ever fails
+  again, the fallback is to manually paste `firestore.rules` into Firebase Console →
+  Firestore Database → Rules and publish it directly, since CI failing silently here means
+  the rule is simply never live.
 
 ## Chrome sizing & mobile viewport
 
@@ -183,6 +185,38 @@ from an older reference, and check:
   `innerHTML` instead if an icon must change after load. Keep the retry ladder
   (100/400/1000/2000ms `createIcons()` calls after `DOMContentLoaded`) regardless — it's cheap
   insurance against an unrelated CDN load-timing race.
+
+## Publishing a module: every list that has to change together
+
+Shipping one GoodBlock touches several hand-maintained lists. They drift independently,
+so update them in one pass and run `node scripts/check-modules.js` (also run by the
+`Module registry check` GitHub Actions workflow on every push and pull request) before
+calling it done:
+
+- [ ] `MODULE_REGISTRY` in `public/index.html` — dashboard completion status. Labs use
+  `category: 'lab'`; the Lab Pack card's status pill and "N live • M coming soon" counter
+  are derived from those entries plus `LAB_PACK_PLANNED` (the full list of labs the pack
+  will hold), so do not hand-edit the pill or counter text. When a lab that was only
+  planned ships, its name is already in `LAB_PACK_PLANNED`; when a brand-new lab is
+  planned, add it there.
+- [ ] `COURSES` in `public/insider/index.html` — Insider analytics (`stepsTotal`,
+  `stepLabel`, `isComplete`, `progressStep`). `stepsTotal` must equal the module's own
+  `Telemetry.init({ stepsTotal })` call.
+- [ ] Lab Pack hub card + "Jump to a Lab" menu entry in
+  `public/jsh/digital-decisions-lab/index.html` — student-facing; remove the matching
+  "Coming Soon" placeholder.
+- [ ] "Steps per module" table in `docs/insider-analytics.md`.
+- [ ] The hardcoded `3` above `MODULES` in the dashboard stat block counts dashboard
+  *cards* (Jolene's, Digital Decisions, Lab Pack), not registry entries. A new lab inside
+  the pack does not change it; a new card does.
+
+Why not one manifest: the three code consumers need different fields (completion
+predicates, step counts, card icons and copy), Insider and the dashboard already disagree
+on Jolene's completion rule on purpose, and the hub cards are static HTML with per-lab
+accent colours. Merging them into one runtime-loaded file would mean rendering the hub
+from JS and reconciling those predicates, which is more risk than the duplication costs.
+The check script is the compromise: the lists stay where they are, but cannot silently
+disagree.
 
 ## Before calling a GoodBlock's integration done
 

@@ -69,10 +69,13 @@
         // actually reachable, so a teacher can't accidentally assign a dead link.
         //
         // Rage Revenue and Finding Yourself are archived too (moved to archive/jsh/) —
-        // they're being replaced by the four-lab Digital Decisions Lab Pack. Social
-        // Intelligence is the first of those four to actually ship; the other three still
-        // show as honest "coming soon" placeholders on the Lab Pack hub itself, not here.
-        // Re-add Rage Revenue/Finding Yourself here if either is ever brought back on its own.
+        // they're being replaced by the four-lab Digital Decisions Lab Pack. Three of those
+        // four have shipped (Social Intelligence, Privacy & Security, Digital Citizenship);
+        // Professional Brand still shows as an honest "coming soon" placeholder on the Lab
+        // Pack hub itself, not here. Every shipped lab gets a `category: 'lab'` entry below,
+        // and the Lab Pack card's status pill + counter are derived from those entries (see
+        // renderLabPackStatus), so shipping a lab means adding it here and nowhere else on
+        // the dashboard. Re-add Rage Revenue/Finding Yourself if either is ever brought back.
         //
         // Completion rules below are confirmed against each module's actual Firestore writes,
         // not guessed: DDC and Jolene's both gate on a finalScore threshold (no fake flags).
@@ -91,6 +94,29 @@
               gameNames: ['Digital Citizenship'], isComplete: (d) => d.completed === true },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
+
+        // Every lab the Digital Decisions Lab Pack will eventually hold, shipped or not. The
+        // hub (public/jsh/digital-decisions-lab/index.html) shows placeholders for the ones
+        // not yet in MODULE_REGISTRY. Counts on the dashboard's Lab Pack card come from here
+        // + the registry, so they can't drift from what's actually live.
+        const LAB_PACK_PLANNED = ['Social Intelligence', 'Privacy & Security', 'Digital Citizenship', 'Professional Brand'];
+        function renderLabPackStatus() {
+            const live = MODULE_REGISTRY.filter(m => m.category === 'lab');
+            const planned = LAB_PACK_PLANNED.length;
+            const comingSoon = Math.max(0, planned - live.length);
+            const pill = document.getElementById('labpack-status-pill');
+            const counter = document.getElementById('labpack-counter');
+            if (pill) {
+                pill.textContent = live.length === 0 ? 'Coming Soon'
+                    : live.length >= planned ? 'All Labs Live'
+                    : live.length === 1 ? `${live[0].name} Live`
+                    : `${live.length} of ${planned} Labs Live`;
+            }
+            if (counter) {
+                counter.textContent = `${planned} labs planned \u2022 ${live.length} live \u2022 ${comingSoon} coming soon`;
+            }
+        }
+        renderLabPackStatus();
 
         // Given one student's fetched game_scores docs, work out their status for a specific
         // registry module.
@@ -2216,6 +2242,10 @@
                         </div>
                         <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
                             <div>
+                                <!-- Counts the module CARDS on this dashboard (Jolene's, Digital
+                                     Decisions, Lab Pack), not MODULE_REGISTRY entries — the Lab
+                                     Pack is one card holding several registry entries. Bump this
+                                     only when a new card is added below. -->
                                 <span class="block text-2xl font-bold text-allgood-secondary leading-none">3</span>
                                 <span class="text-[10px] uppercase text-slate-400 font-bold">MODULES</span>
                             </div>
@@ -2287,10 +2317,10 @@
                             <div class="flex-grow">
                                 <div class="flex justify-between items-start">
                                     <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Decisions Lab Pack</h3>
-                                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Social Intelligence Live</span>
+                                    <span id="labpack-status-pill" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">3 of 4 Labs Live</span>
                                 </div>
                                 <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Short labs with Jodi that build the skills the Digital Decisions Challenge tests.</p>
-                                <p class="text-[10px] text-slate-400 uppercase tracking-wide">4 labs planned &bull; 1 live &bull; 3 coming soon</p>
+                                <p id="labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">4 labs planned &bull; 3 live &bull; 1 coming soon</p>
                             </div>
                         </div>
                     </div>

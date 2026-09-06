@@ -40,6 +40,7 @@ the moments that matter. Steps per module:
 | Jolene's Lemonade Challenge | pages reached | 19 |
 | Social Intelligence | cases reached | 7 |
 | Privacy & Security | cases reached | 6 |
+| Digital Citizenship | cases reached | 7 |
 
 A 20-minute visit costs roughly 25 to 30 Firestore writes (one session rewrite per 45s plus
 the events), which is well inside the free tier at current traffic.
@@ -108,8 +109,17 @@ Three options, in order of effort:
 
 - `firestore.rules` gained rules for `sessions`, `events`, collection-group reads and
   recruit-code deletion. They deploy automatically on merge to `main` (see
-  `.github/workflows/firebase-firestore-rules.yml`). Until they are live, Insider shows an
-  amber "some data sources didn't load" strip naming the affected sources.
+  `.github/workflows/firebase-firestore-rules.yml`). They went live on 2026-09-06 (run #2
+  of that workflow, re-run after a service-account permission fix). If a later rules deploy
+  fails, Insider shows an amber "some data sources didn't load" strip naming the affected
+  sources; check the workflow run before assuming a code problem.
+- Firebase Hosting serves HTML with a one-hour `Cache-Control: max-age=3600` by default, so
+  a freshly deployed Insider (or dashboard) can stay stale in a browser for up to an hour.
+  A hard refresh (or a private window) shows the deployed version.
 - Insider's sessions and events queries order by `startedAt` / `ts`, which use Firestore's
   automatic single-field indexes. No composite index is needed. If Firestore ever asks for
   one, the browser console prints a one-click link.
+- `COURSES` in `public/insider/index.html` and the "Steps per module" table above are two of
+  the hand-maintained module lists; `node scripts/check-modules.js` verifies they agree
+  with each other and with the dashboard, the Lab Pack hub and each module's
+  `Telemetry.init` call. See "Publishing a module" in `docs/goodblock-integration-checklist.md`.
