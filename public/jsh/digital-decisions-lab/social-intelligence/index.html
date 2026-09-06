@@ -34,10 +34,18 @@
         window.currentUserEmail = "";
         window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 window.currentUserName = user.displayName || "Agent Learner";
                 window.currentUserEmail = user.email || "";
+
+                // Restore real progress for a returning visit — same canonical
+                // module_progress doc DDC/Jolene's use, so exiting mid-case (e.g. right
+                // after Case 4 unlocks) doesn't restart the whole lab on the next visit.
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('social-intelligence');
+                    if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
+                }
             }
         });
 
@@ -909,11 +917,47 @@
         window.advanceFromPage = function(pageNum) {
             if (pageNum > highestUnlocked) {
                 highestUnlocked = pageNum;
+                pageCompletion[pageNum - 1] = true;
                 window.renderLocks();
                 window.playPageIntro(pageNum);
+                if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                    window.AuthCore.saveModuleProgress('social-intelligence', {
+                        highestUnlocked, pageCompletion, firstExploredReaction,
+                    });
+                }
             }
             const nextPageEl = document.getElementById(`page-${pageNum + 1}`);
             if (nextPageEl) nextPageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        // Rehydrates a returning visit's progress (see the onAuthStateChanged load above) —
+        // unlocks/marks-complete every case they'd already cleared and jumps straight to
+        // wherever they left off, instead of restarting the whole lab from Case 1.
+        window.restoreModuleProgress = function(data) {
+            if (!data) return;
+            if (typeof data.highestUnlocked === 'number' && data.highestUnlocked > highestUnlocked) {
+                highestUnlocked = data.highestUnlocked;
+            }
+            if (data.pageCompletion && typeof data.pageCompletion === 'object') {
+                pageCompletion = { ...pageCompletion, ...data.pageCompletion };
+            }
+            if (data.firstExploredReaction) {
+                firstExploredReaction = data.firstExploredReaction;
+            }
+            window.renderLocks();
+            for (let i = 1; i < TOTAL_PAGES; i++) {
+                if (pageCompletion[i]) {
+                    const prompt = document.getElementById(`continue-${i + 1}`);
+                    if (prompt) prompt.classList.add('ready');
+                }
+            }
+            if (window.lucide) window.lucide.createIcons();
+            if (highestUnlocked > 0) {
+                setTimeout(() => {
+                    const pageEl = document.getElementById(`page-${highestUnlocked + 1}`);
+                    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 800);
+            }
         };
 
         let exploredReactions = { rage: false, ghost: false, dm: false };
@@ -1347,7 +1391,8 @@
                 // Someone actively moving between pages within the last hour shouldn't see
                 // this screen again — same rolling-activity pattern DDC uses.
                 if (window.AuthCore && window.AuthCore.skipPowerUp) {
-                    const unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
+                    let unsub;
+                    unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
                         unsub();
                         handleStartup();
                     });
@@ -1407,6 +1452,11 @@
             window.renderLocks();
             window.playPageIntro(0);
             document.getElementById('content-column').scrollTop = 0;
+            if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                window.AuthCore.saveModuleProgress('social-intelligence', {
+                    highestUnlocked, pageCompletion, firstExploredReaction,
+                });
+            }
         };
     </script>
 </body>
