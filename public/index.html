@@ -1706,7 +1706,6 @@
             font-family: Verdana, sans-serif;
             background-color: #0f172a; /* Deep Space Blue fallback */
             min-height: 100vh;
-            min-height: 100dvh;
             position: relative;
             margin: 0;
             padding: 0;
@@ -1868,7 +1867,7 @@
             .tablet-frame {
                 width: 100vw !important;
                 height: 100vh !important;
-                height: 100dvh !important;
+                height: calc(var(--vh, 1vh) * 100) !important;
                 max-width: none !important;
                 max-height: none !important;
                 border-radius: 0 !important;
@@ -2913,6 +2912,21 @@
 
         /* REMOVED: Profile Functions from here to avoid ReferenceError */
 
+        // Mobile browsers (esp. iOS Chrome) resize the visible viewport as their
+        // toolbar shows/hides, but 100vh doesn't track that. Keep a --vh custom
+        // property in sync with the real visible height so the app frame always
+        // matches the current viewport instead of leaving a gap or clipping.
+        (function () {
+            const setVh = () => {
+                document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+            };
+            setVh();
+            window.addEventListener('resize', setVh);
+            window.addEventListener('orientationchange', setVh);
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', setVh);
+            }
+        })();
     </script>
 </body>
 </html>
