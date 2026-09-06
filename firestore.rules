@@ -126,7 +126,12 @@ service cloud.firestore {
     //     module_complete, ...). Nobody but the admin allowlist can read them back,
     //     and nothing can edit one after the fact.
     match /artifacts/{appId}/events/{eventId} {
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+             'uid', 'role', 'ageTier', 'isGuest', 'module', 'gameName',
+             'sessionId', 'event', 'step', 'meta', 'device', 'entry', 'ts', 'clientTs'
+           ]);
       allow read, delete: if isAllowlistedAdmin();
     }
 

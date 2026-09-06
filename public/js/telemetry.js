@@ -189,6 +189,10 @@ async function writeEvent(evt) {
 
 function forwardToGA(event, meta) {
     if (typeof window.gtag !== 'function') return;
+    // Never forward analytics for an under-13 Learner Recruit, on any page — GA/gtag
+    // is outside this module's control once fired (cookies, IP-derived geo), which is
+    // not acceptable for a COPPA-covered session regardless of which page loaded gtag.
+    if (state.account && state.account.ageTier === 'under13') return;
     try {
         window.gtag('event', event, { module_name: state.gameName || state.module, ...(meta || {}) });
     } catch (e) { /* ignore */ }
