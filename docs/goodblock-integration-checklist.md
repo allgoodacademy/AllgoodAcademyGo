@@ -145,12 +145,15 @@ from an older reference, and check:
   bottom edge (`position: absolute; bottom: 0`), not in the footer. That's what lets the
   footer be hidden on phones without losing the bar. The JS that sets `#flex-progress-fill`'s
   width is unchanged.
-- [ ] Phone block, labs (`@media (max-width: 767px)`): pin the document (`html, body {
-  position: fixed; ... overflow: hidden !important }`, `.app-shell { position: absolute;
-  inset: 0 }`), hide the footer (`footer.footer-content { display: none !important }`), and
-  keep the header at `.navbar-content { flex: 0 0 auto; min-height: 52px; padding-top:
-  env(safe-area-inset-top) }`. The copyright line is therefore not rendered on phones in the
-  labs; the challenges already hid theirs below `sm`, so this is parity.
+- [ ] Phone block, labs (`@media (max-width: 767px)`): size to the initial containing block
+  and make the document unscrollable (`html { height: 100%; overflow: hidden }`, `body {
+  height: 100%; min-height: 0 !important; overflow: hidden !important }`, `.app-shell {
+  height: 100% }`), hide the footer (`footer.footer-content { display: none !important }`),
+  and keep the header at `.navbar-content { flex: 0 0 auto; min-height: 52px; padding-top:
+  env(safe-area-inset-top) }`. **Do not use `position: fixed` on html/body in the labs**: it
+  was tried and Safari stopped delivering taps to the Message HQ button. The copyright line
+  is therefore not rendered on phones in the labs; the challenges already hid theirs below
+  `sm`, so this is parity.
 - [ ] Phone block, challenges (`@media (max-width: 768px)`): same pinned document (DDC and
   Jolene's had it first), `header.navbar-content { flex: 0 0 auto; min-height: 48px;
   padding-top: max(env(safe-area-inset-top), 4px); padding-bottom: 4px }`. DDC hides its
