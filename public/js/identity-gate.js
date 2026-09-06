@@ -26,12 +26,53 @@ function waitForAuthReady() {
         // Guard against a synchronous first callback (real Firebase always fires
         // async, but nothing about this function should depend on that): `unsub`
         // isn't assigned yet in that case, so just skip calling it once.
+        let settled = false;
         let unsub;
+        // No timeout here previously meant a slow/dropped network call during
+        // Firebase Auth's own state determination left ensureIdentified() awaiting
+        // forever with zero UI feedback - on mobile this read as the whole page
+        // freezing for as long as the network stayed slow. Bounding the wait means
+        // a bad connection degrades to "treated as signed out, gate shows" instead
+        // of "frozen indefinitely."
+        const timeout = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            if (unsub) unsub();
+            console.warn('[AuthGate] onAuthStateChanged did not resolve within 8s; proceeding as signed-out.');
+            resolve(null);
+        }, 8000);
         unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, (user) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
             if (unsub) unsub();
             resolve(user);
         });
     });
+}
+
+// Minimal, dependency-free loading indicator (inline styles, no Tailwind custom
+// colors) shown only during the one phase of ensureIdentified() that previously
+// gave zero visual feedback: waiting on Firebase's first auth-state callback,
+// before the gate modal (or anything else) has appeared. Self-contained the same
+// way message-hq.js is, so it works identically on every page regardless of that
+// page's own Tailwind config.
+function showAuthSpinner() {
+    let el = document.getElementById('ag-loading');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'ag-loading';
+        el.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(255,255,255,0.6);display:flex;align-items:center;justify-content:center;';
+        el.innerHTML = '<div style="width:32px;height:32px;border:3px solid #D34716;border-top-color:transparent;border-radius:50%;animation:ag-spin 0.7s linear infinite;"></div>' +
+            '<style>@keyframes ag-spin{to{transform:rotate(360deg)}}</style>';
+        document.body.appendChild(el);
+    }
+    el.style.display = 'flex';
+}
+
+function hideAuthSpinner() {
+    const el = document.getElementById('ag-loading');
+    if (el) el.style.display = 'none';
 }
 
 function isFullyIdentified(user, account) {
@@ -370,7 +411,13 @@ function openGate(onResolved) {
 }
 
 async function ensureIdentified() {
-    const user = await waitForAuthReady();
+    showAuthSpinner();
+    let user;
+    try {
+        user = await waitForAuthReady();
+    } finally {
+        hideAuthSpinner();
+    }
     if (user) {
         const account = await window.AuthCore.getAccount(user.uid);
         if (isFullyIdentified(user, account)) return { user, account };
