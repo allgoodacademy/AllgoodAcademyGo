@@ -21,18 +21,18 @@
         var wrapper = document.createElement('div');
         wrapper.innerHTML =
             '<div id="message-modal" class="hidden-modal fixed inset-0 z-[9999] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeMessageModal()">' +
-                '<div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">' +
+                '<div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">' +
                     '<button onclick="window.closeMessageModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>' +
                     '<div class="mb-4">' +
-                        '<div class="w-12 h-12 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-3">' +
-                            '<i data-lucide="message-circle" class="w-6 h-6 text-allgood-secondary"></i>' +
+                        '<div class="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-3">' +
+                            '<i data-lucide="message-circle" class="w-6 h-6 text-allgood-primary"></i>' +
                         '</div>' +
                         '<h3 class="text-xl font-heading font-bold text-allgood-dark uppercase">Direct Line</h3>' +
                         '<p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">To: Allgood Academy HQ</p>' +
                     '</div>' +
                     '<div class="text-left mb-4">' +
                         '<p class="text-xs text-gray-500 italic mb-2">Agent, this is your direct line. Find a bug, disagree with something, or have a thought? Drop it here.</p>' +
-                        '<textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-secondary focus:border-allgood-secondary outline-none resize-none bg-white font-body placeholder-gray-400" placeholder="Type your message here..."></textarea>' +
+                        '<textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50 font-body placeholder-gray-400" placeholder="Type your message here..."></textarea>' +
                     '</div>' +
                     '<button id="btn-send-message" onclick="window.submitHQMessage()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">' +
                         '<i data-lucide="send" class="w-3 h-3"></i> Send Transmission' +
