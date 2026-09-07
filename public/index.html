@@ -44,7 +44,13 @@
         let launchCount = parseInt(localStorage.getItem('aa_launch_count') || '0');
         let unsubscribeLaunches = null;
         let unsubscribeDecisions = null;
+        let unsubscribeLabPackProgress = null;
         let unsubscribeIntel = null; // NEW: Intel Listener
+        // Latest known state for the Lab Pack card's own pill — populated independently by
+        // startModuleStatusListener (game_scores -> completed labs) and the module_progress
+        // listener (started labs), each re-rendering the pill on its own snapshot.
+        let _labPackCompletedGameNames = new Set();
+        let _labPackStartedModuleIds = new Set();
         
         window.allModuleElements = {};
 
@@ -107,14 +113,12 @@
             const live = MODULE_REGISTRY.filter(m => m.category === 'lab');
             const planned = LAB_PACK_PLANNED.length;
             const comingSoon = Math.max(0, planned - live.length);
-            const pill = document.getElementById('labpack-status-pill');
+            // labpack-status-pill itself is NOT set here — it shows the signed-in student's
+            // own Not Started / Started / Completed progress across the pack (see
+            // updateLabPackStatusPill(), called from startModuleStatusListener once real
+            // Firestore data has loaded), not a "how many labs exist" business fact. That
+            // fact still shows via labpack-counter below.
             const counter = document.getElementById('labpack-counter');
-            if (pill) {
-                pill.textContent = live.length === 0 ? 'Coming Soon'
-                    : live.length >= planned ? 'All Labs Live'
-                    : live.length === 1 ? `${live[0].name} Live`
-                    : `${live.length} of ${planned} Labs Live`;
-            }
             if (counter) {
                 counter.textContent = comingSoon === 0
                     ? `${planned} labs planned \u2022 ${live.length} live`
@@ -127,6 +131,31 @@
             }
         }
         renderLabPackStatus();
+
+        // Aggregate Not Started / Started / Completed across the whole pack, from the two
+        // independent listeners in startModuleStatusListener/startLaunchListener's sibling
+        // (module_progress) — see their _labPackCompletedGameNames/_labPackStartedModuleIds
+        // updates. Completed only once every lab in the pack is completed; Started if any
+        // lab has been touched at all; Not Started only with zero signal on every lab.
+        function updateLabPackStatusPill() {
+            const pill = document.getElementById('labpack-status-pill');
+            if (!pill) return;
+            const labs = MODULE_REGISTRY.filter(m => m.category === 'lab');
+            if (labs.length === 0) return;
+            const allCompleted = labs.every(lab => lab.gameNames.some(name => _labPackCompletedGameNames.has(name)));
+            const anyStarted = labs.some(lab =>
+                _labPackStartedModuleIds.has(lab.id) || lab.gameNames.some(name => _labPackCompletedGameNames.has(name)));
+            if (allCompleted) {
+                pill.textContent = 'Completed';
+                pill.className = 'bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else if (anyStarted) {
+                pill.textContent = 'Started';
+                pill.className = 'bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else {
+                pill.textContent = 'Not Started';
+                pill.className = 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            }
+        }
 
         // Duration metadata is placeholder data (see MODULE_REGISTRY comment above) rendered
         // from the registry so it can't drift from the numbers there. Any element tagged
@@ -457,9 +486,21 @@
                 unsubscribeLaunches = null;
             }
 
-            if (unsubscribeDecisions) { 
+            if (unsubscribeDecisions) {
                 unsubscribeDecisions();
                 unsubscribeDecisions = null;
+            }
+
+            if (unsubscribeLabPackProgress) {
+                unsubscribeLabPackProgress();
+                unsubscribeLabPackProgress = null;
+            }
+            _labPackCompletedGameNames = new Set();
+            _labPackStartedModuleIds = new Set();
+            const labPackPill = document.getElementById('labpack-status-pill');
+            if (labPackPill) {
+                labPackPill.textContent = 'Not Started';
+                labPackPill.className = 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
             }
 
             if (unsubscribeIntel) { // NEW: Cleanup Intel Listener
@@ -807,8 +848,13 @@
                     const badgeElement = window.allModuleElements[courseName];
                     
                     if (badgeElement) {
-                        if (badgeElement.id === 'ddc-status-badge') return;
-                        
+                        // DDC and the Lab Pack card both drive their own pill from real
+                        // Firestore state (startModuleStatusListener / updateLabPackStatusPill)
+                        // — "LAUNCHED" is for the generic single-game cards only, and was
+                        // sticking on the Lab Pack pill forever with no path back to a real
+                        // Not Started/Started/Completed label.
+                        if (badgeElement.id === 'ddc-status-badge' || badgeElement.id === 'labpack-status-pill') return;
+
                         // FIX: Do not overwrite if already completed
                         if (badgeElement.textContent === "MISSION COMPLETE" || badgeElement.textContent === "CERTIFIED") return;
 
@@ -827,9 +873,21 @@
         // Universal Status Listener (Handles DDC + JLC + All Content Blocks)
         window.startModuleStatusListener = function(uid) {
             if (unsubscribeDecisions) unsubscribeDecisions();
-            
+            if (unsubscribeLabPackProgress) unsubscribeLabPackProgress();
+
+            // The Lab Pack card's "Started" signal — a lab only writes to game_scores on
+            // completion, so this is the only place "at least one lab is underway" shows up
+            // (same root cause as the Lab Pack hub's own badges, fixed earlier).
+            const labPackProgressRef = collection(db, 'artifacts', appId, 'users', uid, 'module_progress');
+            unsubscribeLabPackProgress = onSnapshot(labPackProgressRef, (snapshot) => {
+                _labPackStartedModuleIds = new Set(snapshot.docs.map(d => d.id));
+                updateLabPackStatusPill();
+            }, (error) => {
+                console.error("Lab Pack progress listener silent fail:", error);
+            });
+
             const scoresRef = collection(db, 'artifacts', appId, 'users', uid, 'game_scores');
-            
+
             unsubscribeDecisions = onSnapshot(scoresRef, (snapshot) => {
                 // maxDDCScore only ever considers COMPLETED attempts (all 30 scenarios
                 // answered) — a partial attempt's running score must never read as a
@@ -889,6 +947,9 @@
                         }
                     }
                 });
+
+                _labPackCompletedGameNames = completedModules;
+                updateLabPackStatusPill();
 
                 // Update Local Storage for Badges
                 if (maxDDCScore >= 80) localStorage.setItem('aa_ddc_complete', 'true');
@@ -2374,7 +2435,9 @@
                                 <div class="flex justify-between items-start">
                                     <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Decisions Lab Pack</h3>
                                     <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
-                                    <span id="labpack-status-pill" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Lab Pack</span>
+                                    <!-- Real state only: updateLabPackStatusPill() sets Not Started/Started/Completed once
+                                         Firestore has actually loaded — never a fabricated default. -->
+                                    <span id="labpack-status-pill" class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">—</span>
                                 </div>
                                 <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Short labs with Jodi that build the skills the Digital Decisions Challenge tests.</p>
                                 <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
