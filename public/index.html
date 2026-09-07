@@ -87,8 +87,6 @@
         const MODULE_REGISTRY = [
             { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
               gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 80, durationMinutes: 25 },
-            { id: 'jolene', name: "Jolene's Lemonade", category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge',
-              gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800, durationMinutes: 20 },
             { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', url: '/jsh/digital-decisions-lab/social-intelligence/',
               gameNames: ['Social Intelligence'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', url: '/jsh/digital-decisions-lab/privacy-security/',
@@ -144,11 +142,14 @@
         renderModuleDurations();
 
         // Given one student's fetched game_scores docs, work out their status for a specific
-        // registry module.
-        function computeModuleStatus(moduleId, scoreDocs) {
+        // registry module. startedModuleIds (module_progress doc ids that exist for this
+        // student) is the only "in progress" signal for a GoodBlock lab — labs write to
+        // game_scores only on completion (see logModuleCompletion), so a mid-lab student
+        // has no game_scores doc yet and would otherwise always read as Not Started.
+        function computeModuleStatus(moduleId, scoreDocs, startedModuleIds) {
             const mod = getModuleById(moduleId);
             if (!mod) return { status: 'not_started' };
-            let sawAttempt = false;
+            let sawAttempt = startedModuleIds instanceof Set && startedModuleIds.has(moduleId);
             for (const data of scoreDocs) {
                 if (!mod.gameNames.includes(data.gameName)) continue;
                 sawAttempt = true;
@@ -328,20 +329,18 @@
         // LAUNCH TRANSITIONS: each named module gets its signature "power-in" cover
         // animation (ported from allgoodtransitionconcepts.html) before same-tab
         // navigation. Any module not listed here keeps the old new-tab launch. (Rage
-        // Revenue and Finding Yourself used to share a "jodi" treatment here — removed
-        // along with their dashboard cards when both modules were archived.)
+        // Revenue, Finding Yourself, and Jolene's Lemonade used to have treatments here
+        // — removed along with their dashboard cards when those modules were archived.)
         const LAUNCH_TRANSITIONS = {
             'Digital Decisions': 'ddc',
-            'Jolenes Lemonade': 'jolene',
         };
         const LAUNCH_TRANSITION_IDS = {
             ddc: ['t-ddc-bg', 't-ddc-scan', 't-ddc-ring', 't-ddc-label'],
-            jolene: ['t-jolene-bg', 't-jolene-page', 't-jolene-icon'],
         };
         // Matches the prototype's fire()->land() timeouts exactly: navigation fires
         // right as each treatment reaches its peak cover, masking the destination
         // page's load jank behind the still-animating overlay.
-        const LAUNCH_TRANSITION_DURATIONS = { ddc: 1500, jolene: 1150 };
+        const LAUNCH_TRANSITION_DURATIONS = { ddc: 1500 };
 
         function playLaunchTransition(which, destinationUrl) {
             const overlay = document.getElementById('launch-transition');
@@ -485,8 +484,8 @@
 
             const ddcBadge = document.getElementById('ddc-status-badge');
             if(ddcBadge) {
-                ddcBadge.textContent = "Active";
-                ddcBadge.className = "bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
+                ddcBadge.textContent = "Not Started";
+                ddcBadge.className = "bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
             }
             
             window.initModuleElements();
@@ -926,8 +925,11 @@
                         ddcBadge.textContent = "IN PROGRESS";
                         ddcBadge.className = "bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-blue-200";
                     } else {
-                        ddcBadge.textContent = "Active";
-                        ddcBadge.className = "bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500";
+                        // No game_scores doc at all for DDC — a real fresh account with zero
+                        // interaction. This must never show "Active": that read as a fabricated
+                        // status on a brand-new account that had never clicked the Challenge.
+                        ddcBadge.textContent = "Not Started";
+                        ddcBadge.className = "bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500";
                     }
                 }
                 const ddcBestScore = document.getElementById('ddc-best-score');
@@ -1442,9 +1444,22 @@
                         console.error("Couldn't read a student's scores (permissions?) — showing their assigned modules as Not Started.", e);
                     }
 
+                    // The GoodBlock labs only write to game_scores on completion (see
+                    // logModuleCompletion) — a student mid-lab has no game_scores doc at
+                    // all yet. Their in-progress signal is module_progress, written by
+                    // advanceFromPage() every time they clear a Case, starting at Case 2.
+                    // Without reading this, "in_progress" can never fire for a lab.
+                    let startedModuleIds = new Set();
+                    try {
+                        const progressSnap = await getDocs(collection(db, 'artifacts', appId, 'users', sDoc.id, 'module_progress'));
+                        startedModuleIds = new Set(progressSnap.docs.map(d => d.id));
+                    } catch (e) {
+                        console.error("Couldn't read a student's module_progress (permissions?) — in-progress labs may show as Not Started.", e);
+                    }
+
                     const moduleStatuses = {};
                     assignedModuleIds.forEach(moduleId => {
-                        const result = computeModuleStatus(moduleId, scoreDocs);
+                        const result = computeModuleStatus(moduleId, scoreDocs, startedModuleIds);
                         moduleStatuses[moduleId] = result;
                         totalCompletionPairs++;
                         if (result.status === 'completed') completedPairs++;
@@ -2099,30 +2114,6 @@
         .t-ddc-label.on { animation: labelPulse 1.6s ease forwards; }
         @keyframes labelPulse { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 
-        /* --- Jolene: storybook page turn --- */
-        .t-jolene-bg {
-            position: absolute; inset: 0; background: #FFF8E7;
-            opacity: 0; transition: opacity 0.2s ease;
-        }
-        .t-jolene-bg.on { opacity: 1; }
-        .t-jolene-page {
-            position: absolute; inset: 0;
-            background: linear-gradient(120deg, #FFFDF5 0%, #FEF3C7 100%);
-            transform-origin: left center;
-            transform: perspective(1400px) rotateY(0deg);
-            box-shadow: -20px 0 40px rgba(0,0,0,0.15);
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none;
-        }
-        .t-jolene-page.on { opacity: 1; animation: pageTurn 1.1s cubic-bezier(0.6,0,0.3,1) forwards; }
-        @keyframes pageTurn {
-            0% { transform: perspective(1400px) rotateY(0deg); }
-            100% { transform: perspective(1400px) rotateY(-160deg); }
-        }
-        .t-jolene-icon { font-size: 64px; opacity: 0; }
-        .t-jolene-icon.on { animation: fadeQuick 0.5s ease 0.15s forwards; }
-        @keyframes fadeQuick { to { opacity: 1; } }
-
     </style>
 </head>
 <body class="flex flex-col min-h-screen text-allgood-dark font-body">
@@ -2134,9 +2125,6 @@
         </div>
         <div class="t-ddc-ring" id="t-ddc-ring"></div>
         <div class="t-ddc-label" id="t-ddc-label">Initializing</div>
-
-        <div class="t-jolene-bg" id="t-jolene-bg"></div>
-        <div class="t-jolene-page" id="t-jolene-page"><span class="t-jolene-icon" id="t-jolene-icon">&#127819;</span></div>
     </div>
 
     <!-- ORBITAL LINK: Static Feed Injection -->
@@ -2319,11 +2307,12 @@
                         </div>
                         <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
                             <div>
-                                <!-- Counts the module CARDS on this dashboard (Jolene's, Digital
-                                     Decisions, Lab Pack), not MODULE_REGISTRY entries — the Lab
-                                     Pack is one card holding several registry entries. Bump this
-                                     only when a new card is added below. -->
-                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">3</span>
+                                <!-- Counts the module CARDS on this dashboard (Digital Decisions,
+                                     Lab Pack), not MODULE_REGISTRY entries — the Lab Pack is one
+                                     card holding several registry entries. Bump this only when a
+                                     new card is added below (Jolene's Lemonade was removed along
+                                     with its card and registry entry — do not recount it). -->
+                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">2</span>
                                 <span class="text-[10px] uppercase text-slate-400 font-bold">MODULES</span>
                             </div>
                             <div>
@@ -2349,23 +2338,7 @@
 
                     <!-- TAB 1: CHALLENGES -->
                     <div id="tab-challenges" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
-                        <div onclick="window.launchCourse('Jolenes Lemonade', 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge', this)" 
-                             class="mission-file status-ready p-5 flex items-start gap-4 group">
-                             <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
-                            <div class="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center border border-yellow-100 flex-shrink-0 group-hover:bg-yellow-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🍋</span>
-                            </div>
-                            <div class="flex-grow">
-                                <div class="flex justify-between items-start">
-                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Jolene's Lemonade</h3>
-                                    <span class="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Manage supply, demand, and profit margins in a live market.</p>
-                                <!-- Placeholder duration estimate rendered from MODULE_REGISTRY, not hardcoded -->
-                                <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="jolene">&nbsp;</p>
-                            </div>
-                        </div>
-                        <div onclick="window.launchCourse('Digital Decisions', 'https://www.allgoodacademy.com/educational-games/digital-decisions', this)" 
+                        <div onclick="window.launchCourse('Digital Decisions', 'https://www.allgoodacademy.com/educational-games/digital-decisions', this)"
                              class="mission-file status-active p-5 flex items-start gap-4 group">
                              <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
                             <div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center border border-indigo-100 flex-shrink-0 group-hover:bg-indigo-100 transition-colors shadow-sm">
@@ -2374,7 +2347,9 @@
                             <div class="flex-grow">
                                 <div class="flex justify-between items-start">
                                     <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Decisions</h3>
-                                    <span id="ddc-status-badge" class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Active</span>
+                                    <!-- Not a fabricated status: starts empty, same em-dash pattern as the admin stat tiles.
+                                         startModuleStatusListener sets the real state once Firestore has actually loaded. -->
+                                    <span id="ddc-status-badge" class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">—</span>
                                 </div>
                                 <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Make high-stakes choices in simulated online conflict scenarios.</p>
                                 <!-- Placeholder duration estimate rendered from MODULE_REGISTRY, not hardcoded -->

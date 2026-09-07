@@ -258,9 +258,14 @@
             }
         }
 
-        function applyRealLabStatuses(scoreDocs) {
+        // startedModuleIds is the set of module_progress doc ids for this student — the
+        // only "started" signal a lab has. Labs write to game_scores only on completion
+        // (see logModuleCompletion), so a student mid-lab has no game_scores doc at all
+        // yet; without this, "Started" could never fire and every unfinished lab would
+        // read as Not Started forever.
+        function applyRealLabStatuses(scoreDocs, startedModuleIds) {
             LAB_STATUS_REGISTRY.forEach(lab => {
-                let sawAttempt = false;
+                let sawAttempt = startedModuleIds.has(lab.id);
                 let completed = false;
                 for (const data of scoreDocs) {
                     if (data.gameName !== lab.gameName) continue;
@@ -284,8 +289,12 @@
                 // markup default of "Ready" exactly as it is.
                 if (!user) return;
                 try {
-                    const scoresSnap = await getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'game_scores'));
-                    applyRealLabStatuses(scoresSnap.docs.map(d => d.data()));
+                    const [scoresSnap, progressSnap] = await Promise.all([
+                        getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'game_scores')),
+                        getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'module_progress')),
+                    ]);
+                    const startedModuleIds = new Set(progressSnap.docs.map(d => d.id));
+                    applyRealLabStatuses(scoresSnap.docs.map(d => d.data()), startedModuleIds);
                 } catch (e) {
                     console.error('[Lab Pack Hub] Couldn\'t read progress — leaving cards as Ready', e);
                 }

@@ -49,10 +49,14 @@ for (const lab of dashLabs) {
 for (const c of insiderLabs) if (!dashLabs.find(l => l.id === c.id)) fail(`dashboard: no MODULE_REGISTRY entry with id "${c.id}" (Insider has it)`);
 
 // --- each module page's Telemetry.init
+// Retired courses stay in Insider's COURSES (historical analytics on real past data), but
+// have no live page left to check Telemetry.init against — skip them here instead of
+// failing on a page that was deliberately deleted.
+const RETIRED_NO_LIVE_PAGE = ['jolenes-lemonade'];
 const modulePages = { ...Object.fromEntries(dashLabs.map(l => [l.id, path.join('public', l.url, 'index.html')])),
-  'digital-decisions': 'public/educational-games/digital-decisions/index.html',
-  'jolenes-lemonade': 'public/educational-games/jolenes-lemonade-challenge/index.html' };
+  'digital-decisions': 'public/educational-games/digital-decisions/index.html' };
 for (const c of courses) {
+  if (RETIRED_NO_LIVE_PAGE.includes(c.id)) continue;
   const page = modulePages[c.id];
   if (!page) { fail(`insider: course "${c.id}" has no known page to check Telemetry.init against`); continue; }
   const src = read(page);
