@@ -115,7 +115,9 @@
                     : `${live.length} of ${planned} Labs Live`;
             }
             if (counter) {
-                counter.textContent = `${planned} labs planned \u2022 ${live.length} live \u2022 ${comingSoon} coming soon`;
+                counter.textContent = comingSoon === 0
+                    ? `${planned} labs planned \u2022 ${live.length} live`
+                    : `${planned} labs planned \u2022 ${live.length} live \u2022 ${comingSoon} coming soon`;
             }
         }
         renderLabPackStatus();
@@ -2305,11 +2307,9 @@
                     </div>
 
                     <!-- TAB 2: JODI'S SCHOOLHOUSE — Rage Revenue and Finding Yourself have been
-                         archived (see archive/jsh/); they're being replaced by the four-lab
-                         Digital Decisions Lab Pack. Social Intelligence is the first of those
-                         four to actually ship, so this tab now opens onto the real Lab Pack
-                         hub instead of the old "coming soon" placeholder — the other three
-                         labs still show as honest "coming soon" cards on the hub itself. -->
+                         archived (see archive/jsh/); they're replaced by the Digital Decisions Lab
+                         Pack, a set of short labs with Jodi. This tab opens onto the real Lab Pack
+                         hub, which shows each lab as live or "coming soon" per MODULE_REGISTRY. -->
                     <div id="tab-courses" class="tab-content grid grid-cols-1 gap-4">
                         <div onclick="window.launchCourse('Digital Decisions Lab Pack', '/jsh/digital-decisions-lab/', this)"
                              class="mission-file status-active p-5 flex items-start gap-4 group max-w-xl w-full mx-auto">
@@ -2319,10 +2319,12 @@
                             <div class="flex-grow">
                                 <div class="flex justify-between items-start">
                                     <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Decisions Lab Pack</h3>
-                                    <span id="labpack-status-pill" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">3 of 4 Labs Live</span>
+                                    <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
+                                    <span id="labpack-status-pill" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Lab Pack</span>
                                 </div>
                                 <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Short labs with Jodi that build the skills the Digital Decisions Challenge tests.</p>
-                                <p id="labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">4 labs planned &bull; 3 live &bull; 1 coming soon</p>
+                                <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
+                                <p id="labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">&nbsp;</p>
                             </div>
                         </div>
                     </div>
