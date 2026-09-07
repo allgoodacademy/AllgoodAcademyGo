@@ -968,6 +968,10 @@
                         highestUnlocked, pageCompletion,
                     });
                 }
+                // Completion is recorded here, on reaching the final case, not inside
+                // finalizeCaseRating() — the rating is optional feedback and must never
+                // gate whether completion is logged.
+                if (pageNum === TOTAL_PAGES - 1 && window.logModuleCompletion) window.logModuleCompletion();
             }
             const nextPageEl = document.getElementById(`page-${pageNum + 1}`);
             if (nextPageEl) nextPageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1639,7 +1643,6 @@
             if (window.AuthCore) {
                 window.AuthCore.submitCourseFeedback({ gameName: 'Privacy & Security', rating: selectedStars, feedback: feedbackText });
             }
-            if (window.logModuleCompletion) window.logModuleCompletion();
             if (window.sfx) window.sfx.success();
             setTimeout(() => {
                 document.getElementById('case6-rating').classList.add('hidden');
@@ -1686,7 +1689,7 @@
                     // Same gate the dashboard uses, run right here — reached directly by a
                     // bookmarked or shared link, this GoodBlock can't rely on the Lab Pack
                     // hub's own launchLab having already checked this. Completion itself is
-                    // written later, by finalizeCaseRating() once Case 6 is actually reached.
+                    // written later, by advanceFromPage() once Case 6 is actually reached.
                     await window.AuthGate.ensureIdentified();
                 };
                 startup.addEventListener('click', handleStartup);

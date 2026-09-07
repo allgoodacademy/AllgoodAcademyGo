@@ -1450,6 +1450,10 @@
             } catch (e) {
                 console.error("Roster fetch failed — check that firestore.rules has been deployed with the teacher-classroom rules.", e);
                 rosterBody.innerHTML = '<p class="text-xs text-red-400 italic p-4">Couldn\'t load roster — this usually means the security rules update hasn\'t been deployed yet.</p>';
+                // A failed fetch must never leave a fabricated or stale number on the stat
+                // tiles — show empty state, not a confident-looking placeholder.
+                document.getElementById('admin-stat-total').textContent = '—';
+                document.getElementById('admin-stat-completion').textContent = '—';
             }
         };
 
@@ -2511,7 +2515,7 @@
                         <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
                             <div>
                                 <span id="admin-stat1-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Total Agents</span>
-                                <span id="admin-stat-total" class="block text-3xl font-heading font-bold text-slate-700">24</span>
+                                <span id="admin-stat-total" class="block text-3xl font-heading font-bold text-slate-700">—</span>
                             </div>
                             <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                                 <i data-lucide="users" class="w-5 h-5"></i>
@@ -2521,7 +2525,7 @@
                         <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
                             <div>
                                 <span id="admin-stat2-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Completion Rate</span>
-                                <span id="admin-stat-completion" class="block text-3xl font-heading font-bold text-emerald-600">78%</span>
+                                <span id="admin-stat-completion" class="block text-3xl font-heading font-bold text-emerald-600">—</span>
                             </div>
                             <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
                                 <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
@@ -2531,7 +2535,7 @@
                         <div id="admin-stat3-card" onclick="window.copyClassroomCode()" class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all cursor-pointer">
                             <div>
                                 <span id="admin-stat3-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Invite Link</span>
-                                <span id="admin-stat-code" class="block text-sm font-bold text-allgood-secondary mt-1 underline decoration-dotted">allgood.ac/tf/8821</span>
+                                <span id="admin-stat-code" class="block text-sm font-bold text-allgood-secondary mt-1 underline decoration-dotted">—</span>
                             </div>
                             <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-allgood-primary">
                                 <i data-lucide="copy" class="w-5 h-5"></i>
