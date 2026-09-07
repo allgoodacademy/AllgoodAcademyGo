@@ -182,7 +182,12 @@
             .app-shell { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; max-width: none !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; border: none !important; }
             header.navbar-content { flex: 0 0 auto; padding-top: max(env(safe-area-inset-top), 4px); height: auto; min-height: 48px; padding-bottom: 4px; z-index: 50; }
             footer.footer-content { display: none !important; }
-            .page-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+            /* #mobile-progress-pill floats absolute over `main`, not inside this scroll region,
+               so it stays fixed at the same spot regardless of scroll position — any card that
+               scrolls to the bottom of the viewport sits behind it. Reserving that height as a
+               margin here (rather than trailing padding on .page, which only clears the very
+               end of the list) keeps every scroll position clear of the pill. */
+            .page-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: calc(76px + env(safe-area-inset-bottom)); }
             .page { flex: 1 1 auto; overflow-y: visible; padding-bottom: 30px !important; }
         }
     </style>
