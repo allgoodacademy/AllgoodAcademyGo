@@ -32,7 +32,7 @@
                     '</div>' +
                     '<div class="text-left mb-4">' +
                         '<p class="text-xs text-gray-500 italic mb-2">Agent, this is your direct line. Find a bug, disagree with something, or have a thought? Drop it here.</p>' +
-                        '<textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50 font-body placeholder-gray-400" placeholder="Type your message here..."></textarea>' +
+                        '<textarea id="message-input" rows="4" class="w-full border border-gray-300 rounded p-3 text-sm focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-gray-50 font-body placeholder-gray-400" style="font-size:16px;" placeholder="Type your message here..."></textarea>' +
                     '</div>' +
                     '<button id="btn-send-message" onclick="window.submitHQMessage()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">' +
                         '<i data-lucide="send" class="w-3 h-3"></i> Send Transmission' +
