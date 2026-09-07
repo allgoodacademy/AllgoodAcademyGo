@@ -81,19 +81,22 @@
         // not guessed: DDC and Jolene's both gate on a finalScore threshold (no fake flags).
         // Social Intelligence is a lab, not a graded quiz — no numeric score, just a
         // completed:true flag written once a student reaches its final case.
+        // durationMinutes below are placeholder estimates, not measured data — they exist so
+        // teachers can time-box a module against a class period. Replace with real numbers
+        // once we have completion-time telemetry per module.
         const MODULE_REGISTRY = [
             { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
-              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 80 },
+              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 80, durationMinutes: 25 },
             { id: 'jolene', name: "Jolene's Lemonade", category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge',
-              gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800 },
+              gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800, durationMinutes: 20 },
             { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', url: '/jsh/digital-decisions-lab/social-intelligence/',
-              gameNames: ['Social Intelligence'], isComplete: (d) => d.completed === true },
+              gameNames: ['Social Intelligence'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', url: '/jsh/digital-decisions-lab/privacy-security/',
-              gameNames: ['Privacy & Security'], isComplete: (d) => d.completed === true },
+              gameNames: ['Privacy & Security'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'digital-citizenship', name: 'Digital Citizenship', category: 'lab', url: '/jsh/digital-decisions-lab/digital-citizenship/',
-              gameNames: ['Digital Citizenship'], isComplete: (d) => d.completed === true },
+              gameNames: ['Digital Citizenship'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'professional-brand', name: 'Professional Brand', category: 'lab', url: '/jsh/digital-decisions-lab/professional-brand/',
-              gameNames: ['Professional Brand'], isComplete: (d) => d.completed === true },
+              gameNames: ['Professional Brand'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
 
@@ -119,8 +122,26 @@
                     ? `${planned} labs planned \u2022 ${live.length} live`
                     : `${planned} labs planned \u2022 ${live.length} live \u2022 ${comingSoon} coming soon`;
             }
+            const duration = document.getElementById('labpack-duration');
+            if (duration) {
+                const totalMinutes = live.reduce((sum, m) => sum + (m.durationMinutes || 0), 0);
+                duration.textContent = `~${totalMinutes} MIN`;
+            }
         }
         renderLabPackStatus();
+
+        // Duration metadata is placeholder data (see MODULE_REGISTRY comment above) rendered
+        // from the registry so it can't drift from the numbers there. Any element tagged
+        // data-duration-for="<moduleId>" gets its text set to that module's estimated time.
+        function renderModuleDurations() {
+            document.querySelectorAll('[data-duration-for]').forEach((el) => {
+                const mod = getModuleById(el.dataset.durationFor);
+                if (mod && typeof mod.durationMinutes === 'number') {
+                    el.textContent = `~${mod.durationMinutes} MIN`;
+                }
+            });
+        }
+        renderModuleDurations();
 
         // Given one student's fetched game_scores docs, work out their status for a specific
         // registry module.
@@ -2287,7 +2308,9 @@
                                     <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Jolene's Lemonade</h3>
                                     <span class="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
                                 </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Manage supply, demand, and profit margins in a live market.</p>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Manage supply, demand, and profit margins in a live market.</p>
+                                <!-- Placeholder duration estimate rendered from MODULE_REGISTRY, not hardcoded -->
+                                <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="jolene">&nbsp;</p>
                             </div>
                         </div>
                         <div onclick="window.launchCourse('Digital Decisions', 'https://www.allgoodacademy.com/educational-games/digital-decisions', this)" 
@@ -2301,7 +2324,9 @@
                                     <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Decisions</h3>
                                     <span id="ddc-status-badge" class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Active</span>
                                 </div>
-                                <p class="text-xs text-slate-500 mb-3 leading-relaxed"><strong>Action:</strong> Make high-stakes choices in simulated online conflict scenarios.</p>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Make high-stakes choices in simulated online conflict scenarios.</p>
+                                <!-- Placeholder duration estimate rendered from MODULE_REGISTRY, not hardcoded -->
+                                <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="ddc">&nbsp;</p>
                             </div>
                         </div>
                     </div>
@@ -2324,7 +2349,11 @@
                                 </div>
                                 <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Short labs with Jodi that build the skills the Digital Decisions Challenge tests.</p>
                                 <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
-                                <p id="labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">&nbsp;</p>
+                                <div class="flex items-center justify-between gap-2">
+                                    <p id="labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">&nbsp;</p>
+                                    <!-- Pack total duration, summed from durationMinutes across live labs — see renderLabPackStatus() -->
+                                    <span id="labpack-duration" class="text-[10px] text-slate-400 uppercase tracking-wide whitespace-nowrap">&nbsp;</span>
+                                </div>
                             </div>
                         </div>
                     </div>
