@@ -92,7 +92,7 @@
                     <div class="w-14 h-14 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center shadow-sm">
                         <i data-lucide="radar" class="w-7 h-7 text-allgood-primary"></i>
                     </div>
-                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                    <span id="lab-status-social-intelligence" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
                 </div>
                 <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Social Intelligence</h3>
                 <p class="text-xs text-slate-500 leading-relaxed flex-grow">Read the room before you react — audiences, scripts, allyship, and the three-second pause that changes an outcome.</p>
@@ -108,7 +108,7 @@
                     <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#EEEBFA; border:1px solid #D8D2F0;">
                         <i data-lucide="search-check" class="w-7 h-7" style="color:#5646A8;"></i>
                     </div>
-                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                    <span id="lab-status-privacy-security" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
                 </div>
                 <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Privacy &amp; Security</h3>
                 <p class="text-xs text-slate-500 leading-relaxed flex-grow">Scams, permissions, passwords, and phishing DMs — spotting what's actually trying to get something from you.</p>
@@ -124,7 +124,7 @@
                     <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#E9EFF9; border:1px solid #CBD9EF;">
                         <i data-lucide="globe" class="w-7 h-7" style="color:#2B5FA8;"></i>
                     </div>
-                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                    <span id="lab-status-digital-citizenship" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
                 </div>
                 <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Digital Citizenship</h3>
                 <p class="text-xs text-slate-500 leading-relaxed flex-grow">Sources, reposts, fact-checks, and pile-ons — verifying before you share, and using the tools instead of taking the bait.</p>
@@ -140,7 +140,7 @@
                     <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#F3E8F9; border:1px solid #E3CBEF;">
                         <i data-lucide="briefcase-business" class="w-7 h-7" style="color:#7C3D8E;"></i>
                     </div>
-                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                    <span id="lab-status-professional-brand" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
                 </div>
                 <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Professional Brand</h3>
                 <p class="text-xs text-slate-500 leading-relaxed flex-grow">One ordinary week of small choices — a profile, a bug report, a group project, a class, a Friday — and what they add up to.</p>
@@ -227,6 +227,69 @@
         document.addEventListener('DOMContentLoaded', () => {
             if (window.lucide) window.lucide.createIcons();
             [100, 400, 1000].forEach((delay) => setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay));
+        });
+    </script>
+
+    <!-- Real per-lab progress for a signed-in student — "Ready" is a marketing label for
+         an unauthenticated visitor only. Once there's an auth context, every card must show
+         that student's actual state, not a blanket "Ready" (see the lab hub badge fix). -->
+    <script type="module">
+        import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const LAB_STATUS_REGISTRY = [
+            { id: 'social-intelligence', gameName: 'Social Intelligence', badgeId: 'lab-status-social-intelligence' },
+            { id: 'privacy-security', gameName: 'Privacy & Security', badgeId: 'lab-status-privacy-security' },
+            { id: 'digital-citizenship', gameName: 'Digital Citizenship', badgeId: 'lab-status-digital-citizenship' },
+            { id: 'professional-brand', gameName: 'Professional Brand', badgeId: 'lab-status-professional-brand' },
+        ];
+
+        function setLabBadge(badgeId, status) {
+            const el = document.getElementById(badgeId);
+            if (!el) return;
+            if (status === 'completed') {
+                el.textContent = 'Completed';
+                el.className = 'bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else if (status === 'started') {
+                el.textContent = 'Started';
+                el.className = 'bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else {
+                el.textContent = 'Not Started';
+                el.className = 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            }
+        }
+
+        function applyRealLabStatuses(scoreDocs) {
+            LAB_STATUS_REGISTRY.forEach(lab => {
+                let sawAttempt = false;
+                let completed = false;
+                for (const data of scoreDocs) {
+                    if (data.gameName !== lab.gameName) continue;
+                    sawAttempt = true;
+                    if (data.completed === true) { completed = true; break; }
+                }
+                setLabBadge(lab.badgeId, completed ? 'completed' : (sawAttempt ? 'started' : 'not_started'));
+            });
+        }
+
+        // Wait for auth-core.js's module script (loaded in <head>, executes first) to have
+        // set window.AuthCore before touching it.
+        function whenAuthCoreReady(cb) {
+            if (window.AuthCore) { cb(); return; }
+            const check = setInterval(() => { if (window.AuthCore) { clearInterval(check); cb(); } }, 50);
+        }
+
+        whenAuthCoreReady(() => {
+            window.AuthCore.onAuthStateChanged(window.AuthCore.auth, async (user) => {
+                // No auth context at all (unauthenticated visitor) — leave every card's
+                // markup default of "Ready" exactly as it is.
+                if (!user) return;
+                try {
+                    const scoresSnap = await getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'game_scores'));
+                    applyRealLabStatuses(scoresSnap.docs.map(d => d.data()));
+                } catch (e) {
+                    console.error('[Lab Pack Hub] Couldn\'t read progress — leaving cards as Ready', e);
+                }
+            });
         });
     </script>
 </body>
