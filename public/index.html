@@ -86,7 +86,7 @@
         // once we have completion-time telemetry per module.
         const MODULE_REGISTRY = [
             { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
-              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 80, durationMinutes: 25 },
+              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 80, durationMinutes: 25 },
             { id: 'jolene', name: "Jolene's Lemonade", category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/jolenes-lemonade-challenge',
               gameNames: ['Jolenes Lemonade Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 800, durationMinutes: 20 },
             { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', url: '/jsh/digital-decisions-lab/social-intelligence/',
@@ -832,10 +832,15 @@
             const scoresRef = collection(db, 'artifacts', appId, 'users', uid, 'game_scores');
             
             unsubscribeDecisions = onSnapshot(scoresRef, (snapshot) => {
+                // maxDDCScore only ever considers COMPLETED attempts (all 30 scenarios
+                // answered) — a partial attempt's running score must never read as a
+                // finished, failing one ("Retake Required" implies you actually finished
+                // and failed, not that you merely started).
                 let maxDDCScore = -1;
-                let hasDDCAttempt = false;
+                let hasDDCCompletedAttempt = false;
+                let hasDDCAnyAttempt = false;
                 let isJLCComplete = false;
-                
+
                 // Set to track which modules are done in this snapshot
                 const completedModules = new Set();
 
@@ -843,10 +848,13 @@
                     const data = doc.data();
                     const gameName = data.gameName;
 
-                    // 1. Digital Decisions Logic (Score based)
+                    // 1. Digital Decisions Logic (Score based, gated on a full completed attempt)
                     if (gameName === "Digital Decisions Challenge" && typeof data.finalScore === 'number') {
-                        hasDDCAttempt = true;
-                        if (data.finalScore > maxDDCScore) maxDDCScore = data.finalScore;
+                        hasDDCAnyAttempt = true;
+                        if (data.completed === true) {
+                            hasDDCCompletedAttempt = true;
+                            if (data.finalScore > maxDDCScore) maxDDCScore = data.finalScore;
+                        }
                     }
 
                     // 2. Jolene's Lemonade Logic (Explicit completion flag OR Score Safety Net)
@@ -884,7 +892,7 @@
                 });
 
                 // Update Local Storage for Badges
-                if (hasDDCAttempt && maxDDCScore >= 80) localStorage.setItem('aa_ddc_complete', 'true');
+                if (maxDDCScore >= 80) localStorage.setItem('aa_ddc_complete', 'true');
                 else localStorage.removeItem('aa_ddc_complete');
                 
                 // Store JLC Status
@@ -902,15 +910,29 @@
                 window.updateBadges();
 
                 // UPDATE UI: Digital Decisions (Special Case)
+                // Progression: no attempt -> Active/not started; attempt started but not
+                // finished -> In Progress; a full completed attempt that failed -> Retake
+                // Required (never for a partial one); a full completed attempt that passed
+                // -> Mission Complete.
                 const ddcBadge = document.getElementById('ddc-status-badge');
                 if (ddcBadge) {
-                    if (maxDDCScore >= 80) { 
+                    if (maxDDCScore >= 80) {
                         ddcBadge.textContent = "MISSION COMPLETE";
                         ddcBadge.className = "bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-emerald-200";
-                    } else if (hasDDCAttempt) {
+                    } else if (hasDDCCompletedAttempt) {
                         ddcBadge.textContent = "RETAKE REQUIRED";
                         ddcBadge.className = "bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-amber-200 animate-pulse";
+                    } else if (hasDDCAnyAttempt) {
+                        ddcBadge.textContent = "IN PROGRESS";
+                        ddcBadge.className = "bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-blue-200";
+                    } else {
+                        ddcBadge.textContent = "Active";
+                        ddcBadge.className = "bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500";
                     }
+                }
+                const ddcBestScore = document.getElementById('ddc-best-score');
+                if (ddcBestScore) {
+                    ddcBestScore.textContent = maxDDCScore >= 0 ? `Best score: ${maxDDCScore} / 90` : '';
                 }
 
                 // UPDATE UI: All Other Content Blocks
@@ -1429,12 +1451,27 @@
                     });
 
                     const lastActive = sData.lastLogin && sData.lastLogin.toDate ? sData.lastLogin.toDate().toLocaleDateString() : '—';
+
+                    // DDC attempt history: every retake writes its own game_scores doc (see
+                    // performHardReset() in the Challenge itself), so this is just every
+                    // scored doc for that game, newest first — what a teacher needs to see
+                    // that a student isn't stuck at one attempt.
+                    const ddcAttempts = scoreDocs
+                        .filter(d => d.gameName === 'Digital Decisions Challenge' && typeof d.finalScore === 'number')
+                        .map(d => ({
+                            finalScore: d.finalScore,
+                            completed: d.completed === true,
+                            when: d.lastUpdated && d.lastUpdated.toDate ? d.lastUpdated.toDate() : null,
+                        }))
+                        .sort((a, b) => (b.when?.getTime() || 0) - (a.when?.getTime() || 0));
+
                     rosterFull.push({
                         uid: sDoc.id,
                         name: sData.displayName || 'Student',
                         email: sData.email || '',
                         lastActive,
-                        moduleStatuses
+                        moduleStatuses,
+                        ddcAttempts
                     });
                 }
 
@@ -1529,12 +1566,33 @@
                     const badgeHtml = badgeSvg
                         ? `<div class="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white p-1"><div class="w-full aspect-[3/2] overflow-hidden">${badgeSvg}</div></div>`
                         : '';
+
+                    // DDC attempt history: every retake is its own scored doc, so a teacher
+                    // can see the full retake trail, not just the single latest number.
+                    let attemptsHtml = '';
+                    if (moduleId === 'ddc' && student.ddcAttempts && student.ddcAttempts.length > 0) {
+                        const highest = Math.max(...student.ddcAttempts.filter(a => a.completed).map(a => a.finalScore), -1);
+                        attemptsHtml = `<div class="mt-2 border border-slate-200 rounded-lg bg-white divide-y divide-slate-100">
+                            ${student.ddcAttempts.map(a => {
+                                const dateLabel = a.when ? a.when.toLocaleDateString() + ' ' + a.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                                const isHighest = a.completed && a.finalScore === highest;
+                                return `<div class="flex items-center justify-between px-2 py-1.5 text-[10px]">
+                                    <span class="text-slate-400 font-mono">${dateLabel}</span>
+                                    <span class="flex items-center gap-1">
+                                        ${!a.completed ? '<span class="text-slate-400 italic">In progress</span>' : `<span class="font-bold ${isHighest ? 'text-emerald-600' : 'text-slate-600'}">${a.finalScore}/90${isHighest ? ' (highest)' : ''}</span>`}
+                                    </span>
+                                </div>`;
+                            }).join('')}
+                        </div>`;
+                    }
+
                     return `<div class="p-3 bg-slate-50 rounded-lg mb-2">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-700">${mod ? mod.name : moduleId}</span>
                             <span class="${statusClass} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${statusLabel}</span>
                         </div>
                         ${badgeHtml}
+                        ${attemptsHtml}
                     </div>`;
                 }).join('');
             }
@@ -2321,6 +2379,8 @@
                                 <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Make high-stakes choices in simulated online conflict scenarios.</p>
                                 <!-- Placeholder duration estimate rendered from MODULE_REGISTRY, not hardcoded -->
                                 <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="ddc">&nbsp;</p>
+                                <!-- Highest score across all completed attempts — populated by startModuleStatusListener, never a single attempt's score -->
+                                <p id="ddc-best-score" class="text-[10px] text-slate-400 uppercase tracking-wide mb-2"></p>
                             </div>
                         </div>
                     </div>

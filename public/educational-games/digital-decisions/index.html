@@ -994,6 +994,7 @@
                     window.logFinalScoreToFirestore({
                         finalScore: 0,
                         rank: "Session Started",
+                        completed: false,
                         sessionId: window.sessionId
                     });
                     window.showPage(0);
@@ -1255,6 +1256,7 @@
 
                     window.logFinalScoreToFirestore({
                         finalScore: totalChallengeScore,
+                        completed: false,
                         sessionId: window.sessionId
                     });
 
@@ -1415,11 +1417,16 @@
                      if (certSection) certSection.classList.remove('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
                 }
                 
+                // completed is the explicit signal the dashboard and roster key off of —
+                // isComplete already gates reaching this page at all (see
+                // final-evaluation-container), but stay honest and derive it from state
+                // rather than assuming it, in case that gating ever changes.
                 window.logFinalScoreToFirestore({
                     finalScore: currentScore,
                     maxScore: MAX_SCORE,
                     percentage: percentage,
                     rank: rank,
+                    completed: isComplete,
                     sessionId: window.sessionId
                 });
                 if (window.Telemetry) window.Telemetry.complete({ finalScore: currentScore, maxScore: MAX_SCORE, percentage: percentage, rank: rank });
@@ -1600,6 +1607,20 @@
                 activeCategory = null;
                 categoryQueue = [];
                 currentQueueIndex = 0;
+
+                // A retake is a brand-new attempt, not a continuation: give it its own
+                // sessionId so it lands in its own game_scores doc (every attempt logged
+                // separately, timestamped, nothing overwritten) and clear the persisted
+                // resume-progress doc so a reload mid-retake can't resurrect the scores
+                // from the attempt just abandoned.
+                window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                    window.AuthCore.saveModuleProgress('digital-decisions', {
+                        answeredScenarioScores: {},
+                        totalChallengeScore: 0,
+                    });
+                }
+
                 if (feedObserver) feedObserver.disconnect();
                 const feedContainer = document.getElementById('scenario-feed-container');
                 if (feedContainer) feedContainer.innerHTML = '';
