@@ -37,9 +37,11 @@
         window.currentUserEmail = "";
         window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 
-        // Telemetry: one "step" = one Case (7 total). Case 1 is open the moment the lab loads.
+        // Telemetry: one "step" = one Case (8 total, now that the power-up intro and the
+        // closing rating/handoff screen are both counted). Case 1 (the power-up screen) is
+        // open the moment the lab loads.
         if (window.Telemetry) {
-            window.Telemetry.init({ module: 'digital-citizenship', gameName: 'Digital Citizenship', stepsTotal: 7 });
+            window.Telemetry.init({ module: 'digital-citizenship', gameName: 'Digital Citizenship', stepsTotal: 8 });
             window.Telemetry.step(1);
         }
 
@@ -61,7 +63,8 @@
         // Completion write — same game_scores shape every other GoodBlock/module uses, so
         // the dashboard's MODULE_REGISTRY can compute a real completed/in_progress/
         // not_started status for this GoodBlock. No numeric score here (this is a lab, not
-        // a graded quiz), so completion is just a flag, set once Case 6 is actually reached.
+        // a graded quiz), so completion is just a flag, set once Case 8 (the rating/handoff
+        // screen) is actually reached.
         window.logModuleCompletion = async () => {
             if (window.Telemetry) window.Telemetry.complete();
             const user = auth.currentUser;
@@ -270,18 +273,18 @@
                well under a comfortable thumb target on a phone. */
             .page { padding: 16px 14px 44px; }
 
-            /* Case 2 - three verdict buttons could not sit side by side at this width without
+            /* Case 3 - three verdict buttons could not sit side by side at this width without
                truncating, so they stack full-width and get real height. */
             .src-verdicts { flex-direction: column; }
             .vbtn { width: 100%; text-align: center; padding: 11px 8px; font-size: 11px; }
             .src-inspect { display: block; width: 100%; text-align: left; padding: 10px 0; font-size: 12px; }
             .src-card { padding: 14px; }
 
-            /* Case 5 */
+            /* Case 6 */
             #act-list .act-opt { padding: 13px; }
             #act-lock { padding: 15px; }
 
-            /* Case 6 - a 190px feed ate too much of a short screen. */
+            /* Case 7 - a 190px feed ate too much of a short screen. */
             #lobby-feed { height: 150px; }
             .tool-btn { padding: 12px 4px; font-size: 10px; }
             /* Any focusable text field under 16px makes iOS zoom the whole page on focus,
@@ -291,9 +294,9 @@
 
             /* Three tool buttons across a 320px screen - tighten the gutter so the labels
                aren't the thing that has to give. */
-            #page-6 .grid-cols-3 { gap: 6px; }
+            #page-7 .grid-cols-3 { gap: 6px; }
 
-            /* Case 3 / 4 */
+            /* Case 4 / 5 */
             .check-opt { padding: 13px; }
             #hop-actions button { padding: 13px; }
 
@@ -317,7 +320,7 @@
             border: 1px solid #E5E7EB;
         }
 
-        /* ---- Case 2: Evidence stack ---- */
+        /* ---- Case 3: Evidence stack ---- */
         .src-card { transition: border-color .15s ease, background-color .15s ease, transform .12s ease; cursor: pointer; }
         .src-card:active { transform: scale(.995); }
         .src-card:hover { border-color: #94a3b8; }
@@ -336,7 +339,7 @@
         .src-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
         #hold-bar-fill { height: 100%; width: 0%; border-radius: 999px; background-color: #dc2626; transition: width .35s ease, background-color .35s ease; }
 
-        /* ---- Case 3: Credit trail ----
+        /* ---- Case 4: Credit trail ----
            Four render levels of ONE illustration. Clicking back toward the artist visibly
            restores the picture: crop loosens, blur lifts, colour returns, blocking fades and
            the signature comes back. The student sees the chain instead of reading about it. */
@@ -355,24 +358,24 @@
         #hop-blocking.b3 { opacity: 0; }
         #hop-watermark { transition: opacity .45s ease, filter .45s ease; }
 
-        /* ---- Case 3: Credit trail ---- */
+        /* ---- Case 4: Credit trail ---- */
         .hop-frame { animation: fadeIn .35s ease-out; }
         .hop-dot { width: 9px; height: 9px; border-radius: 999px; background-color: #d1d5db; transition: background-color .25s ease; }
         .hop-dot.visited { background-color: #2B5FA8; }
         .hop-dot.origin { background-color: #059669; }
 
-        /* ---- Case 4: Pick your checks ---- */
+        /* ---- Case 5: Pick your checks ---- */
         .check-opt { transition: border-color .15s ease, background-color .15s ease; cursor: pointer; }
         .check-opt.used { border-color: #2B5FA8; background-color: #E8EFF9; cursor: default; }
         .check-opt.spent { opacity: .45; pointer-events: none; }
 
-        /* ---- Case 5: Action ordering ---- */
+        /* ---- Case 6: Action ordering ---- */
         .act-opt { transition: border-color .15s ease, background-color .15s ease; cursor: pointer; }
         .act-opt.chosen { border-color: #2B5FA8; background-color: #E8EFF9; }
         .act-seq { width: 22px; height: 22px; border-radius: 999px; background-color: #2B5FA8; color: #fff;
                    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
-        /* ---- Case 6: Toxic lobby ---- */
+        /* ---- Case 7: Toxic lobby ---- */
         #lobby-feed { height: 190px; overflow-y: auto; scroll-behavior: smooth; }
         #lobby-feed::-webkit-scrollbar { width: 5px; }
         #lobby-feed::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
@@ -386,31 +389,6 @@
 
     <div class="app-shell" id="screen">
 
-        <!-- STARTUP SCREEN -->
-        <!--
-            Per-GoodBlock identity, changed as ONE set (gradient + glow + icon).
-            Icon is `globe` - verified real Lucide, and deliberately the SAME icon the live DDC
-            uses for its digital_citizenship category, so the assessment and the lab read as the
-            same topic. The COLOUR deliberately does not match DDC's green: icon carries
-            recognition, colour carries differentiation between the four packs.
-        -->
-        <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-[#10203f] via-[#0c1830] to-[#050a14]">
-            <!-- Per-module accent glow -->
-            <div class="absolute inset-0 opacity-40" style="background: radial-gradient(circle at 50% 35%, rgba(43,95,168,0.35), transparent 60%);"></div>
-            <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
-                <div class="flex-grow flex flex-col items-center justify-center px-4">
-                    <div class="relative flex flex-col items-center">
-                        <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                        <i data-lucide="globe" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(43,95,168,0.6)]"></i>
-                        <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
-                        <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10">Jodi's Schoolhouse</h1>
-                        <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: Digital Citizenship</p>
-                    </div>
-                    <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
-                </div>
-            </div>
-        </div>
-
         <!-- HEADER -->
         <header class="bg-allgood-secondary shadow-md navbar-content flex items-center shrink-0">
             <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
@@ -421,7 +399,7 @@
                     </div>
                     <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
                         <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
-                        <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 7</span>
+                        <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 8</span>
                     </div>
                 </div>
                 <div class="flex items-center space-x-1 shrink-0 relative">
@@ -467,8 +445,48 @@
             <!-- RIGHT COLUMN: CONTENT AREA -->
             <div class="content-column" id="content-column">
 
-                <!-- CASE 1: OVERVIEW -->
+                <!-- CASE 1: POWER UP -->
+                <!--
+                    Folded in from what used to be an uncounted splash/gate screen ahead of
+                    Case 1. Layout/copy left exactly as it was - only the wrapper changed, from
+                    a full-screen absolute overlay to a normal Case page in the flow, so it can
+                    carry a "Case 1" label and count toward the header's X / Y like every other
+                    Case. Per-GoodBlock identity, changed as ONE set (gradient + glow + icon).
+                    Icon is `globe` - verified real Lucide, and deliberately the SAME icon the
+                    live DDC uses for its digital_citizenship category, so the assessment and
+                    the lab read as the same topic. The COLOUR deliberately does not match
+                    DDC's green: icon carries recognition, colour carries differentiation
+                    between the four packs.
+                -->
                 <div class="page" id="page-1">
+                    <div class="page-inner">
+                    <div id="startup-screen" class="relative rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-[#10203f] via-[#0c1830] to-[#050a14] min-h-[60vh] px-4 py-12 overflow-hidden">
+                        <!-- Per-module accent glow -->
+                        <div class="absolute inset-0 opacity-40" style="background: radial-gradient(circle at 50% 35%, rgba(43,95,168,0.35), transparent 60%);"></div>
+                        <div class="group flex flex-col items-center justify-center text-center w-full relative">
+                            <div class="flex-grow flex flex-col items-center justify-center px-4">
+                                <div class="relative flex flex-col items-center">
+                                    <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                    <span class="text-xs font-bold uppercase tracking-widest text-gb-accent mb-3 relative z-10">Case 1</span>
+                                    <i data-lucide="globe" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(43,95,168,0.6)]"></i>
+                                    <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
+                                    <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10">Jodi's Schoolhouse</h1>
+                                    <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: Digital Citizenship</p>
+                                </div>
+                                <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE 2: OVERVIEW -->
+                <div class="page" id="page-2">
                     <div class="page-inner">
                     <div class="max-w-2xl mx-auto pt-8 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Before We Start</span>
@@ -505,8 +523,8 @@
                                 <div><p class="text-sm font-bold text-gray-900">Not taking the bait</p><p class="text-xs text-gray-500 mt-0.5">Walking away and closing the door aren't the same thing.</p></div>
                             </div>
                         </div>
-                        <div id="continue-1" class="continue-prompt ready items-center justify-center pt-4">
-                            <button onclick="window.advanceFromPage(1)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-2" class="continue-prompt ready items-center justify-center pt-4">
+                            <button onclick="window.advanceFromPage(2)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -519,12 +537,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 2: THE SOURCE CHECK -->
-                <div class="page" id="page-2">
+                <!-- CASE 3: THE SOURCE CHECK -->
+                <div class="page" id="page-3">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 2: Tuesday</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 3: Tuesday</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Source Check</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Pete's writing about the 1930s Dust Bowl. He's found six things online. Build him a stack that would actually hold up &mdash; and watch the bar, because it doesn't care how <em>many</em> you add.</p>
                         </div>
@@ -566,13 +584,13 @@
                             </button>
                         </div>
 
-                        <div id="mobile-wb-2" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
+                        <div id="mobile-wb-3" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
                             <strong class="mobile-wb-title text-blue-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="continue-2" class="continue-prompt items-center justify-center pt-2">
-                            <button onclick="window.advanceFromPage(2)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-3" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(3)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -585,12 +603,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 3: THE CREDIT TRAIL -->
-                <div class="page" id="page-3">
+                <!-- CASE 4: THE CREDIT TRAIL -->
+                <div class="page" id="page-4">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 3: Wednesday</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4: Wednesday</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Credit Trail</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Pete wants an illustration for his title slide. He found this one on a big account with two million followers. <strong>Click back</strong> and see whether that's really where it came from.</p>
                         </div>
@@ -679,13 +697,13 @@
                             </button>
                         </div>
 
-                        <div id="mobile-wb-3" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
+                        <div id="mobile-wb-4" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
                             <strong class="mobile-wb-title text-blue-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="continue-3" class="continue-prompt items-center justify-center pt-2">
-                            <button onclick="window.advanceFromPage(3)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-4" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(4)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -698,12 +716,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 4: THE ONE YOU'VE NEVER HEARD OF -->
-                <div class="page" id="page-4">
+                <!-- CASE 5: THE ONE YOU'VE NEVER HEARD OF -->
+                <div class="page" id="page-5">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4: Thursday</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 5: Thursday</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The One You've Never Heard Of</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Pete's friend Della shared this. It looks good, she's earnest, and he's never heard of it. He's got time for <strong>three checks</strong> before class &mdash; pick the ones that would actually settle it.</p>
                         </div>
@@ -739,13 +757,13 @@
                             </button>
                         </div>
 
-                        <div id="mobile-wb-4" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
+                        <div id="mobile-wb-5" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
                             <strong class="mobile-wb-title text-blue-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="continue-4" class="continue-prompt items-center justify-center pt-2">
-                            <button onclick="window.advanceFromPage(4)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-5" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(5)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -758,12 +776,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 5: THE ONE YOU KNOW IS FAKE -->
-                <div class="page" id="page-5">
+                <!-- CASE 6: THE ONE YOU KNOW IS FAKE -->
+                <div class="page" id="page-6">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 5: Thursday, 9:40 PM</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 6: Thursday, 9:40 PM</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The One You Know Is Fake</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Different post, and this time there's no mystery &mdash; Pete <em>already knows</em> this one's a scam; it was in the news last month. Della doesn't. And it's climbing. <strong>Build his response in order.</strong></p>
                         </div>
@@ -790,13 +808,13 @@
                             </button>
                         </div>
 
-                        <div id="mobile-wb-5" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
+                        <div id="mobile-wb-6" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
                             <strong class="mobile-wb-title text-blue-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="continue-5" class="continue-prompt items-center justify-center pt-2">
-                            <button onclick="window.advanceFromPage(5)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-6" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(6)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -809,12 +827,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 6: THE TOXIC LOBBY -->
-                <div class="page" id="page-6">
+                <!-- CASE 7: THE TOXIC LOBBY -->
+                <div class="page" id="page-7">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 6: Friday</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 7: Friday</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Toxic Lobby</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Project's turned in. Pete's playing a match, and one player won't let up. The reply box is right there and it works. So are three other buttons most people never touch.</p>
                         </div>
@@ -854,13 +872,13 @@
                             </button>
                         </div>
 
-                        <div id="mobile-wb-6" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
+                        <div id="mobile-wb-7" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-4">
                             <strong class="mobile-wb-title text-blue-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="continue-6" class="continue-prompt items-center justify-center pt-2">
-                            <button onclick="window.advanceFromPage(6)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-7" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(7)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -873,8 +891,8 @@
                     </div>
                 </div>
 
-                <!-- CASE 7: HANDOFF -->
-                <div class="page" id="page-7">
+                <!-- CASE 8: HANDOFF -->
+                <div class="page" id="page-8">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-10 px-4 sm:px-8 flex flex-col justify-center py-4 items-center text-center">
 
@@ -962,7 +980,7 @@
 
     </div>
     <script>
-        const CASE_TITLES = ["One Week, Five Moments", "The Source Check", "The Credit Trail", "The One You've Never Heard Of", "The One You Know Is Fake", "The Toxic Lobby", "Handoff"];
+        const CASE_TITLES = ["Power Up", "One Week, Five Moments", "The Source Check", "The Credit Trail", "The One You've Never Heard Of", "The One You Know Is Fake", "The Toxic Lobby", "Handoff"];
 
         window.openCaseMenu = () => {
             const list = document.getElementById('case-menu-list');
@@ -994,9 +1012,13 @@
     </script>
 
     <script>
-        const TOTAL_PAGES = 7;
-        let highestUnlocked = 0; // index of the highest unlocked page (0 = Case 1)
-        let pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: true };
+        const TOTAL_PAGES = 8;
+        let highestUnlocked = 0; // index of the highest unlocked page (0 = Case 1, the power-up screen)
+        // Index 1 (Case 2, the Overview) is auto-ready the same way index 0 always was -
+        // see the hardcoded "ready" class on #continue-2 below. Index 7 (Case 8, the closing
+        // rating/handoff screen) has no continue prompt of its own, so it stays true as a
+        // harmless placeholder, matching the old last-index convention.
+        let pageCompletion = { 0: true, 1: true, 2: false, 3: false, 4: false, 5: false, 6: false, 7: true };
 
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
@@ -1016,6 +1038,7 @@
         };
 
         const jodiScript = [
+            { text: "Well now, look who wandered in. Go on and give that a click whenever you're ready to get started.", mood: 'happy' },
             { text: "Well hey now — pull up a chair. This week we're following Pete. He's got a research project due Friday and a phone in his pocket like everybody else. Five moments, five days, and every one of them turns on the same little lie: I found it, so I can use it.", mood: 'happy' },
             { text: "Tuesday. Pete's writing about the Dust Bowl and he's got six things pulled up. Build him a stack that'd actually hold up — and keep an eye on that bar, because it does not care how many you throw at it.", mood: 'neutral' },
             { text: "Wednesday. He needs a picture for his title slide, and he found a good one on an account with two million followers. Now — is that where it came from, or just where he happened to see it? Click on back and find out.", mood: 'neutral' },
@@ -1118,10 +1141,10 @@
                     });
                 }
             }
-            // Case 6's chat feed is time-driven, so it must not start until the student can
+            // Case 7's chat feed is time-driven, so it must not start until the student can
             // actually see it - otherwise the provocation plays out behind a lock overlay.
-            if (pageNum + 1 === 5 && window.startSpread) window.startSpread();
-            if (pageNum + 1 === 6 && window.startLobby) window.startLobby();
+            if (pageNum + 1 === 6 && window.startSpread) window.startSpread();
+            if (pageNum + 1 === 7 && window.startLobby) window.startLobby();
             const nextPageEl = document.getElementById(`page-${pageNum + 1}`);
             if (nextPageEl) nextPageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
@@ -1147,8 +1170,8 @@
             if (window.lucide) window.lucide.createIcons();
             // A restored session can land straight on a timed Case, so start those feeds here
             // too - advanceFromPage never fires on that path.
-            if (highestUnlocked >= 4 && window.startSpread) window.startSpread();
-            if (highestUnlocked >= 5 && window.startLobby) window.startLobby();
+            if (highestUnlocked >= 5 && window.startSpread) window.startSpread();
+            if (highestUnlocked >= 6 && window.startLobby) window.startLobby();
             if (highestUnlocked > 0) {
                 setTimeout(() => {
                     const pageEl = document.getElementById(`page-${highestUnlocked + 1}`);
@@ -1245,7 +1268,7 @@
             if (window.lucide) window.lucide.createIcons();
         };
 
-        /* ===================== CASE 2: THE SOURCE CHECK =====================
+        /* ===================== CASE 3: THE SOURCE CHECK =====================
            Judgment call: how much evidence is enough, and what each source is actually good FOR.
 
            REDESIGNED after playtest. v1 let a student tap the two obviously-good sources and
@@ -1327,7 +1350,7 @@
             // Comparing two sources means going back to re-read one, and a dead click there
             // is exactly what makes an interface feel broken.
             if (srcInspected[id]) {
-                window.updateWhiteboard('What He Found', s.found, 2);
+                window.updateWhiteboard('What He Found', s.found, 3);
                 window.sayJodi(srcVerdict[id]
                     ? 'Have another look at that one, and change your call if you want to.'
                     : 'That is what is there. What is it good for?', 'thinking');
@@ -1343,7 +1366,7 @@
                 el.querySelector('.src-verdicts').classList.remove('hidden');
                 el.querySelector('.src-inspect').classList.add('hidden');
             }
-            window.updateWhiteboard('What He Found', s.found, 2);
+            window.updateWhiteboard('What He Found', s.found, 3);
             window.sayJodi('Alright — that is what is actually there. Now tell me what it is good for.', 'thinking');
             if (window.sfx) window.sfx.click();
         };
@@ -1377,7 +1400,7 @@
             if (v === 'cite' && s.credible && !firstGoodSource && s.shortName) firstGoodSource = s.shortName;
 
             const f = s.fb[v];
-            window.updateWhiteboard(f.t, f.d, 2);
+            window.updateWhiteboard(f.t, f.d, 3);
             window.sayJodi(f.b, f.m);
             if (window.sfx) { (v === s.verdict) ? window.sfx.tick() : window.sfx.click(); }
             window.evaluateStack(v === s.verdict);
@@ -1411,7 +1434,7 @@
             if (echo && !echoShown) {
                 echoShown = true;
                 window.updateWhiteboard('Two Sources, One Origin',
-                    'Both are respectable and one is a word-for-word reprint of the other. Counting them twice counts the same claim twice. The bar needs a source that could disagree.', 2);
+                    'Both are respectable and one is a word-for-word reprint of the other. Counting them twice counts the same claim twice. The bar needs a source that could disagree.', 3);
                 window.sayJodi('Now look at that bar — two good ones and it barely moved. One of those is a reprint of the other. That is not a second opinion, that is an echo.', 'thinking');
             }
             if (!echo) echoShown = false;
@@ -1471,13 +1494,13 @@
             const contested = SOURCES.length - (correct || 0);
             window.renderWorksCited();
             window.updateWhiteboard('Two That Do Not Talk To Each Other',
-                'The bar was never a number of sources. It is whether they would know independently — and whether each one answers the question actually being asked.', 2);
+                'The bar was never a number of sources. It is whether they would know independently — and whether each one answers the question actually being asked.', 3);
             const base = "There it is — his stack holds, and there's nothing in it he can't stand behind. What Pete needed was two that don't get their information from each other.";
             const tail = contested === 0
                 ? " And look what you did with the middle two: you didn't bin them. A family story and a reprint are both real — they just aren't evidence for this. That's the part most folks get wrong in the other direction."
                 : ` Go on ahead. I'll say there ${contested === 1 ? "is one I'd" : "are " + contested + " I'd"} still argue with you about — the marked ones are there if you want another run at them.`;
             window.sayJodi(base + tail, 'happy');
-            window.markReady(1);
+            window.markReady(2);
         };
 
         window.resetCase2 = () => {
@@ -1517,7 +1540,7 @@
             });
         }
 
-        /* ===================== CASE 3: THE CREDIT TRAIL =====================
+        /* ===================== CASE 4: THE CREDIT TRAIL =====================
            Judgment call: "I found it online" is not "it's free", and finding the real origin
            takes effort almost everyone skips. Mechanic is a BACKWARD TRACE - unlike anything
            built - and it practises the actual behaviour: most people stop at the first place
@@ -1572,7 +1595,7 @@
                 d.className = 'hop-dot' + (i < hopIndex ? ' visited' : '') + (i === HOPS.length - 1 && hopReachedOrigin ? ' origin' : '');
                 dots.appendChild(d);
             });
-            window.updateWhiteboard(h.title, h.desc, 3);
+            window.updateWhiteboard(h.title, h.desc, 4);
         };
 
         window.hopBack = () => {
@@ -1592,7 +1615,7 @@
                 // Stopping early is corrected by evidence, not by being told "wrong".
                 const next = HOPS[hopIndex + 1];
                 window.updateWhiteboard("Check The Date Behind It",
-                    `Look one click further back: ${next.handle} posted it earlier. If somebody else had it before them, they didn't make it. This is exactly where most people stop.`, 3);
+                    `Look one click further back: ${next.handle} posted it earlier. If somebody else had it before them, they didn't make it. This is exactly where most people stop.`, 4);
                 window.sayJodi("Mm, hold on. Click back one more and look at the date — somebody had it before them. That's the spot where most folks quit looking.", 'thinking');
                 if (window.sfx) window.sfx.click();
                 return;
@@ -1605,21 +1628,21 @@
         window.chooseAttrib = (kind) => {
             if (kind === 'none') {
                 window.updateWhiteboard("Found Isn't Free",
-                    "Being easy to find is not the same as being free to use. She drew it; whether it's convenient doesn't enter into it.", 3);
+                    "Being easy to find is not the same as being free to use. She drew it; whether it's convenient doesn't enter into it.", 4);
                 window.sayJodi("Mm. It being easy to find doesn't make it his. She sat down and drew that.", 'thinking');
                 return;
             }
             if (kind === 'vague') {
                 window.updateWhiteboard("A Shrug With A Bow On It",
-                    "“Credit to the creator” credits nobody. You just spent four clicks learning her actual handle - the whole point was to be able to name her.", 3);
+                    "“Credit to the creator” credits nobody. You just spent four clicks learning her actual handle - the whole point was to be able to name her.", 4);
                 window.sayJodi("'Credit to the creator.' Now who is that, exactly? You just did four clicks of work to learn her name — use it.", 'thinking');
                 return;
             }
             document.getElementById('attrib-zone').classList.add('hidden');
             window.updateWhiteboard("Four Hops Back",
-                "Named, linked, and asked. That's the whole obligation - and it took four clicks, which is roughly four clicks more than almost anyone does.", 3);
+                "Named, linked, and asked. That's the whole obligation - and it took four clicks, which is roughly four clicks more than almost anyone does.", 4);
             window.sayJodi("Four hops. That's what it took. And every single person in that chain figured somebody else had already done the checking. That's how a thing ends up everywhere with nobody's name on it — not malice, just four people in a row who didn't click back once.", 'happy');
-            window.markReady(2);
+            window.markReady(3);
             if (window.sfx) window.sfx.success();
         };
 
@@ -1634,7 +1657,7 @@
 
         function initCase3() { window.renderHop(); }
 
-        /* ===================== CASE 4: THE ONE YOU'VE NEVER HEARD OF =====================
+        /* ===================== CASE 5: THE ONE YOU'VE NEVER HEARD OF =====================
            Judgment call: not "should I check" but "what would actually settle this?" The
            three-check limit is the mechanic - it forces ranking instead of exhaustive
            clicking, and it exposes that two of the options feel reassuring and prove nothing. */
@@ -1683,7 +1706,7 @@
                 el.appendChild(r);
             }
             document.getElementById('checks-left').textContent = `${checkLimit - checksUsed.length} left`;
-            window.updateWhiteboard(c.title, c.desc, 4);
+            window.updateWhiteboard(c.title, c.desc, 5);
             window.sayJodi(c.decisive
                 ? "Now that one actually told you something. Look at the board."
                 : "Mm. Feels like checking, doesn't it? Look at what it actually proved.",
@@ -1700,13 +1723,13 @@
             const decisive = checksUsed.filter(id => CHECKS.find(c => c.id === id).decisive).length;
             if (share) {
                 window.updateWhiteboard("Sharing Is Vouching",
-                    "Passing it on puts Pete's name behind it. Everyone who sees it now trusts it partly because he did - which is exactly how it reached him.", 4);
+                    "Passing it on puts Pete's name behind it. Everyone who sees it now trusts it partly because he did - which is exactly how it reached him.", 5);
                 window.sayJodi("Mm. When he shares it, he's not just passing it along — he's lending it his name. That's how it got to him in the first place.", 'thinking');
                 return;
             }
             if (decisive === 0) {
                 window.updateWhiteboard("Right Answer, No Evidence",
-                    "Not sharing was correct - but none of those checks actually established anything. Being right by instinct doesn't transfer to the next post, because there's nothing to carry over. Here's one more check - spend it on something that could settle it.", 4);
+                    "Not sharing was correct - but none of those checks actually established anything. Being right by instinct doesn't transfer to the next post, because there's nothing to carry over. Here's one more check - spend it on something that could settle it.", 5);
                 window.sayJodi("You landed right, but look at what you leaned on. None of those three actually settled it — a hunch won't travel to the next one. Go on, I'll give you one more. Spend it on something that could actually answer the question.", 'thinking');
                 // Reopen the board with one extra check so this can't dead-end.
                 checkLimit = checksUsed.length + 1;
@@ -1716,9 +1739,9 @@
                 return;
             }
             window.updateWhiteboard("Ask The People Whose Job It Is",
-                "The decisive checks all had one thing in common: they asked something outside the post. The register, the search, the account age. The reassuring ones all asked the post about itself.", 4);
+                "The decisive checks all had one thing in common: they asked something outside the post. The register, the search, the account age. The reassuring ones all asked the post about itself.", 5);
             window.sayJodi("And look which ones actually told you anything. Not the logo — anybody can buy a nice logo for nine dollars. Not asking Della; she's the one who got fooled. The register told you, because the register is somebody whose whole job is knowing. Ask the person whose job it is.", 'happy');
-            window.markReady(3);
+            window.markReady(4);
         };
 
         window.resetCase4 = () => {
@@ -1743,7 +1766,7 @@
             });
         }
 
-        /* ===================== CASE 5: THE ONE YOU KNOW IS FAKE =====================
+        /* ===================== CASE 6: THE ONE YOU KNOW IS FAKE =====================
            Judgment call: he already knows. What does he owe his friend, and what does he owe
            the strangers who might donate before it comes down?
            DELIBERATELY NOT a private-vs-public choice - Social Intelligence already teaches
@@ -1802,7 +1825,7 @@
                 actSeq.push(id);
                 // Every tap responds. Previously only "Lock it in" said anything, so four of
                 // the five options could be selected in total silence.
-                window.updateWhiteboard(a.t, a.d, 5);
+                window.updateWhiteboard(a.t, a.d, 6);
                 window.sayJodi(a.bub, a.mood || (a.required ? 'happy' : 'thinking'));
             }
             window.renderActions();
@@ -1829,13 +1852,13 @@
 
             if (has('public')) {
                 const a = ACTIONS.find(x => x.id === 'public');
-                window.updateWhiteboard(a.t, a.d, 5);
+                window.updateWhiteboard(a.t, a.d, 6);
                 window.sayJodi('That comment is the one thing here that makes it worse both ways. Take it out and try again.', 'thinking');
                 return;
             }
             if (has('wait') && !has('report')) {
                 const a = ACTIONS.find(x => x.id === 'wait');
-                window.updateWhiteboard(a.t, a.d, 5);
+                window.updateWhiteboard(a.t, a.d, 6);
                 window.sayJodi('Waiting costs somebody, and that post is still climbing. What would he actually do?', 'concerned');
                 return;
             }
@@ -1843,7 +1866,7 @@
                 window.updateWhiteboard('One Of These Is Not Enough',
                     has('dm')
                       ? 'Telling Della protects Della. It does not take the post down for the people already scrolling past it.'
-                      : 'Reporting takes the post down. It also means Della finds out from a notification instead of from her friend.', 5);
+                      : 'Reporting takes the post down. It also means Della finds out from a notification instead of from her friend.', 6);
                 window.sayJodi(has('dm')
                     ? 'Telling her is right. But that post is still sitting there for everybody else.'
                     : 'Reporting works. But then she hears it from a notification instead of from you.', 'thinking');
@@ -1863,12 +1886,12 @@
             window.updateWhiteboard('Both. And The Order Is The Point.',
                 dmFirst
                   ? 'Telling her first means she takes it down herself and hears it from a friend. Reporting after covers the strangers. Both duties, in the order that costs least.'
-                  : 'Reporting first is defensible — it stops the spread soonest. The trade is that Della learns it from the platform rather than from Pete.', 5);
+                  : 'Reporting first is defensible — it stops the spread soonest. The trade is that Della learns it from the platform rather than from Pete.', 6);
 
             let line = "Both. That's the answer — and it's the ordering people miss. Telling her protects her. Reporting protects everybody scrolling past it at two in the morning who'll never know his name. You don't have to pick which of those matters.";
             if (extras.length) line += ` I'd drop ${extras.join(' and ')} — once he's told her directly, that's doing the same job with a bigger audience.`;
             window.sayJodi(line, 'happy');
-            window.markReady(4);
+            window.markReady(5);
         };
 
         // One control, two behaviours. Before locking it just clears the selection and
@@ -1915,7 +1938,7 @@
             window.updateResetLabel();
         }
 
-        /* ===================== CASE 6: THE TOXIC LOBBY =====================
+        /* ===================== CASE 7: THE TOXIC LOBBY =====================
            Judgment call: engaging feeds it - but the answer is not passivity, it's tools most
            people never touch. Success is measured by USING the tools, not by withholding:
            "success = do nothing" is indistinguishable from a kid who put the phone down, and
@@ -1984,7 +2007,7 @@
             if (lobbyTimer) { clearInterval(lobbyTimer); lobbyTimer = setInterval(lobbyTick, 1200); }
             setTimeout(() => lobbyPush('TWO OTHERS', 'joined the pile-on', false), 700);
             window.updateWhiteboard("That's What It Wanted",
-                "He answered, and the lobby sped up. Engagement is the reward being fished for - and now two more players have joined, because an argument is more interesting than a game.", 6);
+                "He answered, and the lobby sped up. Engagement is the reward being fished for - and now two more players have joined, because an argument is more interesting than a game.", 7);
             window.sayJodi("And there it goes faster. That's what he was fishing for the whole time — somebody to answer.", 'concerned');
             if (window.sfx) window.sfx.error();
         };
@@ -2006,7 +2029,7 @@
 
             if (tool === 'report') {
                 window.updateWhiteboard("The Only One That Leaves His Screen",
-                    "Reporting is the single action here that reaches past Pete. Muting and blocking fix his evening; reporting is what might stop this player doing it to somebody else tomorrow.", 6);
+                    "Reporting is the single action here that reaches past Pete. Muting and blocking fix his evening; reporting is what might stop this player doing it to somebody else tomorrow.", 7);
                 window.sayJodi("That's the one that matters past tonight. Muting fixes his evening — reporting is the one that might spare the next person.", 'thinking');
             } else if (tool === 'mute') {
                 lobbyMuted = true;
@@ -2014,7 +2037,7 @@
                 lobbyPush('—', 'RIPTIDE_92 muted. You can\'t see their messages.', false);
                 document.getElementById('lobby-heat').textContent = 'tone: calm';
                 window.updateWhiteboard("Quiet For Him",
-                    "Muting works instantly and completely - for Pete. The player is still there, still typing, still visible to everyone else in the lobby.", 6);
+                    "Muting works instantly and completely - for Pete. The player is still there, still typing, still visible to everyone else in the lobby.", 7);
                 window.sayJodi("Quiet now. For him, anyway — that fella's still going for everybody else in there.", 'thinking');
             } else {
                 lobbyMuted = true;
@@ -2022,7 +2045,7 @@
                 lobbyPush('—', 'RIPTIDE_92 blocked. They can\'t reach you again.', false);
                 document.getElementById('lobby-heat').textContent = 'tone: calm';
                 window.updateWhiteboard("The Door, Closed",
-                    "Blocking is permanent and one-sided - no negotiation, no last word, no reply for them to feed on. Pete never has to see this player again.", 6);
+                    "Blocking is permanent and one-sided - no negotiation, no last word, no reply for them to feed on. Pete never has to see this player again.", 7);
                 window.sayJodi("And that's the door shut. No last word, no argument — he just doesn't get to reach Pete anymore.", 'thinking');
             }
             if (window.sfx) window.sfx.click();
@@ -2050,17 +2073,17 @@
             const usedSilence = !!lobbyTools.mute || !!lobbyTools.block;
             if (usedReport && usedSilence && lobbyReplies === 0) {
                 window.updateWhiteboard("Three Things, None Of Them Aimed At Him",
-                    "Walking away and closing the door are not the same thing. Pete did three deliberate things - he just did them to the platform instead of to the person.", 6);
+                    "Walking away and closing the door are not the same thing. Pete did three deliberate things - he just did them to the platform instead of to the person.", 7);
                 const missed = !lobbyTools.block
                     ? " The one he didn't reach for was Block — that's the permanent one, and it means that fella can't find him in a lobby again next week."
                     : (!lobbyTools.mute ? " He skipped Mute, and that's fine — Mute only ever fixes your own evening. Block does the same and keeps doing it." : "");
                 window.sayJodi("And you never said a word to him. Notice that wasn't the same as doing nothing — you did things. They just weren't aimed at him. That's the difference between walking away and actually closing the door." + missed, 'happy');
-                window.markReady(5);
+                window.markReady(6);
             } else if (usedReport && usedSilence && lobbyReplies > 0) {
                 window.updateWhiteboard("Right Tools, One Detour",
-                    "The tools were the correct move. The reply in the middle is the part worth noticing - it cost nothing to skip, and it sped the whole thing up while it lasted.", 6);
+                    "The tools were the correct move. The reply in the middle is the part worth noticing - it cost nothing to skip, and it sped the whole thing up while it lasted.", 7);
                 window.sayJodi("Right tools in the end. Just notice the detour in the middle — it cost him a couple of minutes and it fed the thing while it lasted.", 'thinking');
-                window.markReady(5);
+                window.markReady(6);
             }
         };
 
@@ -2078,7 +2101,7 @@
             if (lobbyTimer) { clearInterval(lobbyTimer); lobbyTimer = null; }
             const heat = document.getElementById('lobby-heat');
             if (heat) heat.textContent = 'tone: calm';
-            document.querySelectorAll('#page-6 .tool-btn').forEach(b => b.classList.remove('done'));
+            document.querySelectorAll('#page-7 .tool-btn').forEach(b => b.classList.remove('done'));
             window.updateLobbyObjective();
             // Guard so the keydown listener is only ever bound once, even though initCase6
             // runs again on reset and on Restart Lab.
@@ -2092,7 +2115,7 @@
             if (input) input.value = '';
         }
 
-        /* ===================== CASE 6: RATING + HANDOFF ===================== */
+        /* ===================== CASE 8: RATING + HANDOFF ===================== */
 
         let selectedStars = 0;
 
@@ -2165,8 +2188,13 @@
                     // Same gate the dashboard uses, run right here — reached directly by a
                     // bookmarked or shared link, this GoodBlock can't rely on the Lab Pack
                     // hub's own launchLab having already checked this. Completion itself is
-                    // written later, by finalizeCaseRating() once Case 6 is actually reached.
+                    // written later, by finalizeCaseRating() once Case 8 is actually reached.
                     await window.AuthGate.ensureIdentified();
+
+                    // Case 1 is now a counted page like any other, so clicking through it has
+                    // to drive the same advance/unlock/telemetry path advanceFromPage(1) gives
+                    // every other Case's Continue button.
+                    if (window.advanceFromPage) window.advanceFromPage(1);
                 };
                 startup.addEventListener('click', handleStartup);
 
@@ -2215,26 +2243,26 @@
 
         window.restartModule = () => {
             highestUnlocked = 0;
-            pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: true };
+            pageCompletion = { 0: true, 1: true, 2: false, 3: false, 4: false, 5: false, 6: false, 7: true };
 
-            // Case 2
+            // Case 3
             srcStack = {}; firstGoodSource = null;
             document.querySelectorAll('#src-list .src-card').forEach(el => el.classList.remove('in-stack'));
             window.evaluateStack();
 
-            // Case 3
+            // Case 4
             hopIndex = 0; hopReachedOrigin = false;
             document.getElementById('hop-actions').classList.remove('hidden');
             document.getElementById('attrib-zone').classList.add('hidden');
             window.renderHop();
 
-            // Case 4
+            // Case 5
             checksUsed = []; checkLimit = 3;
             document.getElementById('checks-left').textContent = '3 left';
             document.getElementById('share-zone').classList.add('hidden');
             initCase4();
 
-            // Case 5
+            // Case 6
             if (window.stopSpread) window.stopSpread();
             case5Locked = false; actSeq = []; spreadCount = 41;
             const sc = document.getElementById('spread-count');
@@ -2244,7 +2272,7 @@
             initCase5();
             if (window.updateResetLabel) window.updateResetLabel();
 
-            // Case 6
+            // Case 7
             initCase6();
 
             // Shared surfaces
@@ -2254,12 +2282,14 @@
             document.querySelectorAll('.mobile-wb').forEach(b => b.classList.add('hidden'));
             document.getElementById('jodi-whiteboard').classList.remove('wb-populated');
             document.getElementById('jodi-bubble').classList.remove('tucked');
-            for (let i = 2; i <= TOTAL_PAGES; i++) {
+            // continue-2 (Case 2, the Overview) is always ready, same as before the shift -
+            // the loop starts one past it so restart never clears that hardcoded state.
+            for (let i = 3; i <= TOTAL_PAGES; i++) {
                 const prompt = document.getElementById(`continue-${i}`);
                 if (prompt) prompt.classList.remove('ready');
             }
 
-            // Case 6
+            // Case 8
             selectedStars = 0;
             document.querySelectorAll('.star-btn').forEach(btn => { btn.classList.remove('text-amber-400'); btn.classList.add('text-gray-300'); });
             document.getElementById('case7-submit-btn').classList.add('hidden');
