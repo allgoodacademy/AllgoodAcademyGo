@@ -37,9 +37,11 @@
         window.currentUserEmail = "";
         window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 
-        // Telemetry: one "step" = one Case (7 total). Case 1 is open the moment the lab loads.
+        // Telemetry: one "step" = one Case (8 total, now that the startup screen counts as
+        // Case 1 and the closing rating/handoff screen counts as the final Case). Case 1 is
+        // open the moment the lab loads.
         if (window.Telemetry) {
-            window.Telemetry.init({ module: 'social-intelligence', gameName: 'Social Intelligence', stepsTotal: 7 });
+            window.Telemetry.init({ module: 'social-intelligence', gameName: 'Social Intelligence', stepsTotal: 8 });
             window.Telemetry.step(1);
         }
 
@@ -276,6 +278,7 @@
                         <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
                         <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10">Jodi's Schoolhouse</h1>
                         <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: Social Intelligence</p>
+                        <span class="mt-3 text-[10px] font-bold uppercase tracking-widest text-white/40 relative z-10">Case 1</span>
                     </div>
                     <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
                 </div>
@@ -292,7 +295,7 @@
                     </div>
                     <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
                         <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
-                        <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 7</span>
+                        <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 8</span>
                     </div>
                 </div>
                 <div class="flex items-center space-x-1 shrink-0 relative">
@@ -333,8 +336,8 @@
             <!-- RIGHT COLUMN: CONTENT AREA -->
             <div class="content-column" id="content-column">
 
-                <!-- CASE 1: OVERVIEW -->
-                <div class="page" id="page-1">
+                <!-- CASE 2: OVERVIEW -->
+                <div class="page" id="page-2">
                     <div class="page-inner">
                     <div class="max-w-2xl mx-auto pt-8 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Before We Start</span>
@@ -366,8 +369,8 @@
                                 <div><p class="text-sm font-bold text-gray-900">The three seconds that change an outcome</p><p class="text-xs text-gray-500 mt-0.5">A genuinely simple trick for not sending the message you'll regret.</p></div>
                             </div>
                         </div>
-                        <div id="continue-1" class="continue-prompt ready items-center justify-center pt-4">
-                            <button onclick="window.advanceFromPage(1)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-2" class="continue-prompt ready items-center justify-center pt-4">
+                            <button onclick="window.advanceFromPage(2)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -380,12 +383,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 2: THE HOOK -->
-                <div class="page" id="page-2">
+                <!-- CASE 3: THE HOOK -->
+                <div class="page" id="page-3">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-6">
-                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 2: The Inciting Incident</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 3: The Inciting Incident</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Group Chat Fire</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Classmate Marcus just published your team slide deck to the class channel with one key tweak.</p>
                         </div>
@@ -435,8 +438,8 @@
                             <strong id="reaction-title" class="text-cyan-300 block text-sm font-heading"></strong>
                             <p id="reaction-desc" class="text-slate-300 leading-relaxed"></p>
                         </div>
-                        <div id="continue-2" class="continue-prompt items-center justify-center pt-6">
-                            <button onclick="window.advanceFromPage(2)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-3" class="continue-prompt items-center justify-center pt-6">
+                            <button onclick="window.advanceFromPage(3)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -449,12 +452,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 3: THE THEATER TRAP -->
-                <div class="page" id="page-3">
+                <!-- CASE 4: THE THEATER TRAP -->
+                <div class="page" id="page-4">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-6">
-                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 3: The Theater Trap</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 4: The Theater Trap</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Audience Changes the Brain</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Slide the dial between the public bleachers and private hallway to observe Marcus's threat response.</p>
                         </div>
@@ -499,8 +502,8 @@
                                 <input type="range" id="theater-slider" min="0" max="100" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-allgood-primary" oninput="handleTheaterSlider(this.value)">
                             </div>
                         </div>
-                        <div id="continue-3" class="continue-prompt items-center justify-center pt-6">
-                            <button onclick="window.advanceFromPage(3)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-4" class="continue-prompt items-center justify-center pt-6">
+                            <button onclick="window.advanceFromPage(4)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -513,12 +516,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 4: THE SCRIPT LAB -->
-                <div class="page" id="page-4">
+                <!-- CASE 5: THE SCRIPT LAB -->
+                <div class="page" id="page-5">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-4">
-                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 4: The Script Lab</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 5: The Script Lab</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The 3-Part "I-Statement"</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Construct a de-escalating direct message using the formula: <strong>[Observation]</strong> + <strong>[Impact]</strong> + <strong>[Clean Ask]</strong>.</p>
                         </div>
@@ -553,8 +556,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="continue-4" class="continue-prompt items-center justify-center pt-6">
-                            <button onclick="window.advanceFromPage(4)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-5" class="continue-prompt items-center justify-center pt-6">
+                            <button onclick="window.advanceFromPage(5)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -567,12 +570,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 5: THE ALLY DILEMMA -->
-                <div class="page" id="page-5">
+                <!-- CASE 6: THE ALLY DILEMMA -->
+                <div class="page" id="page-6">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-6">
-                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 5: The Ally Protocol</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 6: The Ally Protocol</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Feeding the Circus</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">A classmate is getting mocked in an open comment thread. Compare the outcomes of public outrage vs. quiet allyship.</p>
                         </div>
@@ -599,8 +602,8 @@
                             </button>
                         </div>
                         <div id="ally-outcome-box" class="hidden p-4 rounded-xl border transition-all duration-300 text-xs"></div>
-                        <div id="continue-5" class="continue-prompt items-center justify-center pt-6">
-                            <button onclick="window.advanceFromPage(5)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-6" class="continue-prompt items-center justify-center pt-6">
+                            <button onclick="window.advanceFromPage(6)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -613,12 +616,12 @@
                     </div>
                 </div>
 
-                <!-- CASE 6: THE BREATHER -->
-                <div class="page" id="page-6">
+                <!-- CASE 7: THE BREATHER -->
+                <div class="page" id="page-7">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-6">
-                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 6: The Temperature Check</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Case 7: The Temperature Check</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The 3-Second Breather</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">An abrasive message lands in your inbox. Experience the neurological power of interactive friction before replying.</p>
                         </div>
@@ -647,8 +650,8 @@
                                 <p id="breather-caption" class="text-xs text-gray-500 font-medium">Tap once to initiate the 3-second biological reset.</p>
                             </div>
                         </div>
-                        <div id="continue-6" class="continue-prompt items-center justify-center pt-6">
-                            <button onclick="window.advanceFromPage(6)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                        <div id="continue-7" class="continue-prompt items-center justify-center pt-6">
+                            <button onclick="window.advanceFromPage(7)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
                                 Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -661,8 +664,8 @@
                     </div>
                 </div>
 
-                <!-- CASE 7: HANDOFF -->
-                <div class="page" id="page-7">
+                <!-- CASE 8: HANDOFF -->
+                <div class="page" id="page-8">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-10 px-4 sm:px-8 flex flex-col justify-center py-4 items-center text-center">
 
@@ -754,7 +757,7 @@
     </div>
 
     <script>
-        const CASE_TITLES = ["What We're Covering", "The Inciting Incident", "The Theater Trap", "The Script Lab", "The Ally Protocol", "The Temperature Check", "Handoff"];
+        const CASE_TITLES = ["Power Up", "What We're Covering", "The Inciting Incident", "The Theater Trap", "The Script Lab", "The Ally Protocol", "The Temperature Check", "Handoff"];
 
         window.openCaseMenu = () => {
             const list = document.getElementById('case-menu-list');
@@ -786,9 +789,9 @@
     </script>
 
     <script>
-        const TOTAL_PAGES = 7;
+        const TOTAL_PAGES = 8;
         let highestUnlocked = 0; // index of the highest unlocked page (0 = Case 1)
-        let pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: true };
+        let pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: true };
 
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
@@ -807,6 +810,10 @@
         };
 
         const jodiScript = [
+            // Case 1 is the startup screen itself — her line here never actually shows (the
+            // splash covers the whole app, including her sidebar) but it keeps this array's
+            // indexing (jodiScript[i] = Case i+1) consistent with every other case.
+            { text: "Well hey there, Agent. Glad you found your way in — let's get you set up.", mood: 'happy' },
             { text: "Well hey there. Today we're looking at three people — Marcus, Sarah, and Jordan. Different situations, same underlying traps. Let's get into it.", mood: 'happy' },
             { text: "Alright, look at your phone: Marcus just cropped your name clean off the slide. Go ahead and tap through all three of these — I want you to really see what's happening in each one.", mood: 'neutral' },
             { text: "Remember the Audience Effect from a minute ago? Watch it happen in real time. The second other folks are watching, Marcus isn't listening to you anymore — he's performing.", mood: 'thinking' },
@@ -991,7 +998,7 @@
 
         window.showCase2Wrapup = () => {
             window.updateWhiteboard("You've Got It", "Notice the pattern? The private one always wins — not because it's nicer, it's because it removes the audience.");
-            window.markReady(1);
+            window.markReady(2);
         };
 
         window.exploreReaction = (choice, btn) => {
@@ -1079,14 +1086,14 @@
                 mindset.textContent = '"My bad, I can fix that right now."';
                 title.textContent = 'The Private Backchannel (No Spectators)';
                 title.className = 'font-bold text-lg text-emerald-700';
-                if(!pageCompletion[2]) {
+                if(!pageCompletion[3]) {
                     const bubble = document.getElementById('jodi-bubble');
                     bubble.classList.remove('visible');
                     setTimeout(() => {
                         bubble.textContent = "Look at that. The second the crowd vanishes, the shield drops. People defend bad ideas because they don't want to look foolish.";
                         window.renderJodi('happy');
                         bubble.classList.add('visible');
-                        window.markReady(2);
+                        window.markReady(3);
                     }, 300);
                 }
             }
@@ -1168,7 +1175,7 @@
                             bubble.classList.add('visible');
                         }, 300);
                     }
-                    if (isAllRight) window.markReady(3);
+                    if (isAllRight) window.markReady(4);
                 }, 600);
             }
         }
@@ -1217,7 +1224,7 @@
 
             // Either choice unlocks - defending publicly isn't wrong, just less effective.
             // The explanation teaches; it doesn't gate.
-            window.markReady(4);
+            window.markReady(5);
         }
 
         let breatherRunning = false;
@@ -1251,7 +1258,7 @@
                         bubble.textContent = "There you are. Three little seconds. That is the difference between writing an apology tomorrow and walking with your head held high.";
                         window.renderJodi('happy');
                         bubble.classList.add('visible');
-                        window.markReady(5);
+                        window.markReady(6);
                     }, 300);
                     // Fully reset so this is genuinely repeatable, not a one-time-only button -
                     // breatherRunning was getting stuck true forever otherwise.
@@ -1341,10 +1348,27 @@
                     startup.style.opacity = '0';
                     setTimeout(() => { startup.style.display = 'none'; }, 700);
 
+                    // This startup screen IS Case 1 — dismissing it completes Case 1 and
+                    // unlocks Case 2 (the Overview), the same bookkeeping advanceFromPage()
+                    // does for every other case (highestUnlocked, pageCompletion, the Case 2
+                    // narration, telemetry, and saved progress).
+                    if (1 > highestUnlocked) {
+                        highestUnlocked = 1;
+                        pageCompletion[0] = true;
+                        window.renderLocks();
+                        window.playPageIntro(1);
+                        if (window.Telemetry) window.Telemetry.step(2);
+                        if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                            window.AuthCore.saveModuleProgress('social-intelligence', {
+                                highestUnlocked, pageCompletion, firstExploredReaction,
+                            });
+                        }
+                    }
+
                     // Same gate the dashboard uses, run right here — reached directly by a
                     // bookmarked or shared link, this GoodBlock can't rely on the Lab Pack
                     // hub's own launchLab having already checked this. Completion itself is
-                    // written later, by advanceFromPage() once Case 7 is actually reached.
+                    // written later, by advanceFromPage() once Case 8 is actually reached.
                     await window.AuthGate.ensureIdentified();
                 };
                 startup.addEventListener('click', handleStartup);
@@ -1385,7 +1409,7 @@
 
         window.restartModule = () => {
             highestUnlocked = 0;
-            pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: true };
+            pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: true };
             document.getElementById('script-assembly-zone').innerHTML = '<span id="slot-empty-notice" class="text-xs text-gray-400 italic">Select one tile from each category below...</span>';
             scriptState.obs = null; scriptState.impact = null; scriptState.ask = null;
             document.querySelectorAll('.script-btn, .hook-btn, .ally-btn').forEach(b => b.classList.remove('border-allgood-primary', 'bg-orange-50', 'ring-2', 'ring-allgood-primary/20', 'ring-allgood-primary', 'scale-[0.98]'));
