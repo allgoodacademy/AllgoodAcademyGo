@@ -3,13 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Jodi's Schoolhouse: Money as a Skill</title>
+    <title>Jodi's Schoolhouse: Conflict Has a Winner</title>
 
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
     <!-- ============================================================================
@@ -19,9 +16,8 @@
     <script type="module" src="/js/auth-core.js"></script>
     <script type="module" src="/js/identity-gate.js"></script>
     <script type="module" src="/js/telemetry.js"></script>
-    <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: Money as a Skill"></script>
+    <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: Conflict Has a Winner"></script>
 
-    <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js. -->
     <script type="module">
         import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
@@ -34,9 +30,9 @@
         window.currentUserEmail = "";
         window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 
-        // Telemetry: one "step" = one page (6 total: 5 scenarios + handoff). Page 1 opens on load.
+        // Telemetry: one "step" = one page (6 total: 5 Cases + handoff). Page 1 opens on load.
         if (window.Telemetry) {
-            window.Telemetry.init({ module: 'real-world-ready-money', gameName: 'Money as a Skill', stepsTotal: 6 });
+            window.Telemetry.init({ module: 'conflict-has-a-winner', gameName: 'Conflict Has a Winner', stepsTotal: 6 });
             window.Telemetry.step(1);
         }
 
@@ -45,26 +41,25 @@
                 window.currentUserName = user.displayName || "Agent Learner";
                 window.currentUserEmail = user.email || "";
                 if (window.AuthCore && window.AuthCore.loadModuleProgress) {
-                    const progress = await window.AuthCore.loadModuleProgress('real-world-ready-money');
+                    const progress = await window.AuthCore.loadModuleProgress('conflict-has-a-winner');
                     if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
                 }
             }
         });
 
-        // Completion write — same game_scores shape every other GoodBlock uses.
         window.logModuleCompletion = async () => {
             if (window.Telemetry) window.Telemetry.complete();
             const user = auth.currentUser;
             if (!user) return;
             try {
                 await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId), {
-                    gameName: "Money as a Skill",
+                    gameName: "Conflict Has a Winner",
                     completed: true,
-                    narrativeStyle: 'second-person',
+                    narrativeStyle: 'character',
                     lastUpdated: serverTimestamp(),
                     user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail || null }
                 }, { merge: true });
-            } catch (e) { console.error("[RWR-Money] Completion write failed", e); }
+            } catch (e) { console.error("[Conflict] Completion write failed", e); }
         };
     </script>
 
@@ -74,7 +69,6 @@
         }
     </script>
 
-    <!-- Tailwind Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -87,8 +81,8 @@
                         'allgood-hover': '#EB8D69',
                         'jodi-warmth': '#FBF6EE',
                         'jodi-border': '#E8DFCE',
-                        /* PER-GOODBLOCK IDENTITY - Money as a Skill (Real World Ready).
-                           Amber/gold, spec'd for this module. */
+                        /* Real World Ready Lab-Pack accent, shared across all three
+                           GoodBlocks. Icon (merge) is the only differentiator. */
                         'gb-accent': '#C97D1A',
                         'gb-accent-dark': '#9C5F14',
                         'gb-accent-light': '#FBEBD3'
@@ -106,50 +100,25 @@
         body {
             font-family: Verdana, sans-serif;
             background-color: #F7F7F7;
-            min-height: 100vh;
-            min-height: 100dvh;
-            margin: 0; padding: 0;
-            overflow: hidden;
+            min-height: 100vh; min-height: 100dvh;
+            margin: 0; padding: 0; overflow: hidden;
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
-
         h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
-
-        .app-shell {
-            width: 100%; height: 100dvh;
-            display: flex; flex-direction: column;
-            background-color: #F7F7F7;
-            position: relative; overflow: hidden;
-        }
-
+        .app-shell { width: 100%; height: 100dvh; display: flex; flex-direction: column; background-color: #F7F7F7; position: relative; overflow: hidden; }
         .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
         .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
         .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
-
         .content-column::-webkit-scrollbar { width: 10px; }
         .content-column::-webkit-scrollbar-track { background: transparent; border-left: 1px solid #e5e7eb; }
         .content-column::-webkit-scrollbar-thumb { background-color: #C97D1A; border-radius: 5px; border: 2px solid #F9FAFB; }
-
         .navbar-content { flex: 0 0 48px; z-index: 30; position: relative; }
         .footer-content { flex: 0 0 36px; z-index: 30; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
         #flex-progress-bar { height: 4px; width: 100%; background-color: rgba(255,255,255,0.22); position: absolute; bottom: 0; left: 0; }
         #flex-progress-fill { height: 100%; background-color: #C97D1A; width: 0%; transition: width 0.3s ease; }
-
         .split-layout { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
-
-        .sidebar-jodi {
-            width: 100%; height: auto; min-height: 140px;
-            background-color: #FBF6EE; border-bottom: 1px solid #E8DFCE;
-            display: flex; align-items: flex-end; padding: 10px; position: relative; z-index: 10;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            overflow: hidden;
-        }
-
-        .content-column {
-            flex: 1; overflow-y: auto; position: relative;
-            background-color: #F9FAFB; padding-bottom: 20px;
-        }
-
+        .sidebar-jodi { width: 100%; height: auto; min-height: 140px; background-color: #FBF6EE; border-bottom: 1px solid #E8DFCE; display: flex; align-items: flex-end; padding: 10px; position: relative; z-index: 10; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; }
+        .content-column { flex: 1; overflow-y: auto; position: relative; background-color: #F9FAFB; padding-bottom: 20px; }
         .page { width: 100%; padding: 20px 20px 50px; position: relative; scroll-margin-top: 20px; }
         .page.locked { pointer-events: none; user-select: none; }
         .page.locked .page-inner { filter: blur(4px) grayscale(0.4); opacity: 0.55; transition: filter 0.4s ease, opacity 0.4s ease; }
@@ -157,54 +126,31 @@
         .lock-overlay { display: none; }
         .page.locked .lock-overlay { display: flex; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
         .continue-prompt { display: none; }
         .continue-prompt.ready { display: flex; animation: fadeIn 0.4s ease-out; }
-
         .jodi-wrapper { display: flex; flex-direction: row; align-items: center; width: 100%; max-width: 600px; margin: 0 auto; min-height: 0; max-height: 100%; }
         .jodi-avatar.jodi-stage { width: 120px; height: 120px; flex-shrink: 0; margin-right: 15px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1)); }
         .jodi-avatar.jodi-stage img, .jodi-avatar.jodi-stage svg { width: 100%; height: 100%; display: block; }
-
-        .jodi-bubble {
-            background: white; border: 1px solid #E8DFCE; border-radius: 16px; border-bottom-left-radius: 0;
-            padding: 14px 16px; font-size: 0.85rem; color: #4C4C4C; line-height: 1.5;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; flex: 1;
-            transform-origin: bottom left; opacity: 0; transition: opacity 0.3s;
-        }
+        .jodi-bubble { background: white; border: 1px solid #E8DFCE; border-radius: 16px; border-bottom-left-radius: 0; padding: 14px 16px; font-size: 0.85rem; color: #4C4C4C; line-height: 1.5; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; flex: 1; transform-origin: bottom left; opacity: 0; transition: opacity 0.3s; }
         .jodi-bubble.visible { opacity: 1; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .jodi-bubble { max-height: 30vh; overflow-y: auto; overscroll-behavior: contain; }
         .jodi-bubble::-webkit-scrollbar { width: 5px; }
         .jodi-bubble::-webkit-scrollbar-thumb { background-color: #D8CDBA; border-radius: 3px; }
         .jodi-bubble::-webkit-scrollbar-track { background: transparent; }
-
         #jodi-whiteboard { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; overflow: hidden; transition: opacity 0.3s ease, max-height 0.3s ease; }
         #jodi-whiteboard.wb-populated { opacity: 1; max-height: min(320px, 38vh); overflow-y: auto; padding-top: 1rem; padding-bottom: 1rem; margin-bottom: 0.75rem; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-
         @media (min-width: 768px) {
             .split-layout { flex-direction: row; }
-            .sidebar-jodi {
-                width: 25%; min-width: 300px; height: 100%;
-                border-bottom: none; border-right: 1px solid #E8DFCE;
-                flex-direction: column; justify-content: flex-end; padding: 20px;
-            }
+            .sidebar-jodi { width: 25%; min-width: 300px; height: 100%; border-bottom: none; border-right: 1px solid #E8DFCE; flex-direction: column; justify-content: flex-end; padding: 20px; }
             .content-column { width: 75%; }
             .jodi-wrapper { flex-direction: column-reverse; align-items: center; width: 100%; }
             .jodi-avatar.jodi-stage { width: min(200px, 26vh); height: min(200px, 26vh); margin-right: 0; margin-top: 20px; }
             .jodi-bubble.tucked { opacity: 0 !important; max-height: 0; margin-bottom: 0; padding: 0; border-width: 0; overflow: hidden; pointer-events: none; }
-            .jodi-bubble {
-                border-radius: 16px; border-bottom-left-radius: 16px; border-bottom-right-radius: 0;
-                margin-bottom: 10px; text-align: center; font-size: 0.95rem;
-                max-height: 46vh;
-            }
-            .jodi-bubble::after {
-                content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
-                width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 8px solid #FFF;
-                filter: drop-shadow(0 2px 1px rgba(0,0,0,0.05));
-            }
+            .jodi-bubble { border-radius: 16px; border-bottom-left-radius: 16px; border-bottom-right-radius: 0; margin-bottom: 10px; text-align: center; font-size: 0.95rem; max-height: 46vh; }
+            .jodi-bubble::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 8px solid #FFF; filter: drop-shadow(0 2px 1px rgba(0,0,0,0.05)); }
             .mobile-wb { display: none !important; }
         }
-
         @media (max-width: 767px) {
             html { height: 100%; overflow: hidden; }
             body { height: 100%; min-height: 0 !important; overflow: hidden !important; }
@@ -212,68 +158,48 @@
             .navbar-content { flex: 0 0 auto; min-height: 52px; padding-top: env(safe-area-inset-top); }
             footer.footer-content { display: none !important; }
             .content-column { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
-
             .jodi-wrapper { flex-wrap: wrap; }
             #jodi-recall { flex-basis: 100%; order: 5; margin-top: 6px; padding: 8px 0; }
-
             .sidebar-jodi { padding: 10px 10px 6px; }
             .jodi-avatar.jodi-stage { width: 92px; height: 92px; margin-right: 12px; }
             .jodi-bubble { max-height: 26vh; font-size: 0.82rem; padding: 12px 13px; }
-
             .page { padding: 16px 14px 44px; }
             .case-reset { padding: 10px 6px; font-size: 11px; }
         }
-
         .jodi-avatar img, .jodi-avatar svg { transition: opacity 0.18s ease; }
         .jodi-avatar.mood-shift img, .jodi-avatar.mood-shift svg { opacity: 0.15; }
-
         .jodi-avatar.jodi-stage { cursor: pointer; }
         .jodi-avatar.jodi-stage:hover { filter: drop-shadow(2px 4px 10px rgba(201,125,26,0.35)); }
-
-        .card-shimmer {
-            background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(249,250,251,1) 100%);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-            border: 1px solid #E5E7EB;
-        }
-
+        .card-shimmer { background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(249,250,251,1) 100%); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #E5E7EB; }
         .case-reset { transition: transform .12s ease, background-color .15s ease; }
         .case-reset:active { transform: scale(.97); }
-
-        @media (max-width: 767px) {
-            .stack-mobile { flex-direction: column !important; }
-            .stack-mobile > * { width: 100% !important; }
-        }
-
+        @media (max-width: 767px) { .stack-mobile { flex-direction: column !important; } .stack-mobile > * { width: 100% !important; } }
         .step-bar { border-left: 4px solid #C97D1A; background: #FBEBD3; border-radius: 0 12px 12px 0; padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px; }
         .step-bar .step-num { width: 22px; height: 22px; border-radius: 999px; background: #C97D1A; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
         .step-bar .step-text { font-size: 13px; color: #4a3208; line-height: 1.45; }
         .step-bar.done { border-left-color: #059669; background: #ECFDF5; }
         .step-bar.done .step-num { background: #059669; }
         .step-bar.done .step-text { color: #064e3b; }
-
-        .verdict { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
-        .verdict.best { color: #065f46; background: #ECFDF5; border-color: #A7F3D0; }
-        .verdict.ok { color: #475569; background: #F1F5F9; border-color: #CBD5E1; }
-        .verdict.rethink { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
-
-        /* ---- Case 1: three-way commit ---- */
         .choice-btn { transition: border-color .2s ease, background-color .2s ease, transform .1s ease, opacity .3s ease; text-align: left; cursor: pointer; }
         .choice-btn:not(.locked-choice):active { transform: scale(.99); }
         .choice-btn.picked { border-color: #C97D1A; background-color: #FBEBD3; }
         .choice-btn.locked-choice:not(.picked) { opacity: .45; cursor: not-allowed; }
-
-        /* ---- Case 3: toggles ---- */
+        .choice-btn.correct-pick { border-color: #059669; background-color: #ECFDF5; }
+        .choice-btn.wrong-pick { border-color: #D97706; background-color: #FFFBEB; }
+        .evidence-panel { background: #0f172a; border-radius: 12px; padding: 14px; color: #cbd5e1; font-size: 12px; margin-top: 8px; }
+        .meter-track { height: 14px; border-radius: 999px; background: #E5E7EB; overflow: hidden; }
+        .meter-fill { height: 100%; transition: width 0.5s ease; }
+        .inbox-card { border: 2px solid #E5E7EB; border-radius: 16px; padding: 14px; transition: opacity .3s ease, border-color .2s ease; }
+        .inbox-card.dimmed { opacity: .45; }
+        .inbox-card.opened { border-color: #C97D1A; }
+        .ghost-option { opacity: .4; cursor: not-allowed; }
+        .ghost-option.unlocked { opacity: 1; cursor: pointer; border-color: #C97D1A !important; background-color: #FBEBD3 !important; }
         .toggle-chip { transition: border-color .2s ease, background-color .2s ease, transform .1s ease; cursor: pointer; }
         .toggle-chip:active { transform: scale(.98); }
         .toggle-chip.on { border-color: #C97D1A; background-color: #FBEBD3; color: #6b4409; }
         .toggle-chip .chip-box { width: 18px; height: 18px; border-radius: 5px; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background-color .15s ease, border-color .15s ease; }
         .toggle-chip.on .chip-box { background-color: #C97D1A; border-color: #C97D1A; }
         .toggle-chip.locked-choice { opacity: .6; cursor: not-allowed; }
-
-        /* ---- Case 4: investigate then commit ---- */
-        .invest-card { transition: border-color .2s ease, background-color .2s ease; }
-        .invest-card.revealed { border-color: #C97D1A; background-color: #FBEBD3; }
-        .invest-card.locked-choice { opacity: .7; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
@@ -281,22 +207,16 @@
     <div class="app-shell" id="screen">
 
         <!-- STARTUP SCREEN -->
-        <!--
-            Per-GoodBlock identity, changed as ONE set (gradient + glow + icon).
-            Icon is `coins` — verified against the live Lucide library. Reused verbatim on the
-            completion badge so what you see before you start and what you earn for finishing
-            are one mark.
-        -->
         <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out" style="background: linear-gradient(135deg, #C97D1A 0%, #6b4a10 55%, #1a1000 100%);">
             <div class="absolute inset-0 opacity-50" style="background: radial-gradient(circle at 50% 35%, rgba(255,200,90,0.45), transparent 60%);"></div>
             <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
                 <div class="flex-grow flex flex-col items-center justify-center px-4">
                     <div class="relative flex flex-col items-center">
                         <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                        <i data-lucide="coins" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,200,90,0.7)]"></i>
+                        <i data-lucide="merge" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,200,90,0.7)]"></i>
                         <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
                         <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10">Jodi's Schoolhouse</h1>
-                        <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: Money as a Skill</p>
+                        <p class="mt-4 text-allgood-primary font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: Conflict Has a Winner</p>
                         <span class="mt-3 text-[10px] font-bold uppercase tracking-widest text-white/60 relative z-10">Before We Start</span>
                     </div>
                     <p class="mt-16 text-white/70 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">Click to Power Up.</p>
@@ -310,7 +230,7 @@
             <div class="w-full px-4 flex items-center justify-between h-full">
                 <div class="flex items-center overflow-hidden">
                     <div class="flex shrink-0 items-center bg-allgood-primary rounded-full px-3 py-1 shadow-sm mr-2">
-                        <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">Money as a Skill</span>
+                        <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">Conflict Has a Winner</span>
                     </div>
                     <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
                         <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
@@ -333,17 +253,13 @@
             <!-- LEFT COLUMN: MENTOR SIDEBAR -->
             <div class="sidebar-jodi shrink-0">
                 <div class="jodi-wrapper">
-                    <!-- Jodi's four moods, referenced by URL per the shared asset chassis. -->
                     <div class="jodi-avatar jodi-stage rounded-2xl shadow-md relative overflow-hidden bg-[#F5E6D3]">
                         <div id="jodi-img-neutral" class="absolute inset-0 w-full h-full" style="display:block;"><img src="/assets/jodi/jodi-neutral.svg" class="w-full h-full" alt="Jodi, neutral"></div>
                         <div id="jodi-img-happy" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-happy.svg" class="w-full h-full" alt="Jodi, happy"></div>
                         <div id="jodi-img-concerned" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-concerned.svg" class="w-full h-full" alt="Jodi, concerned"></div>
                         <div id="jodi-img-thinking" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-thinking.svg" class="w-full h-full" alt="Jodi, thinking"></div>
                     </div>
-                    <div id="jodi-bubble" class="jodi-bubble">
-                        Hey there. Come sit down a minute.
-                    </div>
-                    <!-- DESKTOP whiteboard: collapsed until she has something to write down. -->
+                    <div id="jodi-bubble" class="jodi-bubble">Hey. Come sit down a minute — this one's about Theo.</div>
                     <div id="jodi-whiteboard" class="hidden md:block w-full bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
                         <strong id="whiteboard-title" class="text-amber-300 block text-sm font-heading"></strong>
                         <p id="whiteboard-desc" class="text-slate-300 leading-relaxed"></p>
@@ -357,32 +273,48 @@
             <!-- RIGHT COLUMN: CONTENT AREA -->
             <div class="content-column" id="content-column">
 
-                <!-- PAGE 1 / CASE 1: THE SPLIT DECISION -->
+                <!-- PAGE 1 / CASE 2: THE UNSPOKEN NEED -->
                 <div class="page" id="page-1">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
                             <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 2</span>
-                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Split Decision</h2>
-                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">You and your friend want to buy a Bluetooth speaker together. It costs $30. Your friend is going to keep it at their house &mdash; they'll use it almost every day. You'll probably use it maybe once or twice a month when you're over. They suggest splitting it 50/50: $15 each. What do you do?</p>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Unspoken Need</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Theo and a classmate are stuck on a group project. Theo wants to do Topic A. His classmate wants Topic B. Both of them are sure. Everybody's first instinct is to figure out who's right — but that's not the job here. The job is figuring out what each of them is actually worried about, because neither one has said it out loud yet.</p>
                         </div>
 
-                        <div id="step-1" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Pick one move. Once you pick, it's locked in.</span></div>
+                        <div id="step-1" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Pick the real need underneath each position — not a restatement of it.</span></div>
 
-                        <div id="c1-choices" class="space-y-2 mb-3"></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                            <div class="card-shimmer rounded-2xl border-2 border-gray-200 p-4">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Theo says</p>
+                                <p class="text-sm font-bold text-gray-800 mb-3">"I want to do Topic A."</p>
+                                <div id="c2-needs-theo" class="space-y-2"></div>
+                            </div>
+                            <div class="card-shimmer rounded-2xl border-2 border-gray-200 p-4">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Classmate says</p>
+                                <p class="text-sm font-bold text-gray-800 mb-3">"I want to do Topic B."</p>
+                                <div id="c2-needs-classmate" class="space-y-2"></div>
+                            </div>
+                        </div>
+
+                        <div id="c2-door" class="hidden mb-3">
+                            <p class="text-xs font-bold uppercase tracking-widest text-gb-accent mb-2">Is there an option that gives both of them that?</p>
+                            <div id="c2-options" class="space-y-2"></div>
+                        </div>
 
                         <div id="mobile-wb-1" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
                             <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="c1-reframe" class="hidden bg-white rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Worth remembering</p>
-                            <p class="text-sm text-gray-800 leading-relaxed">Fair doesn't always mean equal. Fair means everyone got a deal that made sense for them.</p>
+                        <div id="c2-reframe" class="hidden bg-white rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Nobody Lost</p>
+                            <p class="text-sm text-gray-800 leading-relaxed">Neither of them got their original answer. Both of them got the thing underneath it. That's not a compromise — it's an option nobody had looked for.</p>
                         </div>
 
-                        <button onclick="window.resetCase1()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
-                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Try a different move</span>
+                        <button onclick="window.resetCase2()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
+                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Start over</span>
                         </button>
 
                         <div id="continue-1" class="continue-prompt items-center justify-center pt-2">
@@ -399,32 +331,45 @@
                     </div>
                 </div>
 
-                <!-- PAGE 2 / CASE 2: THE IMPULSE WINDOW -->
+                <!-- PAGE 2 / CASE 3: THE COST OF BEING RIGHT -->
                 <div class="page" id="page-2">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
                             <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 3</span>
-                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Impulse Window</h2>
-                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">You've been saving up for a new pair of headphones &mdash; $60. You've got $58 saved. You're almost there. Then you're at a store and you spot something else: a phone case you really like. It's $12. You can afford it right now &mdash; it just sets your savings back to $46. What do you do?</p>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Cost of Being Right</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">A group chat argument. Someone has publicly dismissed Theo's idea, and he's factually, genuinely right. Which is exactly what makes this one dangerous. Watch the top meter below — it isn't going to move. That's the point.</p>
                         </div>
 
-                        <div id="step-2" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Pick a move. You can think it through with Jodi first, or just decide.</span></div>
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Is Theo right?</p>
+                                <div class="meter-track"><div id="c3-right-fill" class="meter-fill" style="width:100%; background-color:#059669;"></div></div>
+                                <p id="c3-right-label" class="text-[10px] text-gray-400 mt-0.5">100%</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Is this working?</p>
+                                <div class="meter-track"><div id="c3-effective-fill" class="meter-fill" style="width:100%; background-color:#C97D1A;"></div></div>
+                                <p id="c3-effective-label" class="text-[10px] text-gray-400 mt-0.5">100%</p>
+                            </div>
+                        </div>
 
-                        <div id="c2-choices" class="space-y-2 mb-3"></div>
+                        <div id="step-2" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Round 1 of 4. Pick a reply for Theo — or exit the thread any time.</span></div>
+
+                        <div id="c3-choices" class="space-y-2 mb-3"></div>
 
                         <div id="mobile-wb-2" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
                             <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="c2-reframe" class="hidden bg-white rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Worth remembering</p>
-                            <p class="text-sm text-gray-800 leading-relaxed">You're not choosing between buying it or not. You're choosing how much your future-self gets to weigh in.</p>
+                        <div id="c3-reframe" class="hidden bg-white rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Right: 100% / Effective: <span id="c3-final-effective">100</span>%</p>
+                            <p class="text-sm text-gray-800 leading-relaxed">He never stopped being right — not once, not for a second. Being right is a fact. Being effective is a choice, and they're not the same button.</p>
                         </div>
 
-                        <button onclick="window.resetCase2()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
-                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Try a different move</span>
+                        <button onclick="window.resetCase3()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
+                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Start over</span>
                         </button>
 
                         <div id="continue-2" class="continue-prompt items-center justify-center pt-2">
@@ -441,36 +386,32 @@
                     </div>
                 </div>
 
-                <!-- PAGE 3 / CASE 3: THE GROUP FUND -->
+                <!-- PAGE 3 / CASE 4: THE APOLOGY THAT ISN'T GREAT -->
                 <div class="page" id="page-3">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
                             <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4</span>
-                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Group Fund</h2>
-                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Your friend group (six people) wants to pool money to buy something together &mdash; say, tickets to an event, or a group gift. Total: $60. $10 each. Someone suggests: "Hey, you should hold the money and keep track of who's paid." They mean it as a compliment &mdash; you're responsible, organized. People trust you. Do you agree?</p>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Apology That Isn't Great</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">A friend has apologised to Theo: <em>"ok I'm sorry you took it that way, can we drop it."</em> It's got the word in it. Before deciding anything, mark what's actually in there.</p>
                         </div>
 
-                        <div id="step-3" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Toggle any conditions you want on this before you commit. Watch the button change as you do.</span></div>
+                        <div id="step-3" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Mark each element present or missing in the apology.</span></div>
 
-                        <div id="c3-toggles" class="space-y-2 mb-4"></div>
+                        <div id="c4-audit" class="space-y-2 mb-4"></div>
 
-                        <button id="c3-commit" onclick="window.commitCase3()" class="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3 rounded-full shadow text-xs uppercase tracking-widest transition-transform hover:scale-105 mb-3">
-                            <span id="c3-commit-label">I'll do it</span>
-                        </button>
+                        <div id="c4-response-block" class="hidden mb-3">
+                            <p class="text-xs font-bold uppercase tracking-widest text-gb-accent mb-2">Now — what does Theo do with that?</p>
+                            <div id="c4-response" class="space-y-2"></div>
+                        </div>
 
                         <div id="mobile-wb-3" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
                             <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="c3-reframe" class="hidden bg-white rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Worth remembering</p>
-                            <p class="text-sm text-gray-800 leading-relaxed">Saying yes to responsibility without saying what comes with it isn't generosity &mdash; it's just setting yourself up.</p>
-                        </div>
-
-                        <button onclick="window.resetCase3()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
-                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Reset the toggles</span>
+                        <button onclick="window.resetCase4()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
+                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Start over</span>
                         </button>
 
                         <div id="continue-3" class="continue-prompt items-center justify-center pt-2">
@@ -487,57 +428,45 @@
                     </div>
                 </div>
 
-                <!-- PAGE 4 / CASE 4: THE UPGRADE TRAP -->
+                <!-- PAGE 4 / CASE 5: BOTH OF THEM WANT YOU -->
                 <div class="page" id="page-4">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
                             <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 5</span>
-                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Upgrade Trap</h2>
-                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">You need a new backpack for school. You're looking at two options at the store. Option A: $18. Basic, has the compartments you need, solid reviews. Option B: $45. More pockets, waterproof, looks nicer, brand name. You can afford either one. Which do you buy?</p>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Both of Them Want You</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Two of Theo's friends have fallen out. Both message him separately. Both want him to say they're right. Open both threads before you decide anything.</p>
                         </div>
 
-                        <div id="step-4" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Look closer at either option if you want &mdash; or just buy. Both buttons work any time.</span></div>
+                        <div id="step-4" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Open both threads. Then pick how Theo replies.</span></div>
 
-                        <div class="flex items-center justify-between mb-3">
-                            <span id="c4-budget" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">2 closer looks available</span>
-                            <button onclick="window.resetCase4()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
-                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Start over</span>
-                            </button>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                            <div id="invest-a" class="invest-card card-shimmer rounded-2xl border-2 border-gray-200 p-4">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Option A</p>
-                                <p class="text-lg font-heading font-bold text-gray-900 mb-2">$18</p>
-                                <p class="text-xs text-gray-600 mb-3">Basic, has the compartments you need, solid reviews.</p>
-                                <button id="look-a" onclick="window.lookCloser('a')" class="w-full flex items-center justify-center gap-1.5 bg-white border border-gray-300 hover:border-gb-accent text-gray-700 font-bold px-3 py-2 rounded-full text-[11px] uppercase tracking-widest mb-2">
-                                    <i data-lucide="search" class="w-3.5 h-3.5"></i> Look closer
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                            <div id="c5-thread-a" class="inbox-card card-shimmer">
+                                <button onclick="window.openThread('a')" class="w-full text-left">
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">From: Priya</p>
+                                    <p class="text-sm text-gray-800">"He completely blew me off, right? Tell him I'm right."</p>
                                 </button>
-                                <p id="detail-a" class="hidden text-xs text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-3 mb-2">Durability: 4.1/5 stars across 340 reviews. Reported average lifespan: 2&ndash;3 years of daily use. Zippers have not been a common complaint. Weight: 0.8 lbs empty.</p>
-                                <button onclick="window.commitCase4('a')" class="w-full bg-gb-accent hover:bg-gb-accent-dark text-white font-bold px-3 py-2.5 rounded-full text-[11px] uppercase tracking-widest">Buy the $18 one</button>
+                                <div id="c5-thread-a-body" class="hidden mt-2 text-xs text-gray-600 leading-relaxed border-t border-gray-100 pt-2">She's certain the other side is entirely at fault.</div>
                             </div>
-                            <div id="invest-b" class="invest-card card-shimmer rounded-2xl border-2 border-gray-200 p-4">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Option B</p>
-                                <p class="text-lg font-heading font-bold text-gray-900 mb-2">$45</p>
-                                <p class="text-xs text-gray-600 mb-3">More pockets, waterproof, looks nicer, brand name.</p>
-                                <button id="look-b" onclick="window.lookCloser('b')" class="w-full flex items-center justify-center gap-1.5 bg-white border border-gray-300 hover:border-gb-accent text-gray-700 font-bold px-3 py-2 rounded-full text-[11px] uppercase tracking-widest mb-2">
-                                    <i data-lucide="search" class="w-3.5 h-3.5"></i> Look closer
+                            <div id="c5-thread-b" class="inbox-card card-shimmer">
+                                <button onclick="window.openThread('b')" class="w-full text-left">
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">From: Marisol</p>
+                                    <p class="text-sm text-gray-800">"I did nothing wrong here. Back me up?"</p>
                                 </button>
-                                <p id="detail-b" class="hidden text-xs text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-3 mb-2">Waterproofing rated for "light rain" &mdash; not submersion or heavy rain. Brand name has 3.8/5 across 210 reviews &mdash; mixed on zipper durability after 18 months. Weight: 1.4 lbs empty.</p>
-                                <button onclick="window.commitCase4('b')" class="w-full bg-gb-accent hover:bg-gb-accent-dark text-white font-bold px-3 py-2.5 rounded-full text-[11px] uppercase tracking-widest">Buy the $45 one</button>
+                                <div id="c5-thread-b-body" class="hidden mt-2 text-xs text-gray-600 leading-relaxed border-t border-gray-100 pt-2">She's just as certain, about something different than Priya thinks it's about.</div>
                             </div>
                         </div>
+
+                        <div id="c5-choices" class="space-y-2 mb-3"></div>
 
                         <div id="mobile-wb-4" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
                             <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="c4-reframe" class="hidden bg-white rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Worth remembering</p>
-                            <p class="text-sm text-gray-800 leading-relaxed">The question isn't "can I afford the good one." It's "what does the good one actually do that I'll actually use?"</p>
-                        </div>
+                        <button onclick="window.resetCase5()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
+                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Start over</span>
+                        </button>
 
                         <div id="continue-4" class="continue-prompt items-center justify-center pt-2">
                             <button onclick="window.advanceFromPage(4)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
@@ -553,32 +482,32 @@
                     </div>
                 </div>
 
-                <!-- PAGE 5 / CASE 5: THE ASK -->
+                <!-- PAGE 5 / CASE 6: WHEN YOU'RE THE ONE WHO'S WRONG -->
                 <div class="page" id="page-5">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
                             <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 6</span>
-                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Ask</h2>
-                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">You're at a local shop. You find a phone case you actually want &mdash; it's $20. But when you pick it up, you notice the packaging is dented and the corner of the case itself has a small scuff. It's not broken &mdash; just not pristine. The tag still says $20. What do you do?</p>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">When You're the One Who's Wrong</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Mid-argument. Theo's been pushing a position, and new information just made it clear he's wrong. Conceding is available every single turn — it just costs more the longer he waits.</p>
                         </div>
 
-                        <div id="step-5" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Pick a move. You can run the worst case with Jodi first, or just decide.</span></div>
+                        <div class="mb-4">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Cost to concede right now</p>
+                            <p id="c6-cost-label" class="text-sm font-bold text-gb-accent">easy</p>
+                        </div>
 
-                        <div id="c5-choices" class="space-y-2 mb-3"></div>
+                        <div id="step-5" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Turn 1 of 4. Pick a move for Theo.</span></div>
+
+                        <div id="c6-choices" class="space-y-2 mb-3"></div>
 
                         <div id="mobile-wb-5" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
                             <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
                             <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
                         </div>
 
-                        <div id="c5-reframe" class="hidden bg-white rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Worth remembering</p>
-                            <p class="text-sm text-gray-800 leading-relaxed">The answer is always no until you ask. And "no" is exactly where you already were.</p>
-                        </div>
-
-                        <button onclick="window.resetCase5()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
-                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Try a different move</span>
+                        <button onclick="window.resetCase6()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 mb-3">
+                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Start over</span>
                         </button>
 
                         <div id="continue-5" class="continue-prompt items-center justify-center pt-2">
@@ -610,7 +539,6 @@
                                 <button onclick="window.selectRating(4)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="4">★</button>
                                 <button onclick="window.selectRating(5)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="5">★</button>
                             </div>
-                            <!-- 16px font: anything smaller makes iOS zoom the page on focus. -->
                             <textarea id="feedback-text" placeholder="Anything you want to tell us? (optional)" class="w-full border border-gray-200 rounded-lg p-3 text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-gb-accent/40" style="font-size:16px;" rows="2"></textarea>
                             <button id="submit-btn" onclick="window.finalizeRating()" class="hidden mt-3 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wide shadow-md transition-transform hover:scale-105">
                                 Submit
@@ -619,24 +547,23 @@
 
                         <div id="reveal-block" class="w-full hidden">
                             <div class="mb-6">
-                                <span class="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Money Lab Cleared</span>
-                                <h2 class="text-3xl sm:text-4xl font-heading font-bold text-gray-900 mt-4">Look at That</h2>
-                                <p class="text-sm text-gray-600 max-w-md mx-auto mt-3 leading-relaxed">Most adults still haven't figured out half of what you just did. Go on &mdash; go make some good calls out there.</p>
+                                <span class="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Conflict Lab Cleared</span>
+                                <h2 class="text-3xl sm:text-4xl font-heading font-bold text-gray-900 mt-4">You Went Looking</h2>
+                                <p class="text-sm text-gray-600 max-w-md mx-auto mt-3 leading-relaxed">Every single one of those had a version where somebody wins and somebody loses, and every one had another way through that most folks never go looking for.</p>
                             </div>
 
                             <div class="card-shimmer rounded-2xl p-8 shadow-md border border-gb-accent/30 mb-8 max-w-lg w-full relative overflow-hidden mx-auto">
                                 <div class="absolute -right-8 -bottom-8 w-32 h-32 bg-gb-accent/5 rounded-full pointer-events-none"></div>
-                                <!-- Same icon as the startup screen, deliberately. -->
                                 <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-gb-accent-light to-amber-100 border-4 border-gb-accent/40 shadow-inner flex items-center justify-center">
-                                    <i data-lucide="coins" class="w-10 h-10 text-gb-accent-dark drop-shadow-sm"></i>
+                                    <i data-lucide="merge" class="w-10 h-10 text-gb-accent-dark drop-shadow-sm"></i>
                                 </div>
                                 <span class="text-[10px] font-bold uppercase tracking-widest text-gb-accent block mb-1">MINTED IN DOSSIER</span>
-                                <h3 class="text-xl font-heading font-bold text-gray-900 mb-2">Money as a Skill</h3>
+                                <h3 class="text-xl font-heading font-bold text-gray-900 mb-2">Conflict Has a Winner</h3>
                                 <p class="text-xs text-gray-600 mb-6 leading-relaxed">8 scenarios completed</p>
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-6">Real World Ready &middot; Allgood Academy</p>
 
                                 <button onclick="window.returnToHub()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2">
-                                    <span>Back to Jodi's Schoolhouse</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                    <span>Back to Real World Ready</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
                                 </button>
                             </div>
                         </div>
@@ -652,12 +579,10 @@
             </div>
         </div>
 
-        <!-- Footer -->
         <footer class="footer-content flex items-center justify-center px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
             <p class="text-gray-400 text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
         </footer>
 
-        <!-- HOME MODAL -->
         <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
             <div class="bg-jodi-warmth rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gb-accent">
                 <div class="mb-4"><i data-lucide="home" class="w-10 h-10 mx-auto text-gb-accent"></i></div>
@@ -671,7 +596,6 @@
             </div>
         </div>
 
-        <!-- CASE MENU -->
         <div id="case-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
             <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-gb-accent">
                 <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Case</h2>
@@ -684,7 +608,7 @@
     </div>
 
     <script>
-        const CASE_TITLES = ["The Split Decision", "The Impulse Window", "The Group Fund", "The Upgrade Trap", "The Ask", "Handoff"];
+        const CASE_TITLES = ["The Unspoken Need", "The Cost of Being Right", "The Apology That Isn't Great", "Both of Them Want You", "When You're the One Who's Wrong", "Handoff"];
 
         window.openCaseMenu = () => {
             const list = document.getElementById('case-menu-list');
@@ -719,7 +643,7 @@
 
     <script>
         const TOTAL_PAGES = 6;
-        let highestUnlocked = 0; // 0-indexed
+        let highestUnlocked = 0;
         let pageCompletion = { 0: false, 1: false, 2: false, 3: false, 4: false, 5: true };
 
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -739,24 +663,17 @@
             error: () => playTone(150, 'sawtooth', 0.3)
         };
 
-        // One entry per page. Index 0 carries the module's welcome line plus Case 1's setup
-        // line, per spec ("plays on Case 1 unlock"). Indices 1-4 are each Case's own entry line.
-        const WELCOME_TEXT = "Alright, let's get into something nobody actually teaches you. Some people act like being good with money is just... a personality type. Like you either have it or you don't. I'm here to tell you that's not how it works — and I'm going to show you exactly why.";
+        const WELCOME_TEXT = "Alright. Today's about something nobody ever teaches you straight: what to do when a disagreement won't just resolve itself. We're going to spend some time with Theo, because he's about to run into five of these.";
         const jodiScript = [
-            { text: WELCOME_TEXT + " Okay — first case. Your friend wants to split the cost of something. Sounds simple enough, right? Here's the situation.", mood: 'thinking' },
-            { text: "Alright, next one. This case is about a thing that happens to everyone — including adults who should know better by now.", mood: 'neutral' },
-            { text: "This next one's a little different. It's not just about money — it's about what saying yes to something actually commits you to.", mood: 'neutral' },
-            { text: "Okay — here's a trap I see people walk into all the time, and it's a sneaky one because it sounds like good reasoning.", mood: 'neutral' },
-            { text: "Last one. And this one's about something a lot of people — adults included — never figure out.", mood: 'neutral' },
+            { text: WELCOME_TEXT + " First one. Two people, two answers, and both of them are sure. Here's the situation.", mood: 'thinking' },
+            { text: "Next one. This one's different, because here — Theo's right. Genuinely, actually right. Which is exactly what makes it dangerous.", mood: 'neutral' },
+            { text: "This one's about an apology that's technically an apology and not much else.", mood: 'neutral' },
+            { text: "Two people he likes, and they both want the same thing from him.", mood: 'neutral' },
+            { text: "Last one, and it's the hardest, so I'll just say it plain. He's wrong, and he knows it.", mood: 'neutral' },
             { text: "You made it through all five. Take a second before you go.", mood: 'happy' }
         ];
 
-        // ---- Jodi recall state ----
-        let currentIntro = null;
-        let lastMechanism = null;
-        let lastSaid = null;
-        let stashedReaction = null;
-        let jodiShowingIntro = true;
+        let currentIntro = null, lastMechanism = null, lastSaid = null, stashedReaction = null, jodiShowingIntro = true;
 
         window.renderJodi = function(stateKey) {
             const mood = ['neutral', 'happy', 'concerned', 'thinking'].includes(stateKey) ? stateKey : 'neutral';
@@ -788,17 +705,14 @@
             if (whiteboard) whiteboard.classList.remove('wb-populated');
             const bubbleEl = document.getElementById('jodi-bubble');
             if (bubbleEl) bubbleEl.classList.remove('tucked');
-
             const script = jodiScript[pageIndex];
             if (!script) return;
             const bubble = document.getElementById('jodi-bubble');
             bubble.classList.remove('visible');
-
             currentIntro = { text: script.text, mood: script.mood };
             stashedReaction = null;
             jodiShowingIntro = true;
             window.updateRecallButton();
-
             setTimeout(() => {
                 bubble.textContent = script.text;
                 bubble.classList.add('visible');
@@ -818,7 +732,7 @@
 
         function saveProgress() {
             if (window.AuthCore && window.AuthCore.saveModuleProgress) {
-                window.AuthCore.saveModuleProgress('real-world-ready-money', { highestUnlocked, pageCompletion });
+                window.AuthCore.saveModuleProgress('conflict-has-a-winner', { highestUnlocked, pageCompletion });
             }
         }
 
@@ -837,12 +751,8 @@
 
         window.restoreModuleProgress = function(data) {
             if (!data) return;
-            if (typeof data.highestUnlocked === 'number' && data.highestUnlocked > highestUnlocked) {
-                highestUnlocked = data.highestUnlocked;
-            }
-            if (data.pageCompletion && typeof data.pageCompletion === 'object') {
-                pageCompletion = { ...pageCompletion, ...data.pageCompletion };
-            }
+            if (typeof data.highestUnlocked === 'number' && data.highestUnlocked > highestUnlocked) highestUnlocked = data.highestUnlocked;
+            if (data.pageCompletion && typeof data.pageCompletion === 'object') pageCompletion = { ...pageCompletion, ...data.pageCompletion };
             window.renderLocks();
             for (let i = 0; i < TOTAL_PAGES; i++) {
                 if (pageCompletion[i]) {
@@ -859,21 +769,16 @@
             }
         };
 
-        // Routes one mechanism explanation to BOTH surfaces: the desktop whiteboard and that
-        // scenario's own inline box on mobile. Every scenario calls this - never one surface directly.
         window.updateWhiteboard = (title, desc, caseNum) => {
             const wbTitle = document.getElementById('whiteboard-title');
             const wbDesc = document.getElementById('whiteboard-desc');
             if (wbTitle) wbTitle.textContent = title;
             if (wbDesc) wbDesc.textContent = desc;
-
             const whiteboard = document.getElementById('jodi-whiteboard');
             if (whiteboard) whiteboard.classList.add('wb-populated');
             const bubble = document.getElementById('jodi-bubble');
             if (bubble) bubble.classList.add('tucked');
-
             lastMechanism = { title, desc, caseNum };
-
             if (caseNum) {
                 const box = document.getElementById(`mobile-wb-${caseNum}`);
                 if (box) {
@@ -888,16 +793,10 @@
             const bubble = document.getElementById('jodi-bubble');
             if (!bubble) return;
             const isDesktop = window.matchMedia('(min-width: 768px)').matches;
-            if (isDesktop) {
-                bubble.textContent = text;
-                window.renderJodi(mood);
-            } else {
+            if (isDesktop) { bubble.textContent = text; window.renderJodi(mood); }
+            else {
                 bubble.classList.remove('visible');
-                setTimeout(() => {
-                    bubble.textContent = text;
-                    bubble.classList.add('visible');
-                    window.renderJodi(mood);
-                }, 150);
+                setTimeout(() => { bubble.textContent = text; bubble.classList.add('visible'); window.renderJodi(mood); }, 150);
             }
         }
 
@@ -943,8 +842,6 @@
         function scheduleUI(fn, ms) { const id = setTimeout(fn, ms); pendingTimers.push(id); return id; }
         function clearPendingUI() { pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
 
-        // reveal() writes the whiteboard/mobile box AND Jodi's bubble with distinct copy, per
-        // spec (each option gives a whiteboard explanation and a separate Jodi reaction line).
         window.reveal = (caseNum, title, wbText, jodiText, mood) => {
             window.updateWhiteboard(title, wbText, caseNum);
             window.sayJodi(jodiText, mood || 'neutral');
@@ -962,378 +859,434 @@
     </script>
 
     <script>
-        /* ===================== CASE 1: THE SPLIT DECISION =====================
-           Three-way commitment choice. Any pick locks and reveals a result. All three valid. */
-        const C1_OPTIONS = [
-            { id: 'a', label: 'Pay $15 — split it evenly, it\'s the easy thing to do',
-              wb: "You paid $15. You're splitting a $30 speaker evenly. But your friend will use it roughly 80% of the time, you'll use it 20%. Functionally, you just paid $15 for what amounts to occasional guest access.",
-              jodi: "Nothing went wrong here. But I want you to notice what you paid for vs. what you're getting. That gap? That's worth seeing.", mood: 'thinking' },
-            { id: 'b', label: 'Propose paying less — maybe $8, since you\'ll use it less',
-              wb: "You proposed $8 — a proportional split based on how much each person will actually use it. Your friend might push back, they might agree. But you named the real situation instead of defaulting to the easy split.",
-              jodi: "That right there is a money habit. You didn't fight about it — you just said what was actually true. That's a different move than most people make.", mood: 'happy' },
-            { id: 'c', label: 'Pass on it — you\'d rather not share something like this',
-              wb: "Shared ownership of physical things gets complicated. You're not wrong to think twice. Passing isn't fear — it's a real assessment of whether this deal makes sense for you.",
-              jodi: "Knowing when not to split something is just as useful as knowing how to. File that one away.", mood: 'thinking' }
+        /* ===================== CASE 2: THE UNSPOKEN NEED =====================
+           Position-to-need translator. Two picks (one per person, real need out of three
+           options), then a third card of integrative options. Gated: wrong picks teach on
+           the spot, right picks lock. */
+        const C2_NEEDS_THEO = [
+            { id: 't1', text: "I really think Topic A is more interesting.", correct: false },
+            { id: 't2', text: "I'm worried if we do Topic B, I'll end up doing most of the research alone.", correct: true },
+            { id: 't3', text: "Topic A is just better, honestly.", correct: false }
         ];
-        let c1Picked = null;
+        const C2_NEEDS_CLASSMATE = [
+            { id: 'c1', text: "Topic B is the one I care about.", correct: false },
+            { id: 'c2', text: "I already started collecting sources for Topic B and don't want that wasted.", correct: true },
+            { id: 'c3', text: "I just don't like Topic A.", correct: false }
+        ];
+        const C2_OPTIONS = [
+            { id: 'o1', text: "Flip a coin to decide which topic.", correct: false,
+              why: "That decides who wins. It doesn't touch either need — not the work split, not the sources already gathered." },
+            { id: 'o2', text: "Do Topic A, but build it using the sources classmate already gathered, and split research evenly from here.", correct: true,
+              why: "Nobody Lost — neither of them got their original answer. Both of them got the thing underneath it." },
+            { id: 'o3', text: "Do Topic B, and Theo does less of the writing to make up for it.", correct: false,
+              why: "That fixes Theo's worry about workload but throws away his actual interest in the topic for no reason — a real option exists that costs neither of them anything." }
+        ];
+        let c2TheoPick = null, c2ClassmatePick = null, c2Locked = false;
 
-        function renderCase1() {
-            const wrap = document.getElementById('c1-choices');
+        function renderC2Needs() {
+            const theoWrap = document.getElementById('c2-needs-theo');
+            const classWrap = document.getElementById('c2-needs-classmate');
+            theoWrap.innerHTML = ''; classWrap.innerHTML = '';
+            C2_NEEDS_THEO.forEach(n => theoWrap.appendChild(makeC2NeedBtn(n, 'theo')));
+            C2_NEEDS_CLASSMATE.forEach(n => classWrap.appendChild(makeC2NeedBtn(n, 'classmate')));
+        }
+        function makeC2NeedBtn(n, who) {
+            const picked = who === 'theo' ? c2TheoPick : c2ClassmatePick;
+            const btn = document.createElement('button');
+            const isThisPicked = picked === n.id;
+            const locked = !!picked;
+            btn.className = `choice-btn w-full card-shimmer rounded-lg border-2 border-gray-200 p-2.5 text-xs font-bold text-gray-800 ${isThisPicked && n.correct ? 'correct-pick' : ''} ${isThisPicked && !n.correct ? 'wrong-pick' : ''} ${locked && !isThisPicked ? 'locked-choice' : ''}`;
+            btn.textContent = n.text;
+            btn.disabled = locked;
+            if (!locked) btn.onclick = () => window.pickC2Need(who, n);
+            return btn;
+        }
+
+        window.pickC2Need = (who, n) => {
+            if (n.correct) {
+                if (who === 'theo') c2TheoPick = n.id; else c2ClassmatePick = n.id;
+                renderC2Needs();
+                window.reveal(1, "Underneath the Position", "Now you've got something to work with. Positions collide. Needs usually don't.", "There it is. Notice that's not what they said. It's what they meant.", 'happy');
+                if (c2TheoPick && c2ClassmatePick) {
+                    document.getElementById('c2-door').classList.remove('hidden');
+                    renderC2Options();
+                    window.setStep(1, "Both needs found. Now find the option that gives both of them that.");
+                }
+                if (window.sfx) window.sfx.success();
+            } else {
+                window.reveal(1, "That's the Position Again", "Read it back. That's the same sentence wearing different clothes. A need is something they'd be worried about even if they got their way.", "Mm. Read those two side by side. What are they afraid of?", 'thinking');
+                if (window.sfx) window.sfx.tick();
+            }
+        };
+
+        function renderC2Options() {
+            const wrap = document.getElementById('c2-options');
             wrap.innerHTML = '';
-            C1_OPTIONS.forEach(opt => {
+            C2_OPTIONS.forEach(o => {
                 const btn = document.createElement('button');
-                const picked = c1Picked === opt.id;
-                const locked = !!c1Picked;
-                btn.className = `choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-4 text-sm font-bold text-gray-800 ${picked ? 'picked' : ''} ${locked ? 'locked-choice' : ''}`;
-                btn.textContent = opt.label;
-                btn.disabled = locked;
-                if (!locked) btn.onclick = () => window.pickCase1(opt.id);
+                btn.className = `choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-3 text-sm font-bold text-gray-800 ${c2Locked ? 'locked-choice' : ''}`;
+                btn.textContent = o.text;
+                btn.disabled = c2Locked;
+                if (!c2Locked) btn.onclick = () => window.pickC2Option(o);
                 wrap.appendChild(btn);
             });
         }
 
-        window.pickCase1 = (id) => {
-            if (c1Picked) return;
-            c1Picked = id;
-            const opt = C1_OPTIONS.find(o => o.id === id);
-            renderCase1();
+        window.pickC2Option = (o) => {
+            if (c2Locked) return;
+            if (!o.correct) {
+                window.reveal(1, "Close, Not Quite", o.why, "Close. But go back and check — whose worry does that one leave sitting there?", 'thinking');
+                if (window.sfx) window.sfx.tick();
+                return;
+            }
+            c2Locked = true;
+            renderC2Options();
             window.setStep(1, "Move locked in. Here's what it means.", true);
-            window.reveal(1, "The Split", opt.wb, opt.jodi, opt.mood);
-            document.getElementById('c1-reframe').classList.remove('hidden');
-            scheduleUI(() => {
-                window.sayJodi("See what I mean? The 50/50 thing feels like the only option until you actually stop and look at it. Keep going.", 'happy');
-            }, 2400);
+            window.reveal(1, "Nobody Lost", o.why, "Look at that. Neither one of them got what they walked in asking for, and neither one of them lost. That's not a compromise — a compromise is where everybody gives something up. Nobody gave anything up here. Somebody just finally asked the right question.", 'happy');
+            document.getElementById('c2-reframe').classList.remove('hidden');
             window.markReady(0);
             if (window.sfx) window.sfx.success();
         };
 
-        window.resetCase1 = () => {
-            c1Picked = null;
-            renderCase1();
-            document.getElementById('c1-reframe').classList.add('hidden');
+        window.resetCase2 = () => {
+            c2TheoPick = null; c2ClassmatePick = null; c2Locked = false;
+            renderC2Needs();
+            document.getElementById('c2-door').classList.add('hidden');
+            document.getElementById('c2-reframe').classList.add('hidden');
             document.getElementById('mobile-wb-1').classList.add('hidden');
-            window.setStep(1, "Pick one move. Once you pick, it's locked in.", false);
+            window.setStep(1, "Pick the real need underneath each position — not a restatement of it.", false);
             if (window.lucide) window.lucide.createIcons();
         };
 
-        function initCase1() { renderCase1(); }
+        function initCase2() { renderC2Needs(); }
 
-        /* ===================== CASE 2: THE IMPULSE WINDOW =====================
-           A and B commit. C is an intermediate beat only — plays once, then hides, and A/B
-           re-appear (still choosable). Ending on A or B locks the scenario. */
-        let c2Locked = false;
-        let c2AfterC = false;
-        let c2CShown = false;
+        /* ===================== CASE 3: THE COST OF BEING RIGHT =====================
+           Escalating exchange, 4 rounds. "Right" meter frozen at 100%; "Effective" meter
+           drops with escalation, holds on restate, recovers on exit. Ungated: exit at any
+           round completes; round 4 forces exit as the only option. */
+        let c3Round = 1;
+        let c3Effective = 100;
+        let c3Done = false;
+        const C3_ESCALATE_COST = [0, 25, 25, 25, 25]; // index by round
+        const C3_RESTATE_COST = [0, 0, 10, 10, 10];
 
-        function renderCase2() {
-            const wrap = document.getElementById('c2-choices');
+        function renderCase3() {
+            const wrap = document.getElementById('c3-choices');
             wrap.innerHTML = '';
-            const rows = [
-                { id: 'a', label: 'Buy it — I have the money, I like it, done', show: true },
-                { id: 'b', label: 'Wait — I\'ll come back if I still want it later', show: true },
-                { id: 'c', label: 'Think it through with Jodi first', show: !c2CShown }
-            ];
+            if (c3Done) return;
+            if (c3Round > 4) return;
+            const rows = c3Round < 4
+                ? [
+                    { id: 'escalate', label: 'Escalate — hit back harder' },
+                    { id: 'restate', label: 'Restate the point once, calmly' },
+                    { id: 'exit', label: 'Exit the thread' }
+                  ]
+                : [ { id: 'exit', label: 'Exit the thread — it\'s the only option left' } ];
             rows.forEach(r => {
-                if (!r.show) return;
                 const btn = document.createElement('button');
-                const locked = c2Locked;
-                btn.className = `choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-4 text-sm font-bold text-gray-800 ${locked ? 'locked-choice' : ''}`;
+                btn.className = 'choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-4 text-sm font-bold text-gray-800';
                 btn.textContent = r.label;
-                btn.disabled = locked;
-                if (!locked) btn.onclick = () => window.pickCase2(r.id);
+                btn.onclick = () => window.pickCase3(r.id);
                 wrap.appendChild(btn);
             });
         }
 
-        window.pickCase2 = (id) => {
-            if (c2Locked) return;
-            if (id === 'c') {
-                c2CShown = true;
-                renderCase2();
-                window.setStep(2, "Here's the math. Then pick A or B.");
-                window.reveal(2, "The Impulse Window",
-                    "Most impulse buys feel most urgent in the first 20 minutes. After 48 hours, research consistently shows most people no longer want the item — or want it much less. The $12 isn't the question. The question is whether future-you would make the same call.",
-                    "Okay, let's actually run the numbers. You're $2 away from your goal. This $12 purchase doesn't just cost $12 — it sets you back $14 from where you need to be, minimum. That's two more weeks if you're saving $7 a week. And here's the thing about the phone case: will you still want it in 48 hours?",
-                    'thinking');
+        function setC3Meters() {
+            document.getElementById('c3-effective-fill').style.width = c3Effective + '%';
+            document.getElementById('c3-effective-label').textContent = c3Effective + '%';
+            document.getElementById('c3-right-fill').style.width = '100%';
+            document.getElementById('c3-right-label').textContent = '100%';
+        }
+
+        window.pickCase3 = (action) => {
+            if (c3Done) return;
+            if (action === 'exit') {
+                c3Effective = Math.min(100, c3Effective + 10);
+                setC3Meters();
+                finishCase3(c3Round === 1);
                 return;
             }
-            c2Locked = true;
-            c2AfterC = c2CShown;
-            renderCase2();
-            let wb, jodi, mood;
-            if (id === 'a') {
-                if (c2AfterC) {
-                    wb = "You thought it through and still decided to buy it. That's a different move than an impulse — you made an informed call. The money habit isn't 'never buy things.' It's 'know what you're deciding.'";
-                    jodi = "That's the move. You didn't just grab it — you checked yourself first. That's the whole thing.";
-                    mood = 'happy';
-                } else {
-                    wb = "The phone case cost $12 today. It also cost you 2 weeks of momentum toward your actual goal. That math doesn't mean don't buy things — it means be honest about what you're trading.";
-                    jodi = "I'm not saying you were wrong. I'm saying: next time, give it 48 hours first. See if the feeling's the same.";
-                    mood = 'thinking';
-                }
+            if (action === 'escalate') {
+                c3Effective = Math.max(0, c3Effective - C3_ESCALATE_COST[c3Round]);
+                window.reveal(2, "That Made It About Who's Smarter", "Others are now replying to the argument, not the point. The original point is getting harder to find in the thread.", "See what just happened? The room stopped talking about the idea and started talking about the fight.", 'concerned');
             } else {
-                wb = "You're going to wait. Statistically, there's a decent chance you won't want it as much in two days — or at all. And if you do still want it, you'll know it was a real want, not just a moment.";
-                jodi = "That 48-hour pause is one of the most underrated money habits there is. Not every purchase needs it — but when you're this close to a goal, it usually does.";
-                mood = 'happy';
+                c3Effective = Math.max(0, c3Effective - C3_RESTATE_COST[c3Round]);
+                window.reveal(2, "Restating Once More", c3Round === 1 ? "Restating once is fair." : "Twice or more starts reading as a lecture.", c3Round === 1 ? "Restating once is fair. Let's see what happens." : "That one's starting to read as a lecture, even though he's not wrong.", 'thinking');
             }
-            window.setStep(2, "Move locked in. Here's what it means.", true);
-            window.reveal(2, "The Impulse Window", wb, jodi, mood);
-            document.getElementById('c2-reframe').classList.remove('hidden');
-            scheduleUI(() => {
-                window.sayJodi("The impulse window is real. Knowing it exists is literally half the battle. Next one.", 'happy');
-            }, 2400);
-            window.markReady(1);
-            if (window.sfx) window.sfx.success();
+            setC3Meters();
+            c3Round += 1;
+            if (c3Round > 4 || c3Effective <= 0) {
+                c3Effective = Math.max(c3Effective, 0);
+                setC3Meters();
+                renderCase3();
+                window.setStep(2, "Round 4. Nobody remembers what he was right about. Exit is the only option left.");
+                return;
+            }
+            renderCase3();
+            window.setStep(2, `Round ${c3Round} of 4. Pick a reply for Theo — or exit the thread any time.`);
         };
 
-        window.resetCase2 = () => {
-            c2Locked = false; c2AfterC = false; c2CShown = false;
-            renderCase2();
-            document.getElementById('c2-reframe').classList.add('hidden');
+        function finishCase3(exitedRound1) {
+            c3Done = true;
+            renderCase3();
+            document.getElementById('c3-final-effective').textContent = c3Effective;
+            window.setStep(2, "Move locked in. Here's what it means.", true);
+            document.getElementById('c3-reframe').classList.remove('hidden');
+            if (exitedRound1) {
+                window.reveal(2, "He Didn't Lose Anything — He Also Didn't Say His Piece", "There was one restate available there that cost him nothing.", "Look at those two numbers. He never stopped being right — not once. And leaving right away meant the point never quite got made either. There was a free restate sitting right there.", 'thinking');
+            } else {
+                window.reveal(2, "Right: 100% / Effective: " + c3Effective + "%", "He never stopped being right — not once, not for a second. And past a certain point it didn't help him at all.", "Look at those two numbers. He never stopped being right. And it didn't help him at all past about the second message. That's the whole thing I wanted you to see. Being right is a fact. Being effective is a choice, and they're not the same button.", 'thinking');
+            }
+            window.markReady(1);
+            if (window.sfx) window.sfx.success();
+        }
+
+        window.resetCase3 = () => {
+            c3Round = 1; c3Effective = 100; c3Done = false;
+            setC3Meters();
+            renderCase3();
+            document.getElementById('c3-reframe').classList.add('hidden');
             document.getElementById('mobile-wb-2').classList.add('hidden');
-            window.setStep(2, "Pick a move. You can think it through with Jodi first, or just decide.", false);
+            window.setStep(2, "Round 1 of 4. Pick a reply for Theo — or exit the thread any time.", false);
             if (window.lucide) window.lucide.createIcons();
         };
 
-        function initCase2() { renderCase2(); }
+        function initCase3() { setC3Meters(); renderCase3(); }
 
-        /* ===================== CASE 3: THE GROUP FUND =====================
-           Four toggles (all stay active regardless of combination), commit button label
-           updates live on every toggle change. */
-        let c3Toggles = { everyone: false, deadline: false, whatif: false, someoneElse: false };
-        let c3Locked = false;
-        const C3_LABELS = {
-            everyone: 'Everyone pays me before I buy anything',
-            deadline: 'There\'s a clear deadline for paying in',
-            whatif: 'We agree what happens if someone doesn\'t pay',
-            someoneElse: 'Someone else holds it — not me'
-        };
+        /* ===================== CASE 4: THE APOLOGY THAT ISN'T GREAT =====================
+           Hybrid: audit (4 elements, gated — factually correct) then response (3 options,
+           ungated exploration). */
+        const C4_ELEMENTS = [
+            { id: 'named', label: "Named what they did", present: false },
+            { id: 'sorry', label: "Said sorry", present: true },
+            { id: 'responsibility', label: "Took responsibility (vs “sorry you felt”)", present: false },
+            { id: 'change', label: "Offered to change something", present: false }
+        ];
+        let c4Marks = {};
+        let c4AuditDone = false;
+        let c4Locked = false;
 
-        function renderCase3() {
-            const wrap = document.getElementById('c3-toggles');
+        function renderC4Audit() {
+            const wrap = document.getElementById('c4-audit');
             wrap.innerHTML = '';
-            Object.keys(C3_LABELS).forEach(key => {
-                const on = c3Toggles[key];
-                const chip = document.createElement('button');
-                chip.className = `toggle-chip w-full card-shimmer rounded-xl border-2 border-gray-200 p-3 flex items-center gap-3 text-sm font-bold text-gray-800 ${on ? 'on' : ''} ${c3Locked ? 'locked-choice' : ''}`;
-                chip.disabled = c3Locked;
-                chip.innerHTML = `<span class="chip-box">${on ? SVG_CHECK : ''}</span><span class="text-left flex-1">${C3_LABELS[key]}</span>`;
-                if (!c3Locked) chip.onclick = () => window.toggleCase3(key);
-                wrap.appendChild(chip);
+            C4_ELEMENTS.forEach(el => {
+                const marked = c4Marks[el.id];
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2 card-shimmer rounded-lg border-2 border-gray-200 p-2.5';
+                row.innerHTML = `<span class="text-xs font-bold text-gray-800">${el.label}</span>`;
+                const btnWrap = document.createElement('div');
+                btnWrap.className = 'flex gap-1 shrink-0';
+                ['present', 'missing'].forEach(choice => {
+                    const b = document.createElement('button');
+                    const active = marked === choice;
+                    b.className = `text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full border-2 ${active ? (choice === el.present ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : (marked ? 'border-amber-500 bg-amber-50 text-amber-700' : '')) : 'border-gray-200 text-gray-500'}`;
+                    b.textContent = choice;
+                    b.disabled = c4AuditDone;
+                    if (!c4AuditDone) b.onclick = () => window.markC4(el, choice);
+                    btnWrap.appendChild(b);
+                });
+                row.appendChild(btnWrap);
+                wrap.appendChild(row);
             });
-            updateCase3Label();
         }
 
-        function updateCase3Label() {
-            const label = document.getElementById('c3-commit-label');
-            const t = c3Toggles;
-            if (t.someoneElse) { label.textContent = "I'd rather not"; return; }
-            const anyOfFirstThree = t.everyone || t.deadline || t.whatif;
-            label.textContent = anyOfFirstThree ? "I'll do it with these conditions" : "I'll do it";
-        }
-
-        window.toggleCase3 = (key) => {
-            if (c3Locked) return;
-            c3Toggles[key] = !c3Toggles[key];
-            renderCase3();
-            if (window.sfx) window.sfx.tick();
+        window.markC4 = (el, choice) => {
+            const correct = choice === (el.present ? 'present' : 'missing');
+            c4Marks[el.id] = choice;
+            renderC4Audit();
+            if (!correct) {
+                window.reveal(3, "Read It Once More", "Where exactly does it say that?", "Read it once more. Where exactly does it say that?", 'thinking');
+                if (window.sfx) window.sfx.tick();
+                return;
+            }
+            const allMarked = C4_ELEMENTS.every(e => c4Marks[e.id]);
+            if (allMarked) {
+                const allCorrect = C4_ELEMENTS.every(e => c4Marks[e.id] === (e.present ? 'present' : 'missing'));
+                if (allCorrect) {
+                    c4AuditDone = true;
+                    renderC4Audit();
+                    window.reveal(3, "Three Missing, One Present", "It has the word and almost nothing else. That's real information, and it's not the same as it being worthless.", "So now he knows exactly what he's got. One out of four. What should he do with that?", 'neutral');
+                    document.getElementById('c4-response-block').classList.remove('hidden');
+                    renderC4Response();
+                    window.setStep(3, "All four marked. Now decide what Theo does with that.");
+                }
+            }
         };
 
-        window.commitCase3 = () => {
-            if (c3Locked) return;
-            c3Locked = true;
-            renderCase3();
-            document.getElementById('c3-commit').disabled = true;
-            document.getElementById('c3-commit').classList.add('opacity-50', 'cursor-not-allowed');
-            let wb, jodi, mood;
-            const t = c3Toggles;
-            if (t.someoneElse) {
-                wb = "Recognizing that you don't want the liability of managing other people's money isn't a personality flaw — it's honest self-knowledge. Someone who wants to hold it should hold it. Saying no protects both you and the group.";
-                jodi = "Knowing your limits with money stuff is just as valuable as knowing how to handle it when you say yes.";
-                mood = 'thinking';
-            } else if (t.everyone || t.deadline || t.whatif) {
-                wb = "You said yes — and you said what came with it. That's not being difficult. That's making the role workable. Most group fund disasters start with someone who said yes without any of this.";
-                jodi = "That right there. Naming the conditions isn't awkward — it's what makes the yes actually mean something.";
-                mood = 'happy';
-            } else {
-                wb = "You're now the group's unofficial treasurer and accountant. If someone's slow to pay — or doesn't — you're the one who either fronts it, chases them, or eats the shortfall. None of that was in the job description, because there wasn't one.";
-                jodi = "The trust was real. The setup wasn't. That gap is where it gets messy.";
-                mood = 'thinking';
-            }
+        const C4_RESPONSES = [
+            { id: 'accept', label: "Accept it", title: "Accepting Isn't Agreeing", desc: "You can accept a thin repair and still know it was thin. Accepting is a decision about the relationship, not a grade on the apology.", jodi: "That's allowed. Just — he noticed. That matters more than you'd think.", mood: 'thinking' },
+            { id: 'name', label: "Name one missing piece", title: "The Ask That Usually Works", desc: "Naming one specific missing thing is a request someone can actually act on. “That wasn't a real apology” isn't.", jodi: "That's the strongest move on the board, and it's not the toughest one. One specific thing they can actually do.", mood: 'happy' },
+            { id: 'holdout', label: "Hold out for a full apology", title: "Holding Out Has a Price", desc: "Sometimes worth it. But a full apology can't be extracted — it has to be offered. Holding out often means waiting for something that was never coming.", jodi: "Sometimes that's right. Just know what he's waiting on, and whether it was ever on its way.", mood: 'thinking' }
+        ];
+
+        function renderC4Response() {
+            const wrap = document.getElementById('c4-response');
+            wrap.innerHTML = '';
+            C4_RESPONSES.forEach(r => {
+                const btn = document.createElement('button');
+                btn.className = `choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-3 text-sm font-bold text-gray-800 ${c4Locked ? 'locked-choice' : ''}`;
+                btn.textContent = r.label;
+                btn.disabled = c4Locked;
+                if (!c4Locked) btn.onclick = () => window.pickC4Response(r);
+                wrap.appendChild(btn);
+            });
+        }
+
+        window.pickC4Response = (r) => {
+            if (c4Locked) return;
+            c4Locked = true;
+            renderC4Response();
             window.setStep(3, "Move locked in. Here's what it means.", true);
-            window.reveal(3, "The Group Fund", wb, jodi, mood);
-            document.getElementById('c3-reframe').classList.remove('hidden');
-            scheduleUI(() => {
-                window.sayJodi("Group money is where friendships get complicated fast. Setting it up right at the start is the whole game.", 'happy');
-            }, 2400);
+            window.reveal(3, r.title, r.desc, r.jodi, r.mood);
             window.markReady(2);
             if (window.sfx) window.sfx.success();
         };
 
-        window.resetCase3 = () => {
-            c3Toggles = { everyone: false, deadline: false, whatif: false, someoneElse: false };
-            c3Locked = false;
-            renderCase3();
-            const btn = document.getElementById('c3-commit');
-            btn.disabled = false;
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
-            document.getElementById('c3-reframe').classList.add('hidden');
-            document.getElementById('mobile-wb-3').classList.add('hidden');
-            window.setStep(3, "Toggle any conditions you want on this before you commit. Watch the button change as you do.", false);
-            if (window.lucide) window.lucide.createIcons();
-        };
-
-        function initCase3() { renderCase3(); }
-
-        /* ===================== CASE 4: THE UPGRADE TRAP =====================
-           Investigate-then-commit. A budget of 2 total "look closer" checks across both
-           options. Commit buttons are ALWAYS enabled — never gated on checking anything. */
-        let c4Checked = { a: false, b: false };
-        let c4Budget = 2;
-        let c4Locked = false;
-
-        window.lookCloser = (which) => {
-            if (c4Locked) return;
-            if (c4Checked[which]) {
-                document.getElementById(`detail-${which}`).classList.toggle('hidden');
-                return;
-            }
-            if (c4Budget <= 0) { if (window.sfx) window.sfx.tick(); return; }
-            c4Checked[which] = true;
-            c4Budget -= 1;
-            document.getElementById(`detail-${which}`).classList.remove('hidden');
-            document.getElementById(`invest-${which}`).classList.add('revealed');
-            document.getElementById('c4-budget').textContent = c4Budget > 0
-                ? `${c4Budget} closer look${c4Budget === 1 ? '' : 's'} available`
-                : 'No closer looks left';
-            if (window.sfx) window.sfx.click();
-        };
-
-        window.commitCase4 = (which) => {
-            if (c4Locked) return;
-            c4Locked = true;
-            ['a', 'b'].forEach(k => {
-                document.getElementById(`invest-${k}`).classList.add('locked-choice');
-                document.getElementById(`look-${k}`).disabled = true;
-            });
-            document.querySelectorAll('#invest-a button, #invest-b button').forEach(b => b.disabled = true);
-            let wb, jodi, mood;
-            if (which === 'a') {
-                wb = "The $18 backpack does the job. It carries your stuff. It has strong reviews. The $45 one costs 2.5x as much, weighs more, and has a shorter strong-review window. For a school backpack, the $18 one hits the functional threshold — the point where extra cost doesn't produce extra value for your actual use.";
-                jodi = "That's the move. The question was never 'can I afford the good one.' It was 'what does the good one actually do that I'll use.'";
-                mood = 'happy';
-            } else {
-                wb = "$45 for a school backpack is a real decision. The waterproofing is light-rain-rated, not heavy rain. The reviews are more mixed after 18 months. You paid for a brand name and some extra pockets. That's not wrong — but it's worth knowing that's what you bought, not objectively better performance.";
-                jodi = "Sometimes the pricier thing is genuinely better. Sometimes you're paying for a label. Knowing the difference is the whole skill.";
-                mood = 'thinking';
-            }
-            window.setStep(4, "Move locked in. Here's what it means.", true);
-            window.reveal(4, "The Upgrade Trap", wb, jodi, mood);
-            document.getElementById('c4-reframe').classList.remove('hidden');
-            scheduleUI(() => {
-                window.sayJodi("Price and value are not the same thing. Once you know that, you start seeing it everywhere.", 'happy');
-            }, 2400);
-            window.markReady(3);
-            if (window.sfx) window.sfx.success();
-        };
-
         window.resetCase4 = () => {
-            c4Checked = { a: false, b: false };
-            c4Budget = 2;
-            c4Locked = false;
-            ['a', 'b'].forEach(k => {
-                document.getElementById(`detail-${k}`).classList.add('hidden');
-                document.getElementById(`invest-${k}`).classList.remove('revealed', 'locked-choice');
-                document.getElementById(`look-${k}`).disabled = false;
-            });
-            document.querySelectorAll('#invest-a button, #invest-b button').forEach(b => b.disabled = false);
-            document.getElementById('c4-budget').textContent = '2 closer looks available';
-            document.getElementById('c4-reframe').classList.add('hidden');
-            document.getElementById('mobile-wb-4').classList.add('hidden');
-            window.setStep(4, "Look closer at either option if you want — or just buy. Both buttons work any time.", false);
+            c4Marks = {}; c4AuditDone = false; c4Locked = false;
+            renderC4Audit();
+            document.getElementById('c4-response-block').classList.add('hidden');
+            document.getElementById('mobile-wb-3').classList.add('hidden');
+            window.setStep(3, "Mark each element present or missing in the apology.", false);
             if (window.lucide) window.lucide.createIcons();
         };
 
-        function initCase4() { window.resetCase4(); }
+        function initCase4() { renderC4Audit(); }
 
-        /* ===================== CASE 5: THE ASK =====================
-           A and B commit. C is a preview-only beat — plays once, then hides, and A/B
-           re-appear (still choosable). Ending on A or B locks the scenario. */
-        let c5Locked = false;
-        let c5AfterC = false;
-        let c5CShown = false;
+        /* ===================== CASE 5: BOTH OF THEM WANT YOU =====================
+           Two-inbox pressure with a greyed placeholder third option, visible from the
+           start, that unlocks once both threads are opened. Ungated: any of four responses
+           completes the Case. */
+        let c5OpenedA = false, c5OpenedB = false, c5Locked = false;
+
+        window.openThread = (which) => {
+            if (which === 'a') { c5OpenedA = true; document.getElementById('c5-thread-a-body').classList.remove('hidden'); document.getElementById('c5-thread-a').classList.add('opened'); }
+            else { c5OpenedB = true; document.getElementById('c5-thread-b-body').classList.remove('hidden'); document.getElementById('c5-thread-b').classList.add('opened'); }
+            if (window.sfx) window.sfx.click();
+            renderCase5();
+            if (c5OpenedA && c5OpenedB) {
+                window.reveal(4, "Now He's Heard Both", "They're not even arguing about the same thing.", "Now he's heard both. Notice anything? They're not even arguing about the same thing.", 'thinking');
+            } else {
+                window.sayJodi("Alright. That's her side. Don't let him answer yet.", 'neutral');
+            }
+        };
 
         function renderCase5() {
             const wrap = document.getElementById('c5-choices');
             wrap.innerHTML = '';
+            const bothOpened = c5OpenedA && c5OpenedB;
             const rows = [
-                { id: 'a', label: 'Pay the $20 — it\'s fine, I don\'t want to make it weird', show: true },
-                { id: 'b', label: 'Ask if they\'d take less because of the damage', show: true },
-                { id: 'c', label: 'What\'s the worst that could happen if I ask?', show: !c5CShown }
+                { id: 'agree', label: "Agree with one of them" },
+                { id: 'defend', label: "Defend the one who isn't in the room" },
+                { id: 'deflect', label: "Deflect both" },
+                { id: 'decline', label: "…something else?", ghost: !bothOpened }
             ];
             rows.forEach(r => {
-                if (!r.show) return;
                 const btn = document.createElement('button');
-                const locked = c5Locked;
-                btn.className = `choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-4 text-sm font-bold text-gray-800 ${locked ? 'locked-choice' : ''}`;
+                const base = 'choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-4 text-sm font-bold text-gray-800';
+                btn.className = r.ghost ? `${base} ghost-option` : `${base} ${bothOpened && r.id === 'decline' ? 'ghost-option unlocked' : ''} ${c5Locked ? 'locked-choice' : ''}`;
                 btn.textContent = r.label;
-                btn.disabled = locked;
-                if (!locked) btn.onclick = () => window.pickCase5(r.id);
+                btn.disabled = r.ghost || c5Locked;
+                if (!r.ghost && !c5Locked) btn.onclick = () => window.pickCase5(r.id);
                 wrap.appendChild(btn);
             });
         }
 
+        const C5_OUTCOMES = {
+            agree: { title: "He Picked", desc: "That friendship holds, the other visibly cools. Both consequences are real.", jodi: "He picked. And he was kind about it. Look what it cost on the other side.", mood: 'concerned' },
+            defend: { title: "Defended Somebody Who Wasn't There", desc: "Both cool. The friend he was talking to feels unheard.", jodi: "He defended somebody who isn't in the room, to somebody who is. Both of them feel unheard now.", mood: 'concerned' },
+            deflect: { title: "Nobody's Angry, Nobody's Closer", desc: "Sometimes that's the right trade. Sometimes it's just avoiding.", jodi: "Nobody's angry. Nobody's closer either. Sometimes that's the right trade. Sometimes it's just avoiding.", mood: 'thinking' },
+            decline: { title: "He Didn't Fix It — He Stayed", desc: "Both threads stay warm. Neither dispute resolves — and that's shown, not hidden.", jodi: "That's it. And notice what he did not do: he didn't fix it. They're still not talking to each other. He just refused to be the judge, and he stayed somebody they can both still talk to.", mood: 'happy' }
+        };
+
         window.pickCase5 = (id) => {
             if (c5Locked) return;
-            if (id === 'c') {
-                c5CShown = true;
-                renderCase5();
-                window.setStep(5, "Here's the ask math. Then pick A or B.");
-                window.reveal(5, "The Ask Math",
-                    "Best case — they say yes (or meet you in the middle). Realistic case — they say no, nothing changes. Worst case — slightly awkward 15 seconds, then it's over. The embarrassment risk is smaller than it feels. The upside is real.",
-                    "Okay — worst case. You ask. They say no. You pay $20 or you leave. That's it. That's the whole worst case. You're not in trouble. They're not offended. The conversation lasts 15 seconds and you're exactly where you already were.",
-                    'thinking');
-                return;
-            }
             c5Locked = true;
-            c5AfterC = c5CShown;
             renderCase5();
-            let wb, jodi, mood;
-            if (id === 'a') {
-                if (c5AfterC) {
-                    wb = "You saw the math and still went with full price. That's a choice — but at least it was an informed one, not just the default.";
-                    jodi = "Fair enough. You knew the option was there.";
-                    mood = 'neutral';
-                } else {
-                    wb = "You paid full price for a damaged item. That's not wrong — but the ask was available the whole time. The answer would have been no until you asked. And 'no' is exactly where you already were.";
-                    jodi = "The feeling of not wanting to make it weird is real. I just want you to notice: the actual worst case of asking is... they say no. Which is where you already were.";
-                    mood = 'thinking';
-                }
-            } else {
-                wb = "You asked. Maybe they said yes. Maybe no. Either way — you used information (the damage) as a reason for a real question. That's not rude. That's just honest.";
-                jodi = "That's it. That's the whole thing. The answer is always no until you ask. And 'no' is exactly where you already were.";
-                mood = 'happy';
-            }
-            window.setStep(5, "Move locked in. Here's what it means.", true);
-            window.reveal(5, "The Ask", wb, jodi, mood);
-            document.getElementById('c5-reframe').classList.remove('hidden');
-            scheduleUI(() => {
-                window.sayJodi("Most adults never ask. You just did — even if only in your head. That's the start of a real habit.", 'happy');
-            }, 2400);
-            window.markReady(4);
+            const o = C5_OUTCOMES[id];
+            window.setStep(4, "Move locked in. Here's what it means.", true);
+            window.reveal(4, o.title, o.desc, o.jodi, o.mood);
+            window.markReady(3);
             if (window.sfx) window.sfx.success();
         };
 
         window.resetCase5 = () => {
-            c5Locked = false; c5AfterC = false; c5CShown = false;
+            c5OpenedA = false; c5OpenedB = false; c5Locked = false;
+            document.getElementById('c5-thread-a-body').classList.add('hidden');
+            document.getElementById('c5-thread-b-body').classList.add('hidden');
+            document.getElementById('c5-thread-a').classList.remove('opened');
+            document.getElementById('c5-thread-b').classList.remove('opened');
             renderCase5();
-            document.getElementById('c5-reframe').classList.add('hidden');
-            document.getElementById('mobile-wb-5').classList.add('hidden');
-            window.setStep(5, "Pick a move. You can run the worst case with Jodi first, or just decide.", false);
+            document.getElementById('mobile-wb-4').classList.add('hidden');
+            window.setStep(4, "Open both threads. Then pick how Theo replies.", false);
             if (window.lucide) window.lucide.createIcons();
         };
 
         function initCase5() { renderCase5(); }
+
+        /* ===================== CASE 6: WHEN YOU'RE THE ONE WHO'S WRONG =====================
+           Rising-cost concession window. Concede always available; deflect/double-down are
+           removed at turn 4, leaving concede as the only option. Gated on conceding, not on
+           timing. */
+        let c6Turn = 1;
+        let c6Done = false;
+        const C6_COST_LABELS = ["easy", "a bit awkward", "he'll have to walk it back", "he'll have to explain why he kept going"];
+
+        function renderCase6() {
+            document.getElementById('c6-cost-label').textContent = C6_COST_LABELS[c6Turn - 1];
+            const wrap = document.getElementById('c6-choices');
+            wrap.innerHTML = '';
+            if (c6Done) return;
+            const rows = c6Turn < 4
+                ? [
+                    { id: 'concede', label: "Concede now" },
+                    { id: 'deflect', label: "Deflect" },
+                    { id: 'doubledown', label: "Double down" }
+                  ]
+                : [ { id: 'concede', label: "Concede — it's the only option left" } ];
+            rows.forEach(r => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn w-full card-shimmer rounded-xl border-2 border-gray-200 p-4 text-sm font-bold text-gray-800';
+                btn.textContent = r.label;
+                btn.onclick = () => window.pickCase6(r.id);
+                wrap.appendChild(btn);
+            });
+        }
+
+        window.pickCase6 = (action) => {
+            if (c6Done) return;
+            if (action === 'concede') {
+                c6Done = true;
+                renderCase6();
+                window.setStep(5, "Move locked in. Here's what it means.", true);
+                if (c6Turn === 1) {
+                    window.reveal(5, "That's the Whole Skill", "“That's my bad, you're right.” Costs nothing. Case completes.", "That's the whole skill and it took him four words. Most grown adults can't do that. He didn't lose the argument — he ended it, and he's the reason it ended.", 'happy');
+                } else {
+                    window.reveal(5, "The Gap", `Conceding at turn ${c6Turn} cost “${C6_COST_LABELS[c6Turn - 1]}.” At turn 1 it would have cost nothing at all.`, "He got there. That's what matters. Just look at that gap — same three words, and back at the start they'd have cost him nothing at all. That's not a lecture. That's just the price going up while he decides.", 'thinking');
+                }
+                window.markReady(4);
+                if (window.sfx) window.sfx.success();
+                return;
+            }
+            if (action === 'deflect') {
+                window.reveal(5, "Deflecting", "It fades out, but the price of conceding later just went up.", "That'll fade out for now. Just know — it hasn't gone away, and it costs more next time.", 'thinking');
+            } else {
+                window.reveal(5, "Doubling Down", "Every extra message makes conceding more expensive.", "Every extra message makes conceding more expensive. He'll still have to do it eventually.", 'concerned');
+            }
+            c6Turn += 1;
+            renderCase6();
+            if (c6Turn <= 4) window.setStep(5, `Turn ${c6Turn} of 4. Pick a move for Theo.`);
+        };
+
+        window.resetCase6 = () => {
+            c6Turn = 1; c6Done = false;
+            renderCase6();
+            document.getElementById('mobile-wb-5').classList.add('hidden');
+            window.setStep(5, "Turn 1 of 4. Pick a move for Theo.", false);
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        function initCase6() { renderCase6(); }
 
         /* ===================== HANDOFF: RATING + BADGE ===================== */
         let selectedStars = 0;
@@ -1352,7 +1305,7 @@
             if (!selectedStars) { if (window.sfx) window.sfx.tick(); return; }
             const feedbackText = document.getElementById('feedback-text')?.value || '';
             if (window.AuthCore && window.AuthCore.submitCourseFeedback) {
-                window.AuthCore.submitCourseFeedback({ gameName: 'Money as a Skill', rating: selectedStars, feedback: feedbackText });
+                window.AuthCore.submitCourseFeedback({ gameName: 'Conflict Has a Winner', rating: selectedStars, feedback: feedbackText });
             }
             if (window.logModuleCompletion) window.logModuleCompletion();
             if (window.sfx) window.sfx.success();
@@ -1363,7 +1316,6 @@
             }, 400);
         };
 
-        // Post-completion redirect: the main JSH hub (the Lab Pack hub doesn't exist yet).
         window.returnToHub = () => { window.location.href = '/jsh/real-world-ready/'; };
         window.handleSystemExit = () => { window.location.href = "https://www.allgoodacademy.com"; };
         window.closeSystemMenu = () => {
@@ -1373,9 +1325,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             if (window.lucide) window.lucide.createIcons();
-            [100, 400, 1000, 2000].forEach(delay => {
-                setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay);
-            });
+            [100, 400, 1000, 2000].forEach(delay => { setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay); });
             window.addEventListener('load', () => { if (window.lucide) window.lucide.createIcons(); });
 
             const startup = document.getElementById('startup-screen');
@@ -1390,13 +1340,9 @@
                     if (window.AuthGate && window.AuthGate.ensureIdentified) await window.AuthGate.ensureIdentified();
                 };
                 startup.addEventListener('click', handleStartup);
-
                 if (window.AuthCore && window.AuthCore.skipPowerUp) {
                     let unsub;
-                    unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
-                        unsub();
-                        handleStartup();
-                    });
+                    unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => { unsub(); handleStartup(); });
                 }
             }
 
@@ -1408,22 +1354,13 @@
 
             const feedbackBox = document.getElementById('feedback-text');
             if (feedbackBox) {
-                feedbackBox.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.finalizeRating(); }
-                });
+                feedbackBox.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.finalizeRating(); } });
             }
 
             const avatarEl = document.querySelector('.jodi-avatar');
-            if (avatarEl) {
-                avatarEl.setAttribute('title', "Tap Jodi to re-read what she said");
-                avatarEl.addEventListener('click', () => window.recallJodi());
-            }
+            if (avatarEl) { avatarEl.setAttribute('title', "Tap Jodi to re-read what she said"); avatarEl.addEventListener('click', () => window.recallJodi()); }
 
-            initCase1();
-            initCase2();
-            initCase3();
-            initCase4();
-            initCase5();
+            initCase2(); initCase3(); initCase4(); initCase5(); initCase6();
 
             window.renderLocks();
             window.playPageIntro(0);
@@ -1432,15 +1369,8 @@
         window.restartModule = () => {
             highestUnlocked = 0;
             pageCompletion = { 0: false, 1: false, 2: false, 3: false, 4: false, 5: true };
-
-            window.resetCase1();
-            window.resetCase2();
-            window.resetCase3();
-            window.resetCase4();
-            window.resetCase5();
-
-            currentIntro = null; lastMechanism = null; lastSaid = null;
-            stashedReaction = null; jodiShowingIntro = true;
+            window.resetCase2(); window.resetCase3(); window.resetCase4(); window.resetCase5(); window.resetCase6();
+            currentIntro = null; lastMechanism = null; lastSaid = null; stashedReaction = null; jodiShowingIntro = true;
             window.updateRecallButton();
             document.querySelectorAll('.mobile-wb').forEach(b => b.classList.add('hidden'));
             document.getElementById('jodi-whiteboard').classList.remove('wb-populated');
@@ -1449,14 +1379,12 @@
                 const prompt = document.getElementById(`continue-${i}`);
                 if (prompt) prompt.classList.remove('ready');
             }
-
             selectedStars = 0;
             document.querySelectorAll('.star-btn').forEach(btn => { btn.classList.remove('text-amber-400'); btn.classList.add('text-gray-300'); });
             document.getElementById('submit-btn').classList.add('hidden');
             document.getElementById('feedback-text').value = '';
             document.getElementById('rating-block').classList.remove('hidden');
             document.getElementById('reveal-block').classList.add('hidden');
-
             window.closeSystemMenu();
             window.renderLocks();
             window.playPageIntro(0);

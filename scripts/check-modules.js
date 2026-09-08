@@ -24,10 +24,17 @@ for (const m of (registrySrc || '').matchAll(/\{\s*id:\s*'([^']+)',\s*name:\s*(?
 const planned = [...((dash.match(/const LAB_PACK_PLANNED = \[([^\]]*)\]/) || ['', ''])[1]).matchAll(/'([^']*)'/g)].map(x => x[1]);
 if (!planned.length) fail('dashboard: LAB_PACK_PLANNED not found or empty');
 const dashLabs = registry.filter(r => r.category === 'lab');
+// LAB_PACK_PLANNED and the digital-decisions-lab hub only track the Digital Decisions Lab
+// Pack. Real World Ready is a separate Lab Pack with its own hub (public/jsh/real-world-ready/)
+// and its own planned-vs-live accounting, so only labs actually living under
+// /jsh/digital-decisions-lab/ are checked against those two DDL-specific lists below.
+const ddlLabs = dashLabs.filter(l => l.url.startsWith('/jsh/digital-decisions-lab/'));
 for (const lab of dashLabs) {
-  if (!planned.includes(lab.name)) fail(`dashboard: live lab "${lab.name}" is not in LAB_PACK_PLANNED`);
-  if (!/^\/jsh\/digital-decisions-lab\/[a-z0-9-]+\/$/.test(lab.url)) fail(`dashboard: lab "${lab.name}" url "${lab.url}" is not a trailing-slash directory path`);
+  if (!/^\/[a-z0-9-]+(?:\/[a-z0-9-]+)*\/$/.test(lab.url)) fail(`dashboard: lab "${lab.name}" url "${lab.url}" is not a trailing-slash directory path`);
   if (!fs.existsSync(path.join(root, 'public', lab.url, 'index.html'))) fail(`dashboard: lab "${lab.name}" url "${lab.url}" has no index.html`);
+}
+for (const lab of ddlLabs) {
+  if (!planned.includes(lab.name)) fail(`dashboard: live lab "${lab.name}" is not in LAB_PACK_PLANNED`);
 }
 if (/labpack-status-pill[^>]*>\s*Social Intelligence Live/.test(dash)) fail('dashboard: status pill still hardcodes "Social Intelligence Live"');
 
@@ -54,7 +61,8 @@ for (const c of insiderLabs) if (!dashLabs.find(l => l.id === c.id)) fail(`dashb
 // failing on a page that was deliberately deleted.
 const RETIRED_NO_LIVE_PAGE = ['jolenes-lemonade'];
 const modulePages = { ...Object.fromEntries(dashLabs.map(l => [l.id, path.join('public', l.url, 'index.html')])),
-  'digital-decisions': 'public/educational-games/digital-decisions/index.html' };
+  'digital-decisions': 'public/educational-games/digital-decisions/index.html',
+  'rwr-challenge': 'public/educational-games/real-world-ready/index.html' };
 for (const c of courses) {
   if (RETIRED_NO_LIVE_PAGE.includes(c.id)) continue;
   const page = modulePages[c.id];
@@ -67,15 +75,16 @@ for (const c of courses) {
   if (Number(m[3]) !== c.stepsTotal) fail(`${page}: Telemetry stepsTotal ${m[3]} != Insider stepsTotal ${c.stepsTotal}`);
 }
 
-// --- hub
+// --- hub (Digital Decisions Lab Pack only — Real World Ready has its own hub, checked
+// only for the generic cross-list assertions above, not this DDL-specific one)
 const hub = read('public/jsh/digital-decisions-lab/index.html').replace(/&amp;/g, '&');
 const hubLive = [...hub.matchAll(/launchLab\('([^']+)',\s*'(\/jsh\/digital-decisions-lab\/[^']+)'\)/g)].map(m => ({ name: m[1].replace(/&amp;/g, '&'), url: m[2] }));
-for (const lab of dashLabs) {
+for (const lab of ddlLabs) {
   const card = hubLive.find(h => h.url === lab.url);
   if (!card) fail(`hub: no live card launching "${lab.url}" (dashboard lists "${lab.name}" as live)`);
   else if (card.name !== lab.name) fail(`hub: card name "${card.name}" != dashboard "${lab.name}"`);
 }
-for (const h of hubLive) if (!dashLabs.find(l => l.url === h.url)) fail(`dashboard: hub launches "${h.url}" but MODULE_REGISTRY has no lab with that url`);
+for (const h of hubLive) if (!ddlLabs.find(l => l.url === h.url)) fail(`dashboard: hub launches "${h.url}" but MODULE_REGISTRY has no lab with that url`);
 for (const name of planned) {
   if (!hub.includes(name)) fail(`hub: planned lab "${name}" appears nowhere on the hub (needs a live card or a Coming Soon placeholder)`);
   const isLive = dashLabs.some(l => l.name === name);

@@ -43,6 +43,9 @@ the moments that matter. Steps per module:
 | Digital Citizenship | cases reached | 7 |
 | Professional Brand | cases reached | 7 |
 | Money as a Skill | cases reached | 6 |
+| Conflict Has a Winner | cases reached | 6 |
+| Reading the Room | cases reached | 6 |
+| Real World Ready Challenge | scenarios answered | 24 |
 
 A 20-minute visit costs roughly 25 to 30 Firestore writes (one session rewrite per 45s plus
 the events), which is well inside the free tier at current traffic.

@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Allgood Academy | Real World Ready Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Shared identity/login module — see /js/auth-core.js. Must load before the inline
+         module script below (module scripts execute in document order, same as defer). -->
+    <script type="module" src="/js/auth-core.js"></script>
+
+    <!-- Shared identify gate (age question / Sign In / Recruit Code) — see
+         /js/identity-gate.js. Runs the same gate whether this module is reached from the
+         dashboard or opened directly by a bookmarked/shared link. -->
+    <script type="module" src="/js/identity-gate.js"></script>
+    <!-- Shared learning-analytics telemetry (sessions + events for Insider) — see /js/telemetry.js. -->
+    <script type="module" src="/js/telemetry.js"></script>
+    <script src="/js/message-hq.js" data-message-source="Real World Ready Challenge"></script>
+
+    <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js. -->
+    <script type="module">
+        import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { doc, setDoc, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const appId = window.AuthCore.appId;
+        const auth = window.AuthCore.auth;
+        const db = window.AuthCore.db;
+
+        window.authSignOut = () => signOut(auth);
+
+        // Telemetry: one "step" here = one scenario answered (30 total), which is the
+        // meaningful unit of progress for a scenario feed — not the 4 page containers.
+        if (window.Telemetry) window.Telemetry.init({ module: 'rwr-challenge', gameName: 'Real World Ready Challenge', stepsTotal: 24 });
+
+        window.currentUser = null;
+        window.currentUserName = "Anonymous";
+        window.currentUserEmail = "";
+        window.isAuthReady = false;
+
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        onAuthStateChanged(auth, async (user) => {
+            window.isAuthReady = true;
+            if (user) {
+                window.currentUser = user;
+                let finalName = user.displayName || localStorage.getItem('aa_username') || "Agent Learner";
+
+                if (finalName === "Agent Learner") {
+                    try {
+                        const userDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                        if (userDoc.exists()) finalName = userDoc.data().displayName || finalName;
+                    } catch(e) { console.log("Profile fetch skipped", e); }
+                }
+
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                if(window.updateUserDisplay) window.updateUserDisplay(finalName);
+
+                // Keep localStorage in step with whatever just signed in here — the same
+                // keys the dashboard reads, so returning there afterward doesn't re-prompt.
+                localStorage.setItem('aa_username', finalName);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', user.isAnonymous);
+
+                // Restore real progress for a returning visit (new tab, next day) instead
+                // of starting cold — the existing per-session game_scores docs never
+                // accumulate across visits, so this reads the one canonical progress doc.
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('rwr-challenge');
+                    if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
+                }
+            } else {
+                window.currentUser = null;
+                if(window.updateUserDisplay) window.updateUserDisplay("Agent Learner");
+            }
+        });
+
+        window.logScenarioAttempt = async (data) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            if (window.Telemetry) window.Telemetry.choice({ scenarioIndex: data.scenarioIndex, choiceIndex: data.choiceIndex, score: data.score, effectiveness: data.effectiveness || null, question: data.question || null });
+            const attemptRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId, 'scenario_attempts', `scenario_${data.scenarioIndex}`);
+            try { await setDoc(attemptRef, { ...data, timestamp: serverTimestamp() }); } catch (e) { console.error("Attempt log failed", e); }
+        };
+
+        window.logFinalScoreToFirestore = async (scoreData) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+            try {
+                await setDoc(sessionRef, { gameName: "Real World Ready Challenge", ...scoreData, lastUpdated: serverTimestamp(), user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail } }, { merge: true });
+            } catch (e) { console.error("[DB] Session Write Failed", e); }
+        }
+
+        // MESSAGE HQ send logic is standardized in /js/message-hq.js, loaded in <head>.
+    </script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Inter', 'Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body { 
+            font-family: 'Inter', Verdana, sans-serif; 
+            background: linear-gradient(135deg, #eef2f3 0%, #dde4e6 100%);
+            min-height: 100vh; min-height: 100dvh; margin: 0; padding: 0;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        h1, h2, h3, h4 { font-family: Georgia, serif; }
+
+        /* App shell replaces the old tablet-frame + screen-container pairing.
+           Full-bleed, edge to edge, at every screen size. */
+        .app-shell {
+            width: 100%;
+            height: 100dvh;
+            background-color: #F7F7F7;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .page::-webkit-scrollbar, .hud-scroll::-webkit-scrollbar { width: 10px; }
+        .page::-webkit-scrollbar-track, .hud-scroll::-webkit-scrollbar-track { background: transparent; }
+        .page::-webkit-scrollbar-thumb, .hud-scroll::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 7px; }
+
+        /* Progress bar sits on the header's bottom edge (not in the footer) so phones, where
+           the footer is hidden or crowded, still show it. */
+        #flex-progress-bar { height: 4px; width: 100%; background-color: rgba(255,255,255,0.22); position: absolute; bottom: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        .choice-btn { background-color: #FFFFFF; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s ease; }
+        .choice-btn:hover:not(:disabled) { border-color: #357889; background-color: #F9FAFB; }
+        .choice-correct { background-color: #D1FAE5 !important; border-color: #10B981 !important; font-weight: bold; }
+        .choice-less-effective { background-color: #FFFBEB !important; border-color: #FBBF24 !important; font-weight: 600; }
+        .choice-least-effective { background-color: #FEE2E2 !important; border-color: #F87171 !important; font-weight: 500; opacity: 0.7; }
+        
+        /* Chrome sizing: 48px header (pill + counter + icon buttons) and a 52px footer (it
+           carries the Back / Next buttons, so it cannot go as tight as the labs' 36px). */
+        .navbar-content { flex: 0 0 48px; z-index: 50; position: relative; }
+        .footer-content { flex: 0 0 52px; z-index: 50; background-color: white; border-top: 1px solid #e5e7eb; position: relative; padding-bottom: env(safe-area-inset-bottom); }
+        
+        .page { flex: 1 1 auto; overflow-y: auto; padding: 20px; position: relative; display: none; width: 100%; }
+        .page.active { display: block; }
+
+        /* Flex children default to min-height:auto, which stops them from shrinking below their
+           content size — this is what let tall scenario content push past the fixed app-shell
+           height and create a second outer scrollbar. min-h-0 lets each level shrink and hand
+           scrolling to the one true scroll region (.page-container). */
+        .app-shell, #workstation-wrapper, #workstation-wrapper > main { min-height: 0; }
+        #workstation-wrapper { min-width: 0; }
+
+        @media (max-width: 768px) {
+            html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; background-color: #F7F7F7; }
+            body > main { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; padding: 0 !important; display: block; }
+            .app-shell { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important; max-width: none !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; border: none !important; }
+            header.navbar-content { flex: 0 0 auto; padding-top: max(env(safe-area-inset-top), 4px); height: auto; min-height: 48px; padding-bottom: 4px; z-index: 50; }
+            footer.footer-content { display: none !important; }
+            /* #mobile-progress-pill floats absolute over `main`, not inside this scroll region,
+               so it stays fixed at the same spot regardless of scroll position — any card that
+               scrolls to the bottom of the viewport sits behind it. Reserving that height as a
+               margin here (rather than trailing padding on .page, which only clears the very
+               end of the list) keeps every scroll position clear of the pill. */
+            .page-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: calc(76px + env(safe-area-inset-bottom)); }
+            .page { flex: 1 1 auto; overflow-y: visible; padding-bottom: 30px !important; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <main class="flex-grow flex items-center justify-center h-[100dvh] w-full">
+        <div class="app-shell" id="screen">
+
+                <!-- 1. STARTUP SCREEN -->
+                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
+                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                        <div class="flex-grow flex flex-col items-center justify-center px-4">
+                            <div class="relative flex flex-col items-center">
+                                <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                <div class="-translate-x-6"><i data-lucide="fingerprint" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"></i></div>
+                                <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
+                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm leading-normal pb-4 max-w-4xl">Real World Ready Challenge</h1>
+                                <div class="mt-2 flex items-baseline justify-center gap-2 relative z-10 opacity-90">
+                                    <span class="text-white/60 text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold font-body">Powered by</span>
+                                    <span class="text-allgood-primary text-2xl sm:text-3xl font-heading font-bold">GoodBlock</span>
+                                    <span class="text-white/60 text-[8px] sm:text-[10px] tracking-widest uppercase font-bold font-body self-start mt-1">TM</span>
+                                </div>
+                            </div>
+                            <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- The identify gate (age question, Sign In, Recruit Code) is injected here
+                     at runtime by /js/identity-gate.js. -->
+
+                <!-- 3. HEADER -->
+                <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
+                    <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+                    <div class="w-full px-4 flex items-center justify-between h-full">
+                        <div class="flex items-center overflow-hidden">
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Real World Ready Challenge</div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0 relative">
+                            <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                            <div class="h-6 w-px bg-white/20 mx-1"></div>
+
+                            <!-- THE MESSAGING PORTAL BUTTON -->
+                            <button id="message-toggle" onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ">
+                                <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+                            </button>
+
+                            <button id="menu-toggle" title="Menu" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- WORKSTATION SPLIT LAYOUT WRAPPER -->
+                <div id="workstation-wrapper" class="flex-1 flex overflow-hidden w-full relative">
+                    
+                    <!-- HUD SIDEBAR (Mission Control) - Desktop Only -->
+                    <aside class="hud-sidebar w-64 md:w-72 bg-white border-r border-gray-200 hidden md:flex flex-col z-20 shadow-[2px_0_10px_rgba(0,0,0,0.05)] hud-panel shrink-0">
+                        <div class="p-5 border-b border-gray-100 bg-slate-50">
+                            <h3 class="font-heading font-bold text-allgood-dark text-lg">Mission Control</h3>
+                            <p class="text-xs font-bold text-allgood-secondary tracking-wider uppercase mt-1" id="hud-name-display">Agent Learner</p>
+                        </div>
+                        <div class="p-5 border-b border-gray-100">
+                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Global Score</p>
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-4xl font-heading font-bold text-allgood-primary" id="hud-score">0</span>
+                                <span class="text-sm font-bold text-gray-400">/ 72</span>
+                            </div>
+                            <div id="hud-delta-container" class="mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-orange-50 text-allgood-primary border border-orange-100 flex items-center gap-1.5 w-fit transition-colors duration-300">
+                                <i id="hud-delta-icon" data-lucide="target" class="w-3 h-3"></i>
+                                <span id="hud-delta-text">64 Points to Certification</span>
+                            </div>
+                        </div>
+                        <div class="p-5 border-b border-gray-100">
+                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Reputation Analytics</p>
+                            <div class="mb-4">
+                                <div class="flex justify-between text-[10px] font-bold text-allgood-dark mb-1">
+                                    <span class="flex items-center gap-1"><i data-lucide="scale" class="w-3 h-3 text-amber-600"></i> Judgment</span>
+                                    <span id="metric-critical">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-amber-600 h-2 rounded-full transition-all duration-500" id="bar-critical" style="width: 0%"></div></div>
+                            </div>
+                            <div class="mb-4">
+                                <div class="flex justify-between text-[10px] font-bold text-allgood-dark mb-1">
+                                    <span class="flex items-center gap-1"><i data-lucide="merge" class="w-3 h-3 text-orange-600"></i> Composure</span>
+                                    <span id="metric-empathy">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-orange-600 h-2 rounded-full transition-all duration-500" id="bar-empathy" style="width: 0%"></div></div>
+                            </div>
+                            <div class="mb-2">
+                                <div class="flex justify-between text-[10px] font-bold text-allgood-dark mb-1">
+                                    <span class="flex items-center gap-1"><i data-lucide="glasses" class="w-3 h-3 text-yellow-700"></i> Perspective</span>
+                                    <span id="metric-integrity">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-yellow-700 h-2 rounded-full transition-all duration-500" id="bar-integrity" style="width: 0%"></div></div>
+                            </div>
+                        </div>
+                        <div class="p-5 flex-1 overflow-y-auto hud-scroll bg-gray-50/50">
+                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-2">Active Mission</p>
+                            <div id="hud-active-mission" class="text-sm font-bold text-allgood-dark border-l-4 border-allgood-secondary pl-3 py-1 mb-2">Standing By</div>
+                            <div id="hud-mission-progress" class="text-xs font-bold text-gray-500 pl-4">Select a mission to begin.</div>
+                        </div>
+                    </aside>
+
+                    <main class="flex-1 relative flex flex-col overflow-hidden bg-gray-50">
+                        <!-- Mobile HUD Strip -->
+                        <div class="md:hidden bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center shadow-sm z-10 shrink-0">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="target" class="w-4 h-4 text-allgood-primary"></i>
+                                <span id="mobile-hud-mission" class="text-xs font-bold text-allgood-dark truncate max-w-[120px]">Standing By</span>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs font-bold text-allgood-secondary bg-gray-100 px-2 py-0.5 rounded inline-block">Score: <span id="mobile-hud-score">0</span></div>
+                                <div id="mobile-hud-delta" class="text-[9px] font-bold text-allgood-primary mt-0.5 transition-colors duration-300">64 pts to badge</div>
+                            </div>
+                        </div>
+
+                        <!-- --- PAGES --- -->
+                        <div class="flex-1 relative overflow-y-auto page-container">
+                            <div class="page active bg-white h-full" id="page-1">
+                                <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-12">
+                                    <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
+                                    <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">The <span class="text-allgood-primary">Real World Ready</span> Challenge</h1>
+                                    <div class="w-full max-w-lg text-left mx-auto">
+                                        <div class="w-full bg-allgood-secondary/10 border-2 border-allgood-secondary p-6 rounded-xl shadow-lg mb-8 flex items-center justify-center space-x-4">
+                                            <i data-lucide="monitor" class="w-12 h-12 text-allgood-secondary"></i>
+                                            <i data-lucide="users" class="w-12 h-12 text-allgood-primary"></i>
+                                            <i data-lucide="lightbulb" class="w-12 h-12 text-allgood-secondary"></i>
+                                        </div>
+                                        <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
+                                            <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                            <i data-lucide="chevron-down" class="accordion-icon w-5 h-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary"></i>
+                                        </button>
+                                        <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
+                                            <p class="mb-4 text-sm text-allgood-dark">This GoodBlock is your interactive workspace. Use the <strong>Control Cluster</strong> in the top right to customize your environment.</p>
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary"><i data-lucide="home" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Home</strong><span class="text-gray-500 leading-snug">Choose to restart this module or head back to the dashboard.</span></div></div>
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-primary"><i data-lucide="message-square" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Direct Line</strong><span class="text-gray-500 leading-snug">Got an idea or found a bug? Send it straight to Allgood Academy HQ.</span></div></div>
+                                                <div class="flex items-start"><div class="p-1.5 bg-white rounded border border-gray-300 mr-3 text-allgood-dark"><i data-lucide="menu" class="w-4 h-4"></i></div><div><strong class="text-allgood-dark block mb-0.5">Table of Contents</strong><span class="text-gray-500 leading-snug">Jump directly to any section without losing progress.</span></div></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Mobile Start Button -->
+                                        <button onclick="window.showPage(1)" class="md:hidden w-full mt-8 bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform active:scale-95 flex items-center justify-center font-body text-base uppercase tracking-wide">
+                                            Start Challenge <i data-lucide="arrow-right" class="w-5 h-5 ml-2"></i>
+                                        </button>
+
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Page 2: Mission Launchpad -->
+                            <div class="page bg-gray-50 h-full" id="page-2">
+                                <div class="max-w-3xl mx-auto py-6">
+                                    <section class="mb-6 border-b border-gray-200 pb-4">
+                                        <h2 class="text-2xl font-heading font-bold text-allgood-dark mb-1">Mission Launchpad</h2>
+                                        <p class="text-sm text-gray-500">Select a priority area to begin your rapid-fire scenario sequence.</p>
+                                    </section>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="category-grid">
+                                        <!-- Rendered dynamically via JS -->
+                                    </div>
+                                    
+                                    <div class="mt-8 text-center" id="final-evaluation-container" style="display: none;">
+                                        <div class="inline-block bg-white p-6 rounded-xl shadow-md border-t-4 border-allgood-primary max-w-md w-full">
+                                            <i data-lucide="shield-check" class="w-12 h-12 text-allgood-primary mx-auto mb-3"></i>
+                                            <h3 class="font-heading font-bold text-xl mb-2">All Missions Complete</h3>
+                                            <p class="text-sm text-gray-600 mb-6">You have responded to all 30 scenarios. Provide feedback to unlock your final evaluation.</p>
+                                            
+                                            <!-- MOVED & GATED FEEDBACK SECTION -->
+                                            <div id="feedback-container" class="w-full bg-gray-50 p-4 rounded-lg shadow-inner border border-gray-200 mb-6 text-left relative">
+                                                <h3 class="font-bold text-allgood-dark text-xs uppercase tracking-wide mb-3 text-center">Rate this GoodBlock</h3>
+                                                <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
+                                                    <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                                    <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                                    <button onclick="window.setRating(3)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="3"><i id="star-3" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                                    <button onclick="window.setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                                    <button onclick="window.setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
+                                                </div>
+                                                <textarea id="feedback-text" rows="2" class="w-full border border-gray-300 rounded p-2 text-xs focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-white" style="font-size:16px;" placeholder="Optional: What worked? What didn't?"></textarea>
+                                                <button onclick="window.submitFeedback()" class="w-full mt-3 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-xs uppercase tracking-wider">Submit & Unlock</button>
+                                            </div>
+                                            <div id="feedback-success" class="hidden w-full bg-green-50 p-4 rounded-lg shadow-inner border border-green-200 mb-6 text-center">
+                                                <i data-lucide="check-circle" class="w-8 h-8 text-green-600 mx-auto mb-1"></i>
+                                                <h3 class="font-bold text-green-800 text-sm">Feedback Received.</h3>
+                                            </div>
+
+                                            <button id="init-eval-btn" onclick="window.showPage(3)" class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-md transition-colors uppercase tracking-wide text-xs cursor-not-allowed" disabled>Initialize Evaluation (Locked)</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Continuous-scroll feed: all scenarios in the active category render here, unlocking in sequence -->
+                            <div class="page" id="page-scenario-feed">
+                                <div id="scenario-feed-container" class="max-w-2xl mx-auto pb-16"></div>
+                            </div>
+
+                            <!-- Page 4 (index 3): Final Score -->
+                            <div class="page bg-white h-full" id="page-33">
+                                <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-3xl font-heading font-bold text-allgood-dark mb-2 mt-4">Final Readiness Assessment</h2><p class="text-xs font-bold text-allgood-primary uppercase tracking-widest">Your Real World Ready Score</p></section>
+                                <div id="final-score-content">
+                                    <div class="text-center py-4">
+                                        <div class="w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-lg shadow-inner border border-gray-200 mb-8">
+                                            <p class="text-sm font-semibold text-gray-500 mb-1">Total Score</p>
+                                            <p id="final-score-value" class="text-5xl font-extrabold text-allgood-dark font-heading">0 / 72</p>
+                                            <p id="final-score-percent" class="text-xs text-gray-400 mt-1">(0% Effectiveness)</p>
+                                        </div>
+                                        <h3 id="final-rank-heading" class="text-xl font-heading font-bold text-allgood-dark mb-2">Digital Learner</h3>
+                                        <p id="final-rank-message" class="text-sm text-gray-600 max-w-md mx-auto mb-8">Good start. Reread the feedback and try again.</p>
+
+                                        <div id="certification-section" class="w-full max-w-md mx-auto bg-gradient-to-br from-allgood-secondary to-allgood-accent p-1 rounded-lg shadow-xl transform transition-all duration-700">
+                                            <div class="bg-white p-6 rounded-md text-center">
+                                                <div class="mb-4 relative inline-block"><i id="badge-icon" data-lucide="award" class="relative w-16 h-16 text-allgood-primary mx-auto"></i></div>
+                                                <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Digital Architect Certification</h3>
+                                                <p id="cert-req-text" class="text-sm text-gray-600 mb-6">You need 64 points to achieve this certification.</p>
+                                                <button id="download-badge-btn" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300">
+                                                    <i id="btn-icon" data-lucide="lock" class="w-4 h-4 mr-2"></i><span id="btn-text">Certification Locked</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Embedded Action Card (Replaces old exit modal) -->
+                                        <div class="w-full max-w-md mx-auto mt-8 bg-allgood-dark p-6 rounded-lg shadow-xl border-t-4 border-allgood-primary text-center">
+                                            <h3 class="font-heading font-bold text-white text-lg mb-2">Your Next Pragmatic Action</h3>
+                                            <p class="text-sm text-gray-300 mb-6">Your brand is secure. Now, keep building — explore the rest of the Lab Pack.</p>
+                                            <button onclick="window.location.href = '/jsh/real-world-ready/'" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
+                                                <i data-lucide="play-circle" class="w-5 h-5 mr-2"></i> Explore the Lab Pack
+                                            </button>
+                                            <button onclick="window.performHardReset()" class="w-full bg-transparent text-gray-400 font-bold py-2 mt-3 hover:text-white transition-colors text-xs uppercase tracking-wider">
+                                                <i data-lucide="rotate-ccw" class="w-3 h-3 inline mr-1"></i> Retake Challenge
+                                            </button>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mobile Progress Pill (Gesture Nav) -->
+                        <div id="mobile-progress-pill" class="md:hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[100] bg-white/95 backdrop-blur-xl border border-gray-200 shadow-xl rounded-full px-5 py-2 flex flex-col items-center justify-center transition-transform duration-200 pointer-events-none w-max">
+                            <span id="pill-text" class="text-[10px] font-bold text-allgood-dark uppercase tracking-widest">Swipe to begin</span>
+                            <div class="flex items-center gap-3 mt-1 opacity-60" id="pill-hints">
+                                <i data-lucide="chevrons-left" class="w-3 h-3 text-allgood-secondary"></i>
+                                <span class="text-[8px] text-gray-500 font-bold tracking-widest">NAVIGATE</span>
+                                <i data-lucide="chevrons-right" class="w-3 h-3 text-allgood-secondary"></i>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <footer class="footer-content flex items-center justify-between px-4 sm:px-6 z-50 bg-white border-t border-gray-200">
+                            <button id="back-button" class="text-allgood-primary hover:text-allgood-dark font-bold text-sm flex items-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-body p-2">
+                                <i data-lucide="chevron-left" class="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1"></i>
+                                <span class="hidden sm:inline">Back</span>
+                            </button>
+                            <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a> <span id="current-year"></span></p>
+                            <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-4 sm:px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body">
+                                <span class="hidden sm:inline" id="next-btn-text">Next</span>
+                                <i data-lucide="chevron-right" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1"></i>
+                            </button>
+                        </footer>
+
+                    </main>
+                </div>
+
+                <!-- 4. MODALS -->
+                <div id="image-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/90 flex items-center justify-center p-4 modal-transition" onclick="document.getElementById('image-modal').classList.add('hidden-modal'); document.getElementById('image-modal').classList.remove('visible-modal');">
+                    <img id="expanded-image" src="" class="max-w-full max-h-full rounded shadow-2xl cursor-pointer" alt="Expanded View">
+                    <div class="absolute bottom-4 text-white/70 text-xs font-body">Click anywhere to close</div>
+                </div>
+
+                <div id="scenario-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-4 modal-transition" onclick="window.closeScenarioModal(false)">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center relative border-t-4 border-allgood-secondary" onclick="event.stopPropagation()">
+                        <div id="scenario-icon" class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl transition-colors"></div>
+                        <h3 id="scenario-title" class="text-xl font-heading font-bold text-allgood-dark mb-2"></h3>
+                        <div id="scenario-feedback" class="text-sm text-gray-600 font-body mb-6 leading-relaxed text-left border-l-4 border-gray-200 pl-4 bg-gray-50 py-2 rounded-r"></div>
+                        <button id="scenario-modal-next-btn" class="w-full bg-allgood-dark text-white px-6 py-3 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-allgood-primary transition-colors shadow-md flex justify-center items-center gap-2">Continue <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+                    </div>
+                </div>
+
+                <div id="menu-modal" class="hidden-modal absolute inset-0 z-[100] bg-black/60 flex justify-end modal-transition">
+                    <div class="w-72 h-full bg-white shadow-xl flex flex-col border-l border-gray-200">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <span class="font-bold text-allgood-dark font-heading">Table of Contents</span>
+                            <button id="close-menu" class="text-gray-500 hover:text-allgood-primary"><i data-lucide="x" class="w-6 h-6"></i></button>
+                        </div>
+                        <div class="p-2 overflow-y-auto flex-grow space-y-1 text-sm font-body" id="toc-list"></div>
+                    </div>
+                </div>
+
+                <!-- 5. Home Choice Modal -->
+                <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-black/80 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+                    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gray-500">
+                        <div class="mb-4">
+                            <i data-lucide="home" class="w-12 h-12 mx-auto text-gray-400"></i>
+                        </div>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Home</h2>
+                        <p class="text-sm text-gray-500 mb-6 font-body">Where do you want to go?</p>
+
+                        <div class="space-y-3">
+                            <button onclick="window.restartModule()" class="w-full bg-gray-100 hover:bg-gray-200 text-allgood-dark font-bold py-3 rounded border border-gray-300 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart This Module
+                            </button>
+                            <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm transition-colors flex items-center justify-center">
+                                <i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Go to Dashboard
+                            </button>
+                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MESSAGE MODAL: standardized in /js/message-hq.js, injected at runtime -->
+
+        </div>
+    </main>
+
+    <!-- Main Logic -->
+    <script>
+        // --- AUDIO ENGINE (HOISTED) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume().catch(e => console.error("Audio resume failed:", e));
+        }
+
+        function playTone(freq, type, duration, vol = 0.1, attack = 0.01, decay = 0.001) {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, now);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(vol, now + attack);
+            gain.gain.exponentialRampToValueAtTime(decay, now + duration);
+            osc.start(now); osc.stop(now + duration);
+        }
+
+        const sfx = {
+            powerOn: () => { initAudio(); const now = audioCtx.currentTime; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.type = 'triangle'; osc.frequency.setValueAtTime(110, now); osc.frequency.exponentialRampToValueAtTime(220, now + 0.4); gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.4, now + 0.1); gain.gain.linearRampToValueAtTime(0, now + 0.4); osc.start(now); osc.stop(now + 0.4); },
+            powerOff: () => { initAudio(); playTone(80, 'triangle', 0.2, 0.5, 0.01, 0.001); },
+            nav: () => { initAudio(); playTone(150, 'sine', 0.1, 0.1, 0.01, 0.01); },
+            tick: () => { initAudio(); playTone(1000, 'sine', 0.01, 0.01); },
+            confirm: () => { initAudio(); playTone(400, 'sine', 0.1, 0.1, 0.01, 0.01); setTimeout(() => playTone(600, 'sine', 0.1, 0.1, 0.01, 0.01), 100); }
+        };
+        window.sfx = sfx;
+        window.initAudio = initAudio;
+
+        // --- GLOBAL APP VARIABLES ---
+        let currentUserName = "Anonymous";
+        let currentPageIndex = 0; 
+        const TOTAL_PAGES = 4; // 0=cover, 1=launchpad, 2=scenario feed, 3=final score
+        const TOTAL_SCENARIOS = 24;
+        const MAX_SCORE = 72; 
+        const BADGE_THRESHOLD = 64;
+        let totalChallengeScore = 0;
+        let answeredScenarioScores = {};
+        let feedbackSubmitted = false;
+        let currentStarRating = 0;
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        // CONTINUOUS SCROLL FEED STATE
+        let activeCategory = null;
+        let categoryQueue = []; // array of scenario indices (1-based) for the active category
+        let currentQueueIndex = 0; // position within categoryQueue currently in view / being worked on
+        let feedObserver = null;
+        let lastAnsweredScenario = null;
+
+        const CATEGORIES = {
+            money:        { title: "Money as a Skill",      icon: "coins",   desc: "Spending, splitting & asking.",        color: "bg-amber-600" },
+            conflict:     { title: "Conflict Has a Winner", icon: "merge",   desc: "Disagreeing without losing people.",   color: "bg-orange-600" },
+            reading_room: { title: "Reading the Room",      icon: "glasses", desc: "Checking your read before you act.",   color: "bg-yellow-700" }
+        };
+
+        function sanitizeText(text) {
+            if (!text) return "";
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
+        }
+
+        // --- DYNAMIC FEEDBACK PARSER ---
+        function formatFeedbackContent(rawFeedback, textClass = 'text-gray-600') {
+            let scriptMatch = rawFeedback.match(/\*Try saying this:\s*(.*?)\*/i);
+            let scriptText = '';
+            if (scriptMatch) {
+                scriptText = scriptMatch[1].trim();
+                rawFeedback = rawFeedback.replace(scriptMatch[0], '').trim();
+            }
+
+            let whyMatch = rawFeedback.match(/\*\*The "Why":\*\*\s*(.*)/i);
+            let consequenceMatch = rawFeedback.match(/\*\*The Consequence:\*\*\s*(.*)/i);
+            let mainInsight = '';
+            let mainIcon = '';
+
+            if (whyMatch) {
+                mainInsight = whyMatch[1].trim();
+                mainIcon = 'lightbulb';
+            } else if (consequenceMatch) {
+                mainInsight = consequenceMatch[1].trim();
+                mainIcon = 'trending-down';
+            } else {
+                mainInsight = rawFeedback;
+            }
+
+            let insightHtml = '';
+            if (mainIcon) {
+                insightHtml = `
+                    <div class="flex items-start gap-2 mb-1">
+                        <i data-lucide="${mainIcon}" class="w-4 h-4 ${textClass} shrink-0 mt-0.5"></i>
+                        <span class="text-xs ${textClass} leading-relaxed">${sanitizeText(mainInsight)}</span>
+                    </div>
+                `;
+            } else {
+                 insightHtml = `<p class="text-xs ${textClass} leading-relaxed">${sanitizeText(mainInsight)}</p>`;
+            }
+
+            let scriptHtml = '';
+            if (scriptText) {
+                let cleanScript = scriptText.replace(/^"|"$/g, '');
+                scriptHtml = `
+                    <div class="mt-3 bg-cyan-50/50 rounded-md p-3 border-l-2 border-allgood-secondary flex gap-2.5 items-start shadow-sm text-left">
+                        <i data-lucide="message-circle" class="w-4 h-4 text-allgood-secondary shrink-0 mt-0.5"></i>
+                        <div class="flex-1">
+                            <p class="text-[9px] font-bold text-allgood-secondary uppercase tracking-widest mb-1">Pragmatic Action</p>
+                            <p class="text-xs text-allgood-dark font-medium italic leading-relaxed">"${cleanScript}"</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `<div class="w-full">${insightHtml}${scriptHtml}</div>`;
+        }
+
+        // SCENARIO DATA
+        const SCENARIO_DATA = [
+
+            /* ===================== MONEY (8) =====================
+               Taught by: Money as a Skill. Cases 2-6.
+               Second-person GoodBlock — narrativeStyle: 'second-person'. */
+
+            // M1 — proportional fairness — Case 2, The Split Decision
+            { cat: 'money', icon: 'split',
+              title: "You and a friend want to buy a $30 speaker together. It'll live at their house and they'll use it most days; you'll use it once or twice a month. They suggest $15 each. Question: What do you do?",
+              choices: [
+                { text: "Say yes to $15 — it's easier than making it awkward.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You paid half for about a fifth of the use. That's allowed — but notice you chose it to avoid a thirty-second conversation." },
+                { text: "Say you'd rather put in less, since you'll use it far less.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Fair doesn't automatically mean equal. Naming the actual usage isn't being difficult — it's being accurate. *Try saying this: \"I'm in, but since it's living at yours could I put in ten instead of fifteen?\"*" },
+                { text: "Agree to $15, then feel annoyed about it later.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** The worst version. You paid the money and kept the resentment. If it wasn't worth saying then, it isn't worth holding now." }
+              ] },
+
+            // M2 — proportional fairness, recurring — Case 2
+            { cat: 'money', icon: 'users',
+              title: "Your friend wants to split a $12/month subscription with you. They'll use it daily. Realistically you'd open it twice a month. Question: What do you do?",
+              choices: [
+                { text: "Split it evenly — it's only six dollars.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Six dollars is small. Seventy-two dollars a year for twenty-four uses is the same decision, just further away." },
+                { text: "Say you'll pass, but you'd chip in occasionally if you start using it more.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** A recurring cost deserves a harder look than a one-off, because it repeats whether you use it or not. Leaving the door open keeps it friendly." },
+                { text: "Split it and just remember to use it more to get your money's worth.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Now you're using something you don't want in order to justify paying for it. The subscription is deciding your evenings." }
+              ] },
+
+            // M3 — opportunity cost — Case 3, The Impulse Window
+            { cat: 'money', icon: 'wallet',
+              title: "You've saved $58 of the $60 you need for headphones. In the shop you spot a $12 phone case you like. You can afford it right now. Question: What do you do?",
+              choices: [
+                { text: "Buy it — you've got the money and you like it.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** It cost $12 today and roughly two more weeks of saving. Buying things is fine; not noticing the second price is what gets expensive." },
+                { text: "Leave it. If you still want it in a couple of days, come back.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Most impulse buys feel most urgent in the first twenty minutes. Waiting doesn't mean no — it means letting the version of you that isn't standing in the shop get a vote." },
+                { text: "Buy it and tell yourself you'll make the money back quickly.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** \"I'll make it back\" is a plan you made in about two seconds, standing next to the thing you already wanted." }
+              ] },
+
+            // M4 — manufactured urgency — Case 3
+            { cat: 'money', icon: 'alert-triangle',
+              title: "A sale ends tonight on something you weren't planning to buy and hadn't thought about until you saw the banner. Question: What do you do?",
+              choices: [
+                { text: "Buy it — the discount won't be there tomorrow.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You saved 30% on something you were going to spend 0% on. The countdown did the deciding." },
+                { text: "Skip it. You didn't want it an hour ago.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** A deadline someone else invented isn't a reason. The real question was never the price — it's whether you wanted the thing before the clock appeared." },
+                { text: "Check whether the same sale runs again later, then decide.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Useful research, wrong question. You're now investigating the discount instead of whether you want it at all." }
+              ] },
+
+            // M5 — conditions on a yes — Case 4, The Group Fund
+            { cat: 'money', icon: 'coins',
+              title: "Six friends are pooling $60 for something together. Someone says you should hold the money and track who's paid, because you're the responsible one. Question: What do you do?",
+              choices: [
+                { text: "Say yes — they trust you, and it'd be weird to make conditions.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You're now the group's bank with no terms. When someone's late, you either front it, chase it, or eat it — and none of that was in the job." },
+                { text: "Say yes, and say what comes with it: everyone pays before you buy, there's a deadline, and you agree now what happens if someone doesn't.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Naming the conditions isn't being difficult — it's what makes the yes workable. Almost every group-fund mess starts with someone who said yes to the role and nothing else." },
+                { text: "Say yes and cover anyone who's short, to keep things smooth.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You've quietly turned a group purchase into a loan you're making to people who don't know they've borrowed anything." }
+              ] },
+
+            // M6 — the cost of a yes with no terms — Case 4
+            { cat: 'money', icon: 'message-square',
+              title: "You lent a friend $20 three weeks ago. Nothing was ever agreed about when they'd pay it back, and they haven't mentioned it. Question: What do you do?",
+              choices: [
+                { text: "Say nothing. Bringing it up would make it weird.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** It's already a bit weird — that's why you're thinking about it. Silence doesn't remove the awkwardness, it just moves it inside you." },
+                { text: "Mention it lightly and directly, without accusing them of anything.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** There's a decent chance they simply forgot. A light, specific reminder gives them an easy way to fix it. *Try saying this: \"Hey — no rush at all, but could you get me that twenty when you can?\"*" },
+                { text: "Bring it up sideways with a joke about being broke and hope they take the hint.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Hints put the work on them to decode you. If they miss it you're more annoyed, and you still haven't asked." }
+              ] },
+
+            // M7 — functional threshold — Case 5, The Upgrade Trap
+            { cat: 'money', icon: 'search-check',
+              title: "You need a school backpack. The $18 one has the compartments you need and solid reviews. The $45 one has more pockets, a brand name, and is 'waterproof.' You can afford either. Question: What do you do?",
+              choices: [
+                { text: "Buy the $45 one — it's better made and will last longer.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Maybe. But you assumed it rather than checked it — and \"waterproof\" on a backpack usually means light rain, not a downpour." },
+                { text: "Read what the extra $27 actually buys, then decide.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** The question isn't whether you can afford the better one. It's what the better one actually does that you'll actually use." },
+                { text: "Buy the $45 one because the cheap one will fall apart.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Price isn't a quality guarantee, it's a price. You decided the $18 bag was bad without opening a single review of it." }
+              ] },
+
+            // M8 — asking is information, not rudeness — Case 6, The Ask
+            { cat: 'money', icon: 'handshake',
+              title: "You find a $20 phone case you want, but the packaging is dented and there's a scuff on the corner. It's still marked full price. Question: What do you do?",
+              choices: [
+                { text: "Pay the $20 — it's not worth making it awkward over.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Fine to do. Just notice what the ask actually risked: they say no, and you're exactly where you already were." },
+                { text: "Point out the damage and ask whether they'd take a bit less.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** You're not haggling — you're naming a real fact about the item. Shops mark damaged stock down routinely. *Try saying this: \"I'll take it, but the corner's scuffed — any chance of a bit off?\"*" },
+                { text: "Put it back and look for an undamaged one somewhere else.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You wanted this one and it works. You've spent time and got nothing, to avoid a fifteen-second question." }
+              ] },
+
+            /* ===================== CONFLICT (8) =====================
+               Taught by: Conflict Has a Winner. Cases 2-6. Character: Theo.
+               narrativeStyle: 'character'. */
+
+            // C1 — integrative option exists — Case 2, The Unspoken Need
+            { cat: 'conflict', icon: 'users',
+              title: "Group project. You want to do one topic, your partner wants another, and you've both now said 'but mine's better' twice. Question: What do you do?",
+              choices: [
+                { text: "Make the strongest case you can for your topic and let them decide.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You're still arguing about which topic wins. Nobody has asked why either of you actually wants yours." },
+                { text: "Ask what they're worried about if you did it your way — and say what you're worried about too.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Positions collide; the needs underneath usually don't. \"I want topic A\" and \"I don't want to get stuck doing the writing\" are different sentences, and only one of them has a solution." },
+                { text: "Give in to keep the peace and do their topic.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Folding isn't compromise, it's just a faster loss. You'll do the project you didn't want and they'll never know there was a problem." }
+              ] },
+
+            // C2 — naming a pattern vs winning an argument — Case 6
+            { cat: 'conflict', icon: 'message-square-off',
+              title: "A friend has cancelled on you three times in a row. They've just cancelled a fourth. Question: What do you do?",
+              choices: [
+                { text: "Reply 'no worries!' like the other three times.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Four times now you've told them it's fine. They have no reason to think it isn't, and you're getting quietly more annoyed each time." },
+                { text: "Say something sharp about how they always do this.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** The pattern is real, but \"you always\" starts a fight about whether it's always. Now you're arguing about the word instead of the thing." },
+                { text: "Name the pattern plainly, once, without heat.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** One clear statement of what's actually happening gives them something they can respond to. *Try saying this: \"That's the fourth one — is everything alright? I'd rather know than keep guessing.\"*" }
+              ] },
+
+            // C3 — positions vs interests — Case 2
+            { cat: 'conflict', icon: 'merge',
+              title: "You want a rule changed at home. You've asked, they've said no, and the conversation has become the same exchange every time. Question: What do you do?",
+              choices: [
+                { text: "Keep asking until they get tired of saying no.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You've turned it into a test of stamina. Even if you win, you've taught them that saying yes is how conversations with you end." },
+                { text: "Ask what would have to be true for them to say yes.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** That question moves the conversation from a wall to a list. Their no is usually protecting something specific — and once it's named, you can often address it." },
+                { text: "Drop it. They've made up their mind.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Sometimes right. But you never found out what the no was actually about, so you can't tell whether it was fixed or just final." }
+              ] },
+
+            // C4 — declining the frame — Case 5, Both of Them Want You
+            { cat: 'conflict', icon: 'users-x',
+              title: "Two friends have fallen out. Both message you separately, and both want you to say they're the one who's right. Question: What do you do?",
+              choices: [
+                { text: "Agree with whichever one you think is actually right.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You might be correct. You've also just become a piece of evidence in their argument, and the other one will hear about it." },
+                { text: "Tell each of them you're not going to be the judge, but you're still here for both.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Declining the frame isn't fence-sitting — fence-sitting is having no opinion. You have one; you're just not handing it over as a verdict. *Try saying this: \"I'm not picking a side on this one, but I'm not going anywhere either.\"*" },
+                { text: "Agree with each of them separately so nobody's upset.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** They will talk to each other eventually. When they do, the only thing they'll agree on is that you weren't straight with either of them." }
+              ] },
+
+            // C5 — accepting an imperfect repair — Case 4, The Apology That Isn't Great
+            { cat: 'conflict', icon: 'frown',
+              title: "A friend apologises with: 'ok I'm sorry you took it that way, can we drop it.' It has the word sorry in it and not much else. Question: What do you do?",
+              choices: [
+                { text: "Accept it and move on — an apology is an apology.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You can accept a thin repair, and sometimes that's the right call for the friendship. Just don't tell yourself it was a full one." },
+                { text: "Name one specific thing that was missing from it.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** \"That wasn't a real apology\" is a verdict they can only argue with. One specific missing piece is a request they can actually act on. *Try saying this: \"I think what I needed was you saying the thing itself wasn't okay, not just that I reacted to it.\"*" },
+                { text: "Refuse it and hold out until they apologise properly.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** A real apology has to be offered, not extracted. Holding out often means waiting for something that was never on its way." }
+              ] },
+
+            // C6 — being right vs being effective — Case 3, The Cost of Being Right
+            { cat: 'conflict', icon: 'message-square',
+              title: "A group chat argument is spiralling. You're factually right, you can prove it, and it's now four messages long. Question: What do you do?",
+              choices: [
+                { text: "Keep going — you're right and they should admit it.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You are still right and nobody remembers what about. Past a certain point the thread stops being about the fact and starts being about who won." },
+                { text: "State your point once more clearly, then leave the thread.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Being right is a fact. Being effective is a choice, and they aren't the same button. Saying it once and stepping out keeps the point and drops the fight." },
+                { text: "Leave immediately without replying.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Nothing lost, but nothing said either. There was one clear restatement available that would have cost you nothing." }
+              ] },
+
+            // C7 — separating idea from person, with an audience — Case 3
+            { cat: 'conflict', icon: 'user-x',
+              title: "In front of the whole group, a teammate calls your idea 'not going to work' and moves on without explaining why. Question: What do you do?",
+              choices: [
+                { text: "Push back right there so the group knows they were out of line.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Now the group is watching a status fight instead of considering your idea. You may win the room and lose the point." },
+                { text: "Ask them, in the moment, what specifically wouldn't work.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** It's not a counterattack and it's not folding. It moves the conversation back onto the idea and quietly requires them to have an actual reason. *Try saying this: \"What part do you think breaks? I'd rather fix it than drop it.\"*" },
+                { text: "Say nothing and let it go.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** The idea dies unexamined and the group learns your ideas can be dismissed with a sentence. Neither of those was true a minute ago." }
+              ] },
+
+            // C8 — conceding as a move — Case 6, When You're the One Who's Wrong
+            { cat: 'conflict', icon: 'split',
+              title: "Mid-argument, something they say makes it clear you're wrong. You've been pushing your position for a while. Question: What do you do?",
+              choices: [
+                { text: "Say so straight away — 'you're right, that's my mistake.'", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Conceding early costs almost nothing and ends the argument on your terms. Most adults can't do this. You didn't lose — you're the reason it stopped." },
+                { text: "Change the subject slightly so it fades out without anyone conceding.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** It ends the argument and leaves them thinking you never got it. The price of admitting it later just went up." },
+                { text: "Keep arguing — backing down now would look weak.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Every extra message makes conceding more expensive. You'll still have to do it, and now you'll have to explain why you kept going." }
+              ] },
+
+            /* ===================== READING THE ROOM (8) =====================
+               Taught by: Reading the Room. Cases 2-6. Character: Mira.
+               narrativeStyle: 'character'. */
+
+            // R1 — a thin signal becomes a conclusion — Case 2, Three Rungs Up
+            { cat: 'reading_room', icon: 'message-square',
+              title: "A friend who's normally chatty has sent you three one-word replies today: 'k', 'sure', 'ok'. Question: What do you do?",
+              choices: [
+                { text: "Assume they're annoyed with you and go quiet back.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You built a whole conclusion out of three words and then acted on it. If they were just busy, you've now created the distance you were worried about." },
+                { text: "Notice that 'k' has several possible meanings and wait for more before deciding.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Three short texts is real information and it's thin. Your read might be right — it just isn't a finding yet." },
+                { text: "Ask them directly whether you've done something.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Direct is good, but this version hands them your conclusion. If they were tired, they now have to reassure you about a problem that didn't exist." }
+              ] },
+
+            // R2 — an exclusion signal that won't resolve — Case 3, Both Still True
+            { cat: 'reading_room', icon: 'user-round-minus',
+              title: "You see photos from something at the weekend that you weren't invited to. You don't know whether it was deliberate. Question: What do you do?",
+              choices: [
+                { text: "Say nothing and quietly pull back from the group.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** If you weren't being excluded, you've just excluded yourself. If you were, you'll never find out why. Both versions end the same." },
+                { text: "Ask one person, lightly, what the plan was.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** It's the one move that works whether or not it was deliberate — easy if it wasn't, briefly awkward if it was, and it ends the not-knowing either way." },
+                { text: "Post something that makes it clear you noticed.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** If it was innocent, it's confusing and a bit alarming. If it wasn't, you've handed them the story. It's the only option that's worse under both explanations." }
+              ] },
+
+            // R3 — first impression vs accumulated evidence — Case 4, Five Tuesdays
+            { cat: 'reading_room', icon: 'user-plus',
+              title: "A new student joined last week. On day one they didn't look up or say much, and you read them as stuck-up. Since then you've seen them laugh with someone and greet the caretaker by name. Question: What do you do?",
+              choices: [
+                { text: "Stick with your first read — first impressions are usually right.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Two things have happened that don't fit, and the read hasn't moved. At that point it isn't a read anymore, it's a decision that stopped listening." },
+                { text: "Update it — the newer evidence doesn't match the first day.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Your first read wasn't stupid; day one genuinely looked like that. Updating when new evidence arrives isn't being talked out of your judgement — it's your judgement working." },
+                { text: "Decide you can't tell and stop thinking about it.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Better than locking in, but you had specific evidence pointing somewhere. \"No idea\" throws it away rather than using it." }
+              ] },
+
+            // R4 — self-reference error, direction one — Case 5, Is This About Me?
+            { cat: 'reading_room', icon: 'book-open-check',
+              title: "Your teacher is short and irritable with the whole class today. You handed work in late this week. Question: What do you do?",
+              choices: [
+                { text: "Assume it's about your late work and keep your head down.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Possible. But they're short with everyone, and the only thing connecting it to you is that you were already thinking about it." },
+                { text: "Notice it's aimed at the whole room, not at you specifically.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Most of what happens near you isn't about you. From inside your own head that's genuinely hard to see, which is exactly why it's worth checking." },
+                { text: "Apologise for the late work to clear the air.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You've made a general bad mood into a conversation about you — and put yourself on their radar for something they hadn't thought about." }
+              ] },
+
+            // R5 — self-reference error, opposite direction — Case 5
+            { cat: 'reading_room', icon: 'frown',
+              title: "You make a joke, the group laughs and moves on. A second later you notice one friend's smile drop — the joke touched something they'd told you privately. Question: What do you do?",
+              choices: [
+                { text: "Nothing — everyone laughed, so it landed fine.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** The room told you and you used the group's reaction to overrule the one person it was actually about. That signal was for you." },
+                { text: "Check in with them privately afterwards.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** You caught a half-second signal most people miss. Handling it privately means they don't have to perform being fine in front of everyone. *Try saying this: \"Hey — that joke earlier, I shouldn't have used that. Sorry.\"*" },
+                { text: "Apologise to the whole group right away.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Good instinct, wrong room. A public apology tells everyone there was something private to apologise about." }
+              ] },
+
+            // R6 — ambiguous signal, sitting with not knowing — Case 3
+            { cat: 'reading_room', icon: 'users',
+              title: "You walk over to a group of friends and the conversation stops. Question: What do you do?",
+              choices: [
+                { text: "Assume they were talking about you.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Conversations stop for a dozen reasons — a punchline landed, someone lost their thread, the topic was private but nothing to do with you. You picked the worst one and treated it as fact." },
+                { text: "Note it, stay normal, and see whether anything else fits that read later.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** One ambiguous moment isn't evidence of anything yet. Filing it instead of acting on it costs you nothing and keeps you from manufacturing the problem." },
+                { text: "Ask them straight out what they were talking about.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Fair question, but on this much evidence it lands as an accusation. There wasn't enough here yet to need an answer." }
+              ] },
+
+            // R7 — reading past the words without overriding — Case 6, "I'm Fine"
+            { cat: 'reading_room', icon: 'heart-off',
+              title: "A friend says 'I'm fine' and very clearly isn't. Question: What do you do?",
+              choices: [
+                { text: "Take them at their word and change the subject.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Respectful, and something was on offer that just passed. 'I'm fine' is often a door left slightly open to see if anyone tries it." },
+                { text: "Accept what they said out loud, and leave a door open anyway.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Nobody gets called a liar and nobody has to admit anything. The door's just open and they know where it is. *Try saying this: \"Okay. I'm around later if you want.\"*" },
+                { text: "Tell them you can obviously see they're not fine and they should just say it.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Now they have to defend the 'I'm fine' instead of getting past it. Pushing got you less truth, not more." }
+              ] },
+
+            // R8 — acting on an uncorrected first read — Case 2
+            { cat: 'reading_room', icon: 'user-round-x',
+              title: "You send a long message about something you're excited about. The reply is one word: 'cool'. Question: What do you do?",
+              choices: [
+                { text: "Decide they don't care and stop telling them things.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** One word became a conclusion about who they are, and then a change in how you treat them — all without a single check." },
+                { text: "Notice you're irritated, and that 'cool' doesn't actually tell you much.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** The feeling is real and the evidence is one word. Both things can be true. Noticing the gap is what stops you acting on the wrong one." },
+                { text: "Send a follow-up asking if they're annoyed with you.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You've turned your own irritation into a question they now have to manage. There wasn't enough here yet to need reassurance." }
+              ] }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const pages = document.querySelectorAll('.page');
+            const nextButton = document.getElementById('next-button');
+            const backButton = document.getElementById('back-button');
+            const progressBar = document.getElementById('flex-progress-fill');
+            const startupScreen = document.getElementById('startup-screen');
+
+            // Called once auth resolves with real progress from Firestore (see the
+            // module script's onAuthStateChanged). Hydrates in-memory state so
+            // startCategory()'s existing "answered vs. next-unanswered" rendering
+            // reflects a returning student's real history instead of starting cold.
+            window.restoreModuleProgress = (data) => {
+                if (!data) return;
+                if (data.answeredScenarioScores && typeof data.answeredScenarioScores === 'object') {
+                    answeredScenarioScores = { ...data.answeredScenarioScores };
+                }
+                if (typeof data.totalChallengeScore === 'number') {
+                    totalChallengeScore = data.totalChallengeScore;
+                }
+                updateHUDDisplay();
+                updateTOC();
+            };
+
+            // --- MENU & MODAL FUNCTIONS ---
+            window.openMenuModal = () => { document.getElementById('menu-modal').classList.remove('hidden-modal'); document.getElementById('menu-modal').classList.add('visible-modal'); sfx.tick(); }
+            window.closeMenuModal = () => { document.getElementById('menu-modal').classList.remove('visible-modal'); document.getElementById('menu-modal').classList.add('hidden-modal'); sfx.tick(); }
+            // openMessageModal/closeMessageModal/submitHQMessage are standardized in
+            // /js/message-hq.js. The notification-dot hint on this button was
+            // dashboard-only by design and has moved there — see public/index.html.
+
+            window.updateUserDisplay = (name) => {
+                currentUserName = name;
+                document.getElementById('header-welcome-text').textContent = `Welcome, ${name}`;
+                document.getElementById('hud-name-display').textContent = name;
+            }
+
+            function updateProgress() {
+                const progress = ((currentPageIndex + 1) / TOTAL_PAGES);	
+                if (progressBar) progressBar.style.width = `${progress * 100}%`;
+                const pageIndicator = document.getElementById('header-page-indicator');
+                if (pageIndicator) pageIndicator.textContent = `${currentPageIndex + 1} / ${TOTAL_PAGES}`;
+            }
+
+            // HUD UPDATER
+            function updateHUDDisplay() {
+                document.getElementById('hud-score').textContent = totalChallengeScore;
+                document.getElementById('mobile-hud-score').textContent = totalChallengeScore;
+                
+                // Certification Delta Logic
+                const delta = BADGE_THRESHOLD - totalChallengeScore;
+                const hudDeltaContainer = document.getElementById('hud-delta-container');
+                const hudDeltaText = document.getElementById('hud-delta-text');
+                const hudDeltaIcon = document.getElementById('hud-delta-icon');
+                const mobileHudDelta = document.getElementById('mobile-hud-delta');
+
+                if (delta > 0) {
+                    if (hudDeltaText) hudDeltaText.textContent = `${delta} Points to Certification`;
+                    if (hudDeltaContainer) hudDeltaContainer.className = "mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-orange-50 text-allgood-primary border border-orange-100 flex items-center gap-1.5 w-fit transition-colors duration-300";
+                    if (hudDeltaIcon) hudDeltaIcon.setAttribute('data-lucide', 'target');
+                    if (mobileHudDelta) {
+                        mobileHudDelta.textContent = `${delta} pts to badge`;
+                        mobileHudDelta.className = "text-[9px] font-bold text-allgood-primary mt-0.5 transition-colors duration-300";
+                    }
+                } else {
+                    if (hudDeltaText) hudDeltaText.textContent = "Certification Unlocked!";
+                    if (hudDeltaContainer) hudDeltaContainer.className = "mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-green-50 text-green-700 border border-green-200 flex items-center gap-1.5 w-fit transition-colors duration-300";
+                    if (hudDeltaIcon) hudDeltaIcon.setAttribute('data-lucide', 'award');
+                    if (mobileHudDelta) {
+                        mobileHudDelta.textContent = "Badge Unlocked!";
+                        mobileHudDelta.className = "text-[9px] font-bold text-green-600 mt-0.5 transition-colors duration-300";
+                    }
+                }
+                
+                // Calculate Metrics based on Categories
+                let catPoints = { money: {s:0, max:0}, conflict: {s:0, max:0}, reading_room: {s:0, max:0} };
+                Object.keys(answeredScenarioScores).forEach(sIdx => {
+                    const s = SCENARIO_DATA[sIdx - 1];
+                    catPoints[s.cat].s += answeredScenarioScores[sIdx];
+                    catPoints[s.cat].max += 3;
+                });
+                
+                const getPct = (earned, max) => max === 0 ? 0 : Math.round((earned/max)*100);
+                // Category-derived, 1:1, no merging — three categories, three bars.
+                const ctPct = getPct(catPoints.money.s, catPoints.money.max);
+                const emPct = getPct(catPoints.conflict.s, catPoints.conflict.max);
+                const inPct = getPct(catPoints.reading_room.s, catPoints.reading_room.max);
+
+                document.getElementById('metric-critical').textContent = `${ctPct}%`;
+                document.getElementById('bar-critical').style.width = `${ctPct}%`;
+                document.getElementById('metric-empathy').textContent = `${emPct}%`;
+                document.getElementById('bar-empathy').style.width = `${emPct}%`;
+                document.getElementById('metric-integrity').textContent = `${inPct}%`;
+                document.getElementById('bar-integrity').style.width = `${inPct}%`;
+                
+                if (currentPageIndex < 2 || currentPageIndex === 3) {
+                    document.getElementById('hud-active-mission').textContent = "Standing By";
+                    document.getElementById('hud-mission-progress').textContent = "Select a mission to begin.";
+                    document.getElementById('mobile-hud-mission').textContent = "Standing By";
+                }
+            }
+
+            // --- LAUNCHPAD RENDERER ---
+            function renderLaunchpad() {
+                const grid = document.getElementById('category-grid');
+                grid.innerHTML = '';
+                let totalAnsweredAll = 0;
+
+                Object.keys(CATEGORIES).forEach(key => {
+                    const cat = CATEGORIES[key];
+                    let total = 0, answered = 0;
+                    SCENARIO_DATA.forEach((s, idx) => {
+                        if (s.cat === key) {
+                            total++;
+                            if (answeredScenarioScores[idx + 1] !== undefined) answered++;
+                        }
+                    });
+                    totalAnsweredAll += answered;
+                    
+                    const isComplete = answered === total;
+                    const statusHtml = isComplete 
+                        ? `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded"><i data-lucide="check" class="w-3 h-3 inline"></i> CLEARED</span>` 
+                        : `<span class="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-1 rounded">${answered} / ${total} DONE</span>`;
+
+                    const btn = document.createElement('button');
+                    btn.className = `w-full bg-white border-2 border-gray-200 hover:border-allgood-primary p-5 rounded-xl shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-3 group relative overflow-hidden ${isComplete ? 'opacity-80' : ''}`;
+                    btn.onclick = () => window.startCategory(key);
+                    btn.innerHTML = `
+                        <div class="absolute right-0 top-0 w-2 h-full ${cat.color} opacity-80"></div>
+                        <div class="flex items-center justify-between w-full">
+                            <div class="p-3 bg-gray-50 rounded-lg group-hover:bg-orange-50 transition-colors"><i data-lucide="${cat.icon}" class="w-6 h-6 text-allgood-dark group-hover:text-allgood-primary"></i></div>
+                            ${statusHtml}
+                        </div>
+                        <div><h3 class="font-heading font-bold text-lg text-allgood-dark group-hover:text-allgood-primary transition-colors">${cat.title}</h3><p class="text-xs text-gray-500 mt-1">${cat.desc}</p></div>
+                    `;
+                    grid.appendChild(btn);
+                });
+
+                if (totalAnsweredAll === TOTAL_SCENARIOS) {
+                    document.getElementById('final-evaluation-container').style.display = 'block';
+                }
+                lucide.createIcons();
+            }
+
+            // --- CATEGORY ROUTING / CONTINUOUS SCROLL FEED ---
+            window.startCategory = function(catKey, opts) {
+                opts = opts || {};
+                activeCategory = catKey;
+                categoryQueue = [];
+                SCENARIO_DATA.forEach((s, idx) => { if (s.cat === catKey) categoryQueue.push(idx + 1); }); // scenario indices, 1-based
+
+                // Find first unanswered position, or land at the end (review mode) if all done
+                let firstUnansweredPos = categoryQueue.findIndex(sIdx => answeredScenarioScores[sIdx] === undefined);
+                if (firstUnansweredPos === -1) firstUnansweredPos = categoryQueue.length - 1;
+                currentQueueIndex = firstUnansweredPos;
+
+                buildCategoryFeed(firstUnansweredPos, opts.forceUnlockIndex);
+                window.showPage(2);
+
+                // Scroll to a specific scenario if requested (e.g. from the Table of Contents)
+                requestAnimationFrame(() => {
+                    const targetScenario = opts.scrollToScenario || categoryQueue[firstUnansweredPos];
+                    const targetEl = document.getElementById('scenario-block-' + targetScenario);
+                    if (targetEl) targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+                });
+            }
+
+            // Builds the full vertical feed for the active category: answered scenarios shown read-only,
+            // the next unanswered one active/interactive, everything after it locked until reached.
+            function buildCategoryFeed(firstUnansweredPos, forceUnlockScenario) {
+                const container = document.getElementById('scenario-feed-container');
+                let html = '';
+                categoryQueue.forEach((sIdx, pos) => {
+                    let state;
+                    if (answeredScenarioScores[sIdx] !== undefined) state = 'answered';
+                    else if (pos === firstUnansweredPos || sIdx === forceUnlockScenario) state = 'active';
+                    else state = 'locked';
+                    html += renderScenarioBlockHTML(sIdx, state);
+                });
+                html += `<div id="mission-complete-card" class="${firstUnansweredPos === categoryQueue.length - 1 && answeredScenarioScores[categoryQueue[categoryQueue.length-1]] !== undefined ? '' : 'hidden'} max-w-xl mx-auto bg-white rounded-2xl border-t-4 border-allgood-primary shadow-sm p-8 text-center">
+                    <i data-lucide="check-circle-2" class="w-10 h-10 text-allgood-primary mx-auto mb-3"></i>
+                    <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Mission Complete</h3>
+                    <p class="text-sm text-gray-500 mb-5">You've answered every scenario in this sector.</p>
+                    <button onclick="window.showPage(1)" class="bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 px-6 rounded-full text-xs uppercase tracking-wider shadow-md">Back to Launchpad</button>
+                </div>`;
+                container.innerHTML = html;
+                lucide.createIcons();
+                setupFeedObserver();
+            }
+
+            // Watches which scenario block is in view so the HUD, mobile pill, and Back/Next buttons
+            // stay in sync as the user scrolls — this is what makes scroll a first-class nav method.
+            function setupFeedObserver() {
+                if (feedObserver) feedObserver.disconnect();
+                const scrollRoot = document.querySelector('#page-scenario-feed');
+                feedObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const sIdx = parseInt(entry.target.getAttribute('data-scenario-idx'));
+                            const pos = categoryQueue.indexOf(sIdx);
+                            if (pos !== -1) { currentQueueIndex = pos; updateFeedNav(); }
+                        }
+                    });
+                }, { root: scrollRoot, threshold: 0.5 });
+                document.querySelectorAll('.scenario-block').forEach(el => feedObserver.observe(el));
+            }
+
+            // Refreshes HUD text, mobile pill, and Back/Next button state based on currentQueueIndex —
+            // called whenever the user scrolls to a new scenario, or answers one.
+            function updateFeedNav() {
+                if (!activeCategory) return;
+                const sIdx = categoryQueue[currentQueueIndex];
+                const isAnswered = answeredScenarioScores[sIdx] !== undefined;
+                const hudCatName = CATEGORIES[activeCategory].title;
+
+                document.getElementById('hud-active-mission').textContent = hudCatName;
+                document.getElementById('mobile-hud-mission').textContent = hudCatName;
+                document.getElementById('hud-mission-progress').textContent = `Scenario ${currentQueueIndex + 1} of ${categoryQueue.length}`;
+
+                let btnHtml;
+                if (!isAnswered) {
+                    nextButton.disabled = true;
+                    btnHtml = '<span class="hidden sm:inline">Awaiting Action</span>';
+                } else {
+                    nextButton.disabled = false;
+                    if (currentQueueIndex === categoryQueue.length - 1) {
+                        btnHtml = '<span class="hidden sm:inline">Complete Mission</span><i data-lucide="check" class="w-4 h-4 ml-1"></i>';
+                        nextButton.onclick = () => window.showPage(1);
+                    } else {
+                        btnHtml = '<span class="hidden sm:inline">Next Scenario</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
+                        nextButton.onclick = () => {
+                            const target = unlockScenarioBlock(categoryQueue[currentQueueIndex + 1]);
+                            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        };
+                    }
+                }
+                nextButton.innerHTML = btnHtml;
+
+                const pillText = document.getElementById('pill-text');
+                const pillHints = document.getElementById('pill-hints');
+                if (pillText) {
+                    pillText.textContent = isAnswered ? `Scenario ${currentQueueIndex + 1} of ${categoryQueue.length}` : "Answer above to continue";
+                    if (pillHints) pillHints.style.opacity = isAnswered ? "0.8" : "0.2";
+                }
+                lucide.createIcons();
+            }
+
+            // --- PAGE NAVIGATION ---
+            window.showPage = function(index) {
+                if (index < 0 || index >= TOTAL_PAGES) return;
+
+                if(window.sfx && window.sfx.nav) window.sfx.nav();
+
+                pages.forEach(p => p.classList.remove('active'));
+                pages[index].classList.add('active');
+                currentPageIndex = index;
+                pages[index].scrollTop = 0;
+                const pageContainerEl = document.querySelector('.page-container');
+                if (pageContainerEl) pageContainerEl.scrollTop = 0;
+
+                backButton.disabled = (index === 0);
+                backButton.classList.toggle('opacity-0', index === 0);
+
+                let btnHtml = '<span class="hidden sm:inline">Next</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
+
+                if (index === 0) {
+                    btnHtml = '<span class="hidden sm:inline">Start Challenge</span><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
+                    nextButton.style.display = 'flex';
+                    nextButton.onclick = () => window.showPage(1);
+                    nextButton.disabled = false;
+                    nextButton.innerHTML = btnHtml;
+                } else if (index === 1) {
+                    renderLaunchpad();
+                    nextButton.style.display = 'none'; // Hide next on launchpad
+                } else if (index === 2) {
+                    nextButton.style.display = 'flex';
+                    updateFeedNav();
+                } else if (index === 3) {
+                    btnHtml = '<span class="hidden sm:inline">Dashboard</span><i data-lucide="layout-grid" class="w-4 h-4 ml-1"></i>';
+                    nextButton.style.display = 'flex';
+                    nextButton.disabled = false;
+                    nextButton.onclick = () => {
+                        window.location.href = 'https://www.allgoodacademy.com';
+                    };
+                    nextButton.innerHTML = btnHtml;
+                    if(window.updateFinalScorePage) window.updateFinalScorePage();
+                }
+
+                updateProgress();
+                updateHUDDisplay();
+
+                // Update Mobile Pill
+                const pillText = document.getElementById('pill-text');
+                const pillHints = document.getElementById('pill-hints');
+                if (pillText) {
+                    if (index === 0) pillText.textContent = "Swipe left to begin";
+                    else if (index === 1) pillText.textContent = "Select a mission";
+                    else if (index === 3) pillText.textContent = "Mission Complete";
+                    else if (index === 2 && pillHints) pillHints.style.opacity = "0.2";
+                }
+
+                lucide.createIcons();
+            }
+
+            // --- STARTUP LOGIC ---
+            if (startupScreen) {
+                const warmUp = () => { if(window.initAudio) window.initAudio(); };
+                startupScreen.addEventListener('mousedown', warmUp, { once: true });
+                startupScreen.addEventListener('touchstart', warmUp, { once: true, passive: true });
+
+                let startupTriggered = false;
+                const handleStartup = async (e, skipSound) => {
+                    if (e && e.type === 'touchend') e.preventDefault(); // Prioritize immediate touch
+                    if (startupTriggered) return;
+                    startupTriggered = true;
+
+                    if(!skipSound && window.sfx) window.sfx.powerOn();
+
+                    startupScreen.style.opacity = '0';
+                    setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
+
+                    // Same gate the dashboard uses, run right here — reached directly by a
+                    // bookmarked or shared link, this module can't rely on the dashboard's
+                    // launchCourse having already checked this.
+                    const { user, account } = await window.AuthGate.ensureIdentified();
+                    if (!user) return;
+
+                    // Sync local display state from what the gate just resolved — the
+                    // module's own onAuthStateChanged already fired once for this sign-in,
+                    // before the gate finished setting a real displayName, so it can't be
+                    // relied on to have the final name.
+                    const finalName = user.displayName || (account && account.displayName) || "Agent Learner";
+                    window.currentUserName = finalName;
+                    window.currentUserEmail = user.email;
+                    if (window.updateUserDisplay) window.updateUserDisplay(finalName);
+                    localStorage.setItem('aa_username', finalName);
+                    localStorage.setItem('aa_uid', user.uid);
+                    localStorage.setItem('aa_is_guest', user.isAnonymous);
+
+                    window.logFinalScoreToFirestore({
+                        finalScore: 0,
+                        rank: "Session Started",
+                        completed: false,
+                        sessionId: window.sessionId
+                    });
+                    window.showPage(0);
+                };
+
+                startupScreen.addEventListener('click', handleStartup);
+                startupScreen.addEventListener('touchend', handleStartup);
+
+                // Someone actively moving between pages within the last hour shouldn't
+                // see this screen again. Wait for the first real auth resolution (not
+                // just DOMContentLoaded) so the signed-in-vs-not branch above is
+                // actually correct instead of racing Firebase's async auth check.
+                if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                    const unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
+                        unsub();
+                        handleStartup(null, true);
+                    });
+                }
+            }
+
+            // --- SCENARIO LOGIC ---
+            function getScenarioTemplate(type, title, icon, choicesHtml, feedbackHtml) {
+                const cleanText = title.split(" Question:")[0];
+
+                // The interactive card ALWAYS sits below the scene, at a comfortable reading width.
+                // Nothing interactive lives inside the small device mockups anymore — that was
+                // what forced a scrollbar inside a 280px-wide box. Now there's exactly one scroll
+                // region (the page itself), and the mockups are purely decorative context.
+                const answerCard = `
+                    <div class="max-w-xl mx-auto mt-5 bg-white rounded-2xl border border-gray-200 shadow-sm p-5 sm:p-6">
+                        <p class="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-3">Select Response</p>
+                        <div class="space-y-2">${choicesHtml}</div>
+                        ${feedbackHtml ? `<div class="mt-4">${feedbackHtml}</div>` : ''}
+                    </div>`;
+
+                let sceneHtml = '';
+
+                if (type === 'chat') {
+                    sceneHtml = `
+                    <div class="mx-auto bg-gray-800 border-[8px] border-gray-800 rounded-[1.8rem] w-full max-w-[260px] shadow-lg">
+                        <div class="rounded-[1.2rem] overflow-hidden w-full bg-slate-50">
+                            <div class="bg-slate-50 h-5 w-full flex justify-between items-center px-3 text-[8px] font-bold text-black"><span>9:41</span><div class="flex gap-1"><i class="fas fa-signal"></i><i class="fas fa-wifi"></i><i class="fas fa-battery-full"></i></div></div>
+                            <div class="bg-slate-100/90 px-3 py-1.5 border-b border-slate-200/60 flex items-center justify-center"><span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Messages</span></div>
+                            <div class="p-3">
+                                <div class="flex items-end">
+                                    <div class="w-5 h-5 rounded-full bg-slate-200 flex-shrink-0 mr-2 flex items-center justify-center text-slate-500 border border-white shadow-sm"><i data-lucide="${icon}" class="w-2.5 h-2.5"></i></div>
+                                    <div class="bg-white p-2.5 rounded-2xl rounded-bl-none shadow-sm text-xs text-slate-700 leading-snug border border-slate-100">${cleanText}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                } else if (type === 'social') {
+                    sceneHtml = `
+                    <div class="mx-auto max-w-xs bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="px-3 py-2 flex items-center justify-between border-b border-gray-100">
+                            <div class="flex items-center space-x-2"><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[1.5px]"><div class="w-full h-full rounded-full bg-white p-[1px] flex items-center justify-center"><i data-lucide="user" class="w-3 h-3 text-gray-400"></i></div></div><div class="leading-none"><div class="text-[10px] font-bold text-gray-900">friend_123</div><div class="text-[8px] text-gray-400">Sponsored</div></div></div><i data-lucide="more-horizontal" class="w-3 h-3 text-gray-400"></i>
+                        </div>
+                        <div class="bg-gray-100 py-6 px-4 flex items-center justify-center text-center"><p class="text-xs font-serif font-medium text-gray-800 italic">"${cleanText}"</p></div>
+                        <div class="px-3 py-2"><div class="flex space-x-3 mb-1"><i data-lucide="heart" class="w-4 h-4 text-gray-800"></i><i data-lucide="message-circle" class="w-4 h-4 text-gray-800"></i><i data-lucide="share-2" class="w-4 h-4 text-gray-800"></i></div><div class="text-[9px] font-bold text-gray-900">4,203 likes</div></div>
+                    </div>`;
+                } else if (type === 'browser') {
+                    sceneHtml = `
+                    <div class="max-w-lg mx-auto bg-white rounded-lg overflow-hidden border border-gray-300 shadow-sm">
+                        <div class="bg-gray-100 px-3 py-2 flex items-center space-x-2 border-b border-gray-200">
+                            <div class="flex space-x-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-400"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div><div class="w-2.5 h-2.5 rounded-full bg-green-400"></div></div>
+                            <div class="flex-grow bg-white rounded shadow-inner h-6 flex items-center px-2 border border-gray-200"><i data-lucide="lock" class="w-2.5 h-2.5 text-green-600 mr-1.5"></i><span class="text-[10px] text-gray-400 font-mono">https://search.web/results</span></div>
+                        </div>
+                        <div class="p-5 bg-white">
+                            <div class="text-[10px] text-gray-500 mb-1 flex items-center"><span class="bg-gray-200 rounded px-1 mr-1">Ad</span> www.result.com</div>
+                            <h3 class="text-base text-blue-700 font-medium mb-1 truncate">Search Result: ${cleanText.substring(0, 40)}...</h3>
+                            <p class="text-sm text-gray-600 leading-relaxed">${cleanText}</p>
+                        </div>
+                    </div>`;
+                } else if (type === 'email') {
+                    sceneHtml = `
+                    <div class="max-w-lg mx-auto bg-white rounded-lg overflow-hidden border border-gray-300 shadow-sm">
+                        <div class="bg-blue-600 px-3 py-2 flex items-center justify-between text-white">
+                            <div class="flex items-center gap-2"><i data-lucide="mail" class="w-4 h-4"></i><span class="text-xs font-bold">MailClient</span></div>
+                            <div class="flex space-x-1"><div class="w-2 h-2 rounded-full bg-white/20"></div><div class="w-2 h-2 rounded-full bg-white/20"></div></div>
+                        </div>
+                        <div class="p-5">
+                            <div class="border-b border-gray-100 pb-3 mb-3">
+                                <h3 class="text-sm font-bold text-gray-800">Professional Opportunity</h3>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-[10px] font-bold">HR</div>
+                                    <div class="text-[10px] text-gray-500">To: Me &lt;applicant@email.com&gt;</div>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 leading-relaxed font-serif">${cleanText}</p>
+                        </div>
+                    </div>`;
+                } else if (type === 'video') {
+                    sceneHtml = `
+                    <div class="max-w-sm mx-auto bg-gray-900 rounded-lg overflow-hidden border border-gray-700 shadow-sm">
+                        <div class="p-2 grid grid-cols-2 gap-2">
+                            <div class="bg-gray-800 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-gray-700 min-h-[80px]">
+                                <div class="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-sm">P</div>
+                                <div class="absolute bottom-1 left-2 text-[8px] text-white font-bold bg-black/50 px-1 rounded">Professor</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-gray-700 min-h-[80px]">
+                                <i data-lucide="smile" class="text-gray-600 w-7 h-7"></i>
+                                <div class="absolute bottom-1 left-2 text-[8px] text-white font-bold bg-black/50 px-1 rounded">Classmate A</div>
+                                <div class="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            </div>
+                        </div>
+                        <div class="mx-2 mb-2 bg-gray-800 rounded-lg border border-gray-700 p-3 text-center"><p class="text-xs italic text-white/80">"${cleanText}"</p></div>
+                        <div class="h-9 bg-gray-800 border-t border-gray-700 flex items-center justify-center gap-3">
+                            <div class="p-1.5 rounded-full bg-gray-700 text-white"><i data-lucide="mic-off" class="w-3 h-3"></i></div>
+                            <div class="p-1.5 rounded-full bg-gray-700 text-white"><i data-lucide="video" class="w-3 h-3"></i></div>
+                            <div class="p-1.5 rounded-full bg-red-600 text-white px-3 text-[9px] font-bold">Leave</div>
+                        </div>
+                    </div>`;
+                } else if (type === 'game') {
+                    sceneHtml = `
+                    <div class="max-w-sm mx-auto bg-gray-900 rounded-lg overflow-hidden border border-gray-700 shadow-sm font-mono">
+                        <div class="bg-black/50 px-3 py-1 flex justify-between items-center text-green-500 text-[9px] border-b border-green-500/30">
+                            <span>FPS: 60</span> <span>PING: 24ms</span>
+                        </div>
+                        <div class="bg-gray-800 flex items-center justify-center p-4">
+                            <div class="w-full bg-black/60 border border-green-500/30 rounded p-2">
+                                <div class="text-[9px] text-gray-400">[Global] <span class="text-red-400">Troll_User99:</span> ${cleanText}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                } else if (type === 'form') {
+                    sceneHtml = `
+                    <div class="mx-auto max-w-[260px] bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-center">
+                        <div class="w-11 h-11 bg-blue-600 rounded-xl mx-auto flex items-center justify-center text-white mb-3 shadow-lg shadow-blue-200"><i data-lucide="${icon}" class="w-5 h-5"></i></div>
+                        <h3 class="text-base font-bold text-gray-800">Security Check</h3>
+                        <p class="text-xs text-gray-500 mt-1">${cleanText}</p>
+                    </div>`;
+                } else {
+                    sceneHtml = `
+                    <div class="mx-auto max-w-sm bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-gray-50 p-2 rounded-lg border border-gray-100 shadow-sm shrink-0"><i data-lucide="${icon}" class="w-5 h-5 text-allgood-primary"></i></div>
+                            <div><h4 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">System Notification</h4><p class="text-sm text-gray-600 leading-snug">${cleanText}</p></div>
+                        </div>
+                    </div>`;
+                }
+
+                return `<div class="w-full">${sceneHtml}${answerCard}</div>`;
+            }
+
+            // Renders one scenario as a feed block. state: 'locked' | 'active' | 'answered'.
+            // Locked blocks are a lightweight placeholder — the real content only renders once reached,
+            // so scrolling ahead never spoils answers and never has to render 30 scenarios' worth of DOM upfront.
+            function renderScenarioBlockHTML(scenarioIndex, state) {
+                if (state === 'locked') {
+                    return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" data-locked="true" class="scenario-block mb-10 max-w-xl mx-auto bg-white/60 rounded-2xl border border-dashed border-gray-300 p-8 text-center select-none">
+                        <i data-lucide="lock" class="w-5 h-5 text-gray-300 mx-auto mb-2"></i>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Scenario ${scenarioIndex}</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Answer the scenario above to continue</p>
+                    </div>`;
+                }
+
+                const data = SCENARIO_DATA[scenarioIndex - 1];
+                const isAnswered = state === 'answered';
+
+                let uiType = 'system';
+                const icon = data.icon;
+                if (['briefcase'].includes(icon)) uiType = 'email';
+                else if (['tv'].includes(icon)) uiType = 'video';
+                else if (['gamepad-2'].includes(icon)) uiType = 'game';
+                else if (['key', 'lock', 'user-lock', 'form-input', 'wallet', 'bug'].includes(icon)) uiType = 'form';
+                else if (['message-square', 'message-square-off', 'phone-off', 'split'].includes(icon)) uiType = 'chat';
+                else if (['users', 'users-x', 'user-plus', 'heart-off', 'camera-off', 'user-round-minus', 'user-round-x', 'thumbs-down', 'image-up', 'frown'].includes(icon)) uiType = 'social';
+                else if (['search', 'globe', 'search-check', 'book-open-check', 'image'].includes(icon)) uiType = 'browser';
+
+                let choicesHtml = data.choices.map((choice, index) => {
+                    let btnClass = 'w-full text-left p-2.5 rounded-lg text-xs font-medium transition-all shadow-sm mb-2 border';
+                    if (isAnswered) {
+                        if (choice.score === 3) {
+                            btnClass += ' bg-emerald-50 border-emerald-200 text-emerald-800 ring-1 ring-emerald-300';
+                        } else if (answeredScenarioScores[scenarioIndex] === choice.score) {
+                             btnClass += choice.score === 1
+                                ? ' bg-amber-50 border-amber-200 text-amber-800 ring-1 ring-amber-300'
+                                : ' bg-rose-50 border-rose-200 text-rose-800 ring-1 ring-rose-300';
+                        } else {
+                            btnClass += ' bg-gray-50 border-gray-100 text-gray-400 opacity-60';
+                        }
+                    } else {
+                        btnClass += ' bg-white border-gray-200 text-gray-700 md:hover:border-allgood-primary md:hover:bg-orange-50 md:hover:text-allgood-primary active:border-allgood-primary active:bg-orange-50 active:text-allgood-primary cursor-pointer active:scale-[0.98]';
+                    }
+
+                    const disabledAttr = isAnswered ? 'disabled' : '';
+
+                    return `<button class="${btnClass}" onclick="window.selectScenarioChoice(${scenarioIndex}, ${index})" ${disabledAttr}>
+                        <div class="flex items-start">
+                            <span class="font-bold mr-2 opacity-50 text-[10px] uppercase mt-0.5">${String.fromCharCode(65 + index)}</span>
+                            <span>${sanitizeText(choice.text)}</span>
+                        </div>
+                    </button>`;
+                }).join('');
+
+                let feedbackHtml = '';
+                if (isAnswered) {
+                    const chosen = data.choices.find(c => c.score === answeredScenarioScores[scenarioIndex]);
+                    let bgClass = chosen.score === 3 ? 'bg-emerald-100 border-emerald-200' : (chosen.score === 1 ? 'bg-amber-100 border-amber-200' : 'bg-rose-100 border-rose-200');
+                    let textClass = chosen.score === 3 ? 'text-emerald-800' : (chosen.score === 1 ? 'text-amber-800' : 'text-rose-800');
+                    let iconName = chosen.score === 3 ? 'check-circle' : 'alert-circle';
+
+                    feedbackHtml = `
+                    <div class="${bgClass} border rounded-lg p-3 flex items-start gap-3 shadow-sm">
+                         <i data-lucide="${iconName}" class="w-5 h-5 ${textClass} flex-shrink-0 mt-0.5"></i>
+                         <div class="flex-1">
+                             <p class="text-[10px] font-bold uppercase tracking-wider ${textClass} mb-2 border-b border-${chosen.score === 3 ? 'emerald' : (chosen.score === 1 ? 'amber' : 'rose')}-200/50 pb-1">
+                                ${chosen.effectiveness.replace('-', ' ')}
+                             </p>
+                             ${formatFeedbackContent(chosen.feedback, textClass)}
+                         </div>
+                    </div>`;
+                }
+
+                const visualHtml = getScenarioTemplate(uiType, data.title, icon, choicesHtml, feedbackHtml);
+
+                return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" class="scenario-block mb-10 scroll-mt-4">
+                    <section class="mb-4 border-b border-gray-200 pb-2 flex justify-between items-end max-w-xl mx-auto">
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark">Scenario ${scenarioIndex}</h2>
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">${isAnswered ? 'Reviewed' : 'Decide'}</span>
+                    </section>
+                    <div class="flex justify-center">
+                        ${visualHtml}
+                    </div>
+                </div>`;
+            }
+
+            // Unlocks a scenario block in place if it's still showing the locked placeholder.
+            // Shared by closeScenarioModal (auto-advance) and the Next button (manual advance) so
+            // neither path can scroll a user to a block that's still locked.
+            function unlockScenarioBlock(sIdx) {
+                const el = document.getElementById('scenario-block-' + sIdx);
+                if (!el) return null;
+                if (el.dataset.locked === 'true') {
+                    el.outerHTML = renderScenarioBlockHTML(sIdx, 'active');
+                    lucide.createIcons();
+                    const freshEl = document.getElementById('scenario-block-' + sIdx);
+                    if (feedObserver && freshEl) feedObserver.observe(freshEl);
+                    return freshEl;
+                }
+                return el;
+            }
+
+            window.selectScenarioChoice = function(sIdx, cIdx) {
+                const data = SCENARIO_DATA[sIdx - 1];
+                const chosen = data.choices[cIdx];
+                
+                if (answeredScenarioScores[sIdx] === undefined) {
+                    totalChallengeScore += chosen.score;
+                    answeredScenarioScores[sIdx] = chosen.score;
+                    
+                    window.logScenarioAttempt({
+                        scenarioIndex: sIdx,
+                        choiceIndex: cIdx,
+                        score: chosen.score,
+                        effectiveness: chosen.effectiveness,
+                        question: data.title
+                    });
+
+                    window.logFinalScoreToFirestore({
+                        finalScore: totalChallengeScore,
+                        completed: false,
+                        sessionId: window.sessionId
+                    });
+
+                    if (window.Telemetry) window.Telemetry.step(Object.keys(answeredScenarioScores).length);
+
+                    if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                        window.AuthCore.saveModuleProgress('rwr-challenge', {
+                            answeredScenarioScores,
+                            totalChallengeScore,
+                        });
+                    }
+                }
+
+                // Re-render just this block in its answered state — the rest of the feed stays untouched.
+                const blockEl = document.getElementById('scenario-block-' + sIdx);
+                if (blockEl) {
+                    blockEl.outerHTML = renderScenarioBlockHTML(sIdx, 'answered');
+                    lucide.createIcons();
+                    // Re-observe since outerHTML replaced the node the observer was watching
+                    const freshEl = document.getElementById('scenario-block-' + sIdx);
+                    if (feedObserver && freshEl) feedObserver.observe(freshEl);
+                }
+                updateHUDDisplay();
+                if (currentPageIndex === 2) updateFeedNav();
+                
+                let iconClass = chosen.score === 3 ? 'bg-green-100 text-green-600' : (chosen.score === 1 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600');
+                let iconInner = chosen.score === 3 ? '<i data-lucide="check-circle" class="w-8 h-8"></i>' : (chosen.score === 1 ? '<i data-lucide="alert-triangle" class="w-8 h-8"></i>' : '<i data-lucide="x-circle" class="w-8 h-8"></i>');
+                
+                window.showScenarioOutcome('scenario-completed', {
+                    title: `${chosen.effectiveness.toUpperCase().replace('-', ' ')} (${chosen.score} / 3 pts)`,
+                    htmlText: formatFeedbackContent(chosen.feedback, 'text-gray-600'),
+                    iconClass: iconClass,
+                    iconInner: iconInner,
+                    answeredScenario: sIdx
+                });
+            }
+
+            window.closeScenarioModal = (advance) => {
+                document.getElementById('scenario-modal').classList.remove('visible-modal');
+                document.getElementById('scenario-modal').classList.add('hidden-modal');
+                sfx.nav();
+
+                if (advance && currentPageIndex === 2 && activeCategory && lastAnsweredScenario !== null) {
+                    const pos = categoryQueue.indexOf(lastAnsweredScenario);
+                    const nextScenario = categoryQueue[pos + 1];
+
+                    setTimeout(() => {
+                        if (nextScenario !== undefined) {
+                            const freshEl = unlockScenarioBlock(nextScenario);
+                            if (freshEl) freshEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        } else {
+                            // That was the last scenario in the category — reveal the completion card
+                            const completeCard = document.getElementById('mission-complete-card');
+                            if (completeCard) {
+                                completeCard.classList.remove('hidden');
+                                completeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }
+                    }, 100);
+                }
+            }
+
+            window.showScenarioOutcome = (type, data) => {
+                const modal = document.getElementById('scenario-modal');
+                const title = document.getElementById('scenario-title');
+                const fb = document.getElementById('scenario-feedback');
+                const icon = document.getElementById('scenario-icon');
+                const btn = document.getElementById('scenario-modal-next-btn');
+
+                if (type === 'challenge-incomplete') {
+                    title.textContent = "Incomplete";
+                    fb.textContent = "Please answer all questions.";
+                    icon.className = "mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl bg-red-100 text-red-600";
+                    icon.innerHTML = '<i data-lucide="alert-triangle" class="w-8 h-8"></i>';
+                    btn.onclick = () => window.closeScenarioModal(false);
+                } else {
+                    title.textContent = data.title;
+                    fb.innerHTML = data.htmlText; 
+                    icon.className = `mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl ${data.iconClass}`;
+                    icon.innerHTML = data.iconInner;
+                    if (data.answeredScenario !== undefined) lastAnsweredScenario = data.answeredScenario;
+                    btn.onclick = () => window.closeScenarioModal(true);
+                }
+                modal.classList.remove('hidden-modal');
+                modal.classList.add('visible-modal');
+                sfx.tick();
+                lucide.createIcons();
+            }
+
+            window.updateFinalScorePage = function() {
+                const scoreValue = document.getElementById('final-score-value');
+                const scorePercent = document.getElementById('final-score-percent');
+                const rankHeading = document.getElementById('final-rank-heading');
+                const rankMessage = document.getElementById('final-rank-message');
+                const badgeBtn = document.getElementById('download-badge-btn');
+                const certReqText = document.getElementById('cert-req-text'); 
+                const certSection = document.getElementById('certification-section');
+
+                let currentScore = 0;
+                try {
+                    const scores = Object.values(answeredScenarioScores);
+                    if (scores.length > 0) {
+                        currentScore = scores.reduce((acc, val) => acc + (Number(val) || 0), 0);
+                    }
+                } catch(e) { console.error("Score calc error", e); }
+
+                if (currentScore === 0 && totalChallengeScore > 0) {
+                    currentScore = totalChallengeScore;
+                }
+
+                const percentage = Math.round((currentScore / MAX_SCORE) * 100);
+
+                let rank = "";
+                let rankColor = "";
+                let message = "";
+                
+                if (percentage >= 89) { 
+                    rank = "Digital Architect";
+                    rankColor = "text-green-600";
+                    message = "Exceptional! You consistently demonstrated the Publisher Mindset.";
+                } else if (percentage >= 70) {
+                    rank = "Digital Manager";
+                    rankColor = "text-yellow-600";
+                    message = "Solid performance. Review your 'less-effective' choices.";
+                } else {
+                    rank = "Digital Learner";
+                    rankColor = "text-red-600";
+                    message = "Good start. Reread the feedback and try again.";
+                }
+
+                scoreValue.textContent = `${currentScore} / ${MAX_SCORE}`;
+                scoreValue.className = `text-5xl font-extrabold font-heading ${rankColor}`;
+                scorePercent.textContent = `(${percentage}% Effectiveness)`;
+                rankHeading.textContent = rank;
+                rankHeading.className = `text-xl font-heading font-bold mb-2 ${rankColor}`;
+                rankMessage.textContent = message;
+                certReqText.innerHTML = sanitizeText(certReqText.innerHTML);
+
+                const isComplete = Object.keys(answeredScenarioScores).length === TOTAL_SCENARIOS;
+                const isPassing = currentScore >= BADGE_THRESHOLD;
+                
+                badgeBtn.disabled = true;
+                badgeBtn.className = "w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300";
+                
+                if (!isComplete) {
+                     badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Finish Challenge to Unlock';
+                     if (certSection) certSection.classList.add('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
+                } else if (!isPassing) {
+                     badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Certification Locked (Score < 64)';
+                     if (certSection) certSection.classList.add('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
+                } else if (!feedbackSubmitted) {
+                     badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Submit Feedback to Unlock';
+                     if (certSection) certSection.classList.remove('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
+                } else {
+                     badgeBtn.disabled = true;
+                     badgeBtn.className = "w-full bg-emerald-100 text-emerald-700 font-bold py-3 rounded shadow-none cursor-default flex items-center justify-center transition-all duration-300 border border-emerald-200";
+                     badgeBtn.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4 mr-2"></i>Certification Unlocked';
+                     if (certSection) certSection.classList.remove('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
+                }
+                
+                // completed is the explicit signal the dashboard and roster key off of —
+                // isComplete already gates reaching this page at all (see
+                // final-evaluation-container), but stay honest and derive it from state
+                // rather than assuming it, in case that gating ever changes.
+                window.logFinalScoreToFirestore({
+                    finalScore: currentScore,
+                    maxScore: MAX_SCORE,
+                    percentage: percentage,
+                    rank: rank,
+                    completed: isComplete,
+                    sessionId: window.sessionId
+                });
+                if (window.Telemetry) window.Telemetry.complete({ finalScore: currentScore, maxScore: MAX_SCORE, percentage: percentage, rank: rank });
+            };
+
+            // --- TOC LOGIC ---
+            function updateTOC() {
+                const tocList = document.getElementById('toc-list');
+                if (!tocList) return;
+                tocList.innerHTML = '';
+                
+                const homeBtn = document.createElement('button');
+                homeBtn.className = 'w-full text-left p-2 hover:bg-gray-100 rounded text-allgood-dark font-bold text-xs flex items-center mb-1';
+                homeBtn.innerHTML = '<i data-lucide="home" class="w-4 h-4 mr-2"></i> Cover Page';
+                homeBtn.onclick = () => { window.showPage(0); window.closeMenuModal(); };
+                tocList.appendChild(homeBtn);
+
+                const lpBtn = document.createElement('button');
+                lpBtn.className = 'w-full text-left p-2 hover:bg-gray-100 rounded text-allgood-dark font-bold text-xs flex items-center mb-2 border-b border-gray-100 pb-2';
+                lpBtn.innerHTML = '<i data-lucide="grid" class="w-4 h-4 mr-2"></i> Mission Launchpad';
+                lpBtn.onclick = () => { window.showPage(1); window.closeMenuModal(); };
+                tocList.appendChild(lpBtn);
+                
+                SCENARIO_DATA.forEach((s, idx) => {
+                    const btn = document.createElement('button');
+                    const isAns = answeredScenarioScores[idx + 1] !== undefined;
+                    const iconName = isAns ? 'check-circle' : 'circle';
+                    const iconClass = isAns ? 'text-green-500' : 'text-gray-300';
+                    
+                    btn.className = 'w-full text-left p-1.5 hover:bg-gray-100 rounded text-gray-600 text-[10px] flex items-center truncate';
+                    btn.innerHTML = `<i data-lucide="${iconName}" class="w-3 h-3 mr-2 shrink-0 ${iconClass}"></i> <span class="truncate">Scenario ${idx + 1}</span>`;
+                    btn.onclick = () => {
+                        window.startCategory(s.cat, { scrollToScenario: idx + 1, forceUnlockIndex: idx + 1 });
+                        window.closeMenuModal();
+                    };
+                    tocList.appendChild(btn);
+                });
+                if(window.lucide) window.lucide.createIcons();
+            }
+
+            // --- NAV LISTENERS & SWIPE LOGIC ---
+            const handleBackAction = () => {
+                if (currentPageIndex === 2 && activeCategory) {
+                    if (currentQueueIndex > 0) {
+                        const prevScenario = categoryQueue[currentQueueIndex - 1];
+                        const prevEl = document.getElementById('scenario-block-' + prevScenario);
+                        if (prevEl) prevEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                        window.showPage(1);
+                    }
+                } else if (currentPageIndex > 0) {
+                    window.showPage(currentPageIndex - 1); 
+                }
+            };
+            
+            if(backButton) backButton.addEventListener('click', handleBackAction);
+
+            // Mobile Swipe Detection
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchEndX = 0;
+            let touchEndY = 0;
+
+            const pageContainer = document.querySelector('.page-container');
+            if (pageContainer) {
+                pageContainer.addEventListener('touchstart', e => {
+                    touchStartX = e.changedTouches[0].screenX;
+                    touchStartY = e.changedTouches[0].screenY;
+                }, { passive: true });
+
+                pageContainer.addEventListener('touchend', e => {
+                    touchEndX = e.changedTouches[0].screenX;
+                    touchEndY = e.changedTouches[0].screenY;
+                    handleSwipe();
+                }, { passive: true });
+            }
+
+            function handleSwipe() {
+                if (currentPageIndex === 2) return; // feed page: vertical scroll is the primary gesture
+                const swipeThreshold = 50; 
+                const verticalTolerance = 60; 
+                const isHorizontalSwipe = Math.abs(touchStartX - touchEndX) > swipeThreshold;
+                const isNotVerticalScroll = Math.abs(touchStartY - touchEndY) < verticalTolerance;
+
+                if (isHorizontalSwipe && isNotVerticalScroll) {
+                    if (touchEndX < touchStartX) {
+                        // Swipe Left (Next)
+                        if (!nextButton.disabled && nextButton.style.display !== 'none') {
+                            nextButton.click();
+                            document.getElementById('mobile-progress-pill').style.transform = 'translate(-50%, 0) scale(1.05)';
+                            setTimeout(() => document.getElementById('mobile-progress-pill').style.transform = 'translate(-50%, 0) scale(1)', 150);
+                        }
+                    } else if (touchEndX > touchStartX) {
+                        // Swipe Right (Back)
+                        if (!backButton.disabled && !backButton.classList.contains('opacity-0')) {
+                            handleBackAction();
+                            document.getElementById('mobile-progress-pill').style.transform = 'translate(-50%, 0) scale(1.05)';
+                            setTimeout(() => document.getElementById('mobile-progress-pill').style.transform = 'translate(-50%, 0) scale(1)', 150);
+                        }
+                    }
+                }
+            }
+
+            document.getElementById('menu-toggle').addEventListener('click', window.openMenuModal);
+            document.getElementById('close-menu').addEventListener('click', window.closeMenuModal);
+            
+            // --- HEADER LISTENERS ---
+            // Home is a single tap now — no hidden hold gesture. It always opens the
+            // same two-choice modal (Restart This Module / Go to Dashboard) so the
+            // available actions are visible rather than discovered by accident.
+            const homeButton = document.getElementById('home-button');
+            if(homeButton) {
+                homeButton.addEventListener('click', () => {
+                    document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                    document.getElementById('system-menu-modal').classList.add('visible-modal');
+                    if(window.lucide) window.lucide.createIcons();
+                    if(window.sfx) window.sfx.nav();
+                });
+            }
+
+            // --- SYSTEM MENU FUNCTIONS ---
+            window.closeSystemMenu = () => {
+                 document.getElementById('system-menu-modal').classList.add('hidden-modal');
+                 document.getElementById('system-menu-modal').classList.remove('visible-modal');
+            };
+
+            window.restartModule = () => {
+                window.closeSystemMenu();
+                window.showPage(0);
+                if(window.sfx) window.sfx.nav();
+            };
+
+            window.handleLogOut = async () => {
+                if (window.authSignOut) await window.authSignOut();
+                localStorage.removeItem('aa_username');
+                localStorage.removeItem('aa_email');
+                localStorage.removeItem('aa_uid');
+                localStorage.removeItem('aa_is_guest');
+                
+                totalChallengeScore = 0;
+                answeredScenarioScores = {};
+                window.currentUser = null;
+                window.currentUserName = "Anonymous";
+                
+                window.closeSystemMenu();
+                
+                const startup = document.getElementById('startup-screen');
+                startup.style.display = 'flex';
+                setTimeout(() => startup.style.opacity = '1', 10);
+                
+                window.showPage(0);
+                sfx.powerOff();
+            };
+
+            window.handleSystemExit = () => {
+                window.location.href = "https://www.allgoodacademy.com";
+            };
+
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            
+            document.querySelectorAll('.accordion-toggle').forEach(acc => {
+                acc.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    const icon = this.querySelector('.accordion-icon');
+                    content.classList.toggle('hidden');
+                    if(icon) icon.classList.toggle('rotate-180');
+                    sfx.tick();
+                });
+            });
+
+            // Initial Render
+            window.showPage(0);
+            updateTOC();
+            
+            window.performHardReset = () => {
+                totalChallengeScore = 0;
+                answeredScenarioScores = {};
+                activeCategory = null;
+                categoryQueue = [];
+                currentQueueIndex = 0;
+
+                // A retake is a brand-new attempt, not a continuation: give it its own
+                // sessionId so it lands in its own game_scores doc (every attempt logged
+                // separately, timestamped, nothing overwritten) and clear the persisted
+                // resume-progress doc so a reload mid-retake can't resurrect the scores
+                // from the attempt just abandoned.
+                window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                    window.AuthCore.saveModuleProgress('rwr-challenge', {
+                        answeredScenarioScores: {},
+                        totalChallengeScore: 0,
+                    });
+                }
+
+                if (feedObserver) feedObserver.disconnect();
+                const feedContainer = document.getElementById('scenario-feed-container');
+                if (feedContainer) feedContainer.innerHTML = '';
+                updateTOC();
+                const startup = document.getElementById('startup-screen');
+                startup.style.display = 'flex';
+                setTimeout(() => startup.style.opacity = '1', 10);
+                window.showPage(0);
+                sfx.powerOff();
+            }
+            
+            
+            window.setRating = function(n) {
+                currentStarRating = n; 
+                for (let i = 1; i <= 5; i++) {
+                    const star = document.getElementById(`star-${i}`);
+                    if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                    else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
+                }
+                sfx.tick();
+            }
+            window.submitFeedback = function() {
+                const feedbackText = document.getElementById('feedback-text').value;
+
+                if (window.AuthCore.auth.currentUser) {
+                    window.AuthCore.submitCourseFeedback({
+                        gameName: "Real World Ready Challenge",
+                        rating: currentStarRating,
+                        feedback: feedbackText,
+                    }).catch(e => console.error("Course feedback write failed", e));
+                }
+
+                document.getElementById('feedback-container').classList.add('hidden');
+                document.getElementById('feedback-success').classList.remove('hidden');
+                
+                const initEvalBtn = document.getElementById('init-eval-btn');
+                if (initEvalBtn) {
+                    initEvalBtn.disabled = false;
+                    initEvalBtn.classList.remove('bg-gray-300', 'cursor-not-allowed');
+                    initEvalBtn.classList.add('bg-allgood-dark', 'hover:bg-allgood-primary');
+                    initEvalBtn.innerText = 'Initialize Evaluation';
+                }
+
+                feedbackSubmitted = true;
+                sfx.nav(); 
+            }
+
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
