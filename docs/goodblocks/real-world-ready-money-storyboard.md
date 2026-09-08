@@ -14,7 +14,7 @@
 | Icon | `coins` (verified against the Lucide icon library) |
 | Jodi continuity | Solo — no recurring characters, no callbacks to other GoodBlocks |
 | Total scenarios | 5 |
-| Badge text | "5 scenarios completed" |
+| Badge text | "5 cases completed" |
 | Post-completion redirect | Main JSH hub |
 
 ## Scenarios as built
