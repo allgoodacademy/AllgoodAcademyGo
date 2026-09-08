@@ -353,13 +353,10 @@
                                     
                                     <div class="mt-8 text-center" id="final-evaluation-container" style="display: none;">
                                         <div class="inline-block bg-white p-6 rounded-xl shadow-md border-t-4 border-allgood-primary max-w-md w-full">
-                                            <i data-lucide="shield-check" class="w-12 h-12 text-allgood-primary mx-auto mb-3"></i>
-                                            <h3 class="font-heading font-bold text-xl mb-2">All Missions Complete</h3>
-                                            <p class="text-sm text-gray-600 mb-6">You have responded to all 30 scenarios. Provide feedback to unlock your final evaluation.</p>
-                                            
-                                            <!-- MOVED & GATED FEEDBACK SECTION -->
+                                            <h3 class="font-heading font-bold text-xl mb-1">Before You Go</h3>
+                                            <p class="text-sm text-gray-500 mb-6">How was this one?</p>
+
                                             <div id="feedback-container" class="w-full bg-gray-50 p-4 rounded-lg shadow-inner border border-gray-200 mb-6 text-left relative">
-                                                <h3 class="font-bold text-allgood-dark text-xs uppercase tracking-wide mb-3 text-center">Rate this GoodBlock</h3>
                                                 <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
                                                     <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
                                                     <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
@@ -367,15 +364,10 @@
                                                     <button onclick="window.setRating(4)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="4"><i id="star-4" class="fas fa-star text-2xl text-gray-300"></i></button>
                                                     <button onclick="window.setRating(5)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="5"><i id="star-5" class="fas fa-star text-2xl text-gray-300"></i></button>
                                                 </div>
-                                                <textarea id="feedback-text" rows="2" class="w-full border border-gray-300 rounded p-2 text-xs focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-white" style="font-size:16px;" placeholder="Optional: What worked? What didn't?"></textarea>
-                                                <button onclick="window.submitFeedback()" class="w-full mt-3 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-xs uppercase tracking-wider">Submit & Unlock</button>
+                                                <!-- 16px font: anything smaller makes iOS zoom the page on focus. -->
+                                                <textarea id="feedback-text" rows="2" class="w-full border border-gray-300 rounded p-2 text-xs focus:ring-1 focus:ring-allgood-primary focus:border-allgood-primary outline-none resize-none bg-white" style="font-size:16px;" placeholder="Anything you want to tell us? (optional)"></textarea>
+                                                <button id="submit-feedback-btn" onclick="window.submitFeedback()" class="hidden w-full mt-3 bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-2 rounded transition-colors text-xs uppercase tracking-wider">Submit</button>
                                             </div>
-                                            <div id="feedback-success" class="hidden w-full bg-green-50 p-4 rounded-lg shadow-inner border border-green-200 mb-6 text-center">
-                                                <i data-lucide="check-circle" class="w-8 h-8 text-green-600 mx-auto mb-1"></i>
-                                                <h3 class="font-bold text-green-800 text-sm">Feedback Received.</h3>
-                                            </div>
-
-                                            <button id="init-eval-btn" onclick="window.showPage(3)" class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-md transition-colors uppercase tracking-wide text-xs cursor-not-allowed" disabled>Initialize Evaluation (Locked)</button>
                                         </div>
                                     </div>
                                 </div>
@@ -1807,6 +1799,13 @@
 
             document.getElementById('menu-toggle').addEventListener('click', window.openMenuModal);
             document.getElementById('close-menu').addEventListener('click', window.closeMenuModal);
+
+            const rwrFeedbackBox = document.getElementById('feedback-text');
+            if (rwrFeedbackBox) {
+                rwrFeedbackBox.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.submitFeedback(); }
+                });
+            }
             
             // --- HEADER LISTENERS ---
             // Home is a single tap now — no hidden hold gesture. It always opens the
@@ -1909,15 +1908,18 @@
             
             
             window.setRating = function(n) {
-                currentStarRating = n; 
+                currentStarRating = n;
                 for (let i = 1; i <= 5; i++) {
                     const star = document.getElementById(`star-${i}`);
-                    if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); } 
+                    if (i <= n) { star.classList.remove('text-gray-300'); star.classList.add('text-yellow-400'); }
                     else { star.classList.add('text-gray-300'); star.classList.remove('text-yellow-400'); }
                 }
                 sfx.tick();
+                const submitBtn = document.getElementById('submit-feedback-btn');
+                if (submitBtn) submitBtn.classList.remove('hidden');
             }
             window.submitFeedback = function() {
+                if (!currentStarRating) { sfx.tick(); return; }
                 const feedbackText = document.getElementById('feedback-text').value;
 
                 if (window.AuthCore.auth.currentUser) {
@@ -1928,19 +1930,10 @@
                     }).catch(e => console.error("Course feedback write failed", e));
                 }
 
-                document.getElementById('feedback-container').classList.add('hidden');
-                document.getElementById('feedback-success').classList.remove('hidden');
-                
-                const initEvalBtn = document.getElementById('init-eval-btn');
-                if (initEvalBtn) {
-                    initEvalBtn.disabled = false;
-                    initEvalBtn.classList.remove('bg-gray-300', 'cursor-not-allowed');
-                    initEvalBtn.classList.add('bg-allgood-dark', 'hover:bg-allgood-primary');
-                    initEvalBtn.innerText = 'Initialize Evaluation';
-                }
-
                 feedbackSubmitted = true;
-                sfx.nav(); 
+                sfx.nav();
+                // Straight to the earned outcome (certified or retake) — no separate unlock step.
+                window.showPage(3);
             }
 
             lucide.createIcons();
