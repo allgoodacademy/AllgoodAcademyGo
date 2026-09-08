@@ -998,6 +998,10 @@
                     window.closeCaseMenu();
                     const pageEl = document.getElementById(`page-${i + 1}`);
                     if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Case 1's page holds the startup overlay, which fades itself to
+                    // display:none on first dismissal - scrolling to page-1 alone would land on
+                    // a blank page after that, so bring the overlay back too.
+                    if (i === 0 && window.reshowStartupScreen) window.reshowStartupScreen();
                 };
                 list.appendChild(btn);
             }
@@ -2179,7 +2183,15 @@
             if (startup) {
                 let startupTriggered = false;
                 const handleStartup = async () => {
-                    if (startupTriggered) return;
+                    if (startupTriggered) {
+                        // Already dismissed once - this is a replay (from the Case menu, or a
+                        // stray click on the now-empty page-1) rather than the real first
+                        // dismissal, so just fade it back out without re-running
+                        // advanceFromPage(1) again.
+                        startup.style.opacity = '0';
+                        setTimeout(() => { startup.style.display = 'none'; }, 700);
+                        return;
+                    }
                     startupTriggered = true;
                     if (window.sfx) window.sfx.powerOn();
                     startup.style.opacity = '0';
@@ -2197,6 +2209,17 @@
                     if (window.advanceFromPage) window.advanceFromPage(1);
                 };
                 startup.addEventListener('click', handleStartup);
+
+                // "Peek back at Case 1" from the Jump-to-a-Case menu - page-1 has no content of
+                // its own once #startup-screen fades itself to display:none, so scrolling to it
+                // alone would land on a blank page. Re-show the overlay too. Clicking it again
+                // just calls handleStartup, which (now that startupTriggered is true) fades it
+                // back out without touching highestUnlocked/pageCompletion.
+                window.reshowStartupScreen = () => {
+                    startup.style.display = 'flex';
+                    void startup.offsetWidth; // force reflow so the opacity transition replays
+                    startup.style.opacity = '1';
+                };
 
                 // Someone actively moving between pages within the last hour shouldn't see
                 // this screen again — same rolling-activity pattern DDC/Social Intelligence use.

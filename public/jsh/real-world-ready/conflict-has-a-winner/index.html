@@ -653,6 +653,10 @@
                     window.closeCaseMenu();
                     const pageEl = document.getElementById(`page-${i + 1}`);
                     if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Case 1's page-1 is preceded by a separate splash overlay (#startup-screen)
+                    // that fades itself to display:none on first dismissal and otherwise has no
+                    // way back - bring it back too when jumping to Case 1.
+                    if (i === 0 && window.reshowStartupScreen) window.reshowStartupScreen();
                 };
                 list.appendChild(btn);
             }
@@ -1358,7 +1362,14 @@
             if (startup) {
                 let startupTriggered = false;
                 const handleStartup = async () => {
-                    if (startupTriggered) return;
+                    if (startupTriggered) {
+                        // Already dismissed once - this is a replay (from the Case menu) rather
+                        // than the real first dismissal, so just fade it back out without
+                        // re-firing the identity gate again.
+                        startup.style.opacity = '0';
+                        setTimeout(() => { startup.style.display = 'none'; }, 700);
+                        return;
+                    }
                     startupTriggered = true;
                     if (window.sfx) window.sfx.powerOn();
                     startup.style.opacity = '0';
@@ -1366,6 +1377,16 @@
                     if (window.AuthGate && window.AuthGate.ensureIdentified) await window.AuthGate.ensureIdentified();
                 };
                 startup.addEventListener('click', handleStartup);
+
+                // "Peek back at Case 1" from the Jump-to-a-Case menu - re-shows this splash
+                // overlay on top of wherever the student currently is. Clicking it again just
+                // calls handleStartup, which (now that startupTriggered is true) fades it back
+                // out without touching progress or re-firing the identity gate.
+                window.reshowStartupScreen = () => {
+                    startup.style.display = 'flex';
+                    void startup.offsetWidth; // force reflow so the opacity transition replays
+                    startup.style.opacity = '1';
+                };
                 if (window.AuthCore && window.AuthCore.skipPowerUp) {
                     let unsub;
                     unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => { unsub(); handleStartup(); });

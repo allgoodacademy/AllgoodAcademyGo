@@ -693,6 +693,21 @@
         window.openCaseMenu = () => {
             const list = document.getElementById('case-menu-list');
             list.innerHTML = '';
+
+            // Case 1 ("Before We Start", the power-up splash) isn't one of the TOTAL_PAGES
+            // scrollable page-N divs the loop below walks - it's a one-time overlay shown at
+            // load, per CASE_OFFSET's own comment. It's always available to replay and never
+            // "current" in the same sense as a paged Case, so it's added here as its own row,
+            // styled identically to an unlocked row below, rather than folded into the loop.
+            const introBtn = document.createElement('button');
+            introBtn.className = 'w-full text-left p-3 rounded-lg border flex items-center justify-between text-xs font-bold transition-colors bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer';
+            introBtn.innerHTML = `<span>Case 1: Before We Start</span><i data-lucide="chevron-right" class="w-4 h-4"></i>`;
+            introBtn.onclick = () => {
+                window.closeCaseMenu();
+                if (window.reshowStartupScreen) window.reshowStartupScreen();
+            };
+            list.appendChild(introBtn);
+
             for (let i = 0; i < TOTAL_PAGES; i++) {
                 const unlocked = i <= highestUnlocked;
                 const isCurrent = i === highestUnlocked;
@@ -1392,7 +1407,14 @@
             if (startup) {
                 let startupTriggered = false;
                 const handleStartup = async () => {
-                    if (startupTriggered) return;
+                    if (startupTriggered) {
+                        // Already dismissed once - this is a replay (from the Case menu) rather
+                        // than the real first dismissal, so just fade it back out without
+                        // re-firing the telemetry step or identity gate again.
+                        startup.style.opacity = '0';
+                        setTimeout(() => { startup.style.display = 'none'; }, 700);
+                        return;
+                    }
                     startupTriggered = true;
                     if (window.sfx) window.sfx.powerOn();
                     startup.style.opacity = '0';
@@ -1402,6 +1424,16 @@
                     if (window.AuthGate && window.AuthGate.ensureIdentified) await window.AuthGate.ensureIdentified();
                 };
                 startup.addEventListener('click', handleStartup);
+
+                // "Peek back at Case 1" from the Jump-to-a-Case menu - re-shows the same overlay
+                // on top of wherever the student currently is. Clicking it again just calls
+                // handleStartup, which (now that startupTriggered is true) fades it back out
+                // without touching progress or re-firing telemetry/the identity gate.
+                window.reshowStartupScreen = () => {
+                    startup.style.display = 'flex';
+                    void startup.offsetWidth; // force reflow so the opacity transition replays
+                    startup.style.opacity = '1';
+                };
 
                 if (window.AuthCore && window.AuthCore.skipPowerUp) {
                     let unsub;

@@ -773,6 +773,14 @@
                 btn.innerHTML = `<span>Case ${i + 1}: ${CASE_TITLES[i]}</span>${unlocked ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : '<i data-lucide="lock" class="w-3.5 h-3.5"></i>'}`;
                 if (unlocked) btn.onclick = () => {
                     window.closeCaseMenu();
+                    // Case 1 (i === 0) isn't a physical page in this flow - it's the startup
+                    // overlay shown once at load. There's no "page-1" to scroll to; replay the
+                    // overlay instead so a student who dismissed it can look at it again without
+                    // disturbing highestUnlocked/pageCompletion or their current page underneath.
+                    if (i === 0) {
+                        if (window.reshowStartupScreen) window.reshowStartupScreen();
+                        return;
+                    }
                     const pageEl = document.getElementById(`page-${i + 1}`);
                     if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 };
@@ -1342,7 +1350,14 @@
             if (startup) {
                 let startupTriggered = false;
                 const handleStartup = async () => {
-                    if (startupTriggered) return;
+                    if (startupTriggered) {
+                        // Already dismissed once - this is a replay (from the Case menu or a
+                        // stray click) rather than the real first dismissal, so just fade it back
+                        // out without re-running the Case 1 unlock bookkeeping below.
+                        startup.style.opacity = '0';
+                        setTimeout(() => { startup.style.display = 'none'; }, 700);
+                        return;
+                    }
                     startupTriggered = true;
                     if (window.sfx) window.sfx.powerOn();
                     startup.style.opacity = '0';
@@ -1372,6 +1387,16 @@
                     await window.AuthGate.ensureIdentified();
                 };
                 startup.addEventListener('click', handleStartup);
+
+                // "Peek back at Case 1" from the Jump-to-a-Case menu - re-shows the same overlay
+                // on top of wherever the student currently is, and clicking it again just calls
+                // handleStartup, which (now that startupTriggered is true) fades it back out
+                // without touching highestUnlocked/pageCompletion.
+                window.reshowStartupScreen = () => {
+                    startup.style.display = 'flex';
+                    void startup.offsetWidth; // force reflow so the opacity transition replays
+                    startup.style.opacity = '1';
+                };
 
                 // Someone actively moving between pages within the last hour shouldn't see
                 // this screen again — same rolling-activity pattern DDC uses.
