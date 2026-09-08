@@ -18,23 +18,30 @@ const dash = read('public/index.html');
 const registrySrc = (dash.match(/const MODULE_REGISTRY = \[([\s\S]*?)\n\s*\];/) || [])[1];
 if (!registrySrc) fail('dashboard: MODULE_REGISTRY not found');
 const registry = [];
-for (const m of (registrySrc || '').matchAll(/\{\s*id:\s*'([^']+)',\s*name:\s*(?:'([^']*)'|"([^"]*)"),\s*category:\s*'([^']+)',\s*url:\s*'([^']+)',\s*gameNames:\s*\[([^\]]*)\]/g)) {
-  registry.push({ id: m[1], name: m[2] ?? m[3], category: m[4], url: m[5], gameNames: [...m[6].matchAll(/'([^']*)'/g)].map(x => x[1]) });
+for (const m of (registrySrc || '').matchAll(/\{\s*id:\s*'([^']+)',\s*name:\s*(?:'([^']*)'|"([^"]*)"),\s*category:\s*'([^']+)',\s*(?:pack:\s*'([^']*)',\s*)?url:\s*'([^']+)',\s*gameNames:\s*\[([^\]]*)\]/g)) {
+  registry.push({ id: m[1], name: m[2] ?? m[3], category: m[4], pack: m[5], url: m[6], gameNames: [...m[7].matchAll(/'([^']*)'/g)].map(x => x[1]) });
 }
 const planned = [...((dash.match(/const LAB_PACK_PLANNED = \[([^\]]*)\]/) || ['', ''])[1]).matchAll(/'([^']*)'/g)].map(x => x[1]);
 if (!planned.length) fail('dashboard: LAB_PACK_PLANNED not found or empty');
+const rwrPlanned = [...((dash.match(/const RWR_LAB_PACK_PLANNED = \[([^\]]*)\]/) || ['', ''])[1]).matchAll(/'([^']*)'/g)].map(x => x[1]);
+if (!rwrPlanned.length) fail('dashboard: RWR_LAB_PACK_PLANNED not found or empty');
 const dashLabs = registry.filter(r => r.category === 'lab');
 // LAB_PACK_PLANNED and the digital-decisions-lab hub only track the Digital Decisions Lab
 // Pack. Real World Ready is a separate Lab Pack with its own hub (public/jsh/real-world-ready/)
-// and its own planned-vs-live accounting, so only labs actually living under
-// /jsh/digital-decisions-lab/ are checked against those two DDL-specific lists below.
-const ddlLabs = dashLabs.filter(l => l.url.startsWith('/jsh/digital-decisions-lab/'));
+// and its own planned-vs-live accounting. Scoped by the registry's own `pack` field rather
+// than URL prefix, since Money as a Skill is pack 'rwr' but its file was never moved out of
+// /jsh/digital-decisions-lab/ (a logged deviation — see docs/goodblocks/real-world-ready-money-storyboard.md).
+const ddlLabs = dashLabs.filter(l => l.pack === 'ddl');
+const rwrLabs = dashLabs.filter(l => l.pack === 'rwr');
 for (const lab of dashLabs) {
   if (!/^\/[a-z0-9-]+(?:\/[a-z0-9-]+)*\/$/.test(lab.url)) fail(`dashboard: lab "${lab.name}" url "${lab.url}" is not a trailing-slash directory path`);
   if (!fs.existsSync(path.join(root, 'public', lab.url, 'index.html'))) fail(`dashboard: lab "${lab.name}" url "${lab.url}" has no index.html`);
 }
 for (const lab of ddlLabs) {
   if (!planned.includes(lab.name)) fail(`dashboard: live lab "${lab.name}" is not in LAB_PACK_PLANNED`);
+}
+for (const lab of rwrLabs) {
+  if (!rwrPlanned.includes(lab.name)) fail(`dashboard: live lab "${lab.name}" is not in RWR_LAB_PACK_PLANNED`);
 }
 if (/labpack-status-pill[^>]*>\s*Social Intelligence Live/.test(dash)) fail('dashboard: status pill still hardcodes "Social Intelligence Live"');
 
@@ -85,6 +92,24 @@ for (const lab of ddlLabs) {
   else if (card.name !== lab.name) fail(`hub: card name "${card.name}" != dashboard "${lab.name}"`);
 }
 for (const h of hubLive) if (!ddlLabs.find(l => l.url === h.url)) fail(`dashboard: hub launches "${h.url}" but MODULE_REGISTRY has no lab with that url`);
+
+// --- hub (Real World Ready) — same live-card cross-check as above, scoped to the rwr pack.
+// Its hubLive regex has to match any lab url (not just /jsh/digital-decisions-lab/), since
+// Money as a Skill's card here still points at its un-moved DDL-era path.
+const rwrHub = read('public/jsh/real-world-ready/index.html').replace(/&amp;/g, '&');
+const rwrHubLive = [...rwrHub.matchAll(/launchLab\('([^']+)',\s*'(\/[a-z0-9\/-]+\/)'\)/g)].map(m => ({ name: m[1].replace(/&amp;/g, '&'), url: m[2] }));
+for (const lab of rwrLabs) {
+  const card = rwrHubLive.find(h => h.url === lab.url);
+  if (!card) fail(`rwr hub: no live card launching "${lab.url}" (dashboard lists "${lab.name}" as live)`);
+  else if (card.name !== lab.name) fail(`rwr hub: card name "${card.name}" != dashboard "${lab.name}"`);
+}
+for (const name of rwrPlanned) {
+  if (!rwrHub.includes(name)) fail(`rwr hub: planned lab "${name}" appears nowhere on the hub (needs a live card or a Coming Soon placeholder)`);
+  const isLive = rwrLabs.some(l => l.name === name);
+  const placeholder = new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]{0,400}?Coming Soon`).test(rwrHub);
+  if (!isLive && !placeholder) fail(`rwr hub: "${name}" is not live and has no Coming Soon placeholder`);
+}
+
 for (const name of planned) {
   if (!hub.includes(name)) fail(`hub: planned lab "${name}" appears nowhere on the hub (needs a live card or a Coming Soon placeholder)`);
   const isLive = dashLabs.some(l => l.name === name);

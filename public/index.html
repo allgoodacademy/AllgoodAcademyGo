@@ -91,23 +91,23 @@
         // teachers can time-box a module against a class period. Replace with real numbers
         // once we have completion-time telemetry per module.
         const MODULE_REGISTRY = [
-            { id: 'ddc', name: 'Digital Decisions', category: 'challenge', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
+            { id: 'ddc', name: 'Digital Decisions', category: 'challenge', pack: 'ddl', url: 'https://www.allgoodacademy.com/educational-games/digital-decisions',
               gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 80, durationMinutes: 25 },
-            { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', url: '/jsh/digital-decisions-lab/social-intelligence/',
+            { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', pack: 'ddl', url: '/jsh/digital-decisions-lab/social-intelligence/',
               gameNames: ['Social Intelligence'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', url: '/jsh/digital-decisions-lab/privacy-security/',
+            { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', pack: 'ddl', url: '/jsh/digital-decisions-lab/privacy-security/',
               gameNames: ['Privacy & Security'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'digital-citizenship', name: 'Digital Citizenship', category: 'lab', url: '/jsh/digital-decisions-lab/digital-citizenship/',
+            { id: 'digital-citizenship', name: 'Digital Citizenship', category: 'lab', pack: 'ddl', url: '/jsh/digital-decisions-lab/digital-citizenship/',
               gameNames: ['Digital Citizenship'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'professional-brand', name: 'Professional Brand', category: 'lab', url: '/jsh/digital-decisions-lab/professional-brand/',
+            { id: 'professional-brand', name: 'Professional Brand', category: 'lab', pack: 'ddl', url: '/jsh/digital-decisions-lab/professional-brand/',
               gameNames: ['Professional Brand'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'real-world-ready-money', name: 'Money as a Skill', category: 'lab', url: '/jsh/digital-decisions-lab/real-world-ready-money/',
+            { id: 'real-world-ready-money', name: 'Money as a Skill', category: 'lab', pack: 'rwr', url: '/jsh/digital-decisions-lab/real-world-ready-money/',
               gameNames: ['Money as a Skill'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'conflict-has-a-winner', name: 'Conflict Has a Winner', category: 'lab', url: '/jsh/real-world-ready/conflict-has-a-winner/',
+            { id: 'conflict-has-a-winner', name: 'Conflict Has a Winner', category: 'lab', pack: 'rwr', url: '/jsh/real-world-ready/conflict-has-a-winner/',
               gameNames: ['Conflict Has a Winner'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'reading-the-room', name: 'Reading the Room', category: 'lab', url: '/jsh/real-world-ready/reading-the-room/',
+            { id: 'reading-the-room', name: 'Reading the Room', category: 'lab', pack: 'rwr', url: '/jsh/real-world-ready/reading-the-room/',
               gameNames: ['Reading the Room'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'rwr-challenge', name: 'Real World Ready Challenge', category: 'challenge', url: '/educational-games/real-world-ready/',
+            { id: 'rwr-challenge', name: 'Real World Ready Challenge', category: 'challenge', pack: 'rwr', url: '/educational-games/real-world-ready/',
               gameNames: ['Real World Ready Challenge'], isComplete: (d) => typeof d.finalScore === 'number' && d.finalScore >= 64, durationMinutes: 20 },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
@@ -116,27 +116,33 @@
         // hub (public/jsh/digital-decisions-lab/index.html) shows placeholders for the ones
         // not yet in MODULE_REGISTRY. Counts on the dashboard's Lab Pack card come from here
         // + the registry, so they can't drift from what's actually live.
-        const LAB_PACK_PLANNED = ['Social Intelligence', 'Privacy & Security', 'Digital Citizenship', 'Professional Brand', 'Money as a Skill'];
-        function renderLabPackStatus() {
-            const live = MODULE_REGISTRY.filter(m => m.category === 'lab');
-            const planned = LAB_PACK_PLANNED.length;
-            const comingSoon = Math.max(0, planned - live.length);
-            // labpack-status-pill itself is NOT set here — it shows the signed-in student's
-            // own Not Started / Started / Completed progress across the pack (see
+        const LAB_PACK_PLANNED = ['Social Intelligence', 'Privacy & Security', 'Digital Citizenship', 'Professional Brand'];
+        // Real World Ready is its own Lab Pack -- Money as a Skill moved here from the
+        // Digital Decisions Lab Pack and is not double-counted in LAB_PACK_PLANNED above.
+        const RWR_LAB_PACK_PLANNED = ['Money as a Skill', 'Conflict Has a Winner', 'Reading the Room'];
+        function renderPackStatus(pack, planned, counterId, durationId) {
+            const live = MODULE_REGISTRY.filter(m => m.category === 'lab' && m.pack === pack);
+            const comingSoon = Math.max(0, planned.length - live.length);
+            // *-status-pill elements are NOT set here -- they show the signed-in student's own
+            // Not Started / Started / Completed progress across the pack (see
             // updateLabPackStatusPill(), called from startModuleStatusListener once real
             // Firestore data has loaded), not a "how many labs exist" business fact. That
-            // fact still shows via labpack-counter below.
-            const counter = document.getElementById('labpack-counter');
+            // fact still shows via the counter element below.
+            const counter = document.getElementById(counterId);
             if (counter) {
                 counter.textContent = comingSoon === 0
-                    ? `${planned} labs planned \u2022 ${live.length} live`
-                    : `${planned} labs planned \u2022 ${live.length} live \u2022 ${comingSoon} coming soon`;
+                    ? `${planned.length} labs planned \u2022 ${live.length} live`
+                    : `${planned.length} labs planned \u2022 ${live.length} live \u2022 ${comingSoon} coming soon`;
             }
-            const duration = document.getElementById('labpack-duration');
+            const duration = document.getElementById(durationId);
             if (duration) {
                 const totalMinutes = live.reduce((sum, m) => sum + (m.durationMinutes || 0), 0);
                 duration.textContent = `~${totalMinutes} MIN`;
             }
+        }
+        function renderLabPackStatus() {
+            renderPackStatus('ddl', LAB_PACK_PLANNED, 'labpack-counter', 'labpack-duration');
+            renderPackStatus('rwr', RWR_LAB_PACK_PLANNED, 'rwr-labpack-counter', 'rwr-labpack-duration');
         }
         renderLabPackStatus();
 
@@ -145,10 +151,10 @@
         // (module_progress) — see their _labPackCompletedGameNames/_labPackStartedModuleIds
         // updates. Completed only once every lab in the pack is completed; Started if any
         // lab has been touched at all; Not Started only with zero signal on every lab.
-        function updateLabPackStatusPill() {
-            const pill = document.getElementById('labpack-status-pill');
+        function setPackStatusPill(pillId, pack) {
+            const pill = document.getElementById(pillId);
             if (!pill) return;
-            const labs = MODULE_REGISTRY.filter(m => m.category === 'lab');
+            const labs = MODULE_REGISTRY.filter(m => m.category === 'lab' && m.pack === pack);
             if (labs.length === 0) return;
             const allCompleted = labs.every(lab => lab.gameNames.some(name => _labPackCompletedGameNames.has(name)));
             const anyStarted = labs.some(lab =>
@@ -163,6 +169,10 @@
                 pill.textContent = 'Not Started';
                 pill.className = 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
             }
+        }
+        function updateLabPackStatusPill() {
+            setPackStatusPill('labpack-status-pill', 'ddl');
+            setPackStatusPill('rwr-labpack-status-pill', 'rwr');
         }
 
         // Duration metadata is placeholder data (see MODULE_REGISTRY comment above) rendered
@@ -505,11 +515,13 @@
             }
             _labPackCompletedGameNames = new Set();
             _labPackStartedModuleIds = new Set();
-            const labPackPill = document.getElementById('labpack-status-pill');
-            if (labPackPill) {
-                labPackPill.textContent = 'Not Started';
-                labPackPill.className = 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
-            }
+            ['labpack-status-pill', 'rwr-labpack-status-pill'].forEach(id => {
+                const pill = document.getElementById(id);
+                if (pill) {
+                    pill.textContent = 'Not Started';
+                    pill.className = 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+                }
+            });
 
             if (unsubscribeIntel) { // NEW: Cleanup Intel Listener
                 unsubscribeIntel();
@@ -861,7 +873,7 @@
                         // — "LAUNCHED" is for the generic single-game cards only, and was
                         // sticking on the Lab Pack pill forever with no path back to a real
                         // Not Started/Started/Completed label.
-                        if (badgeElement.id === 'ddc-status-badge' || badgeElement.id === 'labpack-status-pill') return;
+                        if (badgeElement.id === 'ddc-status-badge' || badgeElement.id === 'labpack-status-pill' || badgeElement.id === 'rwr-labpack-status-pill') return;
 
                         // FIX: Do not overwrite if already completed
                         if (badgeElement.textContent === "MISSION COMPLETE" || badgeElement.textContent === "CERTIFIED") return;
@@ -2427,6 +2439,24 @@
                                 <p id="ddc-best-score" class="text-[10px] text-slate-400 uppercase tracking-wide mb-2"></p>
                             </div>
                         </div>
+
+                        <!-- Real World Ready Challenge — generic completion badge, auto-wired by
+                             window.initModuleElements() off the "Real World Ready Challenge"
+                             onclick name, same as any other single-game card. -->
+                        <div onclick="window.launchCourse('Real World Ready Challenge', '/educational-games/real-world-ready/', this)"
+                             class="mission-file status-active p-5 flex items-start gap-4 group">
+                            <div class="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm" style="background-color:#FBEBD3; border:1px solid #EFCF9C;">
+                                <i data-lucide="target" class="w-7 h-7" style="color:#C97D1A;"></i>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Real World Ready Challenge</h3>
+                                    <span class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">—</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> 24 situations, scored — money, conflict, and reading the room.</p>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="rwr-challenge">&nbsp;</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- TAB 2: JODI'S SCHOOLHOUSE — Rage Revenue and Finding Yourself have been
@@ -2453,6 +2483,32 @@
                                     <p id="labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">&nbsp;</p>
                                     <!-- Pack total duration, summed from durationMinutes across live labs — see renderLabPackStatus() -->
                                     <span id="labpack-duration" class="text-[10px] text-slate-400 uppercase tracking-wide whitespace-nowrap">&nbsp;</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Real World Ready Lab Pack — same status-pill/counter/duration pattern
+                             as the Digital Decisions Lab Pack card above, scoped to the 'rwr'
+                             pack via renderLabPackStatus()/updateLabPackStatusPill(). -->
+                        <div onclick="window.launchCourse('Real World Ready Lab Pack', '/jsh/real-world-ready/', this)"
+                             class="mission-file status-active p-5 flex items-start gap-4 group">
+                            <div class="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm" style="background-color:#FBEBD3; border:1px solid #EFCF9C;">
+                                <i data-lucide="coins" class="w-7 h-7" style="color:#C97D1A;"></i>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Real World Ready Lab Pack</h3>
+                                    <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
+                                    <!-- Real state only: updateLabPackStatusPill() sets Not Started/Started/Completed once
+                                         Firestore has actually loaded — never a fabricated default. -->
+                                    <span id="rwr-labpack-status-pill" class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">—</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> The stuff school doesn't get around to teaching — money, conflict, and reading a room.</p>
+                                <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
+                                <div class="flex items-center justify-between gap-2">
+                                    <p id="rwr-labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">&nbsp;</p>
+                                    <!-- Pack total duration, summed from durationMinutes across live labs — see renderLabPackStatus() -->
+                                    <span id="rwr-labpack-duration" class="text-[10px] text-slate-400 uppercase tracking-wide whitespace-nowrap">&nbsp;</span>
                                 </div>
                             </div>
                         </div>
