@@ -4,7 +4,7 @@
 **Lab Pack:** Real World Ready
 **Slug:** `real-world-ready-money`
 **File:** `public/jsh/digital-decisions-lab/real-world-ready-money/index.html`
-**Status:** Corrected in the Real World Ready Lab Pack sprint (this pass) per the coverage map (`01-coverage-map-AUTHORITATIVE.md`) and pushed to `claude/money-skill-goodblock-poc-1atbyv` (PR #11). Static checks passed; manual browser QA not yet performed.
+**Status:** Corrected in the Real World Ready Lab Pack sprint (that pass) per the coverage map (`01-coverage-map-AUTHORITATIVE.md`) and pushed to `claude/money-skill-goodblock-poc-1atbyv` (PR #11). A follow-up pass folded the intro into the counted Case flow as Case 1 and the feedback page as Case 7 (total Cases 5 → 7; `Telemetry.init` `stepsTotal` 6 → 7). Static checks passed both passes; manual browser QA not yet performed.
 
 ## Corrections applied this pass
 
@@ -12,8 +12,9 @@ Per the coverage map's terminology lock (Case = one page in a GoodBlock; Scenari
 
 | # | Was | Now |
 |---|---|---|
-| 1 | Page labels "Case 1"…"Case 5" | "Case 2"…"Case 6" (intro is not a Case; first interactive page is Case 2) |
-| 2 | No label on the intro/startup screen | "Before We Start" |
+| 1 | Page labels "Case 1"…"Case 5" | "Case 2"…"Case 6" (interactive pages keep this numbering; the intro is Case 1 and the feedback page is Case 7) |
+| 2 | No label on the intro/startup screen | "Before We Start", now badged "Case 1" and folded into the counted flow |
+| 2b | No label on the feedback/rating page | Badged "Case 7" (the flow's last numbered Case) |
 | 3 | Badge: "5 cases completed" | "8 scenarios completed" (counts the `money` category's 8 Challenge scenarios, not the 5 Cases — these are different, correct numbers measuring different things) |
 | 4 | Post-completion redirect: `/jsh/` | `/jsh/real-world-ready/` (the new Lab Pack hub) |
 | 5 | No A/B marker on the completion doc | `narrativeStyle: 'second-person'` added to the Firestore write |
@@ -27,7 +28,7 @@ Per the coverage map's terminology lock (Case = one page in a GoodBlock; Scenari
 | Accent color | `#C97D1A` |
 | Icon | `coins` (verified against the Lucide icon library) |
 | Jodi continuity | Solo — no recurring characters, no callbacks to other GoodBlocks |
-| Total Cases | 5 (pages 2–6; "Before We Start" is the intro, not a Case) |
+| Total Cases | 7 ("Before We Start" is Case 1, pages 2–6 are the 5 interactive Cases, the feedback page is Case 7). Header counter shows `X / 7`. |
 | Coverage-map scenario count | 8 (`money` category, M1–M8) |
 | Badge text | "8 scenarios completed" |
 | Post-completion redirect | Real World Ready hub (`/jsh/real-world-ready/`) |

@@ -42,9 +42,9 @@ the moments that matter. Steps per module:
 | Privacy & Security | cases reached | 6 |
 | Digital Citizenship | cases reached | 7 |
 | Professional Brand | cases reached | 7 |
-| Money as a Skill | cases reached | 6 |
+| Money as a Skill | cases reached | 7 |
 | Conflict Has a Winner | cases reached | 6 |
-| Reading the Room | cases reached | 6 |
+| Reading the Room | cases reached | 7 |
 | Real World Ready Challenge | scenarios answered | 24 |
 
 A 20-minute visit costs roughly 25 to 30 Firestore writes (one session rewrite per 45s plus
