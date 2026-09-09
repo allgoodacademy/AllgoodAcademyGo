@@ -98,7 +98,8 @@
         // student off a preview channel and onto the live site.
         const MODULE_REGISTRY = [
             { id: 'ddc', name: 'Digital Decisions', category: 'challenge', pack: 'digital-decisions', url: '/educational-games/digital-decisions/',
-              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 80, durationMinutes: 25 },
+              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 80,
+              badgeThreshold: 80, maxScore: 90, durationMinutes: 25 },
             { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/social-intelligence/',
               gameNames: ['Social Intelligence'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/privacy-security/',
@@ -115,9 +116,27 @@
               gameNames: ['Reading the Room'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
             // 64 of 72 — the Real World Ready Challenge's own threshold, NOT the DDC's 80 of 90.
             { id: 'rwr-challenge', name: 'Real World Ready Challenge', category: 'challenge', pack: 'real-world-ready', url: '/educational-games/real-world-ready/',
-              gameNames: ['Real World Ready Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64, durationMinutes: 20 },
+              gameNames: ['Real World Ready Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
+              badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
+
+        // One standalone card per Challenge in the Challenges tab, each at the same level and
+        // independent of its Lab Pack hub — the hub links to its Challenge as well, so both
+        // entry points work. Everything here is derived from MODULE_REGISTRY so a card can
+        // never disagree with the Challenge page it represents: `name` is also the string in
+        // the card's own launchCourse() call, and the card's element ids follow the convention
+        // `<id>-status-badge` / `<id>-best-score`. scripts/check-modules.js enforces all of it.
+        const CHALLENGE_CARDS = MODULE_REGISTRY.filter(m => m.category === 'challenge').map(m => ({
+            id: m.id,
+            launchName: m.name,
+            gameNames: m.gameNames,
+            badgeThreshold: m.badgeThreshold,
+            maxScore: m.maxScore,
+            badgeId: `${m.id}-status-badge`,
+            bestScoreId: `${m.id}-best-score`,
+        }));
+        function isChallengeBadgeId(id) { return CHALLENGE_CARDS.some(c => c.badgeId === id); }
 
         // Every lab the Digital Decisions Lab Pack will eventually hold, shipped or not. The
         // hub (public/jsh/digital-decisions-lab/index.html) shows placeholders for the ones
@@ -456,7 +475,7 @@
                 if (element) {
                     const badge = element.querySelector('span.rounded'); 
                     if (badge) {
-                        if (badge.id === 'ddc-status-badge') return; 
+                        if (isChallengeBadgeId(badge.id)) return;
 
                         badge.textContent = "LAUNCHED";
                         badge.className = "bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 animate-pulse";
@@ -553,11 +572,15 @@
                 }
             });
 
-            const ddcBadge = document.getElementById('ddc-status-badge');
-            if(ddcBadge) {
-                ddcBadge.textContent = "Not Started";
-                ddcBadge.className = "bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
-            }
+            CHALLENGE_CARDS.forEach(card => {
+                const badge = document.getElementById(card.badgeId);
+                if (badge) {
+                    badge.textContent = "Not Started";
+                    badge.className = "bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
+                }
+                const best = document.getElementById(card.bestScoreId);
+                if (best) best.textContent = '';
+            });
             
             window.initModuleElements();
 
@@ -883,7 +906,7 @@
                         // — "LAUNCHED" is for the generic single-game cards only, and was
                         // sticking on the Lab Pack pill forever with no path back to a real
                         // Not Started/Started/Completed label.
-                        if (badgeElement.id === 'ddc-status-badge' || badgeElement.id === 'labpack-status-pill' || badgeElement.id === 'rwr-status-pill') return;
+                        if (isChallengeBadgeId(badgeElement.id) || badgeElement.id === 'labpack-status-pill' || badgeElement.id === 'rwr-status-pill') return;
 
                         // FIX: Do not overwrite if already completed
                         if (badgeElement.textContent === "MISSION COMPLETE" || badgeElement.textContent === "CERTIFIED") return;
@@ -919,13 +942,12 @@
             const scoresRef = collection(db, 'artifacts', appId, 'users', uid, 'game_scores');
 
             unsubscribeDecisions = onSnapshot(scoresRef, (snapshot) => {
-                // maxDDCScore only ever considers COMPLETED attempts (all 30 scenarios
-                // answered) — a partial attempt's running score must never read as a
-                // finished, failing one ("Retake Required" implies you actually finished
-                // and failed, not that you merely started).
-                let maxDDCScore = -1;
-                let hasDDCCompletedAttempt = false;
-                let hasDDCAnyAttempt = false;
+                // Per-Challenge attempt stats, keyed by MODULE_REGISTRY id. `max` only ever
+                // considers COMPLETED attempts — a partial attempt's running score must never
+                // read as a finished, failing one ("Retake Required" implies you actually
+                // finished and failed, not that you merely started).
+                const challengeStats = {};
+                CHALLENGE_CARDS.forEach(c => { challengeStats[c.id] = { max: -1, hasCompleted: false, hasAny: false }; });
                 let isJLCComplete = false;
 
                 // Set to track which modules are done in this snapshot
@@ -935,12 +957,16 @@
                     const data = doc.data();
                     const gameName = data.gameName;
 
-                    // 1. Digital Decisions Logic (Score based, gated on a full completed attempt)
-                    if (gameName === "Digital Decisions Challenge" && typeof data.finalScore === 'number') {
-                        hasDDCAnyAttempt = true;
+                    // 1. Challenge logic (score based, gated on a full completed attempt).
+                    // One rule for every Challenge card; the per-Challenge facts come from
+                    // CHALLENGE_CARDS, which is derived from the registry.
+                    const challengeCard = CHALLENGE_CARDS.find(c => c.gameNames.includes(gameName));
+                    if (challengeCard && typeof data.finalScore === 'number') {
+                        const st = challengeStats[challengeCard.id];
+                        st.hasAny = true;
                         if (data.completed === true) {
-                            hasDDCCompletedAttempt = true;
-                            if (data.finalScore > maxDDCScore) maxDDCScore = data.finalScore;
+                            st.hasCompleted = true;
+                            if (data.finalScore > st.max) st.max = data.finalScore;
                         }
                     }
 
@@ -982,7 +1008,9 @@
                 updateLabPackStatusPill();
 
                 // Update Local Storage for Badges
-                if (maxDDCScore >= 80) localStorage.setItem('aa_ddc_complete', 'true');
+                const ddcCard = CHALLENGE_CARDS.find(c => c.id === 'ddc');
+                const ddcStats = challengeStats['ddc'];
+                if (ddcCard && ddcStats && ddcStats.max >= ddcCard.badgeThreshold) localStorage.setItem('aa_ddc_complete', 'true');
                 else localStorage.removeItem('aa_ddc_complete');
                 
                 // Store JLC Status
@@ -999,38 +1027,42 @@
                 
                 window.updateBadges();
 
-                // UPDATE UI: Digital Decisions (Special Case)
-                // Progression: no attempt -> Active/not started; attempt started but not
-                // finished -> In Progress; a full completed attempt that failed -> Retake
-                // Required (never for a partial one); a full completed attempt that passed
-                // -> Mission Complete.
-                const ddcBadge = document.getElementById('ddc-status-badge');
-                if (ddcBadge) {
-                    if (maxDDCScore >= 80) {
-                        ddcBadge.textContent = "MISSION COMPLETE";
-                        ddcBadge.className = "bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-emerald-200";
-                    } else if (hasDDCCompletedAttempt) {
-                        ddcBadge.textContent = "RETAKE REQUIRED";
-                        ddcBadge.className = "bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-amber-200 animate-pulse";
-                    } else if (hasDDCAnyAttempt) {
-                        ddcBadge.textContent = "IN PROGRESS";
-                        ddcBadge.className = "bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-blue-200";
-                    } else {
-                        // No game_scores doc at all for DDC — a real fresh account with zero
-                        // interaction. This must never show "Active": that read as a fabricated
-                        // status on a brand-new account that had never clicked the Challenge.
-                        ddcBadge.textContent = "Not Started";
-                        ddcBadge.className = "bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500";
+                // UPDATE UI: every Challenge card, same progression for each.
+                // No attempt -> Not Started; an attempt started but not finished -> In Progress;
+                // a full completed attempt that failed -> Retake Required (never for a partial
+                // one); a full completed attempt that passed -> Mission Complete.
+                CHALLENGE_CARDS.forEach(card => {
+                    const st = challengeStats[card.id];
+                    if (!st) return;
+                    const badge = document.getElementById(card.badgeId);
+                    if (badge) {
+                        if (st.max >= card.badgeThreshold) {
+                            badge.textContent = "MISSION COMPLETE";
+                            badge.className = "bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-emerald-200";
+                        } else if (st.hasCompleted) {
+                            badge.textContent = "RETAKE REQUIRED";
+                            badge.className = "bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-amber-200 animate-pulse";
+                        } else if (st.hasAny) {
+                            badge.textContent = "IN PROGRESS";
+                            badge.className = "bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500 shadow-sm border border-blue-200";
+                        } else {
+                            // No game_scores doc at all for this Challenge — a real fresh account
+                            // with zero interaction. This must never show "Active": that read as a
+                            // fabricated status on a brand-new account that had never clicked it.
+                            badge.textContent = "Not Started";
+                            badge.className = "bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide transition-all duration-500";
+                        }
                     }
-                }
-                const ddcBestScore = document.getElementById('ddc-best-score');
-                if (ddcBestScore) {
-                    ddcBestScore.textContent = maxDDCScore >= 0 ? `Best score: ${maxDDCScore} / 90` : '';
-                }
+                    // Highest score across all completed attempts, out of that Challenge's own
+                    // max — never a single attempt's score, and never the other Challenge's scale.
+                    const best = document.getElementById(card.bestScoreId);
+                    if (best) best.textContent = st.max >= 0 ? `Best score: ${st.max} / ${card.maxScore}` : '';
+                });
 
                 // UPDATE UI: All Other Content Blocks
                 for (const [courseName, badgeElement] of Object.entries(window.allModuleElements)) {
-                    if (courseName === "Digital Decisions") continue; // Skip DDC
+                    // Every Challenge card is rendered above from challengeStats.
+                    if (CHALLENGE_CARDS.some(c => c.launchName === courseName)) continue;
 
                     // Check JLC specifically (Key matches the SAFE NAME 'Jolenes Lemonade')
                     if ((courseName === "Jolenes Lemonade" || courseName === "Jolene's Lemonade") && isJLCComplete) {
@@ -2399,12 +2431,12 @@
                         <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
                             <div>
                                 <!-- Counts the module CARDS on this dashboard (Digital Decisions,
-                                     Lab Pack, Real World Ready Lab Pack), not MODULE_REGISTRY
-                                     entries — a Lab Pack is one card holding several registry
-                                     entries. Bump this only when a new card is added below
-                                     (Jolene's Lemonade was removed along with its card and
-                                     registry entry — do not recount it). -->
-                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">3</span>
+                                     Lab Pack, Real World Ready Lab Pack, Real World Ready
+                                     Challenge), not MODULE_REGISTRY entries — a Lab Pack is one
+                                     card holding several registry entries. Bump this only when a
+                                     new card is added below (Jolene's Lemonade was removed along
+                                     with its card and registry entry — do not recount it). -->
+                                <span class="block text-2xl font-bold text-allgood-secondary leading-none">4</span>
                                 <span class="text-[10px] uppercase text-slate-400 font-bold">MODULES</span>
                             </div>
                             <div>
@@ -2448,6 +2480,31 @@
                                 <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="ddc">&nbsp;</p>
                                 <!-- Highest score across all completed attempts — populated by startModuleStatusListener, never a single attempt's score -->
                                 <p id="ddc-best-score" class="text-[10px] text-slate-400 uppercase tracking-wide mb-2"></p>
+                            </div>
+                        </div>
+
+                        <!-- REAL WORLD READY CHALLENGE — standalone, at the same level as Digital
+                             Decisions and independent of the Real World Ready Lab Pack hub, which
+                             also links to it. Same card structure as the DDC above; the amber
+                             swatch is the Real World Ready pack accent, matching its Lab Pack card
+                             the way DDC's indigo matches its own. Status badge, duration and best
+                             score are all driven from MODULE_REGISTRY — do not hardcode them. -->
+                        <div onclick="window.launchCourse('Real World Ready Challenge', '/educational-games/real-world-ready/', this)"
+                             class="mission-file status-active p-5 flex items-start gap-4 group">
+                            <div class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100 flex-shrink-0 group-hover:bg-amber-100 transition-colors shadow-sm">
+                                <span class="text-3xl emoji-badge">🧭</span>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Real World Ready</h3>
+                                    <!-- Not a fabricated status: starts empty, same em-dash pattern as
+                                         the DDC card. startModuleStatusListener sets the real state
+                                         once Firestore has actually loaded. -->
+                                    <span id="rwr-challenge-status-badge" class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">—</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Decide your way through 24 situations about money, conflict, and reading a room.</p>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="rwr-challenge">&nbsp;</p>
+                                <p id="rwr-challenge-best-score" class="text-[10px] text-slate-400 uppercase tracking-wide mb-2"></p>
                             </div>
                         </div>
                     </div>

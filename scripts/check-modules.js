@@ -168,6 +168,34 @@ for (const [pack, cfg] of Object.entries(PACKS)) {
   }
 }
 
+// --- Challenge cards on the dashboard: every Challenge in the registry gets a standalone
+// card at the same level, and its numbers must match the Challenge page it represents.
+// (The Real World Ready Challenge shipped reachable only through its Lab Pack hub once.)
+for (const [pack, cfg] of Object.entries(PACKS)) {
+  const ch = registry.find(r => r.id === cfg.challengeId);
+  if (!ch) { fail(`dashboard: no MODULE_REGISTRY entry for challenge "${cfg.challengeId}"`); continue; }
+  // An entry runs from `{ id: '<id>'` to its first `},` — no nested object literals inside.
+  const entry = (registrySrc.match(new RegExp(`\\{\\s*id:\\s*'${cfg.challengeId}'[\\s\\S]*?\\},`)) || [])[0] || '';
+  const threshold = Number((entry.match(/badgeThreshold:\s*(\d+)/) || [])[1]);
+  const maxScore = Number((entry.match(/maxScore:\s*(\d+)/) || [])[1]);
+  const page = read(cfg.challengePage);
+  const pageThreshold = Number((page.match(/const BADGE_THRESHOLD = (\d+);/) || [])[1]);
+  const pageMax = Number((page.match(/const MAX_SCORE = (\d+);/) || [])[1]);
+  if (!threshold) fail(`dashboard: challenge "${ch.id}" has no badgeThreshold`);
+  else if (threshold !== pageThreshold) fail(`dashboard: challenge "${ch.id}" badgeThreshold ${threshold} != ${cfg.challengePage} BADGE_THRESHOLD ${pageThreshold}`);
+  if (!maxScore) fail(`dashboard: challenge "${ch.id}" has no maxScore`);
+  else if (maxScore !== pageMax) fail(`dashboard: challenge "${ch.id}" maxScore ${maxScore} != ${cfg.challengePage} MAX_SCORE ${pageMax}`);
+  // isComplete's literal threshold must be the same number as badgeThreshold.
+  const predThreshold = Number((entry.match(/finalScore >= (\d+)/) || [])[1]);
+  if (predThreshold && threshold && predThreshold !== threshold) fail(`dashboard: challenge "${ch.id}" isComplete uses >= ${predThreshold} but badgeThreshold is ${threshold}`);
+  // The standalone card: its own launchCourse call plus the elements the status loop writes.
+  if (!dash.includes(`window.launchCourse('${ch.name}', '${ch.url}'`)) fail(`dashboard: no standalone Challenges-tab card launching "${ch.name}" at "${ch.url}"`);
+  for (const id of [`${ch.id}-status-badge`, `${ch.id}-best-score`]) {
+    if (!dash.includes(`id="${id}"`)) fail(`dashboard: challenge "${ch.id}" card is missing #${id} (CHALLENGE_CARDS writes it)`);
+  }
+  if (!dash.includes(`data-duration-for="${ch.id}"`)) fail(`dashboard: challenge "${ch.id}" card has no data-duration-for="${ch.id}"`);
+}
+
 // --- docs table
 const doc = read('docs/insider-analytics.md');
 const table = (doc.match(/Steps per module:[\s\S]*?\n\n(\|[\s\S]*?)\n\n/) || [])[1] || '';
