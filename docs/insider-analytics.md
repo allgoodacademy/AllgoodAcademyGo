@@ -14,7 +14,7 @@ All data lives in Firestore under `artifacts/allgood-academy/…`. Two kinds of 
 |---|---|---|
 | `users/{uid}` | auth-core.js | displayName, email (13+ only), role, ageTier, recruitCode, classroomCode, lastLogin |
 | `users/{uid}/launches/{id}` | dashboard launch button | courseName, targetUrl, timestamp. Only dashboard launches. Lab Pack hub launches are not written here. |
-| `users/{uid}/game_scores/{sessionId}` | DDC, Jolene's, both labs | gameName, finalScore / percentage / rank (games), completed flag (labs), lastUpdated |
+| `users/{uid}/game_scores/{sessionId}` | both Challenges, Jolene's, every lab | gameName, finalScore / percentage / rank (games), completed flag (labs), lastUpdated. Real World Ready labs also write `narrativeStyle` (`'second-person'` for Money as a Skill, `'character'` for Conflict Has a Winner and Reading the Room) — the tag for the Lab Pack's narrative-style A/B test. Compare per-category Real World Ready Challenge scores (Judgment ← money, Composure ← conflict, Perspective ← reading_room) against it. |
 | `users/{uid}/game_scores/{sessionId}/scenario_attempts/{n}` | DDC, Jolene's | scenarioIndex, choiceIndex, score (0 to 3), effectiveness, question |
 | `users/{uid}/module_progress/{slug}` | every module | resume state: answered scenarios (games) or highestUnlocked case (labs) |
 | `course_feedback/{id}` | DDC only today | rating 1 to 5 plus free text |
@@ -42,6 +42,16 @@ the moments that matter. Steps per module:
 | Privacy & Security | cases reached | 6 |
 | Digital Citizenship | cases reached | 7 |
 | Professional Brand | cases reached | 7 |
+| Money as a Skill | cases reached | 7 |
+| Conflict Has a Winner | cases reached | 7 |
+| Reading the Room | cases reached | 7 |
+| Real World Ready Challenge | scenarios answered | 24 |
+
+Modules belong to a Lab Pack. The dashboard's `MODULE_REGISTRY` (`public/index.html`) carries a
+`pack` field on every entry — `'digital-decisions'` or `'real-world-ready'` — and each pack has
+one dashboard card whose counter, duration and status pill are derived from the entries with
+that pack. Insider's `COURSES` does not carry `pack` today; group by the `category` label or
+by the module ids listed above if you need a per-pack view.
 
 A 20-minute visit costs roughly 25 to 30 Firestore writes (one session rewrite per 45s plus
 the events), which is well inside the free tier at current traffic.

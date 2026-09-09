@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Allgood Academy | Real World Ready Lab Pack</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Shared identity/login module + identify gate — see /js/auth-core.js and
+         /js/identity-gate.js. Needed here only for the Direct Line (Message HQ) icon,
+         which requires a real signed-in session to write; launching a lab from one of
+         the cards below hands off to that lab's own gate, same as every other module. -->
+    <script type="module" src="/js/auth-core.js"></script>
+    <script type="module" src="/js/identity-gate.js"></script>
+    <script src="/js/message-hq.js" data-message-source="Real World Ready Hub"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'jodi-warmth': '#FBF6EE',
+                        'jodi-border': '#E8DFCE',
+                        /* Lab-Pack-level accent: every Real World Ready module shares amber. */
+                        'rwr-accent': '#C97D1A',
+                        'rwr-accent-dark': '#A8620E',
+                        'rwr-accent-light': '#FEF3DC'
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body { font-family: Verdana, sans-serif; background-color: #FBF6EE; margin: 0; min-height: 100vh; min-height: 100dvh; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .lab-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .lab-card.live:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body class="text-allgood-dark font-body">
+
+    <!-- HEADER — same Home / Message / Menu pattern as every GoodBlock and the Digital
+         Decisions Lab Pack hub. Structure copied from /jsh/digital-decisions-lab/, not
+         its content. -->
+    <header class="bg-allgood-secondary shadow-md flex items-center h-[60px] sticky top-0 z-30">
+        <div class="w-full px-4 flex items-center justify-between h-full">
+            <div class="flex items-center overflow-hidden">
+                <div class="flex shrink-0 items-center bg-allgood-primary rounded-full px-3 py-1 shadow-sm">
+                    <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[220px]">Real World Ready Lab Pack</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-1 shrink-0">
+                <a href="/" title="Dashboard" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 inline-flex"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></a>
+                <button onclick="window.openMessageModal()" title="Direct Line to HQ" class="text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                <button onclick="window.openLabMenu()" title="Jump to a Lab" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+
+        <!-- HERO. The hub borrows no single GoodBlock's icon: the three module icons sit
+             together in a row (coins / merge / glasses), the way the Challenge intro shows
+             three icons side by side. That reads as "a pack of three", not one promoted module. -->
+        <section class="text-center mb-12">
+            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Jodi's Schoolhouse</span>
+            <h1 class="text-3xl sm:text-5xl font-heading font-bold text-allgood-dark mt-2 mb-4">Real World <span class="text-rwr-accent">Ready</span></h1>
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-full bg-rwr-accent-light border border-rwr-accent/30 flex items-center justify-center shadow-sm"><i data-lucide="coins" class="w-6 h-6 text-rwr-accent-dark"></i></div>
+                <div class="w-12 h-12 rounded-full bg-rwr-accent-light border border-rwr-accent/30 flex items-center justify-center shadow-sm"><i data-lucide="merge" class="w-6 h-6 text-rwr-accent-dark"></i></div>
+                <div class="w-12 h-12 rounded-full bg-rwr-accent-light border border-rwr-accent/30 flex items-center justify-center shadow-sm"><i data-lucide="glasses" class="w-6 h-6 text-rwr-accent-dark"></i></div>
+            </div>
+            <p class="text-sm sm:text-base text-gray-600 max-w-xl mx-auto leading-relaxed">
+                The stuff school doesn't get around to teaching. Three short labs with Jodi &mdash; money, conflict, and reading a room &mdash; then the
+                <strong class="text-allgood-dark">Real World Ready Challenge</strong> to see where you actually land. Take them in any order.
+            </p>
+        </section>
+
+        <!-- THREE GOODBLOCKS + THE CHALLENGE. Order is deliberate but not enforced. -->
+        <section id="labs" class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+
+            <!-- MONEY AS A SKILL — live. Icon/accent match the GoodBlock's own startup screen
+                 and completion badge (coins / amber #C97D1A). -->
+            <div onclick="window.launchLab('Money as a Skill', '/jsh/real-world-ready-lab/money-as-a-skill/')"
+                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FEF3DC; border:1px solid #F3D9A8;">
+                        <i data-lucide="coins" class="w-7 h-7" style="color:#C97D1A;"></i>
+                    </div>
+                    <span id="lab-status-money-as-a-skill" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Money as a Skill</h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Splitting, spending, and the ask most people never make.</p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+
+            <!-- CONFLICT HAS A WINNER — live. merge / amber. -->
+            <div onclick="window.launchLab('Conflict Has a Winner', '/jsh/real-world-ready-lab/conflict-has-a-winner/')"
+                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FEF3DC; border:1px solid #F3D9A8;">
+                        <i data-lucide="merge" class="w-7 h-7" style="color:#C97D1A;"></i>
+                    </div>
+                    <span id="lab-status-conflict-has-a-winner" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Conflict Has a Winner</h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Disagreeing without someone having to lose.</p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+
+            <!-- READING THE ROOM — live. glasses / amber. -->
+            <div onclick="window.launchLab('Reading the Room', '/jsh/real-world-ready-lab/reading-the-room/')"
+                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FEF3DC; border:1px solid #F3D9A8;">
+                        <i data-lucide="glasses" class="w-7 h-7" style="color:#C97D1A;"></i>
+                    </div>
+                    <span id="lab-status-reading-the-room" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Reading the Room</h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Your first read is a signal, not a verdict.</p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+
+            <!-- REAL WORLD READY CHALLENGE — live. Covers all three labs; sits last, but nothing
+                 blocks a student starting here. -->
+            <div onclick="window.launchLab('Real World Ready Challenge', '/educational-games/real-world-ready/')"
+                 class="lab-card live cursor-pointer bg-slate-900 rounded-2xl border border-slate-800 shadow-sm p-6 flex flex-col text-white relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/5 rounded-full pointer-events-none"></div>
+                <div class="flex items-start justify-between mb-4 relative z-10">
+                    <div class="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shadow-sm">
+                        <i data-lucide="compass" class="w-7 h-7 text-amber-300"></i>
+                    </div>
+                    <span id="lab-status-rwr-challenge" class="bg-white/10 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-white/10">Challenge</span>
+                </div>
+                <h3 class="font-bold text-white text-lg mb-1 uppercase relative z-10">Real World Ready Challenge</h3>
+                <p class="text-xs text-slate-300 leading-relaxed flex-grow relative z-10">24 situations, scored. See where you actually land.</p>
+                <span class="mt-4 text-[11px] font-bold text-white uppercase tracking-wide flex items-center gap-1 relative z-10">Jump In <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+        </section>
+
+        <div class="mt-12 mb-4 text-center">
+            <p class="text-[10px] text-slate-400 font-mono tracking-widest uppercase opacity-80">
+                ALLGOOD OS <span class="mx-2">•</span> GOODBLOCK™
+            </p>
+        </div>
+    </main>
+
+    <!-- LAB MENU: jump to any lab or the Challenge. Same four entries as the cards above —
+         a second, separate list with its own hardcoded onclicks (see the integration checklist). -->
+    <div id="lab-menu-modal" class="hidden-modal fixed inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+        <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-rwr-accent">
+            <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Lab</h2>
+            <p class="text-xs text-gray-500 mb-4 font-body">Any order works.</p>
+            <div class="space-y-2">
+                <button onclick="window.closeLabMenu(); window.launchLab('Money as a Skill', '/jsh/real-world-ready-lab/money-as-a-skill/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
+                    <span>Money as a Skill</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <button onclick="window.closeLabMenu(); window.launchLab('Conflict Has a Winner', '/jsh/real-world-ready-lab/conflict-has-a-winner/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
+                    <span>Conflict Has a Winner</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <button onclick="window.closeLabMenu(); window.launchLab('Reading the Room', '/jsh/real-world-ready-lab/reading-the-room/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
+                    <span>Reading the Room</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <button onclick="window.closeLabMenu(); window.launchLab('Real World Ready Challenge', '/educational-games/real-world-ready/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
+                    <span>Real World Ready Challenge</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <button onclick="window.closeLabMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+        </div>
+    </div>
+
+    <!-- MESSAGE MODAL: standardized in /js/message-hq.js, injected at runtime -->
+
+    <script>
+        window.openLabMenu = () => {
+            document.getElementById('lab-menu-modal').classList.remove('hidden-modal');
+            document.getElementById('lab-menu-modal').classList.add('visible-modal');
+            if (window.lucide) window.lucide.createIcons();
+        };
+        window.closeLabMenu = () => {
+            document.getElementById('lab-menu-modal').classList.add('hidden-modal');
+            document.getElementById('lab-menu-modal').classList.remove('visible-modal');
+        };
+
+        // Every lab (this hub included) runs its own identify gate at its own power-up
+        // moment — see /js/identity-gate.js — so a direct/bookmarked visit to a lab still
+        // gets gated. Checking again here just means someone clicking a card from an
+        // already-identified session never sees the gate twice.
+        window.launchLab = async (name, url) => {
+            const { user } = await window.AuthGate.ensureIdentified();
+            if (!user) return;
+            if (typeof gtag === 'function') gtag('event', 'launch_module', { module_name: name });
+            window.location.href = url;
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) window.lucide.createIcons();
+            [100, 400, 1000].forEach((delay) => setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay));
+        });
+    </script>
+
+    <!-- Real per-module progress for a signed-in student — "Ready" is a marketing label for
+         an unauthenticated visitor only. Reads the same game_scores / module_progress paths
+         the dashboard's MODULE_REGISTRY uses; the predicates here mirror those entries. -->
+    <script type="module">
+        import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // 64 = the Real World Ready Challenge's certification threshold (of 72), NOT the
+        // Digital Decisions Challenge's 80 (of 90). Copying 80 across would make the badge
+        // unreachable — a perfect score is 72.
+        const LAB_STATUS_REGISTRY = [
+            { id: 'money-as-a-skill', gameName: 'Money as a Skill', badgeId: 'lab-status-money-as-a-skill', isComplete: (d) => d.completed === true },
+            { id: 'conflict-has-a-winner', gameName: 'Conflict Has a Winner', badgeId: 'lab-status-conflict-has-a-winner', isComplete: (d) => d.completed === true },
+            { id: 'reading-the-room', gameName: 'Reading the Room', badgeId: 'lab-status-reading-the-room', isComplete: (d) => d.completed === true },
+            { id: 'rwr-challenge', gameName: 'Real World Ready Challenge', badgeId: 'lab-status-rwr-challenge', isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64, dark: true },
+        ];
+
+        function setLabBadge(lab, status) {
+            const el = document.getElementById(lab.badgeId);
+            if (!el) return;
+            if (status === 'completed') {
+                el.textContent = 'Completed';
+                el.className = 'bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else if (status === 'started') {
+                el.textContent = 'Started';
+                el.className = lab.dark ? 'bg-blue-500/20 text-blue-200 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-blue-400/30' : 'bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else {
+                el.textContent = 'Not Started';
+                el.className = lab.dark ? 'bg-white/10 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-white/10' : 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            }
+        }
+
+        // startedModuleIds is the set of module_progress doc ids for this student — the
+        // only "started" signal a lab has. Labs write to game_scores only on completion.
+        function applyRealLabStatuses(scoreDocs, startedModuleIds) {
+            LAB_STATUS_REGISTRY.forEach(lab => {
+                let sawAttempt = startedModuleIds.has(lab.id);
+                let completed = false;
+                for (const data of scoreDocs) {
+                    if (data.gameName !== lab.gameName) continue;
+                    sawAttempt = true;
+                    if (lab.isComplete(data)) { completed = true; break; }
+                }
+                setLabBadge(lab, completed ? 'completed' : (sawAttempt ? 'started' : 'not_started'));
+            });
+        }
+
+        // Wait for auth-core.js's module script (loaded in <head>, executes first) to have
+        // set window.AuthCore before touching it.
+        function whenAuthCoreReady(cb) {
+            if (window.AuthCore) { cb(); return; }
+            const check = setInterval(() => { if (window.AuthCore) { clearInterval(check); cb(); } }, 50);
+        }
+
+        whenAuthCoreReady(() => {
+            window.AuthCore.onAuthStateChanged(window.AuthCore.auth, async (user) => {
+                if (!user) return;
+                try {
+                    const [scoresSnap, progressSnap] = await Promise.all([
+                        getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'game_scores')),
+                        getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'module_progress')),
+                    ]);
+                    const startedModuleIds = new Set(progressSnap.docs.map(d => d.id));
+                    applyRealLabStatuses(scoresSnap.docs.map(d => d.data()), startedModuleIds);
+                } catch (e) {
+                    console.error('[Real World Ready Hub] Couldn\'t read progress — leaving cards as Ready', e);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
