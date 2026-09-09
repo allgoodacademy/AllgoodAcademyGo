@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Jodi's Schoolhouse: Reading the Room</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- ============================================================================
+         The four shared modules below are loaded exactly the way the live Professional
+         Brand GoodBlock (the chassis this Lab Pack copies) loads them. Nothing in this
+         file re-implements them. The only per-module config is the data-message-source
+         string on message-hq.js.
+         ============================================================================ -->
+    <script type="module" src="/js/auth-core.js"></script>
+    <script type="module" src="/js/identity-gate.js"></script>
+    <script type="module" src="/js/telemetry.js"></script>
+    <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: Reading the Room"></script>
+
+    <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js.
+         Same block every GoodBlock carries; slug and gameName are the only things that
+         change. Slug 'reading-the-room' matches the MODULE_REGISTRY entry in public/index.html,
+         the Insider COURSES entry, and the Real World Ready hub link. -->
+    <script type="module">
+        import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const appId = window.AuthCore.appId;
+        const auth = window.AuthCore.auth;
+        const db = window.AuthCore.db;
+
+        window.currentUserName = "Agent Learner";
+        window.currentUserEmail = "";
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        // Telemetry: one "step" = one page (7 total). Page 1 is open the moment the lab loads.
+        if (window.Telemetry) {
+            window.Telemetry.init({ module: 'reading-the-room', gameName: 'Reading the Room', stepsTotal: 7 });
+            window.Telemetry.step(1);
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                window.currentUserName = user.displayName || "Agent Learner";
+                window.currentUserEmail = user.email || "";
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('reading-the-room');
+                    if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
+                }
+            }
+        });
+
+        // Completion write — same game_scores shape every other GoodBlock uses. No numeric
+        // score (this is a lab, not a graded quiz); completion is a flag set once the handoff
+        // page is reached and the rating is submitted. narrativeStyle tags the Lab Pack's
+        // second-person vs character-driven A/B test — see the storyboard; do not harmonise.
+        window.logModuleCompletion = async () => {
+            if (window.Telemetry) window.Telemetry.complete();
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId), {
+                    gameName: "Reading the Room",
+                    completed: true,
+                    narrativeStyle: 'character',
+                    lastUpdated: serverTimestamp(),
+                    user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail || null }
+                }, { merge: true });
+            } catch (e) { console.error("[RTR] Completion write failed", e); }
+        };
+    </script>
+
+    <script>
+        function playSfx(name) {
+            if (window.sfx && typeof window.sfx[name] === 'function') window.sfx[name]();
+        }
+    </script>
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'allgood-primary': '#D34716',
+                        'allgood-secondary': '#357889',
+                        'allgood-dark': '#4C4C4C',
+                        'allgood-light': '#F7F7F7',
+                        'allgood-hover': '#EB8D69',
+                        'jodi-warmth': '#FBF6EE',
+                        'jodi-border': '#E8DFCE',
+                        /* LAB-PACK-LEVEL IDENTITY - Real World Ready.
+                           Amber #C97D1A is shared by every GoodBlock in this Lab Pack (founder
+                           decision, recorded in the accent registry as a Lab-Pack-level
+                           convention). The three GoodBlocks are differentiated by icon only:
+                           coins / merge / glasses. Do not give this module its own accent. */
+                        'gb-accent': '#C97D1A',
+                        'gb-accent-dark': '#A8620E',
+                        'gb-accent-light': '#FEF3DC'
+                    },
+                    fontFamily: {
+                        'heading': ['Georgia', 'serif'],
+                        'body': ['Verdana', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: Verdana, sans-serif;
+            background-color: #F7F7F7;
+            min-height: 100vh;
+            min-height: 100dvh;
+            margin: 0; padding: 0;
+            overflow: hidden;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; }
+
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+
+        .app-shell {
+            width: 100%; height: 100dvh;
+            display: flex; flex-direction: column;
+            background-color: #F7F7F7;
+            position: relative; overflow: hidden;
+        }
+
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .content-column::-webkit-scrollbar { width: 10px; }
+        .content-column::-webkit-scrollbar-track { background: transparent; border-left: 1px solid #e5e7eb; }
+        .content-column::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 5px; border: 2px solid #F9FAFB; }
+
+        .navbar-content { flex: 0 0 48px; z-index: 30; position: relative; }
+        .footer-content { flex: 0 0 36px; z-index: 30; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        #flex-progress-bar { height: 4px; width: 100%; background-color: rgba(255,255,255,0.22); position: absolute; bottom: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        .split-layout { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
+
+        .sidebar-jodi {
+            width: 100%; height: auto; min-height: 140px;
+            background-color: #FBF6EE; border-bottom: 1px solid #E8DFCE;
+            display: flex; align-items: flex-end; padding: 10px; position: relative; z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .content-column {
+            flex: 1; overflow-y: auto; position: relative;
+            background-color: #F9FAFB; padding-bottom: 20px;
+        }
+
+        .page { width: 100%; padding: 20px 20px 50px; position: relative; scroll-margin-top: 20px; }
+        .page.locked { pointer-events: none; user-select: none; }
+        .page.locked .page-inner { filter: blur(4px) grayscale(0.4); opacity: 0.55; transition: filter 0.4s ease, opacity 0.4s ease; }
+        .page:not(.locked) .page-inner { animation: fadeIn 0.5s ease-out; }
+        .lock-overlay { display: none; }
+        .page.locked .lock-overlay { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .continue-prompt { display: none; }
+        .continue-prompt.ready { display: flex; animation: fadeIn 0.4s ease-out; }
+
+        /* min-height:0 lets this flex child actually shrink; without it a long bubble grows the
+           wrapper past the sidebar and the top of her speech gets clipped under the header. */
+        .jodi-wrapper { display: flex; flex-direction: row; align-items: center; width: 100%; max-width: 600px; margin: 0 auto; min-height: 0; max-height: 100%; }
+        .jodi-avatar.jodi-stage { width: 120px; height: 120px; flex-shrink: 0; margin-right: 15px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1)); }
+        .jodi-avatar.jodi-stage img, .jodi-avatar.jodi-stage svg { width: 100%; height: 100%; display: block; }
+
+        .jodi-bubble {
+            background: white; border: 1px solid #E8DFCE; border-radius: 16px; border-bottom-left-radius: 0;
+            padding: 14px 16px; font-size: 0.85rem; color: #4C4C4C; line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; flex: 1;
+            transform-origin: bottom left; opacity: 0; transition: opacity 0.3s;
+        }
+        .jodi-bubble.visible { opacity: 1; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        /* A long line scrolls INSIDE the bubble rather than growing it under the header. */
+        .jodi-bubble { max-height: 30vh; overflow-y: auto; overscroll-behavior: contain; }
+        .jodi-bubble::-webkit-scrollbar { width: 5px; }
+        .jodi-bubble::-webkit-scrollbar-thumb { background-color: #D8CDBA; border-radius: 3px; }
+        .jodi-bubble::-webkit-scrollbar-track { background: transparent; }
+
+        #jodi-whiteboard { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; overflow: hidden; transition: opacity 0.3s ease, max-height 0.3s ease; }
+        #jodi-whiteboard.wb-populated { opacity: 1; max-height: min(320px, 38vh); overflow-y: auto; padding-top: 1rem; padding-bottom: 1rem; margin-bottom: 0.75rem; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+        @media (min-width: 768px) {
+            .split-layout { flex-direction: row; }
+            .sidebar-jodi {
+                width: 25%; min-width: 300px; height: 100%;
+                border-bottom: none; border-right: 1px solid #E8DFCE;
+                flex-direction: column; justify-content: flex-end; padding: 20px;
+            }
+            .content-column { width: 75%; }
+            .jodi-wrapper { flex-direction: column-reverse; align-items: center; width: 100%; }
+            .jodi-avatar.jodi-stage { width: min(200px, 26vh); height: min(200px, 26vh); margin-right: 0; margin-top: 20px; }
+            .jodi-bubble.tucked { opacity: 0 !important; max-height: 0; margin-bottom: 0; padding: 0; border-width: 0; overflow: hidden; pointer-events: none; }
+            .jodi-bubble {
+                border-radius: 16px; border-bottom-left-radius: 16px; border-bottom-right-radius: 0;
+                margin-bottom: 10px; text-align: center; font-size: 0.95rem;
+                max-height: 46vh;
+            }
+            .jodi-bubble::after {
+                content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+                width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 8px solid #FFF;
+                filter: drop-shadow(0 2px 1px rgba(0,0,0,0.05));
+            }
+            /* Mobile inline mechanism boxes are redundant on desktop, where the same content
+               is routed to Jodi's whiteboard instead. Hidden here, once, for every Case. */
+            .mobile-wb { display: none !important; }
+        }
+
+        /* ============================ MOBILE ============================
+           Phones: size everything to the initial containing block (100%, which iOS sizes to
+           the toolbar-visible viewport) and make the document unscrollable, so the shell can
+           never be taller than what is on screen. Deliberately NOT position:fixed on html/body
+           (the DDC/Jolene's pattern): Safari stopped delivering taps to the Message HQ button
+           on the labs when that was tried. See docs/goodblock-integration-checklist.md. */
+        @media (max-width: 767px) {
+            html { height: 100%; overflow: hidden; }
+            body { height: 100%; min-height: 0 !important; overflow: hidden !important; }
+            .app-shell { height: 100%; }
+            .navbar-content { flex: 0 0 auto; min-height: 52px; padding-top: env(safe-area-inset-top); }
+            footer.footer-content { display: none !important; }
+            .content-column { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+
+            /* .jodi-wrapper is a ROW on mobile, and #jodi-recall is a direct child of it - so
+               the moment the recall button appeared it became a third column squeezing the
+               avatar and bubble. Wrapping drops it onto its own line instead. */
+            .jodi-wrapper { flex-wrap: wrap; }
+            #jodi-recall { flex-basis: 100%; order: 5; margin-top: 6px; padding: 8px 0; }
+
+            .sidebar-jodi { padding: 10px 10px 6px; }
+            .jodi-avatar.jodi-stage { width: 92px; height: 92px; margin-right: 12px; }
+            .jodi-bubble { max-height: 26vh; font-size: 0.82rem; padding: 12px 13px; }
+
+            .page { padding: 16px 14px 44px; }
+            .case-reset { padding: 10px 6px; font-size: 11px; }
+        }
+
+        .jodi-avatar img, .jodi-avatar svg { transition: opacity 0.18s ease; }
+        .jodi-avatar.mood-shift img, .jodi-avatar.mood-shift svg { opacity: 0.15; }
+
+        /* Jodi is clickable: her whiteboard covers her original line, so tapping her brings it back. */
+        .jodi-avatar.jodi-stage { cursor: pointer; }
+        .jodi-avatar.jodi-stage:hover { filter: drop-shadow(2px 4px 10px rgba(201,125,26,0.35)); }
+
+        .card-shimmer {
+            background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(249,250,251,1) 100%);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            border: 1px solid #E5E7EB;
+        }
+
+        /* Shared: one reset control per interactive Case, same position, same look. */
+        .case-reset { transition: transform .12s ease, background-color .15s ease; }
+        .case-reset:active { transform: scale(.97); }
+
+        /* Multi-option rows stack full-width on phones; 11px buttons are not tap targets. */
+        @media (max-width: 767px) {
+            .stack-mobile { flex-direction: column !important; }
+            .stack-mobile > * { width: 100% !important; }
+        }
+
+        /* Shared: one instruction bar per Case. Updates as the Case moves through its steps. */
+        .step-bar { border-left: 4px solid #C97D1A; background: #FEF3DC; border-radius: 0 12px 12px 0; padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px; }
+        .step-bar .step-num { width: 22px; height: 22px; border-radius: 999px; background: #C97D1A; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+        .step-bar .step-text { font-size: 13px; color: #4a2f08; line-height: 1.45; }
+        .step-bar.done { border-left-color: #059669; background: #ECFDF5; }
+        .step-bar.done .step-num { background: #059669; }
+        .step-bar.done .step-text { color: #064e3b; }
+
+        /* Shared: per-item verdict pill. Never "wrong" - a reframe, not a grade. */
+        .verdict { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
+        .verdict.best { color: #065f46; background: #ECFDF5; border-color: #A7F3D0; }
+        .verdict.ok { color: #475569; background: #F1F5F9; border-color: #CBD5E1; }
+        .verdict.rethink { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
+
+        /* Shared: a selectable option card. amber = "look again", green = locked in. */
+        .opt-card { transition: border-color .2s ease, background-color .2s ease, transform .1s ease, opacity .3s ease; cursor: pointer; }
+        .opt-card:active:not(.is-locked):not(.is-disabled) { transform: scale(.985); }
+        .opt-card.is-amber { border-color: #D97706; background-color: #FFFBEB; }
+        .opt-card.is-green { border-color: #059669; background-color: #ECFDF5; }
+        .opt-card.is-picked { border-color: #C97D1A; background-color: #FEF3DC; }
+        .opt-card.is-locked { pointer-events: none; }
+        .opt-card.is-disabled { opacity: .45; pointer-events: none; }
+        .opt-card.is-dim { opacity: .5; }
+
+        /* Shared: a reframe line under a finished Case (the one sentence worth keeping). */
+        .reframe-box { border-left: 3px solid #C97D1A; background: #FEF3DC; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 12px; font-style: italic; color: #7A4A0A; margin-top: 14px; display: none; }
+        .reframe-box.show { display: block; animation: fadeIn 0.4s ease-out; }
+
+        /* Shared: chat bubbles for message-thread Cases. */
+        .chat-line { animation: fadeIn .3s ease-out; }
+        .chat-them { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; border-bottom-left-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1f2937; max-width: 85%; }
+        .chat-me { background: #FEF3DC; border: 1px solid #F3D9A8; border-radius: 14px; border-bottom-right-radius: 4px; padding: 8px 12px; font-size: 12px; color: #4a2f08; max-width: 85%; margin-left: auto; }
+        .chat-sys { font-size: 10px; text-align: center; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 0; }
+
+        /* ---- Case 2: inference ladder ---- */
+        .rung { border: 2px solid #E5E7EB; border-radius: 12px; background: #fff; padding: 10px 12px; transition: border-color .3s ease, background-color .3s ease, opacity .5s ease, transform .5s ease, max-height .5s ease; }
+        .rung.is-amber { border-color: #D97706; background: #FFFBEB; }
+        .rung.is-home { border-color: #C97D1A; background: #FEF3DC; }
+        .rung.is-lit { border-color: #F3D9A8; background: #FFFDF7; }
+        .rung.is-base { border-color: #059669; background: #ECFDF5; }
+        .rung.collapsing { opacity: 0; transform: translateY(14px) scale(.96); pointer-events: none; }
+        .rung-num { width: 22px; height: 22px; border-radius: 999px; background: #e5e7eb; color: #4b5563; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .rung.is-home .rung-num, .rung.is-lit .rung-num { background: #C97D1A; color: #fff; }
+        .rung.is-base .rung-num { background: #059669; color: #fff; }
+        .rung-btn { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 6px 10px; border-radius: 999px; border: 1px solid #d1d5db; background: #fff; color: #4b5563; transition: all .15s ease; white-space: nowrap; }
+        .rung-btn:hover { border-color: #C97D1A; color: #A8620E; }
+        .rung-btn.on { background: #C97D1A; border-color: #C97D1A; color: #fff; }
+        .evidence { margin-top: 8px; border: 2px dashed #d1d5db; border-radius: 10px; padding: 10px 12px; font-size: 12px; color: #6b7280; animation: fadeIn .3s ease-out; }
+        .evidence.is-empty { min-height: 44px; display: flex; align-items: center; justify-content: center; font-style: italic; color: #9ca3af; }
+        #gut-card { transition: opacity .4s ease, transform .4s ease; }
+        #gut-card.is-placed { opacity: .5; transform: scale(.97); }
+        #c2-collapsed { animation: fadeIn .6s ease-out; }
+
+        /* ---- Case 3: robust action under ambiguity ---- */
+        .explain-card { border: 2px solid #E5E7EB; border-radius: 14px; background: #fff; padding: 12px 14px; }
+        .resp-row { border: 2px solid #E5E7EB; border-radius: 12px; background: #fff; padding: 10px 12px; transition: border-color .2s ease, background-color .2s ease, opacity .3s ease; }
+        .resp-row.is-tested { border-color: #F3D9A8; }
+        .resp-row.is-amber { border-color: #D97706; background: #FFFBEB; }
+        .resp-row.is-green { border-color: #059669; background: #ECFDF5; }
+        .resp-row.is-disabled { opacity: .45; pointer-events: none; }
+        .outcome-col { border-radius: 10px; padding: 8px 10px; font-size: 11px; line-height: 1.45; animation: fadeIn .3s ease-out; }
+        .outcome-col.ok { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065f46; }
+        .outcome-col.bad { background: #FEF2F2; border: 1px solid #FECACA; color: #991b1b; }
+        .outcome-col.bad.flash-fail { animation: failFlash .8s ease-out; }
+        @keyframes failFlash { 0% { box-shadow: 0 0 0 0 rgba(220,38,38,.5); } 100% { box-shadow: 0 0 0 10px rgba(220,38,38,0); } }
+        .small-btn { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 6px 10px; border-radius: 999px; border: 1px solid #d1d5db; background: #fff; color: #4b5563; transition: all .15s ease; white-space: nowrap; }
+        .small-btn:hover:not(:disabled) { border-color: #C97D1A; color: #A8620E; }
+        .small-btn:disabled { opacity: .4; cursor: not-allowed; }
+        .small-btn.primary { background: #C97D1A; border-color: #C97D1A; color: #fff; }
+        .small-btn.primary:hover:not(:disabled) { background: #A8620E; color: #fff; }
+        #c3-acted { animation: fadeIn .5s ease-out; }
+
+        /* ---- Case 4: belief revision trace ---- */
+        .dial-btn { flex: 1; border: 2px solid #E5E7EB; background: #fff; border-radius: 12px; padding: 10px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #4b5563; transition: all .15s ease; }
+        .dial-btn:hover { border-color: #C97D1A; }
+        .dial-btn.on { border-color: #C97D1A; background: #FEF3DC; color: #A8620E; }
+        .day-card { animation: fadeIn .4s ease-out; }
+        #c4-trace { animation: fadeIn .6s ease-out; }
+        #c4-trace svg { width: 100%; height: auto; display: block; }
+
+        /* ---- Case 5: perspective swap ---- */
+        .scene-card { border: 2px solid #E5E7EB; border-radius: 14px; background: #fff; padding: 14px; }
+        .scene-card.is-done { border-color: #F3D9A8; }
+        .call-btn { flex: 1; border: 2px solid #E5E7EB; background: #fff; border-radius: 12px; padding: 10px 12px; font-size: 12px; font-weight: 700; color: #1f2937; transition: all .15s ease; }
+        .call-btn:hover:not(:disabled) { border-color: #C97D1A; background: #FEF3DC; }
+        .call-btn.on { border-color: #C97D1A; background: #FEF3DC; color: #A8620E; }
+        .call-btn:disabled { opacity: .5; cursor: default; }
+        .call-btn.on:disabled { opacity: 1; }
+        .pov { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 12px 14px; margin-top: 10px; animation: fadeIn .4s ease-out; }
+        .pov-beat { font-size: 12px; line-height: 1.5; padding: 4px 0; border-left: 2px solid #C97D1A; padding-left: 10px; margin-bottom: 6px; animation: fadeIn .4s ease-out; }
+        .pov-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #fbbf24; margin-bottom: 6px; }
+        #c5-summary { animation: fadeIn .6s ease-out; }
+        .verdict-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 9px; border-radius: 999px; border: 1px solid; display: inline-block; }
+        .verdict-tag.not { color: #1e3a8a; background: #EFF6FF; border-color: #BFDBFE; }
+        .verdict-tag.was { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
+
+        /* ---- Case 6: two-turn exchange ---- */
+        .door { border-radius: 14px; padding: 14px; text-align: center; animation: fadeIn .5s ease-out; }
+        .door.open { background: #ECFDF5; border: 2px solid #A7F3D0; color: #065f46; }
+        .door.closed { background: #F1F5F9; border: 2px solid #CBD5E1; color: #475569; }
+        .door.reopened { background: #FFFBEB; border: 2px solid #FDE68A; color: #92400E; }
+        .reply-btn { display: block; width: 100%; text-align: left; border: 2px solid #E5E7EB; background: #fff; border-radius: 12px; padding: 10px 12px; transition: border-color .15s ease, background-color .15s ease, transform .1s ease; }
+        .reply-btn:hover { border-color: #C97D1A; background: #FEF3DC; }
+        .reply-btn:active { transform: scale(.985); }
+        .reply-kind { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; display: block; margin-bottom: 2px; color: #92400E; }
+        .reply-text { font-size: 12px; color: #1f2937; line-height: 1.4; }
+        .friend-state { font-size: 12px; color: #4b5563; font-style: italic; padding: 8px 12px; border-left: 3px solid #d1d5db; margin: 8px 0; animation: fadeIn .4s ease-out; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <div class="app-shell" id="screen">
+
+        <!-- STARTUP SCREEN -->
+        <!--
+            Lab-Pack identity, changed as ONE set (gradient + glow + accent) — shared by all
+            three Real World Ready GoodBlocks. Icon is `glasses` - verified against the live
+            Lucide library. Reused verbatim on the completion badge so what you see before you
+            start and what you earn for finishing are one mark.
+        -->
+        <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-[#1a1000] via-[#2d1a00] to-[#0f0900]">
+            <div class="absolute inset-0 opacity-40" style="background: radial-gradient(circle at 50% 35%, rgba(201,125,26,0.4), transparent 60%);"></div>
+            <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                <div class="flex-grow flex flex-col items-center justify-center px-4">
+                    <div class="relative flex flex-col items-center">
+                        <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        <i data-lucide="glasses" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(201,125,26,0.7)]"></i>
+                        <h2 class="text-xl md:text-2xl font-heading font-bold text-amber-200 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
+                        <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-amber-200 tracking-tighter relative z-10">Jodi's Schoolhouse</h1>
+                        <p class="mt-4 text-amber-300 font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: Reading the Room</p>
+                        <p class="mt-2 text-white/50 text-[10px] tracking-[0.3em] uppercase font-bold relative z-10">Real World Ready Lab Pack</p>
+                    </div>
+                    <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- HEADER -->
+        <header class="bg-allgood-secondary shadow-md navbar-content flex items-center shrink-0">
+            <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+            <div class="w-full px-4 flex items-center justify-between h-full">
+                <div class="flex items-center overflow-hidden">
+                    <div class="flex shrink-0 items-center bg-allgood-primary rounded-full px-3 py-1 shadow-sm mr-2">
+                        <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">Reading the Room</span>
+                    </div>
+                    <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                        <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
+                        <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 7</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-1 shrink-0 relative">
+                    <button id="home-toggle" title="Home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                    <button onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ">
+                        <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+                    </button>
+                    <button id="menu-toggle" title="Jump to a Case" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN SPLIT VIEW -->
+        <div class="flex-1 min-h-0 relative split-layout">
+
+            <!-- LEFT COLUMN: MENTOR SIDEBAR -->
+            <div class="sidebar-jodi shrink-0">
+                <div class="jodi-wrapper">
+                    <!-- Jodi's four moods, referenced by URL from the shared /assets/jodi/ files —
+                         never re-embedded inline. renderJodi() toggles the wrapper divs by id. -->
+                    <div class="jodi-avatar jodi-stage rounded-2xl shadow-md relative overflow-hidden bg-[#F5E6D3]">
+                        <div id="jodi-img-neutral" class="absolute inset-0 w-full h-full" style="display:block;"><img src="/assets/jodi/jodi-neutral.svg" class="w-full h-full" alt="Jodi, neutral"></div>
+                        <div id="jodi-img-happy" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-happy.svg" class="w-full h-full" alt="Jodi, happy"></div>
+                        <div id="jodi-img-concerned" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-concerned.svg" class="w-full h-full" alt="Jodi, concerned"></div>
+                        <div id="jodi-img-thinking" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-thinking.svg" class="w-full h-full" alt="Jodi, thinking"></div>
+                    </div>
+                    <div id="jodi-bubble" class="jodi-bubble">
+                        Hey there. Come sit down a minute.
+                    </div>
+                    <!-- DESKTOP whiteboard: collapsed until she has something to write down. -->
+                    <div id="jodi-whiteboard" class="hidden md:block w-full bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                        <strong id="whiteboard-title" class="text-amber-300 block text-sm font-heading"></strong>
+                        <p id="whiteboard-desc" class="text-slate-300 leading-relaxed"></p>
+                    </div>
+                    <button id="jodi-recall" onclick="window.recallJodi()" class="hidden w-full text-[10px] font-bold uppercase tracking-widest text-gb-accent hover:text-gb-accent-dark py-1 mb-2 items-center justify-center gap-1">
+                        <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span id="jodi-recall-label">Re-read what Jodi said</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: CONTENT AREA -->
+            <div class="content-column" id="content-column">
+
+                <!-- CASE 1: OVERVIEW. Every page is a Case, numbered from 1 (Lab Pack convention;
+                     supersedes the older "Before We Start" intro label). -->
+                <div class="page" id="page-1">
+                    <div class="page-inner">
+                    <div class="max-w-2xl mx-auto pt-8 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 1</span>
+                        <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1 mb-4">Reading the Room</h2>
+                        <p class="text-sm text-gray-600 mb-4 leading-relaxed">Five moments, one person. Mira reads each one fast, and her first read is usually pretty good. The question in every Case is the same: what does she do with it &mdash; and what does it cost when she treats it as the answer?</p>
+                        <div class="mb-6 card-shimmer rounded-xl p-4 border flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gb-accent-light border border-gb-accent/30 flex items-center justify-center shrink-0">
+                                <i data-lucide="user" class="w-5 h-5 text-gb-accent-dark"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold text-gray-900">Mira</p>
+                                <p class="text-xs text-gray-500">Twelve. Quick. Right more often than not. Here for all five.</p>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-8">
+                            <div class="flex items-start gap-3 card-shimmer rounded-xl p-4 border">
+                                <div class="w-14 shrink-0 rounded-lg bg-gb-accent-light text-gb-accent-dark flex items-center justify-center font-bold text-[11px] py-2">Case 2</div>
+                                <div><p class="text-sm font-bold text-gray-900">Three Rungs Up</p><p class="text-xs text-gray-500 mt-0.5">Three one-word texts became a whole opinion. Find out how far that travelled.</p></div>
+                            </div>
+                            <div class="flex items-start gap-3 card-shimmer rounded-xl p-4 border">
+                                <div class="w-14 shrink-0 rounded-lg bg-gb-accent-light text-gb-accent-dark flex items-center justify-center font-bold text-[11px] py-2">Case 3</div>
+                                <div><p class="text-sm font-bold text-gray-900">Both Still True</p><p class="text-xs text-gray-500 mt-0.5">A weekend she wasn't invited to. Two explanations, and nobody's going to tell her which.</p></div>
+                            </div>
+                            <div class="flex items-start gap-3 card-shimmer rounded-xl p-4 border">
+                                <div class="w-14 shrink-0 rounded-lg bg-gb-accent-light text-gb-accent-dark flex items-center justify-center font-bold text-[11px] py-2">Case 4</div>
+                                <div><p class="text-sm font-bold text-gray-900">Five Tuesdays</p><p class="text-xs text-gray-500 mt-0.5">A new kid, a first impression, and five days to move &mdash; or not.</p></div>
+                            </div>
+                            <div class="flex items-start gap-3 card-shimmer rounded-xl p-4 border">
+                                <div class="w-14 shrink-0 rounded-lg bg-gb-accent-light text-gb-accent-dark flex items-center justify-center font-bold text-[11px] py-2">Case 5</div>
+                                <div><p class="text-sm font-bold text-gray-900">Is This About Me?</p><p class="text-xs text-gray-500 mt-0.5">Two moments that look the same and aren't. Same room, different chair.</p></div>
+                            </div>
+                            <div class="flex items-start gap-3 card-shimmer rounded-xl p-4 border">
+                                <div class="w-14 shrink-0 rounded-lg bg-gb-accent-light text-gb-accent-dark flex items-center justify-center font-bold text-[11px] py-2">Case 6</div>
+                                <div><p class="text-sm font-bold text-gray-900">"I'm Fine"</p><p class="text-xs text-gray-500 mt-0.5">She isn't. There's a trap on both sides of saying so.</p></div>
+                            </div>
+                        </div>
+                        <div id="continue-1" class="continue-prompt ready items-center justify-center pt-4">
+                            <button onclick="window.advanceFromPage(1)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE 2: THREE RUNGS UP -->
+                <div class="page" id="page-2">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 2</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Three Rungs Up</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Sana is normally chatty. Today Mira has had three one-word replies from her, and by the third one Mira has it worked out.</p>
+                        </div>
+
+                        <div id="step-2" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Mira's conclusion is on the card. The ladder underneath goes from <strong>what was actually said</strong> up to <strong>what she's concluded about Sana</strong>. <strong>Put the card on the rung it actually sits on.</strong></span></div>
+
+                        <div class="flex items-center justify-between mb-3">
+                            <span id="c2-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Not placed</span>
+                            <button onclick="window.resetCase2()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Pick the card back up</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-3">
+                            <div class="sm:col-span-2 card-shimmer rounded-2xl border border-gray-200 p-3">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Mira &amp; Sana &mdash; today</p>
+                                <div class="space-y-1.5">
+                                    <div class="chat-me">you coming tonight?</div>
+                                    <div class="chat-them">k</div>
+                                    <div class="chat-me">did you see the thing with the quiz 😭</div>
+                                    <div class="chat-them">sure</div>
+                                    <div class="chat-me">you ok?</div>
+                                    <div class="chat-them">ok</div>
+                                </div>
+                            </div>
+                            <div class="sm:col-span-3">
+                                <div id="gut-card" class="card-shimmer rounded-2xl border-2 border-gb-accent bg-gb-accent-light p-4 mb-3">
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-1">Mira's gut says</p>
+                                    <p class="text-lg font-heading font-bold text-gray-900">"She's mad at me. And she's being petty about it."</p>
+                                    <p id="gut-hint" class="text-[11px] text-gray-500 mt-2">Which rung is that sentence sitting on?</p>
+                                </div>
+                                <div id="ladder" class="space-y-2"></div>
+                            </div>
+                        </div>
+
+                        <div id="c2-collapsed" class="hidden card-shimmer rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-5 mb-3 text-center">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-2">Rung 1 &mdash; what was actually said</p>
+                            <div class="flex justify-center gap-2 mb-3">
+                                <span class="chat-them">k</span><span class="chat-them">sure</span><span class="chat-them">ok</span>
+                            </div>
+                            <p class="text-sm font-bold text-gray-900">This is everything Mira actually knows.</p>
+                        </div>
+
+                        <div id="mobile-wb-2" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                            <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-2" class="reframe-box mb-4">"There's a real difference between 'I think' and 'I know', and it's about three rungs wide."</div>
+
+                        <div id="continue-2" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(2)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE 3: BOTH STILL TRUE -->
+                <div class="page" id="page-3">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 3</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Both Still True</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Sunday night. Six photos from a lake day on Saturday. Everyone Mira knows is in them. Nobody asked her.</p>
+                        </div>
+
+                        <div id="step-3" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Two explanations, both live. Four things she could do. <strong>Test at least two of them</strong> against both explanations before you commit to one &mdash; the columns show what each does if A is true, and if B is true.</span></div>
+
+                        <div class="flex items-center justify-between mb-3">
+                            <span id="c3-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">0 tested &middot; commit unlocks at 2</span>
+                            <button onclick="window.resetCase3()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Back to Sunday night</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <div class="explain-card"><p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Explanation A</p><p class="text-xs text-gray-900 leading-snug">It was a small thing that came together fast, and she genuinely wasn't thought of.</p></div>
+                            <div class="explain-card"><p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Explanation B</p><p class="text-xs text-gray-900 leading-snug">It was deliberate. She was left out on purpose.</p></div>
+                        </div>
+
+                        <div id="c3-responses" class="space-y-2 mb-3"></div>
+
+                        <div id="c3-acted" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3 text-center">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-2">What she did</p>
+                            <p class="text-sm text-gray-900 font-medium mb-2" id="c3-acted-text"></p>
+                            <p class="text-xs font-bold uppercase tracking-widest text-gray-500">Still doesn't know. Acted anyway.</p>
+                        </div>
+
+                        <div id="mobile-wb-3" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                            <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-3" class="reframe-box mb-4">"Some of this you never find out. Pick the one thing that doesn't fall apart either way."</div>
+
+                        <div id="continue-3" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(3)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE 4: FIVE TUESDAYS -->
+                <div class="page" id="page-4">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Five Tuesdays</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">A new student, Kofi, joined Mira's class. First impression: he didn't say much and didn't look up. Mira's read: <strong>"He's stuck-up."</strong></p>
+                        </div>
+
+                        <div id="step-4" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">One observation a day, five days. After each one, <strong>move the dial if you think it should move</strong> &mdash; or leave it. Nothing's marked right or wrong. Your history is what gets shown at the end.</span></div>
+
+                        <div class="flex items-center justify-between mb-3">
+                            <span id="c4-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Day 1 of 5</span>
+                            <button onclick="window.resetCase4()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Back to Monday</span>
+                            </button>
+                        </div>
+
+                        <div id="c4-day" class="day-card card-shimmer rounded-2xl border-2 border-gray-200 p-4 mb-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1" id="c4-day-label">Day 1</p>
+                            <p class="text-sm text-gray-900 leading-relaxed" id="c4-day-text"></p>
+                        </div>
+
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-1.5">Mira's read of Kofi</p>
+                        <div class="flex gap-2 mb-3" id="c4-dial">
+                            <button class="dial-btn on" data-pos="0" onclick="window.setDial(0)">Stuck-up</button>
+                            <button class="dial-btn" data-pos="1" onclick="window.setDial(1)">Not sure</button>
+                            <button class="dial-btn" data-pos="2" onclick="window.setDial(2)">Something else going on</button>
+                        </div>
+                        <button id="c4-next" onclick="window.nextDay()" class="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-3 rounded-full text-xs uppercase tracking-widest mb-3 transition-transform hover:scale-[1.01]">
+                            <span id="c4-next-label">Next day</span> <span id="c4-next-icon"></span>
+                        </button>
+
+                        <div id="c4-trace" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-2">Where you sat, each day</p>
+                            <div id="c4-trace-svg"></div>
+                            <div id="c4-trace-days" class="grid grid-cols-5 gap-1 mt-2"></div>
+                        </div>
+
+                        <div id="mobile-wb-4" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                            <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-4" class="reframe-box mb-4">"A read that can't move isn't a read any more. It's a decision that stopped listening."</div>
+
+                        <div id="continue-4" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(4)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE 5: IS THIS ABOUT ME? -->
+                <div class="page" id="page-5">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 5</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Is This About Me?</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Two moments from the same Wednesday. In each one, Mira has to decide whether what just happened was about her. Then you get to watch the same seconds from somebody else's chair.</p>
+                        </div>
+
+                        <div id="step-5" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text"><strong>Scene A.</strong> Call it: about her, or not about her. Either call runs the replay &mdash; you're not being graded on the guess.</span></div>
+
+                        <div class="flex items-center justify-between mb-3">
+                            <span id="c5-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Scene A</span>
+                            <button onclick="window.resetCase5()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Replay both</span>
+                            </button>
+                        </div>
+
+                        <div id="scene-a" class="scene-card mb-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Scene A &mdash; 1:50 PM, history</p>
+                            <p class="text-sm text-gray-900 leading-relaxed">Ms. Adeyemi comes in late and short with everyone. "Books out. Now, please." She doesn't look at Mira. Mira handed her homework in a day late this morning, and she is <em>certain</em> this is about that.</p>
+                            <div class="flex gap-2 mt-3 stack-mobile" id="calls-a">
+                                <button class="call-btn" onclick="window.callScene('a', true)">About her</button>
+                                <button class="call-btn" onclick="window.callScene('a', false)">Not about her</button>
+                            </div>
+                            <div id="pov-a" class="pov hidden"><p class="pov-label">Same seconds &mdash; from Ms. Adeyemi's chair</p><div id="pov-a-beats"></div></div>
+                        </div>
+
+                        <div id="scene-b" class="scene-card mb-3 hidden">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Scene B &mdash; 3:20 PM, the bench outside</p>
+                            <p class="text-sm text-gray-900 leading-relaxed">Mira makes a joke about how Dani's brother "can't even reverse out of a driveway." The group laughs. Somebody starts on something else. Mira's already moved on &mdash; it landed, nothing to see.</p>
+                            <div class="flex gap-2 mt-3 stack-mobile" id="calls-b">
+                                <button class="call-btn" onclick="window.callScene('b', true)">About her</button>
+                                <button class="call-btn" onclick="window.callScene('b', false)">Not about her</button>
+                            </div>
+                            <div id="pov-b" class="pov hidden"><p class="pov-label">Same seconds &mdash; from Dani's chair</p><div id="pov-b-beats"></div></div>
+                        </div>
+
+                        <div id="c5-summary" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-3">Same girl, same day, same pair of eyes</p>
+                            <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div class="rounded-xl bg-white border border-gray-200 p-3"><p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Scene A</p><span class="verdict-tag not">Wasn't about her</span><p id="sum-a" class="text-[11px] text-gray-500 mt-2"></p></div>
+                                <div class="rounded-xl bg-white border border-gray-200 p-3"><p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Scene B</p><span class="verdict-tag was">Was about her</span><p id="sum-b" class="text-[11px] text-gray-500 mt-2"></p></div>
+                            </div>
+                            <p class="text-xs text-gray-700 leading-relaxed">From inside her own head, she could not tell either one. That's not a flaw in Mira. That's where the information is.</p>
+                        </div>
+
+                        <div id="mobile-wb-5" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                            <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-5" class="reframe-box mb-4">"The lesson isn't 'it's never about you.' That's just being wrong in a new direction. From inside your own head, you cannot tell. You have to go and look."</div>
+
+                        <div id="continue-5" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(5)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE 6: "I'M FINE" -->
+                <div class="page" id="page-6">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 6</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">"I'm Fine"</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Leah is sitting on the wall outside after school, phone face down, not looking at anyone. Mira asks if she's okay. Leah says <strong>"I'm fine"</strong> without looking up. She is visibly not fine.</p>
+                        </div>
+
+                        <div id="step-6" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text"><strong>Turn one.</strong> Three ways Mira can answer that. Whatever happens, there's a turn two &mdash; a first-turn misstep is recoverable, it just costs more.</span></div>
+
+                        <div class="flex items-center justify-between mb-3">
+                            <span id="c6-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Turn 1 of 2</span>
+                            <button onclick="window.resetCase6()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Back to the wall</span>
+                            </button>
+                        </div>
+
+                        <div class="card-shimmer rounded-2xl border border-gray-200 p-3 mb-3">
+                            <div id="c6-exchange" class="space-y-1.5"></div>
+                        </div>
+
+                        <div id="c6-replies" class="space-y-2 mb-3"></div>
+
+                        <div id="c6-door" class="hidden mb-3"></div>
+
+                        <div id="mobile-wb-6" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                            <strong class="mobile-wb-title text-amber-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-6" class="reframe-box mb-4">"Take her at her word out loud, and answer what's underneath at the same time. Nobody has to be caught out."</div>
+
+                        <div id="continue-6" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(6)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE 7: RATING + HANDOFF. Its own page, not tucked inside the last scenario Case. -->
+                <div class="page" id="page-7">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-10 px-4 sm:px-8 flex flex-col justify-center py-4 items-center text-center">
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent mb-3">Case 7</span>
+
+                        <div id="case7-rating" class="mb-6 w-full max-w-md">
+                            <h2 class="text-2xl font-heading font-bold text-gray-900 mb-1">Before You Go</h2>
+                            <p class="text-sm text-gray-500 mb-4">How was this one?</p>
+                            <div class="flex justify-center gap-1 mb-4">
+                                <button onclick="window.selectCaseRating(1)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="1">★</button>
+                                <button onclick="window.selectCaseRating(2)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="2">★</button>
+                                <button onclick="window.selectCaseRating(3)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="3">★</button>
+                                <button onclick="window.selectCaseRating(4)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="4">★</button>
+                                <button onclick="window.selectCaseRating(5)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="5">★</button>
+                            </div>
+                            <!-- 16px font: anything smaller makes iOS zoom the page on focus. -->
+                            <textarea id="case7-feedback-text" placeholder="Anything you want to tell us? (optional)" class="w-full border border-gray-200 rounded-lg p-3 text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-gb-accent/40" style="font-size:16px;" rows="2"></textarea>
+                            <button id="case7-submit-btn" onclick="window.finalizeCaseRating()" class="hidden mt-3 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wide shadow-md transition-transform hover:scale-105">
+                                Submit
+                            </button>
+                        </div>
+
+                        <div id="case7-reveal" class="w-full hidden">
+                            <div class="mb-6">
+                                <span class="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Reading Lab Cleared</span>
+                                <h2 class="text-3xl sm:text-4xl font-heading font-bold text-gray-900 mt-4">You Went and Looked</h2>
+                                <p class="text-sm text-gray-600 max-w-md mx-auto mt-3 leading-relaxed">Three short texts, a party she missed, a new kid, a teacher's bad day, a friend who was fine. Five first reads, and you checked every one.</p>
+                            </div>
+
+                            <div class="card-shimmer rounded-2xl p-8 shadow-md border border-gb-accent/30 mb-8 max-w-lg w-full relative overflow-hidden mx-auto">
+                                <div class="absolute -right-8 -bottom-8 w-32 h-32 bg-gb-accent/5 rounded-full pointer-events-none"></div>
+                                <!-- Same icon as the startup screen, deliberately. -->
+                                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-gb-accent-light to-amber-100 border-4 border-gb-accent/40 shadow-inner flex items-center justify-center">
+                                    <i data-lucide="glasses" class="w-10 h-10 text-gb-accent-dark drop-shadow-sm"></i>
+                                </div>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-gb-accent block mb-1">MINTED IN DOSSIER</span>
+                                <h3 class="text-xl font-heading font-bold text-gray-900 mb-1">Reading the Room Foundation</h3>
+                                <!-- 8 = 'reading_room' scenarios in the Real World Ready Challenge SCENARIO_DATA.
+                                     Counted against the coverage map, not estimated. This counts Challenge
+                                     scenarios, not the five Cases above. -->
+                                <p id="badge-count-line" class="text-lg font-heading font-bold text-gb-accent-dark mb-2">8 scenarios completed</p>
+                                <p class="text-xs text-gray-600 mb-6 leading-relaxed">Covers the principles behind <strong>8 scenarios</strong> in the 24-scenario Real World Ready Challenge.</p>
+
+                                <button onclick="window.returnToLabPack()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2">
+                                    <span>Back to Real World Ready</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="window.launchRealWorldReadyChallenge()" class="w-full text-gray-400 hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
+                                    Or jump straight to the Real World Ready Challenge
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer-content flex items-center justify-center px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
+            <p class="text-gray-400 text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
+        </footer>
+
+        <!-- HOME MODAL -->
+        <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+            <div class="bg-jodi-warmth rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gb-accent">
+                <div class="mb-4"><i data-lucide="home" class="w-10 h-10 mx-auto text-gb-accent"></i></div>
+                <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Where to, Agent?</h2>
+                <p class="text-sm text-gray-500 mb-6 font-body">You can pick this back up anytime.</p>
+                <div class="space-y-3">
+                    <button onclick="window.restartModule()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart Lab</button>
+                    <button onclick="window.returnToLabPack()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="layers" class="w-4 h-4 mr-2"></i> Real World Ready Hub</button>
+                    <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm flex items-center justify-center"><i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Dashboard</button>
+                    <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CASE MENU -->
+        <div id="case-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+            <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-gb-accent">
+                <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Case</h2>
+                <p class="text-xs text-gray-500 mb-4 font-body">Only cases you've already cleared are open for review.</p>
+                <div id="case-menu-list" class="space-y-2"></div>
+                <button onclick="window.closeCaseMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+            </div>
+        </div>
+
+    </div>
+    <script>
+        const CASE_TITLES = ["Reading the Room", "Three Rungs Up", "Both Still True", "Five Tuesdays", "Is This About Me?", "I'm Fine", "Handoff"];
+
+        window.openCaseMenu = () => {
+            const list = document.getElementById('case-menu-list');
+            list.innerHTML = '';
+            for (let i = 0; i < TOTAL_PAGES; i++) {
+                const unlocked = i <= highestUnlocked;
+                const isCurrent = i === highestUnlocked;
+                const btn = document.createElement('button');
+                btn.disabled = !unlocked;
+                btn.className = `w-full text-left p-3 rounded-lg border flex items-center justify-between text-xs font-bold transition-colors ${
+                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                } ${isCurrent ? 'ring-2 ring-allgood-primary' : ''}`;
+                btn.innerHTML = `<span>Case ${i + 1}: ${CASE_TITLES[i]}</span>${unlocked ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : '<i data-lucide="lock" class="w-3.5 h-3.5"></i>'}`;
+                if (unlocked) btn.onclick = () => {
+                    clearPendingUI(); // same guard as advanceFromPage - jumping via this menu must not let a stale timer from the page being left fire later
+                    window.closeCaseMenu();
+                    const pageEl = document.getElementById(`page-${i + 1}`);
+                    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                };
+                list.appendChild(btn);
+            }
+            document.getElementById('case-menu-modal').classList.remove('hidden-modal');
+            document.getElementById('case-menu-modal').classList.add('visible-modal');
+            if (window.lucide) window.lucide.createIcons();
+        };
+        window.closeCaseMenu = () => {
+            document.getElementById('case-menu-modal').classList.add('hidden-modal');
+            document.getElementById('case-menu-modal').classList.remove('visible-modal');
+        };
+    </script>
+
+    <script>
+        const TOTAL_PAGES = 7;
+        let highestUnlocked = 0; // 0-indexed; 0 = Case 1, the overview page
+        let pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: true };
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+        function playTone(freq, type, duration, vol = 0.1) {
+            initAudio(); const now = audioCtx.currentTime; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, now); osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(vol, now + 0.01); gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            osc.start(now); osc.stop(now + duration);
+        }
+        window.sfx = {
+            powerOn: () => { initAudio(); playTone(220, 'triangle', 0.4, 0.2); },
+            tick: () => { initAudio(); playTone(800, 'sine', 0.05, 0.05); },
+            click: () => { initAudio(); playTone(520, 'sine', 0.05, 0.05); },
+            success: () => { playTone(400, 'sine', 0.1); setTimeout(() => playTone(600, 'sine', 0.2), 100); },
+            error: () => playTone(150, 'sawtooth', 0.3)
+        };
+
+        // One entry per page (Case). Played once, exactly when that Case first unlocks.
+        const jodiScript = [
+            { text: "This is Mira. She's twelve, and she's got good instincts — I want to say that up front, because I am not here to tell you her gut is wrong. Her first read of a room is right more often than not. What I want you to watch is what she does with it. Because somewhere along the way she stopped treating it as a first read, and started treating it as the answer.", mood: 'neutral' },
+            { text: "Alright. Three short answers and Mira's already got it worked out — Sana's mad at her. Now I'm not going to tell you she's wrong. She might be exactly right. What I want is for us to go back and find out how she got there, because I don't think she noticed how far she travelled.", mood: 'neutral' },
+            { text: "Two explanations. Now here's the part nobody likes: I'm not going to tell you which one it is. Neither is Mira going to find out — not today, maybe not ever. So the question isn't which one's true. The question is what she does while both of them are still standing.", mood: 'neutral' },
+            { text: "First day, he barely said a word. Mira's already got a label on him. Now — five days are going to go by, and I want you to move that dial whenever you think it should move. Or don't. I'm keeping track either way.", mood: 'neutral' },
+            { text: "Two moments. They look like the same kind of thing and they are not, and that's exactly why I've put them next to each other.", mood: 'neutral' },
+            { text: "Last one. Her friend says she's fine, and she isn't, and Mira can see it. Now — there's a trap on both sides of this one, so take your time.", mood: 'neutral' },
+            { text: "Here's the thing I'd like you to keep. Not one time today did I tell you Mira's gut was wrong. Her first read was good more often than not — that's not the problem. The problem is she'd stopped treating it as a first read. Yours is probably good too. Just go and check it. That's the whole thing, and it takes about ten seconds.", mood: 'happy' }
+        ];
+
+        // ---- Jodi recall state ----
+        let currentIntro = null;
+        let lastMechanism = null;
+        let lastSaid = null;
+        let stashedReaction = null;
+        let jodiShowingIntro = true;
+
+        window.renderJodi = function(stateKey) {
+            const mood = ['neutral', 'happy', 'concerned', 'thinking'].includes(stateKey) ? stateKey : 'neutral';
+            const avatarEl = document.querySelector('.jodi-avatar');
+            if (avatarEl) avatarEl.classList.add('mood-shift');
+            setTimeout(() => {
+                ['neutral', 'happy', 'concerned', 'thinking'].forEach(m => {
+                    const el = document.getElementById(`jodi-img-${m}`);
+                    if (el) el.style.display = (m === mood) ? 'block' : 'none';
+                });
+                if (avatarEl) avatarEl.classList.remove('mood-shift');
+            }, 90);
+        }
+
+        window.renderLocks = function() {
+            for (let i = 0; i < TOTAL_PAGES; i++) {
+                const pageEl = document.getElementById(`page-${i + 1}`);
+                if (!pageEl) continue;
+                if (i <= highestUnlocked) pageEl.classList.remove('locked');
+                else pageEl.classList.add('locked');
+            }
+            document.getElementById('header-page-indicator').textContent = `${highestUnlocked + 1} / ${TOTAL_PAGES}`;
+            document.getElementById('flex-progress-fill').style.width = `${((highestUnlocked + 1) / TOTAL_PAGES) * 100}%`;
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        // Plays a page's Jodi line - called once, exactly when that page first unlocks.
+        window.playPageIntro = function(pageIndex) {
+            const whiteboard = document.getElementById('jodi-whiteboard');
+            if (whiteboard) whiteboard.classList.remove('wb-populated');
+            const bubbleEl = document.getElementById('jodi-bubble');
+            if (bubbleEl) bubbleEl.classList.remove('tucked');
+
+            const script = jodiScript[pageIndex];
+            if (!script) return;
+            const bubble = document.getElementById('jodi-bubble');
+            bubble.classList.remove('visible');
+
+            // Callback on the handoff: a module can prefix Case 7's line with something the
+            // student actually did earlier. Callbacks are load-bearing, not decorative.
+            let displayText = script.text;
+            if (pageIndex === TOTAL_PAGES - 1 && typeof window.handoffPrefix === 'function') {
+                const prefix = window.handoffPrefix();
+                if (prefix) displayText = prefix + ' ' + script.text;
+            }
+
+            currentIntro = { text: displayText, mood: script.mood };
+            stashedReaction = null;
+            jodiShowingIntro = true;
+            window.updateRecallButton();
+
+            setTimeout(() => {
+                bubble.textContent = displayText;
+                bubble.classList.add('visible');
+                window.renderJodi(script.mood);
+            }, 300);
+        };
+
+        window.markReady = function(pageIndex) {
+            if (pageCompletion[pageIndex]) return; // already revealed, don't re-trigger
+            pageCompletion[pageIndex] = true;
+            const prompt = document.getElementById(`continue-${pageIndex + 1}`);
+            if (prompt) prompt.classList.add('ready');
+            if (window.lucide) window.lucide.createIcons();
+            if (window.sfx) window.sfx.success();
+        };
+
+        function saveProgress() {
+            if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                window.AuthCore.saveModuleProgress('reading-the-room', { highestUnlocked, pageCompletion });
+            }
+        }
+
+        window.advanceFromPage = function(pageNum) {
+            clearPendingUI(); // cancel any delayed teach()/whiteboard call from the page being left
+            if (pageNum > highestUnlocked) {
+                highestUnlocked = pageNum;
+                pageCompletion[pageNum - 1] = true;
+                window.renderLocks();
+                window.playPageIntro(pageNum);
+                if (window.Telemetry) window.Telemetry.step(pageNum + 1);
+                saveProgress();
+            }
+            const nextPageEl = document.getElementById(`page-${pageNum + 1}`);
+            if (nextPageEl) nextPageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        window.restoreModuleProgress = function(data) {
+            if (!data) return;
+            if (typeof data.highestUnlocked === 'number' && data.highestUnlocked > highestUnlocked) {
+                highestUnlocked = data.highestUnlocked;
+            }
+            if (data.pageCompletion && typeof data.pageCompletion === 'object') {
+                pageCompletion = { ...pageCompletion, ...data.pageCompletion };
+            }
+            window.renderLocks();
+            for (let i = 1; i < TOTAL_PAGES; i++) {
+                if (pageCompletion[i]) {
+                    const prompt = document.getElementById(`continue-${i + 1}`);
+                    if (prompt) prompt.classList.add('ready');
+                }
+            }
+            if (window.lucide) window.lucide.createIcons();
+            if (highestUnlocked > 0) {
+                setTimeout(() => {
+                    const pageEl = document.getElementById(`page-${highestUnlocked + 1}`);
+                    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 800);
+            }
+        };
+
+        // Routes one mechanism explanation to BOTH surfaces: the desktop whiteboard and that
+        // Case's own inline box on mobile. Every Case calls this - never one surface directly.
+        window.updateWhiteboard = (title, desc, caseNum) => {
+            const wbTitle = document.getElementById('whiteboard-title');
+            const wbDesc = document.getElementById('whiteboard-desc');
+            if (wbTitle) wbTitle.textContent = title;
+            if (wbDesc) wbDesc.textContent = desc;
+
+            const whiteboard = document.getElementById('jodi-whiteboard');
+            if (whiteboard) whiteboard.classList.add('wb-populated');
+            const bubble = document.getElementById('jodi-bubble');
+            if (bubble) bubble.classList.add('tucked');
+
+            lastMechanism = { title, desc, caseNum };
+
+            if (caseNum) {
+                const box = document.getElementById(`mobile-wb-${caseNum}`);
+                if (box) {
+                    box.classList.remove('hidden');
+                    box.querySelector('.mobile-wb-title').textContent = title;
+                    box.querySelector('.mobile-wb-desc').textContent = desc;
+                }
+            }
+        };
+
+        // On desktop she's tucked behind the whiteboard, so text/mood swap silently underneath;
+        // re-triggering the reveal animation there would fight past the tucked state.
+        function renderBubble(text, mood) {
+            const bubble = document.getElementById('jodi-bubble');
+            if (!bubble) return;
+            const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+            if (isDesktop) {
+                bubble.textContent = text;
+                window.renderJodi(mood);
+            } else {
+                bubble.classList.remove('visible');
+                setTimeout(() => {
+                    bubble.textContent = text;
+                    bubble.classList.add('visible');
+                    window.renderJodi(mood);
+                }, 150);
+            }
+        }
+
+        window.sayJodi = (text, mood) => {
+            lastSaid = { text, mood };
+            jodiShowingIntro = false;
+            window.updateRecallButton();
+            renderBubble(text, mood);
+        };
+
+        window.recallJodi = () => {
+            if (jodiShowingIntro) {
+                if (!stashedReaction) { if (window.sfx) window.sfx.tick(); return; } // nothing to toggle to yet
+                const s = stashedReaction;
+                if (s.mechanism) window.updateWhiteboard(s.mechanism.title, s.mechanism.desc, s.mechanism.caseNum);
+                window.sayJodi(s.text, s.mood);
+            } else {
+                if (!currentIntro) { if (window.sfx) window.sfx.tick(); return; }
+                stashedReaction = { text: lastSaid ? lastSaid.text : '', mood: lastSaid ? lastSaid.mood : 'neutral', mechanism: lastMechanism };
+                const wb = document.getElementById('jodi-whiteboard');
+                if (wb) wb.classList.remove('wb-populated');
+                const bubble = document.getElementById('jodi-bubble');
+                if (bubble) bubble.classList.remove('tucked');
+                jodiShowingIntro = true;
+                window.updateRecallButton();
+                renderBubble(currentIntro.text, currentIntro.mood);
+            }
+            if (window.sfx) window.sfx.click();
+        };
+
+        window.updateRecallButton = () => {
+            const btn = document.getElementById('jodi-recall');
+            const label = document.getElementById('jodi-recall-label');
+            if (!btn || !label) return;
+            const canToggle = jodiShowingIntro ? !!stashedReaction : !!currentIntro;
+            btn.classList.toggle('hidden', !canToggle);
+            btn.classList.toggle('flex', canToggle);
+            label.textContent = jodiShowingIntro ? 'Back to the board' : 'Re-read what Jodi said';
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        // A delayed teach()/updateWhiteboard() call must not survive a page change - otherwise
+        // it fires on whatever Case the student has since moved to, silently overwriting that
+        // Case's own whiteboard. Every setTimeout that schedules a UI reaction goes through
+        // scheduleUI() instead of raw setTimeout, so advanceFromPage() (and every Case's own
+        // reset) can cancel it.
+        let pendingTimers = [];
+        function scheduleUI(fn, ms) { const id = setTimeout(fn, ms); pendingTimers.push(id); return id; }
+        function clearPendingUI() { pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+
+        // THE feedback call for every Case. On desktop the bubble tucks behind the whiteboard
+        // after the first mechanism fires, so anything sent only to the bubble is invisible
+        // there. teach() writes the whiteboard (desktop) AND the bubble (mobile) every time,
+        // so every click gets a visible reaction on both surfaces.
+        window.teach = (caseNum, title, desc, mood) => {
+            window.updateWhiteboard(title, desc, caseNum);
+            window.sayJodi(desc, mood || 'neutral');
+        };
+
+        // Whiteboard says one thing, Jodi says another — for the moments where the board is
+        // the mechanism and her line is the reaction. Both surfaces still update every time.
+        window.teachSplit = (caseNum, title, desc, said, mood) => {
+            window.updateWhiteboard(title, desc, caseNum);
+            window.sayJodi(said, mood || 'neutral');
+        };
+
+        // One instruction bar per Case. Step number + one line, updated as the Case moves on.
+        window.setStep = (caseNum, num, html, done) => {
+            const bar = document.getElementById(`step-${caseNum}`);
+            if (!bar) return;
+            bar.querySelector('.step-num').innerHTML = done ? SVG_CHECK : String(num);
+            bar.querySelector('.step-text').innerHTML = html;
+            bar.classList.toggle('done', !!done);
+        };
+
+        function showReframe(caseNum) {
+            const r = document.getElementById(`reframe-${caseNum}`);
+            if (r) r.classList.add('show');
+        }
+
+        // Small inline SVGs for anything injected after page load (data-lucide is not safe there).
+        const SVG_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+        const SVG_LOCK = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+        const SVG_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
+        const SVG_EYE = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>';
+        function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    </script>
+    <script>
+        /* ===================== CASE 2: THREE RUNGS UP =====================
+           Inference-ladder placement. The gut-read card must be placed on the rung it
+           actually sits on (rung 4). Then the upper rungs open to show what evidence exists
+           for them — and for rungs 3 and 4 the panel is EMPTY. That is correct, not a
+           loading failure. Skill-practice, GATED: placed on 4 AND an empty panel opened. */
+        const RUNGS = [
+            { n: 4, label: "What I've concluded about her", text: "She's mad at me, and she's being petty about it.", evidence: null },
+            { n: 3, label: "What I've decided it means", text: "She's annoyed.", evidence: null },
+            { n: 2, label: "What that could mean", text: "She's busy. She's tired. She's annoyed. Her phone's dying.", evidence: "Only the three words below. And they fit every one of these equally well." },
+            { n: 1, label: "What was actually said", text: "\"k\" / \"sure\" / \"ok\"", evidence: 'base' }
+        ];
+        let c2Placed = false;
+        let c2Amber = {};
+        let c2Opened = {};
+        let c2Done = false;
+
+        function renderLadder() {
+            document.getElementById('ladder').innerHTML = RUNGS.map(r => {
+                let cls = '';
+                if (c2Placed) cls = r.n === 4 ? 'is-home' : r.n === 1 ? 'is-base' : 'is-lit';
+                else if (c2Amber[r.n]) cls = 'is-amber';
+                let action = '';
+                if (!c2Placed) action = `<button class="rung-btn" onclick="window.placeRead(${r.n})">Put it here</button>`;
+                else if (r.n > 1 && !c2Done) action = `<button class="rung-btn ${c2Opened[r.n] ? 'on' : ''}" onclick="window.showEvidence(${r.n})">${c2Opened[r.n] ? 'Evidence' : 'Show the evidence'}</button>`;
+                let evidence = '';
+                if (c2Opened[r.n]) {
+                    evidence = r.evidence ? `<div class="evidence">${esc(r.evidence)}</div>` : `<div class="evidence is-empty">Nothing here. Not weak evidence — none.</div>`;
+                }
+                return `<div class="rung ${cls}" id="rung-${r.n}">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-start gap-2.5 min-w-0">
+                            <span class="rung-num">${r.n}</span>
+                            <div class="min-w-0"><p class="text-[10px] font-bold uppercase tracking-widest text-gray-400">${esc(r.label)}</p><p class="text-xs text-gray-900 mt-0.5 leading-snug">${esc(r.text)}</p></div>
+                        </div>
+                        ${action}
+                    </div>
+                    ${evidence}
+                </div>`;
+            }).join('');
+            document.getElementById('c2-status').textContent = c2Done ? 'Three rungs up' : c2Placed ? 'Placed on rung 4 — now check the rungs' : 'Not placed';
+        }
+
+        window.placeRead = (n) => {
+            if (c2Placed) { if (window.sfx) window.sfx.tick(); return; }
+            if (n !== 4) {
+                c2Amber[n] = true;
+                renderLadder();
+                const line = n === 3
+                    ? "Close — but 'she's being petty about it' isn't a meaning of the words. It's a verdict on who Sana is. That's one more rung up."
+                    : "Not quite. Rung one is just the words. Rung two is every meaning those words could carry. 'She's mad at me' has already picked one — and added a verdict on top.";
+                window.teachSplit(2, "Look at It Again", "Rung one is only what's on the screen. Rung two is every meaning those words could carry. 'She's mad at me' has already picked one.", line, 'thinking');
+                if (window.sfx) window.sfx.error();
+                return;
+            }
+            c2Placed = true;
+            document.getElementById('gut-card').classList.add('is-placed');
+            document.getElementById('gut-hint').textContent = 'Placed on rung 4.';
+            renderLadder();
+            window.setStep(2, 2, "Rung four. Now, for each rung above the words: <strong>show the evidence</strong> for it. Go on and look.");
+            window.teachSplit(2, "Three Rungs Up", "Three one-word texts became a whole opinion about who Sana is. Every rung in between happened silently and fast, and none of them got checked.",
+                "There it is. Three rungs up from anything that actually happened. And she took every one of those steps in about a second and a half. Now check what's holding each rung up.", 'happy');
+            if (window.sfx) window.sfx.success();
+        };
+
+        window.showEvidence = (n) => {
+            if (!c2Placed || c2Done) { if (window.sfx) window.sfx.tick(); return; }
+            c2Opened[n] = true;
+            renderLadder();
+            if (window.sfx) window.sfx.click();
+            if (n === 2) {
+                window.teachSplit(2, "Only the Words", "Rung two's evidence is the three words below it — and they fit 'busy' and 'tired' exactly as well as 'annoyed'.", "That's the only rung with anything under it. And look — the words fit all four meanings equally. Now try the ones above.", 'neutral');
+                return;
+            }
+            window.teachSplit(2, "Nothing Here", "There's no evidence on this rung. Not weak evidence. None. The rung was built out of the one below it.",
+                "Go on, look for it. I'll wait. There's nothing there — and that's not a trick, that's the whole point.", 'thinking');
+            if (!c2Done) {
+                c2Done = true;
+                scheduleUI(() => {
+                    renderLadder();
+                    [4, 3, 2].forEach(k => { const el = document.getElementById('rung-' + k); if (el) el.classList.add('collapsing'); });
+                    scheduleUI(() => {
+                        [4, 3, 2].forEach(k => { const el = document.getElementById('rung-' + k); if (el) el.classList.add('hidden'); });
+                        document.getElementById('gut-card').classList.add('hidden');
+                        document.getElementById('c2-collapsed').classList.remove('hidden');
+                        window.setStep(2, 2, "The ladder's gone. Three words are what's left — everything else was hers.", true);
+                        window.teachSplit(2, "Everything She Actually Knows", "Three words. Everything else was hers. She still might be right — but there's a real difference between 'I think' and 'I know'.",
+                            "That's all of it. Three words. Everything else was hers. Now — she still might be right, and I want to be straight with you about that. Sana might genuinely be annoyed. But Mira doesn't know that, and there's a real difference between 'I think' and 'I know' that most folks stop noticing somewhere around your age.", 'happy');
+                        showReframe(2);
+                        window.markReady(1);
+                    }, 550);
+                }, 1600);
+            }
+        };
+
+        window.resetCase2 = () => {
+            clearPendingUI();
+            c2Placed = false; c2Amber = {}; c2Opened = {}; c2Done = false;
+            const gut = document.getElementById('gut-card'); gut.classList.remove('is-placed', 'hidden');
+            document.getElementById('gut-hint').textContent = 'Which rung is that sentence sitting on?';
+            document.getElementById('c2-collapsed').classList.add('hidden');
+            document.getElementById('reframe-2').classList.remove('show');
+            renderLadder();
+            window.setStep(2, 1, "Mira's conclusion is on the card. The ladder underneath goes from <strong>what was actually said</strong> up to <strong>what she's concluded about Sana</strong>. <strong>Put the card on the rung it actually sits on.</strong>");
+            if (highestUnlocked >= 1) window.teach(2, "Card's back in hand", "Same three texts. Where does the sentence sit?", 'neutral');
+            if (window.sfx) window.sfx.tick();
+        };
+        function initCase2() { c2Placed = false; c2Amber = {}; c2Opened = {}; c2Done = false; renderLadder(); }
+
+        /* ===================== CASE 3: BOTH STILL TRUE =====================
+           Robust-action selector under unresolved ambiguity. Both explanation cards stay on
+           screen and NEVER resolve — deliberately. Test any response to see its outcome under
+           A and under B; commit unlocks after two are tested. Only one holds under both.
+           Skill-practice, GATED — every wrong commit shows exactly which column it fails in. */
+        const RESP = [
+            { id: 'passive', text: "Post something passive-aggressive. \"Must be nice to have friends who remember you exist.\"",
+              a: { ok: false, text: "Confusing and slightly alarming to people who meant no harm. They didn't know they'd done anything." },
+              b: { ok: false, text: "Escalates it, and hands them the story: now she's the one being dramatic." },
+              bets: "That one's betting on B — and even if B is true, it makes B worse." },
+            { id: 'withdraw', text: "Say nothing. Pull back from the group and see if anyone notices.",
+              a: { ok: false, text: "She's now absent from a group that didn't exclude her. They'll notice — and read it as her pulling away." },
+              b: { ok: false, text: "Confirms the distance, and she never finds out why. Whoever left her out gets exactly what they wanted." },
+              bets: "That one's betting on B. Under A it manufactures the very thing she's afraid of." },
+            { id: 'ask', text: "Ask one person, directly and lightly. \"Lake looked fun — was that a last-minute thing?\"",
+              a: { ok: true, text: "Easy. \"Yeah, Priya's mum just said yes at like 11am, we didn't even text people.\" Real answer, ten seconds." },
+              b: { ok: true, text: "Awkward for ten seconds. Then a real answer — or a dodge that is itself a real answer. Either way she knows more than she did." },
+              bets: "That one's not betting on either. It works under A, it works under B, and it's the only one that ends the not-knowing." },
+            { id: 'demand', text: "Message the group: \"So why wasn't I invited?\"",
+              a: { ok: false, text: "Reads as an accusation aimed at people who did nothing. Now they're apologising for something that wasn't a thing." },
+              b: { ok: false, text: "They get to be defensive instead of accountable. \"It wasn't like that\" — and it's over before it started." },
+              bets: "That one's betting on B, hard — and it gives B an easy way out." }
+        ];
+        let c3Tested = {};
+        let c3Amber = {};
+        let c3Done = null;
+
+        function renderResponses() {
+            const tested = Object.keys(c3Tested).length;
+            const canCommit = tested >= 2;
+            document.getElementById('c3-responses').innerHTML = RESP.map(r => {
+                const cls = c3Done ? (c3Done === r.id ? 'is-green' : 'is-disabled') : (c3Amber[r.id] ? 'is-amber' : c3Tested[r.id] ? 'is-tested' : '');
+                const cols = c3Tested[r.id] ? `<div class="grid grid-cols-2 gap-2 mt-2">
+                        <div class="outcome-col ${r.a.ok ? 'ok' : 'bad'} ${c3Amber[r.id] && !r.a.ok ? 'flash-fail' : ''}"><span class="block text-[9px] font-bold uppercase tracking-widest mb-0.5">If A is true</span>${esc(r.a.text)}</div>
+                        <div class="outcome-col ${r.b.ok ? 'ok' : 'bad'} ${c3Amber[r.id] && !r.b.ok ? 'flash-fail' : ''}"><span class="block text-[9px] font-bold uppercase tracking-widest mb-0.5">If B is true</span>${esc(r.b.text)}</div>
+                    </div>` : '';
+                const btns = c3Done ? '' : `<div class="flex gap-2 shrink-0">
+                        <button class="small-btn" onclick="window.testResp('${r.id}')" ${c3Tested[r.id] ? 'disabled' : ''}>${c3Tested[r.id] ? 'Tested' : 'Test it'}</button>
+                        <button class="small-btn primary" onclick="window.commitResp('${r.id}')" ${canCommit ? '' : 'disabled'}>Commit</button>
+                    </div>`;
+                return `<div class="resp-row ${cls}" id="resp-${r.id}">
+                    <div class="flex items-start justify-between gap-3 stack-mobile"><p class="text-xs text-gray-900 leading-snug">${esc(r.text)}</p>${btns}</div>
+                    ${cols}
+                </div>`;
+            }).join('');
+            document.getElementById('c3-status').textContent = c3Done ? 'Acted' : canCommit ? `${tested} tested · commit is open` : `${tested} tested · commit unlocks at 2`;
+        }
+
+        window.testResp = (id) => {
+            if (c3Done || c3Tested[id]) { if (window.sfx) window.sfx.tick(); return; }
+            const r = RESP.find(x => x.id === id);
+            c3Tested[id] = true;
+            renderResponses();
+            const tested = Object.keys(c3Tested).length;
+            if (tested >= 2) window.setStep(3, 2, `${tested} tested. <strong>Commit</strong> is open on every row now. Only one of them holds up in both columns.`);
+            window.teachSplit(3, "What It's Betting On", r.bets, "Notice what that one's betting on.", 'thinking');
+            if (window.sfx) window.sfx.click();
+        };
+
+        window.commitResp = (id) => {
+            if (c3Done || Object.keys(c3Tested).length < 2) { if (window.sfx) window.sfx.tick(); return; }
+            const r = RESP.find(x => x.id === id);
+            if (!(r.a.ok && r.b.ok)) {
+                c3Tested[id] = true; c3Amber[id] = true;
+                renderResponses();
+                const failCol = !r.a.ok && !r.b.ok ? "both columns" : (!r.a.ok ? "the A column" : "the B column");
+                window.teachSplit(3, "Fails In One Column", `That one falls apart in ${failCol}. It only works if she's already guessed right about which explanation is true — and she can't know that.`,
+                    "That one works fine if she's right. Have a look at the other column.", 'concerned');
+                if (window.sfx) window.sfx.error();
+                return;
+            }
+            c3Done = id;
+            renderResponses();
+            document.getElementById('c3-acted-text').textContent = r.text;
+            document.getElementById('c3-acted').classList.remove('hidden');
+            window.setStep(3, 2, "She asked one person, lightly. Both explanations are still up there. That's on purpose.", true);
+            window.teachSplit(3, "The Move That Doesn't Need to Be Right", "It costs almost nothing under either explanation, and it's the only one on the board that ends the not-knowing.",
+                "And look — she still doesn't know. I'm leaving those both up there on purpose, because that's honest. Some of this you never find out. What she did was pick the one thing that doesn't fall apart either way. That's not avoiding it. That's the most useful thing available.", 'happy');
+            showReframe(3);
+            window.markReady(2);
+            if (window.sfx) window.sfx.success();
+        };
+
+        window.resetCase3 = () => {
+            clearPendingUI();
+            c3Tested = {}; c3Amber = {}; c3Done = null;
+            document.getElementById('c3-acted').classList.add('hidden');
+            document.getElementById('reframe-3').classList.remove('show');
+            renderResponses();
+            window.setStep(3, 1, "Two explanations, both live. Four things she could do. <strong>Test at least two of them</strong> against both explanations before you commit to one — the columns show what each does if A is true, and if B is true.");
+            if (highestUnlocked >= 2) window.teach(3, "Back to Sunday night", "Six photos, two explanations, still no answer.", 'neutral');
+            if (window.sfx) window.sfx.tick();
+        };
+        function initCase3() { c3Tested = {}; c3Amber = {}; c3Done = null; renderResponses(); }
+
+        /* ===================== CASE 4: FIVE TUESDAYS =====================
+           Belief revision trace. Five observations, one per day; a three-position dial the
+           student may move or not. Nothing is marked right or wrong in the moment. The
+           recorded history is the output. Exploration, NOT GATED: never moving completes. */
+        const DAYS = [
+            "He didn't look up when he was introduced. Nodded at the floor, sat down.",
+            "He laughed at something across the room — properly, not politely. Then went back to his book.",
+            "He answered a question in class. Quietly, and correctly, and he'd clearly been listening the whole time.",
+            "He sat alone at lunch, reading. Not hunched. Looked comfortable, actually.",
+            "He said good morning to the caretaker by name. She said it back like they'd been doing it all week."
+        ];
+        const DIAL_LABELS = ['Stuck-up', 'Not sure', 'Something else going on'];
+        let c4Day = 0;
+        let c4Pos = 0;
+        let c4Trace = [];
+        let c4Done = false;
+        let c4MovedToday = false;
+
+        function renderDay() {
+            document.getElementById('c4-day-label').textContent = `Day ${c4Day + 1}`;
+            document.getElementById('c4-day-text').textContent = DAYS[c4Day];
+            document.getElementById('c4-status').textContent = `Day ${c4Day + 1} of 5`;
+            document.querySelectorAll('#c4-dial .dial-btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pos) === c4Pos));
+            document.getElementById('c4-next-label').textContent = c4Day === 4 ? 'Confirm day 5' : 'Next day';
+            document.getElementById('c4-next-icon').innerHTML = c4Day === 4 ? SVG_CHECK : SVG_ARROW;
+            const card = document.getElementById('c4-day'); card.classList.remove('day-card'); void card.offsetWidth; card.classList.add('day-card');
+        }
+
+        window.setDial = (pos) => {
+            if (c4Done) { window.teach(4, "Week's over", "Five days recorded. Go back to Monday to run it again.", 'neutral'); if (window.sfx) window.sfx.tick(); return; }
+            if (pos === c4Pos) { if (window.sfx) window.sfx.tick(); return; }
+            c4Pos = pos; c4MovedToday = true;
+            document.querySelectorAll('#c4-dial .dial-btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pos) === c4Pos));
+            const why = [
+                "Nothing in day one contradicts the label. It doesn't support it either — quiet isn't the same as stuck-up.",
+                "A real laugh is the first thing that doesn't fit 'stuck-up'. Stuck-up people laugh politely, if at all.",
+                "He'd been listening the whole time. That's somebody paying attention, not somebody looking down on the room.",
+                "Alone and comfortable is different from alone and cold. He didn't look like he was waiting to be rescued.",
+                "He knows the caretaker's name. Most people in that building don't."
+            ][c4Day];
+            window.teachSplit(4, "What Could Justify That", why + " Whether it should have moved you is your call — I'm just naming what's in the observation.", "Alright. What was it in that one?", 'thinking');
+            if (window.sfx) window.sfx.click();
+        };
+
+        window.nextDay = () => {
+            if (c4Done) { if (window.sfx) window.sfx.tick(); return; }
+            c4Trace.push(c4Pos);
+            if (!c4MovedToday) {
+                window.teachSplit(4, "Holding Is a Choice Too", "Holding is a choice too. It only counts if it's a choice.", "Sticking with it. Fair. Just make sure you're sticking, and not just not-looking.", 'neutral');
+            }
+            c4MovedToday = false;
+            if (window.sfx) window.sfx.tick();
+            if (c4Day >= 4) { finishCase4(); return; }
+            c4Day += 1;
+            renderDay();
+            window.setStep(4, 1, `Day ${c4Day + 1}. Move the dial if this one should move it. Or don't.`);
+        };
+
+        function finishCase4() {
+            c4Done = true;
+            document.getElementById('c4-status').textContent = 'Five days recorded';
+            document.getElementById('c4-next').classList.add('hidden');
+            // Trace: x = day, y = dial position (0 top = stuck-up, 2 bottom = something else).
+            const W = 300, H = 110, padX = 30, padY = 18;
+            const xs = c4Trace.map((_, i) => padX + i * ((W - padX * 2) / 4));
+            const ys = c4Trace.map(p => padY + p * ((H - padY * 2) / 2));
+            const pts = xs.map((x, i) => `${x},${ys[i]}`).join(' ');
+            const grid = [0, 1, 2].map(p => { const y = padY + p * ((H - padY * 2) / 2); return `<line x1="${padX}" x2="${W - padX}" y1="${y}" y2="${y}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3"/><text x="${padX - 6}" y="${y + 3}" font-size="7" text-anchor="end" fill="#9ca3af" font-family="Verdana">${['Stuck-up', 'Not sure', 'Else'][p]}</text>`; }).join('');
+            const dots = xs.map((x, i) => `<circle cx="${x}" cy="${ys[i]}" r="4" fill="#C97D1A" stroke="#fff" stroke-width="1.5"/>`).join('');
+            document.getElementById('c4-trace-svg').innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Your dial position across five days">${grid}<polyline points="${pts}" fill="none" stroke="#C97D1A" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
+            document.getElementById('c4-trace-days').innerHTML = DAYS.map((d, i) => `<div class="text-[9px] text-gray-500 leading-snug"><span class="block font-bold text-gray-700">Day ${i + 1}</span>${esc(d.split('.')[0])}.</div>`).join('');
+            document.getElementById('c4-trace').classList.remove('hidden');
+            const firstMove = c4Trace.findIndex(p => p !== 0);
+            let jodi, wbT, wbD, mood;
+            if (firstMove === -1) {
+                wbT = "Held It All Five Days"; wbD = "A flat line. Nothing in five days moved it. Was there anything in there that could have?";
+                jodi = "Held it the whole way. Now — I'm not going to tell you you're wrong, because I don't know Kofi either. But look at that line next to those five days and ask yourself honestly: was there anything in there that could have moved it? If the answer's no, that's not a read anymore. That's a decision that stopped listening.";
+                mood = 'thinking';
+            } else if (firstMove <= 1) {
+                wbT = "Moved Early"; wbD = firstMove === 0 ? "You moved on day one, before anything had changed. 'Not sure' is an honest place to start." : "You moved on day two, at the laugh — the first thing that didn't fit. That's your read doing its job.";
+                jodi = firstMove === 0
+                    ? "You moved on day one — before anything had happened that didn't fit. That's fair too. 'Not sure' is an honest place to start from, and it's a lot easier to move from than a label."
+                    : "You moved on day two, at the laugh. That's the right place to move — it's the first thing that didn't fit. That's not being talked out of your read. That's your read doing its job.";
+                mood = 'happy';
+            } else {
+                wbT = "Moved Late"; wbD = `Took until day ${firstMove + 1}. The evidence had piled up by then. Worth asking what day two would have cost you to consider.`;
+                jodi = `Took until day ${firstMove + 1}. That's alright — you got there, and the evidence had piled up by then. Worth asking yourself what day two would have cost you to consider.`;
+                mood = 'thinking';
+            }
+            window.setStep(4, 2, "Five days, one line. That's the whole output.", true);
+            window.teachSplit(4, wbT, wbD, jodi, mood);
+            showReframe(4);
+            window.markReady(3);
+            if (window.sfx) window.sfx.success();
+        }
+
+        window.resetCase4 = () => {
+            clearPendingUI();
+            c4Day = 0; c4Pos = 0; c4Trace = []; c4Done = false; c4MovedToday = false;
+            document.getElementById('c4-trace').classList.add('hidden');
+            document.getElementById('c4-next').classList.remove('hidden');
+            document.getElementById('reframe-4').classList.remove('show');
+            renderDay();
+            window.setStep(4, 1, "One observation a day, five days. After each one, <strong>move the dial if you think it should move</strong> — or leave it. Nothing's marked right or wrong. Your history is what gets shown at the end.");
+            if (highestUnlocked >= 3) window.teach(4, "Back to Monday", "Label's back on him. Five days again.", 'neutral');
+            if (window.sfx) window.sfx.tick();
+        };
+        function initCase4() { c4Day = 0; c4Pos = 0; c4Trace = []; c4Done = false; c4MovedToday = false; renderDay(); }
+
+        // Case 7 callback: the trace is the thing they made. Name it.
+        window.handoffPrefix = () => {
+            if (!c4Done) return '';
+            const firstMove = c4Trace.findIndex(p => p !== 0);
+            return firstMove === -1 ? "Back on Kofi's week, you held that label all five days." : `Back on Kofi's week, you moved on day ${firstMove + 1}.`;
+        };
+
+        /* ===================== CASE 5: IS THIS ABOUT ME? =====================
+           Perspective swap on paired OPPOSITE scenes. Scene A: she thinks it's about her; it
+           isn't. Scene B: she thinks it isn't; it is. Either call runs the replay — the POV
+           replay is the teaching, not the guess. Exploration, NOT GATED. Neither blanket
+           answer passes: "not about her" x2 is corrected on B, "about her" x2 on A. */
+        const POV = {
+            a: [
+                "12:40. A phone call at lunch. Her sister's scan results. Not good, not final.",
+                "1:48. She's walking to the classroom rehearsing what to say to her sister tonight.",
+                "1:50. \"Books out. Now, please.\" She hears her own voice and knows it's too sharp. She doesn't have anything left to fix it with.",
+                "Mira's homework? Marked it Tuesday. Hasn't thought about it since."
+            ],
+            b: [
+                "3:20. The joke lands. Everyone laughs. Dani laughs too, for about half a second.",
+                "Dani told Mira on Sunday, privately, that her brother had failed his test twice and was sick about it. She asked Mira not to say.",
+                "Half a second. Her smile drops, she looks at her shoes, and then somebody's talking about something else.",
+                "Mira has already moved on. She didn't see it. She wasn't looking."
+            ]
+        };
+        let c5Calls = { a: null, b: null };
+        let c5Replayed = { a: false, b: false };
+        let c5Playing = false;
+
+        function runPov(scene, then) {
+            c5Playing = true;
+            const box = document.getElementById('pov-' + scene);
+            const beats = document.getElementById('pov-' + scene + '-beats');
+            beats.innerHTML = '';
+            box.classList.remove('hidden');
+            POV[scene].forEach((b, i) => scheduleUI(() => {
+                beats.insertAdjacentHTML('beforeend', `<div class="pov-beat">${esc(b)}</div>`);
+                beats.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (window.sfx) window.sfx.tick();
+            }, 400 + i * 1300));
+            scheduleUI(() => { c5Playing = false; c5Replayed[scene] = true; then(); }, 400 + POV[scene].length * 1300 + 300);
+        }
+
+        window.callScene = (scene, aboutHer) => {
+            if (c5Playing || c5Calls[scene] !== null) { if (window.sfx) window.sfx.tick(); return; }
+            c5Calls[scene] = aboutHer;
+            document.querySelectorAll(`#calls-${scene} .call-btn`).forEach((b, i) => { b.disabled = true; b.classList.toggle('on', (i === 0) === aboutHer); });
+            document.getElementById('scene-' + scene).classList.add('is-done');
+            if (window.sfx) window.sfx.click();
+            if (scene === 'a') {
+                document.getElementById('c5-status').textContent = 'Scene A — replaying';
+                window.setStep(5, 1, "Called it. Now <strong>watch it from Ms. Adeyemi's chair</strong>.");
+                window.teachSplit(5, aboutHer ? "Watch It Again" : "Let's See", "Same room, different chair. Nothing in the room is going to change — only whose head we're in.",
+                    aboutHer ? "Watch it again. Same room, different chair." : "Let's see. Watch it from where she's sitting.", aboutHer ? 'thinking' : 'neutral');
+                runPov('a', () => {
+                    document.getElementById('scene-b').classList.remove('hidden');
+                    document.getElementById('c5-status').textContent = 'Scene B';
+                    window.setStep(5, 2, "<strong>Scene B.</strong> Same day, two hours later. Call it.");
+                    window.teachSplit(5, "It Wasn't About Her", "Nothing in the room changed. The only thing that changed was whose head we were in.",
+                        "Not one thing in that room was about Mira. And she'd have sworn it all was. Now this one. Watch Dani.", 'thinking');
+                    scheduleUI(() => document.getElementById('scene-b').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150);
+                });
+            } else {
+                document.getElementById('c5-status').textContent = 'Scene B — replaying';
+                window.setStep(5, 2, "Called it. Now <strong>watch Dani</strong>.");
+                window.teachSplit(5, "Now This One", "Same seconds, from the chair next to hers.", "Now this one. Watch Dani.", 'neutral');
+                runPov('b', () => {
+                    document.getElementById('sum-a').textContent = `You called it: ${c5Calls.a ? 'about her' : 'not about her'}.`;
+                    document.getElementById('sum-b').textContent = `You called it: ${c5Calls.b ? 'about her' : 'not about her'}.`;
+                    document.getElementById('c5-summary').classList.remove('hidden');
+                    document.getElementById('c5-status').textContent = 'Both scenes replayed';
+                    window.setStep(5, 2, "One she thought was about her and wasn't. One she'd have sworn wasn't, and was.", true);
+                    window.teachSplit(5, "This One Was About Her", "Half a second, and Mira had already moved on. The room told her. She wasn't looking.",
+                        "That one was about her. And she walked straight past it — because she'd just decided this wasn't the kind of moment where she'd got something wrong. So the lesson is not 'it's never about you' — that's just being wrong in a new direction. The lesson is that from inside your own head, you cannot tell. You have to go and look.", 'concerned');
+                    showReframe(5);
+                    window.markReady(4);
+                    scheduleUI(() => document.getElementById('c5-summary').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150);
+                });
+            }
+        };
+
+        window.resetCase5 = () => {
+            clearPendingUI();
+            c5Calls = { a: null, b: null }; c5Replayed = { a: false, b: false }; c5Playing = false;
+            ['a', 'b'].forEach(s => {
+                document.querySelectorAll(`#calls-${s} .call-btn`).forEach(b => { b.disabled = false; b.classList.remove('on'); });
+                document.getElementById('pov-' + s).classList.add('hidden');
+                document.getElementById('pov-' + s + '-beats').innerHTML = '';
+                document.getElementById('scene-' + s).classList.remove('is-done');
+            });
+            document.getElementById('scene-b').classList.add('hidden');
+            document.getElementById('c5-summary').classList.add('hidden');
+            document.getElementById('c5-status').textContent = 'Scene A';
+            document.getElementById('reframe-5').classList.remove('show');
+            window.setStep(5, 1, "<strong>Scene A.</strong> Call it: about her, or not about her. Either call runs the replay — you're not being graded on the guess.");
+            if (highestUnlocked >= 4) window.teach(5, "Both scenes reset", "Same Wednesday. Same two moments.", 'neutral');
+            if (window.sfx) window.sfx.tick();
+        };
+        function initCase5() { c5Calls = { a: null, b: null }; c5Replayed = { a: false, b: false }; c5Playing = false; }
+
+        /* ===================== CASE 6: "I'M FINE" =====================
+           Two-turn responsive exchange with failure in both directions. Face value
+           under-responds; insisting overrides. Turn two makes a first-turn misstep
+           recoverable at visible cost. Exploration, NOT GATED: every path completes. */
+        const T1 = {
+            face:   { msg: "Okay, cool. See you tomorrow?", state: "Leah's expression closes, just slightly. Something was on offer, and it passed.",
+                      t2: [ { id: 'late', kind: 'Open the door, late', msg: "Actually — I'm around later, if you want. No pressure." }, { id: 'leave', kind: 'Leave it', msg: "…Okay. Tomorrow then." } ] },
+            door:   { msg: "Okay. I'm around later if you want.", state: "Leah's shoulders drop half an inch. Nothing said. The door stays open.",
+                      t2: [ { id: 'stay', kind: 'Stay a minute', msg: "No rush. Want to walk?" }, { id: 'sit', kind: 'Say nothing more', msg: "(Mira sits down on the wall next to her.)" } ] },
+            insist: { msg: "You're obviously not fine. Just tell me.", state: "Leah goes flat. \"I said I'm fine.\" Now she's defending it.",
+                      t2: [ { id: 'back', kind: 'Back off', msg: "Sorry. I'll leave it. I'm here, though." }, { id: 'push', kind: 'Push again', msg: "Come on. Just tell me what happened." } ] }
+        };
+        const T2_OUT = {
+            late:  { door: 'reopened', title: 'Door reopened — with effort', state: "Leah looks up. \"…maybe. yeah.\" Heavier than it would have been a minute ago. Still open.",
+                     t: "Late Is Still Open", d: "The moment passed, and the door can still be opened. It's just heavier the second time.", jodi: "She caught it. A bit late, and it cost a little more to say. Still counts.", m: 'thinking' },
+            leave: { door: 'closed', title: 'Door closed', state: "Leah nods at the ground. Mira walks off. Whatever it was, it stays where it is.",
+                     t: "It Passed", d: "Taking 'I'm fine' at face value twice isn't rude. It's just that something was on offer and nobody picked it up.", jodi: "Nothing bad happened there. Nothing happened at all. That's the cost — not a fight, just a door that closed quietly.", m: 'concerned' },
+            stay:  { door: 'open', title: 'Door open', state: "\"…yeah, okay.\" They walk. Three streets later, Leah starts talking.",
+                     t: "Believed Her and Didn't", d: "She took the words at face value out loud, and answered what was underneath at the same time. Nobody had to be caught out.", jodi: "That's the one. And look at what it does: it takes her at her word out loud, and it answers the thing underneath at the same time. Nobody got called a liar. Nobody had to admit anything. The door's just open, and she knows where it is.", m: 'happy' },
+            sit:   { door: 'open', title: 'Door open', state: "Neither of them says anything for a while. Then Leah does.",
+                     t: "Believed Her and Didn't", d: "She took the words at face value out loud, and answered what was underneath at the same time. Nobody had to be caught out.", jodi: "That's the one. And look at what it does: it takes her at her word out loud, and it answers the thing underneath at the same time. Nobody got called a liar. Nobody had to admit anything. The door's just open, and she knows where it is.", m: 'happy' },
+            back:  { door: 'reopened', title: 'Door reopened — with effort', state: "A long pause. Leah: \"…thanks.\" She doesn't say more today. She doesn't leave either.",
+                     t: "Backing Off Is a Repair", d: "Pushing made her defend the 'I'm fine.' Backing off doesn't undo that, but it stops adding to it.", jodi: "See what pushing did? Now she's got to defend it. Mira didn't get more truth — she got less. Backing off was the right repair. Got there in the end, and notice it was heavier the second time — that's real, and it's not a punishment. Just what it costs.", m: 'concerned' },
+            push:  { door: 'closed', title: 'Door closed', state: "Leah stands up. \"I said I'm FINE.\" She's gone.",
+                     t: "Pushed Twice", d: "Twice is an interrogation. She now has to defend 'I'm fine' harder than she ever meant it.", jodi: "That's the other trap. She didn't get more truth — she got a friend who now has to defend a sentence she didn't even mean. Reading past the words is fine. Overriding the person isn't.", m: 'concerned' }
+        };
+        let c6Turn1 = null;
+        let c6Done = false;
+
+        function c6Line(who, text) {
+            const wrap = document.getElementById('c6-exchange');
+            let html;
+            if (who === 'state') html = `<div class="friend-state">${esc(text)}</div>`;
+            else if (who === 'me') html = `<div class="chat-line"><div class="chat-me"><span class="block text-[9px] font-bold uppercase tracking-widest text-gb-accent-dark mb-0.5">Mira</span>${esc(text)}</div></div>`;
+            else html = `<div class="chat-line"><div class="chat-them"><span class="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">Leah</span>${esc(text)}</div></div>`;
+            wrap.insertAdjacentHTML('beforeend', html);
+        }
+        function c6RenderReplies() {
+            const wrap = document.getElementById('c6-replies');
+            if (c6Done) { wrap.innerHTML = ''; return; }
+            const btn = (id, kind, text) => `<button class="reply-btn" onclick="window.c6Pick('${id}')"><span class="reply-kind">${esc(kind)}</span><span class="reply-text">${esc(text)}</span></button>`;
+            if (!c6Turn1) {
+                wrap.innerHTML = btn('face', 'Take it at face value', T1.face.msg) + btn('door', 'Leave a door open', T1.door.msg) + btn('insist', 'Insist', T1.insist.msg);
+            } else {
+                wrap.innerHTML = T1[c6Turn1].t2.map(o => btn(o.id, o.kind, o.msg)).join('');
+            }
+        }
+
+        window.c6Pick = (id) => {
+            if (c6Done) { if (window.sfx) window.sfx.tick(); return; }
+            if (!c6Turn1) {
+                const t = T1[id];
+                c6Turn1 = id;
+                c6Line('me', t.msg);
+                scheduleUI(() => c6Line('state', t.state), 400);
+                c6RenderReplies();
+                document.getElementById('c6-status').textContent = 'Turn 2 of 2';
+                window.setStep(6, 2, "<strong>Turn two.</strong> Answer what just happened. " + (id === 'door' ? "That one landed. Keep it landed." : id === 'face' ? "Something passed. It can still be picked up — it's just heavier now." : "She's defending it now. What does Mira do with that?"));
+                const first = { face: ["Something Passed", "She took 'I'm fine' as the whole answer. Leah's face says it wasn't. There's a turn two.", 'thinking'],
+                                door: ["Believed Her, Out Loud", "'Okay' takes her at her word. 'I'm around later' answers the part she didn't say. Both at once.", 'happy'],
+                                insist: ["Now She Has To Defend It", "Insisting turned 'I'm fine' from a deflection into a position. She'll hold it harder now.", 'concerned'] }[id];
+                window.teachSplit(6, first[0], first[1], id === 'door' ? "See her shoulders? Nothing said. That's the door staying open." : id === 'face' ? "Watch her face. Something was on offer there." : "And now she's got to defend it.", first[2]);
+                if (window.sfx) window.sfx[id === 'insist' ? 'error' : 'click']();
+                return;
+            }
+            const opt = T1[c6Turn1].t2.find(o => o.id === id);
+            const out = T2_OUT[id];
+            c6Done = true;
+            c6Line('me', opt.msg);
+            scheduleUI(() => c6Line('state', out.state), 400);
+            c6RenderReplies();
+            document.getElementById('c6-status').textContent = out.title;
+            document.getElementById('c6-door').innerHTML = `<div class="door ${out.door}"><p class="text-[10px] font-bold uppercase tracking-widest mb-1">Where it ended</p><p class="text-lg font-heading font-bold">${esc(out.title)}</p></div>`;
+            document.getElementById('c6-door').classList.remove('hidden');
+            window.setStep(6, 2, out.title + ". Two turns played.", true);
+            window.teachSplit(6, out.t, out.d, out.jodi, out.m);
+            showReframe(6);
+            window.markReady(5);
+            if (window.sfx) window.sfx.success();
+        };
+
+        window.resetCase6 = () => {
+            clearPendingUI();
+            c6Turn1 = null; c6Done = false;
+            const ex = document.getElementById('c6-exchange'); ex.innerHTML = '';
+            c6Line('me', "Hey. You okay?"); c6Line('them', "I'm fine."); c6Line('state', "She doesn't look up. She is visibly not fine.");
+            document.getElementById('c6-door').classList.add('hidden');
+            document.getElementById('c6-status').textContent = 'Turn 1 of 2';
+            document.getElementById('reframe-6').classList.remove('show');
+            c6RenderReplies();
+            window.setStep(6, 1, "<strong>Turn one.</strong> Three ways Mira can answer that. Whatever happens, there's a turn two — a first-turn misstep is recoverable, it just costs more.");
+            if (highestUnlocked >= 5) window.teach(6, "Back to the wall", "Phone face down. 'I'm fine.' Turn one.", 'neutral');
+            if (window.sfx) window.sfx.tick();
+        };
+        function initCase6() { c6Turn1 = null; c6Done = false; const ex = document.getElementById('c6-exchange'); ex.innerHTML = ''; c6Line('me', "Hey. You okay?"); c6Line('them', "I'm fine."); c6Line('state', "She doesn't look up. She is visibly not fine."); c6RenderReplies(); }
+    </script>
+    <script>
+        /* ===================== CASE 7: RATING + HANDOFF =====================
+           Star selection never auto-submits; Submit appears on first star pick. The badge
+           reveals after Submit, on this page, not inside the last scenario Case. */
+        let selectedStars = 0;
+        window.selectCaseRating = (stars) => {
+            selectedStars = stars;
+            document.querySelectorAll('.star-btn').forEach(btn => {
+                const val = parseInt(btn.dataset.star);
+                btn.classList.toggle('text-amber-400', val <= stars);
+                btn.classList.toggle('text-gray-300', val > stars);
+            });
+            if (window.sfx) window.sfx.tick();
+            document.getElementById('case7-submit-btn').classList.remove('hidden');
+        };
+
+        window.finalizeCaseRating = () => {
+            if (!selectedStars) { if (window.sfx) window.sfx.tick(); return; }
+            const feedbackText = document.getElementById('case7-feedback-text')?.value || '';
+            // Per-lab rating collection (course_feedback), separate from the general Message HQ
+            // inbox. Same call every GoodBlock uses.
+            if (window.AuthCore && window.AuthCore.submitCourseFeedback) {
+                window.AuthCore.submitCourseFeedback({ gameName: 'Reading the Room', rating: selectedStars, feedback: feedbackText });
+            }
+            if (window.logModuleCompletion) window.logModuleCompletion();
+            if (window.sfx) window.sfx.success();
+            setTimeout(() => {
+                document.getElementById('case7-rating').classList.add('hidden');
+                document.getElementById('case7-reveal').classList.remove('hidden');
+                if (window.lucide) window.lucide.createIcons();
+            }, 400);
+        };
+
+        window.launchRealWorldReadyChallenge = () => { window.location.href = '/educational-games/real-world-ready/'; };
+        // Primary destination: back to the Real World Ready hub, not straight into the Challenge.
+        window.returnToLabPack = () => { window.location.href = '/jsh/real-world-ready-lab/'; };
+        // Dashboard is the site root. Relative on purpose: an absolute production URL would
+        // throw a student off a preview channel and onto the live site.
+        window.handleSystemExit = () => { window.location.href = '/'; };
+        window.closeSystemMenu = () => {
+            document.getElementById('system-menu-modal').classList.add('hidden-modal');
+            document.getElementById('system-menu-modal').classList.remove('visible-modal');
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) window.lucide.createIcons();
+            [100, 400, 1000, 2000].forEach(delay => {
+                setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay);
+            });
+            window.addEventListener('load', () => { if (window.lucide) window.lucide.createIcons(); });
+
+            const startup = document.getElementById('startup-screen');
+            if (startup) {
+                let startupTriggered = false;
+                const handleStartup = async () => {
+                    if (startupTriggered) return;
+                    startupTriggered = true;
+                    if (window.sfx) window.sfx.powerOn();
+                    startup.style.opacity = '0';
+                    setTimeout(() => { startup.style.display = 'none'; }, 700);
+                    // Same gate the dashboard uses.
+                    if (window.AuthGate && window.AuthGate.ensureIdentified) await window.AuthGate.ensureIdentified();
+                };
+                startup.addEventListener('click', handleStartup);
+
+                // NOT `const unsub = ...` — see docs/goodblock-integration-checklist.md (a
+                // synchronous callback would hit the TDZ before unsub exists).
+                if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                    let unsub;
+                    unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
+                        unsub();
+                        handleStartup();
+                    });
+                }
+            }
+
+            document.getElementById('home-toggle').addEventListener('click', () => {
+                document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                document.getElementById('system-menu-modal').classList.add('visible-modal');
+            });
+            document.getElementById('menu-toggle').addEventListener('click', () => window.openCaseMenu());
+
+            const feedbackBox = document.getElementById('case7-feedback-text');
+            if (feedbackBox) {
+                feedbackBox.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.finalizeCaseRating(); }
+                });
+            }
+
+            const avatarEl = document.querySelector('.jodi-avatar');
+            if (avatarEl) {
+                avatarEl.setAttribute('title', "Tap Jodi to re-read what she said");
+                avatarEl.addEventListener('click', () => window.recallJodi());
+            }
+
+            initCase2();
+            initCase3();
+            initCase4();
+            initCase5();
+            initCase6();
+
+            window.renderLocks();
+            window.playPageIntro(0);
+        });
+
+        window.restartModule = () => {
+            highestUnlocked = 0;
+            pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: true };
+
+            // Each Case's own reset already restores its DOM and step bar. Jodi's lines from
+            // those resets are overwritten by playPageIntro(0) below.
+            window.resetCase2();
+            window.resetCase3();
+            window.resetCase4();
+            window.resetCase5();
+            window.resetCase6();
+
+            // Shared surfaces
+            currentIntro = null; lastMechanism = null; lastSaid = null;
+            stashedReaction = null; jodiShowingIntro = true;
+            window.updateRecallButton();
+            document.querySelectorAll('.mobile-wb').forEach(b => b.classList.add('hidden'));
+            document.querySelectorAll('.reframe-box').forEach(r => r.classList.remove('show'));
+            document.getElementById('jodi-whiteboard').classList.remove('wb-populated');
+            document.getElementById('jodi-bubble').classList.remove('tucked');
+            for (let i = 2; i <= TOTAL_PAGES; i++) {
+                const prompt = document.getElementById(`continue-${i}`);
+                if (prompt) prompt.classList.remove('ready');
+            }
+
+            // Handoff
+            selectedStars = 0;
+            document.querySelectorAll('.star-btn').forEach(btn => { btn.classList.remove('text-amber-400'); btn.classList.add('text-gray-300'); });
+            document.getElementById('case7-submit-btn').classList.add('hidden');
+            document.getElementById('case7-feedback-text').value = '';
+            document.getElementById('case7-rating').classList.remove('hidden');
+            document.getElementById('case7-reveal').classList.add('hidden');
+
+            window.closeSystemMenu();
+            window.renderLocks();
+            window.playPageIntro(0);
+            document.getElementById('content-column').scrollTop = 0;
+            if (window.lucide) window.lucide.createIcons();
+            saveProgress();
+        };
+    </script>
+</body>
+</html>

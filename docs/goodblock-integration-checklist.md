@@ -49,7 +49,9 @@ add it here so the next one doesn't repeat it.
 ## Lab Pack hub wiring
 
 - [ ] Add a live card to the Lab Pack hub (`public/jsh/<lab-pack>/index.html`)'s main grid,
-  using `window.launchLab(name, url)`.
+  using `window.launchLab(name, url)`. There are two hubs now — `digital-decisions-lab/` and
+  `real-world-ready-lab/` — and the registry entry's `pack` field says which one a module
+  belongs to; `scripts/check-modules.js` checks the matching hub, not both.
 - [ ] Add the **same** entry to the hub's "Jump to a Lab" menu list — this is a second,
   separate place with its own hardcoded `onclick`, easy to update one and forget the other.
 - [ ] Both use the trailing-slash URL form (see above) — same reasoning, same bug shipped
@@ -200,17 +202,22 @@ so update them in one pass and run `node scripts/check-modules.js` (also run by 
 calling it done:
 
 - [ ] `MODULE_REGISTRY` in `public/index.html` — dashboard completion status. Labs use
-  `category: 'lab'`; the Lab Pack card's status pill and "N live • M coming soon" counter
-  are derived from those entries plus `LAB_PACK_PLANNED` (the full list of labs the pack
-  will hold), so do not hand-edit the pill or counter text. When a lab that was only
-  planned ships, its name is already in `LAB_PACK_PLANNED`; when a brand-new lab is
-  planned, add it there.
+  `category: 'lab'`, and every entry carries `pack` (`'digital-decisions'` or
+  `'real-world-ready'`). Each pack's dashboard card has its status pill and "N live • M
+  coming soon" counter derived from the entries with that pack plus that pack's planned
+  list (`LAB_PACK_PLANNED` / `RWR_PACK_PLANNED`, wired together in `LAB_PACKS`), so do
+  not hand-edit the pill or counter text. When a lab that was only planned ships, its name
+  is already in the planned list; when a brand-new lab is planned, add it there.
 - [ ] `COURSES` in `public/insider/index.html` — Insider analytics (`stepsTotal`,
   `stepLabel`, `isComplete`, `progressStep`). `stepsTotal` must equal the module's own
   `Telemetry.init({ stepsTotal })` call.
-- [ ] Lab Pack hub card + "Jump to a Lab" menu entry in
-  `public/jsh/digital-decisions-lab/index.html` — student-facing; remove the matching
-  "Coming Soon" placeholder.
+- [ ] Lab Pack hub card + "Jump to a Lab" menu entry in the module's own pack hub
+  (`public/jsh/digital-decisions-lab/index.html` or `public/jsh/real-world-ready-lab/index.html`)
+  — student-facing; remove the matching "Coming Soon" placeholder.
+- [ ] The completion badge's "N scenarios" figure must equal the count of that module's
+  category in its pack's Challenge `SCENARIO_DATA` (`scripts/check-modules.js` counts it).
+  Privacy & Security once shipped "9" against a real count of 8 — an inferred number that
+  no structural check could catch until this one existed.
 - [ ] "Steps per module" table in `docs/insider-analytics.md`.
 - [ ] The hardcoded `3` above `MODULES` in the dashboard stat block counts dashboard
   *cards* (Jolene's, Digital Decisions, Lab Pack), not registry entries. A new lab inside

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Allgood Academy | Digital Decisions Challenge</title>
+    <title>Allgood Academy | Real World Ready Challenge</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -20,7 +20,7 @@
     <script type="module" src="/js/identity-gate.js"></script>
     <!-- Shared learning-analytics telemetry (sessions + events for Insider) — see /js/telemetry.js. -->
     <script type="module" src="/js/telemetry.js"></script>
-    <script src="/js/message-hq.js" data-message-source="Digital Decisions Challenge"></script>
+    <script src="/js/message-hq.js" data-message-source="Real World Ready Challenge"></script>
 
     <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js. -->
     <script type="module">
@@ -33,9 +33,9 @@
 
         window.authSignOut = () => signOut(auth);
 
-        // Telemetry: one "step" here = one scenario answered (30 total), which is the
+        // Telemetry: one "step" here = one scenario answered (24 total), which is the
         // meaningful unit of progress for a scenario feed — not the 4 page containers.
-        if (window.Telemetry) window.Telemetry.init({ module: 'digital-decisions', gameName: 'Digital Decisions Challenge', stepsTotal: 30 });
+        if (window.Telemetry) window.Telemetry.init({ module: 'rwr-challenge', gameName: 'Real World Ready Challenge', stepsTotal: 24 });
 
         window.currentUser = null;
         window.currentUserName = "Anonymous";
@@ -71,7 +71,7 @@
                 // of starting cold — the existing per-session game_scores docs never
                 // accumulate across visits, so this reads the one canonical progress doc.
                 if (window.AuthCore && window.AuthCore.loadModuleProgress) {
-                    const progress = await window.AuthCore.loadModuleProgress('digital-decisions');
+                    const progress = await window.AuthCore.loadModuleProgress('rwr-challenge');
                     if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
                 }
             } else {
@@ -93,7 +93,7 @@
             if (!user) return;
             const sessionRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
             try {
-                await setDoc(sessionRef, { gameName: "Digital Decisions Challenge", ...scoreData, lastUpdated: serverTimestamp(), user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail } }, { merge: true });
+                await setDoc(sessionRef, { gameName: "Real World Ready Challenge", ...scoreData, lastUpdated: serverTimestamp(), user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail } }, { merge: true });
             } catch (e) { console.error("[DB] Session Write Failed", e); }
         }
 
@@ -203,9 +203,9 @@
                         <div class="flex-grow flex flex-col items-center justify-center px-4">
                             <div class="relative flex flex-col items-center">
                                 <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                                <div class="-translate-x-6"><i data-lucide="fingerprint" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"></i></div>
+                                <div class="-translate-x-6"><i data-lucide="compass" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"></i></div>
                                 <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
-                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm leading-normal pb-4 max-w-4xl">Digital Decisions Challenge</h1>
+                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm leading-normal pb-4 max-w-4xl">Real World Ready Challenge</h1>
                                 <div class="mt-2 flex items-baseline justify-center gap-2 relative z-10 opacity-90">
                                     <span class="text-white/60 text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold font-body">Powered by</span>
                                     <span class="text-allgood-primary text-2xl sm:text-3xl font-heading font-bold">GoodBlock</span>
@@ -225,7 +225,7 @@
                     <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
                     <div class="w-full px-4 flex items-center justify-between h-full">
                         <div class="flex items-center overflow-hidden">
-                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Digital Decisions Challenge</div>
+                            <div id="header-welcome-text" class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate mr-4 select-none">Real World Ready Challenge</div>
                         </div>
                         <div class="flex items-center space-x-1 shrink-0 relative">
                             <button id="home-button" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
@@ -254,35 +254,35 @@
                             <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Global Score</p>
                             <div class="flex items-baseline gap-2">
                                 <span class="text-4xl font-heading font-bold text-allgood-primary" id="hud-score">0</span>
-                                <span class="text-sm font-bold text-gray-400">/ 90</span>
+                                <span class="text-sm font-bold text-gray-400">/ 72</span>
                             </div>
                             <div id="hud-delta-container" class="mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-orange-50 text-allgood-primary border border-orange-100 flex items-center gap-1.5 w-fit transition-colors duration-300">
                                 <i id="hud-delta-icon" data-lucide="target" class="w-3 h-3"></i>
-                                <span id="hud-delta-text">80 Points to Certification</span>
+                                <span id="hud-delta-text">64 Points to Certification</span>
                             </div>
                         </div>
                         <div class="p-5 border-b border-gray-100">
-                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Reputation Analytics</p>
+                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Readiness Analytics</p>
                             <div class="mb-4">
                                 <div class="flex justify-between text-[10px] font-bold text-allgood-dark mb-1">
-                                    <span class="flex items-center gap-1"><i data-lucide="shield-check" class="w-3 h-3 text-cyan-600"></i> Critical Thinking</span>
-                                    <span id="metric-critical">0%</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="scale" class="w-3 h-3 text-amber-600"></i> Judgment</span>
+                                    <span id="metric-judgment">0%</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-cyan-600 h-2 rounded-full transition-all duration-500" id="bar-critical" style="width: 0%"></div></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-amber-600 h-2 rounded-full transition-all duration-500" id="bar-judgment" style="width: 0%"></div></div>
                             </div>
                             <div class="mb-4">
                                 <div class="flex justify-between text-[10px] font-bold text-allgood-dark mb-1">
-                                    <span class="flex items-center gap-1"><i data-lucide="heart" class="w-3 h-3 text-orange-500"></i> Empathy</span>
-                                    <span id="metric-empathy">0%</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="anchor" class="w-3 h-3 text-orange-600"></i> Composure</span>
+                                    <span id="metric-composure">0%</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-orange-500 h-2 rounded-full transition-all duration-500" id="bar-empathy" style="width: 0%"></div></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-orange-600 h-2 rounded-full transition-all duration-500" id="bar-composure" style="width: 0%"></div></div>
                             </div>
                             <div class="mb-2">
                                 <div class="flex justify-between text-[10px] font-bold text-allgood-dark mb-1">
-                                    <span class="flex items-center gap-1"><i data-lucide="award" class="w-3 h-3 text-green-600"></i> Integrity</span>
-                                    <span id="metric-integrity">0%</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="eye" class="w-3 h-3 text-yellow-700"></i> Perspective</span>
+                                    <span id="metric-perspective">0%</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-green-600 h-2 rounded-full transition-all duration-500" id="bar-integrity" style="width: 0%"></div></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-yellow-700 h-2 rounded-full transition-all duration-500" id="bar-perspective" style="width: 0%"></div></div>
                             </div>
                         </div>
                         <div class="p-5 flex-1 overflow-y-auto hud-scroll bg-gray-50/50">
@@ -301,7 +301,7 @@
                             </div>
                             <div class="text-right">
                                 <div class="text-xs font-bold text-allgood-secondary bg-gray-100 px-2 py-0.5 rounded inline-block">Score: <span id="mobile-hud-score">0</span></div>
-                                <div id="mobile-hud-delta" class="text-[9px] font-bold text-allgood-primary mt-0.5 transition-colors duration-300">80 pts to badge</div>
+                                <div id="mobile-hud-delta" class="text-[9px] font-bold text-allgood-primary mt-0.5 transition-colors duration-300">64 pts to badge</div>
                             </div>
                         </div>
 
@@ -310,12 +310,12 @@
                             <div class="page active bg-white h-full" id="page-1">
                                 <div class="flex flex-col items-center justify-start h-full text-center px-2 pt-12">
                                     <div class="mb-6"><h2 class="text-2xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
-                                    <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">The <span class="text-allgood-primary">Digital Decisions</span> Challenge</h1>
+                                    <h1 class="text-3xl sm:text-4xl font-heading font-bold text-allgood-dark mb-8 leading-tight tracking-tight">The <span class="text-allgood-primary">Real World Ready</span> Challenge</h1>
                                     <div class="w-full max-w-lg text-left mx-auto">
                                         <div class="w-full bg-allgood-secondary/10 border-2 border-allgood-secondary p-6 rounded-xl shadow-lg mb-8 flex items-center justify-center space-x-4">
-                                            <i data-lucide="monitor" class="w-12 h-12 text-allgood-secondary"></i>
-                                            <i data-lucide="users" class="w-12 h-12 text-allgood-primary"></i>
-                                            <i data-lucide="lightbulb" class="w-12 h-12 text-allgood-secondary"></i>
+                                            <i data-lucide="coins" class="w-12 h-12 text-allgood-secondary"></i>
+                                            <i data-lucide="merge" class="w-12 h-12 text-allgood-primary"></i>
+                                            <i data-lucide="glasses" class="w-12 h-12 text-allgood-secondary"></i>
                                         </div>
                                         <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
                                             <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
@@ -355,7 +355,7 @@
                                         <div class="inline-block bg-white p-6 rounded-xl shadow-md border-t-4 border-allgood-primary max-w-md w-full">
                                             <i data-lucide="shield-check" class="w-12 h-12 text-allgood-primary mx-auto mb-3"></i>
                                             <h3 class="font-heading font-bold text-xl mb-2">All Missions Complete</h3>
-                                            <p class="text-sm text-gray-600 mb-6">You have responded to all 30 scenarios. Your evaluation is ready whenever you are.</p>
+                                            <p class="text-sm text-gray-600 mb-6">You have responded to all 24 scenarios. Your evaluation is ready whenever you are.</p>
 
                                             <button id="init-eval-btn" onclick="window.showPage(3)" class="w-full bg-allgood-dark hover:bg-allgood-primary text-white font-bold py-3 rounded shadow-md transition-colors uppercase tracking-wide text-xs mb-6">See Your Evaluation</button>
 
@@ -389,22 +389,22 @@
 
                             <!-- Page 4 (index 3): Final Score -->
                             <div class="page bg-white h-full" id="page-33">
-                                <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-3xl font-heading font-bold text-allgood-dark mb-2 mt-4">Final Readiness Assessment</h2><p class="text-xs font-bold text-allgood-primary uppercase tracking-widest">Your Digital Decisions Score</p></section>
+                                <section class="mb-6 border-b border-gray-200 pb-4 text-center"><h2 class="text-3xl font-heading font-bold text-allgood-dark mb-2 mt-4">Final Readiness Assessment</h2><p class="text-xs font-bold text-allgood-primary uppercase tracking-widest">Your Real World Ready Score</p></section>
                                 <div id="final-score-content">
                                     <div class="text-center py-4">
                                         <div class="w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-lg shadow-inner border border-gray-200 mb-8">
                                             <p class="text-sm font-semibold text-gray-500 mb-1">Total Score</p>
-                                            <p id="final-score-value" class="text-5xl font-extrabold text-allgood-dark font-heading">0 / 90</p>
+                                            <p id="final-score-value" class="text-5xl font-extrabold text-allgood-dark font-heading">0 / 72</p>
                                             <p id="final-score-percent" class="text-xs text-gray-400 mt-1">(0% Effectiveness)</p>
                                         </div>
-                                        <h3 id="final-rank-heading" class="text-xl font-heading font-bold text-allgood-dark mb-2">Digital Learner</h3>
+                                        <h3 id="final-rank-heading" class="text-xl font-heading font-bold text-allgood-dark mb-2">Still Learning</h3>
                                         <p id="final-rank-message" class="text-sm text-gray-600 max-w-md mx-auto mb-8">Good start. Reread the feedback and try again.</p>
 
                                         <div id="certification-section" class="w-full max-w-md mx-auto bg-gradient-to-br from-allgood-secondary to-allgood-accent p-1 rounded-lg shadow-xl transform transition-all duration-700">
                                             <div class="bg-white p-6 rounded-md text-center">
                                                 <div class="mb-4 relative inline-block"><i id="badge-icon" data-lucide="award" class="relative w-16 h-16 text-allgood-primary mx-auto"></i></div>
-                                                <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Digital Architect Certification</h3>
-                                                <p id="cert-req-text" class="text-sm text-gray-600 mb-6">You need 80 points to achieve this certification.</p>
+                                                <h3 class="font-heading font-bold text-xl text-allgood-dark mb-2">Real World Ready Certification</h3>
+                                                <p id="cert-req-text" class="text-sm text-gray-600 mb-6">You need 64 points to achieve this certification.</p>
                                                 <button id="download-badge-btn" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded shadow-none cursor-not-allowed flex items-center justify-center transition-all duration-300">
                                                     <i id="btn-icon" data-lucide="lock" class="w-4 h-4 mr-2"></i><span id="btn-text">Certification Locked</span>
                                                 </button>
@@ -414,8 +414,8 @@
                                         <!-- Embedded Action Card (Replaces old exit modal) -->
                                         <div class="w-full max-w-md mx-auto mt-8 bg-allgood-dark p-6 rounded-lg shadow-xl border-t-4 border-allgood-primary text-center">
                                             <h3 class="font-heading font-bold text-white text-lg mb-2">Your Next Pragmatic Action</h3>
-                                            <p class="text-sm text-gray-300 mb-6">Your brand is secure. Now, keep building — explore the rest of the Lab Pack.</p>
-                                            <button onclick="window.location.href = '/jsh/digital-decisions-lab/'" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
+                                            <p class="text-sm text-gray-300 mb-6">Now keep building — explore the rest of the Real World Ready Lab Pack.</p>
+                                            <button onclick="window.location.href = '/jsh/real-world-ready-lab/'" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
                                                 <i data-lucide="play-circle" class="w-5 h-5 mr-2"></i> Explore the Lab Pack
                                             </button>
                                             <button onclick="window.performHardReset()" class="w-full bg-transparent text-gray-400 font-bold py-2 mt-3 hover:text-white transition-colors text-xs uppercase tracking-wider">
@@ -545,9 +545,9 @@
         let currentUserName = "Anonymous";
         let currentPageIndex = 0;
         const TOTAL_PAGES = 4; // 0=cover, 1=launchpad, 2=scenario feed, 3=final score
-        const TOTAL_SCENARIOS = 30;
-        const MAX_SCORE = 90;
-        const BADGE_THRESHOLD = 80;
+        const TOTAL_SCENARIOS = 24;
+        const MAX_SCORE = 72; // 24 scenarios x 3
+        const BADGE_THRESHOLD = 64; // 64 of 72 = the DDC 80-of-90 bar, scaled (88.9%)
         let totalChallengeScore = 0;
         let answeredScenarioScores = {};
         let feedbackSubmitted = false;
@@ -562,10 +562,9 @@
         let lastAnsweredScenario = null;
 
         const CATEGORIES = {
-            privacy_security: { title: "Privacy & Security", icon: "shield-alert", desc: "Data protection & scam evasion.", color: "bg-cyan-600" },
-            social_intelligence: { title: "Social Intelligence", icon: "users", desc: "Conflict resolution & empathy.", color: "bg-orange-500" },
-            professional_brand: { title: "Professional Brand", icon: "briefcase", desc: "Managing online reputation.", color: "bg-indigo-600" },
-            digital_citizenship: { title: "Digital Citizenship", icon: "globe", desc: "Information verification & ethics.", color: "bg-green-600" }
+            money:        { title: "Money as a Skill",      icon: "coins",   desc: "Spending, splitting & asking.",        color: "bg-amber-600" },
+            conflict:     { title: "Conflict Has a Winner", icon: "merge",   desc: "Disagreeing without losing people.",   color: "bg-orange-600" },
+            reading_room: { title: "Reading the Room",      icon: "glasses", desc: "Checking your read before you act.",   color: "bg-yellow-700" }
         };
 
         function sanitizeText(text) {
@@ -626,38 +625,308 @@
             return `<div class="w-full">${insightHtml}${scriptHtml}</div>`;
         }
 
-        // SCENARIO DATA
+        // SCENARIO DATA — from real-world-ready-challenge-scenarios.js (coverage map v1). 24 scenarios, 8 per category.
         const SCENARIO_DATA = [
-            { cat: 'social_intelligence', title: "Your classmate posts a picture of your group project online without getting your permission. Question: What do you do?", icon: "users", choices: [ { text: "Say nothing and ignore the post, hoping it will go away.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Silence doesn't solve the problem. Being principled means speaking up for your boundaries calmly." }, { text: "Post a mean comment on their picture telling them to take it down immediately.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Aggression ruins your reputation. You lose the high ground and the friend without fixing the issue." }, { text: "Politely message them to ask them to take it down, explaining why you're uncomfortable.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You protect your work while keeping the friendship intact. *Try saying this: \"Hey, I saw the picture of our project you posted. I’m actually not comfortable with my work being online yet—could you please take that down for me?\"*" } ] },
-            { cat: 'social_intelligence', title: "You get into a heated debate with a stranger in the comments section of a social media post. Question: What do you do?", icon: "message-square", choices: [ { text: "Use an 'I' statement to express your point of view calmly and then disengage from the conversation.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Knowing when to walk away protects your mental peace and professional brand. *Try saying this: \"I see we have different views here, so I'm going to step away from this thread now. Have a good one.\"*" }, { text: "Use personal attacks to try and win the argument.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Personal attacks signal a loss of control. It hurts your online brand more than the person you’re arguing with." }, { text: "Say nothing and leave the conversation.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** It’s okay to leave, but sharing your perspective respectfully before exiting is a stronger communicator trait." } ] },
-            { cat: 'professional_brand', title: "You are applying for a job, and the company asks for your social media handles. Question: What do you do?", icon: "briefcase", choices: [ { text: "You curate your social media to reflect your professional goals and then share it.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Your digital footprint is a resume. Showing you can manage a brand tells employers you are professional." }, { text: "You delete all your social media accounts before giving them your handles.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Deleting everything can look suspicious. It’s better to show you can manage your presence rather than hide it." }, { text: "You give them all your social media handles without reviewing them.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** High risk. One bad post can cost you a job. Always audit your profile through a professional lens." } ] },
-            { cat: 'privacy_security', title: "Your friend sends you a link to a 'free gift card' survey. It asks for your personal information, including your full name and address. Question: What do you do?", icon: "wallet", choices: [ { text: "Fill out the survey with your real information to get the reward.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Your personal data is worth way more than a gift card. Never trade privacy for a \"freebie.\"" }, { text: "Delete the message and warn your friend that it might be a scam.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You used critical thinking to spot a risk and protected your network. *Try saying this: \"Hey, I think that gift card link is a scam. It's asking for personal info, so you should probably delete that message!\"*" }, { text: "Ask your friend if they have used it successfully and if it's safe.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Don't rely on one person's word. A thinker verifies the source, not just the sender." } ] },
-            { cat: 'digital_citizenship', title: "You want to use a picture you found on Google for your school presentation. The picture is not labeled for reuse. Question: What do you do?", icon: "image", choices: [ { text: "Search for the original creator and ask for permission.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** This shows integrity. Respecting creative work is a hallmark of a professional researcher. *Try saying this: \"I'm working on a school project and would love to use your photo. May I have permission to include it with full credit?\"*" }, { text: "Use the image anyway since it's on the internet and easy to find.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Just because it’s easy to find doesn’t mean it’s free. This is a copyright risk and shows a lack of respect." }, { text: "Use the image anyway and give credit to 'Google Images.'", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** 'Google' isn't the creator. Taking the extra step to find the actual source is what a principled student does." } ] },
-            { cat: 'social_intelligence', title: "You see a post from your classmate making fun of another student. The comments are full of hateful remarks. Question: What do you do?", icon: "users-x", choices: [ { text: "Report the post and privately message the person being bullied to offer support.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Supporting the victim privately is more powerful and empathetic than joining a public argument. *Try saying this: \"Hey, I saw that post and wanted to let you know I'm in your corner if you need to talk.\"*" }, { text: "Like the post to fit in with your friends.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Liking a post is supporting the behavior. A leader stands up for what’s right, even if it’s unpopular." }, { text: "Comment on the post, telling everyone to stop being so mean.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Good intentions, but public comments often draw more attention to the bully's post." } ] },
-            { cat: 'social_intelligence', title: "You're taking an online class and your classmate posts something with a clear mistake. Question: What do you do?", icon: "book-open-check", choices: [ { text: "Privately message your classmate with constructive feedback and offer to help.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You corrected the error without the public embarrassment. This is how effective teammates communicate. *Try saying this: \"Hey, I noticed a small mistake in your post about the dates. Just wanted to let you know so you could tweak it!\"*" }, { text: "Post a public comment correcting their mistake so everyone can learn.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Public corrections can make people defensive. To be a better ally, keep the feedback private." }, { text: "Say nothing and ignore the mistake.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Silence isn't helpful. Great collaborators help each other improve by sharing knowledge." } ] },
-            { cat: 'privacy_security', title: "You receive a friend request on social media from a person you don't know. Question: What do you do?", icon: "user-plus", choices: [ { text: "Ignore the request and review your privacy settings to make sure your profile is private.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You’re a smart risk-taker. Protecting your network is the first step to a secure digital life." }, { text: "Accept the request and then immediately send them a message asking who they are.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Once you accept, they already have your data. Verify before you click, not after." }, { text: "Accept the request; the more friends you have, the more popular you seem.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Popularity isn't worth a security breach. Random followers can access your personal details and location." } ] },
-            { cat: 'privacy_security', title: "You're scrolling through social media, and a pop-up appears, claiming your phone has a virus and you need to download a special app to fix it. Question: What do you do?", icon: "alert-triangle", choices: [ { text: "Show it to your parents or a trusted adult to get their opinion.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** It's fine to ask, but trust your inner thinker. You usually know a pop-up ad when you see one." }, { text: "Close the pop-up and run a scan with your phone's built-in security software.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You stayed calm and used logic. Knowing the difference between a real alert and a scam is vital." }, { text: "Immediately tap the pop-up and follow the instructions to get rid of the virus.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This is exactly how real viruses are installed. Never let an urgent pop-up rush your decision." } ] },
-            { cat: 'digital_citizenship', title: "Your teacher has asked you to use a specific website for research, but you've found a different website that seems to have more information. You have never heard of this new website before. Question: What do you do?", icon: "search", choices: [ { text: "Use both websites and check to see if the information is the same.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Checking multiple sites is good, but don't waste time on unverified sources if you have a reliable one." }, { text: "Use the new website because it has more information.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** More info doesn't mean better info. Using unreliable sources can ruin your credibility and your grade." }, { text: "Stick to the website your teacher has provided because it is a reliable source.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Quality over quantity. Using vetted sources ensures your work is accurate and professional." } ] },
-            { cat: 'privacy_security', title: "You are creating a new account and are asked to create a new password. You're eager to start using the app. Question: What do you do?", icon: "key", choices: [ { text: "Use the same password you use for everything else because it's easy to remember.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** High risk—if one account is hacked, they all are. Use unique variations for every site." }, { text: "Create a complex password with a mix of letters, numbers, and symbols that is unique to this account.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You chose security over convenience. This simple habit protects your entire digital identity." }, { text: "Use your birthdate or a simple name because it is easy to remember.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This is the easiest type of password to crack. Don't make it easy for hackers to access your life." } ] },
-            { cat: 'social_intelligence', title: "You notice your friend is constantly online and seems to be neglecting their schoolwork and other responsibilities. Question: What do you do?", icon: "user-x", choices: [ { text: "Make a public post about how your friend needs to get off their phone.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Public shaming creates defensiveness. If you want to help, reach out, don't call out." }, { text: "Use an 'I' statement to express your concern to your friend privately.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You’re being a caring ally. Addressing this privately shows you value the person more than the \"drama.\" *Try saying this: \"Hey, I’ve noticed you’ve been online a lot lately—is everything okay? I miss seeing you at practice.\"*" }, { text: "Do nothing because it's their life and their choices.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Sometimes being a friend means speaking up. Don't let a \"privacy\" concern stop you from helping." } ] },
-            { cat: 'digital_citizenship', title: "You want to share a funny meme online. You found the meme on a popular page, but you don't know who created it. Question: What do you do?", icon: "image-up", choices: [ { text: "Share the meme without a second thought.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This is technically intellectual property theft. Respect the work others put into making you laugh." }, { text: "Try to find the original creator and tag them in your post.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** This is digital integrity. Giving credit builds a better internet for everyone." }, { text: "Add 'Credit to the creator' to your post.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** \"Credit to creator\" is lazy. A principled person takes the time to find the actual handle." } ] },
-            { cat: 'social_intelligence', title: "You see a post online with a picture of a friend looking sad and a caption that says, 'Don't talk to me today.' Question: What do you do?", icon: "user-round-minus", choices: [ { text: "Privately message them to ask if they're okay and offer to listen.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** A private check-in shows genuine empathy without public pressure. *Try saying this: \"Hey, I saw your post. I'm sorry you're having a tough day. I'm here to listen if you need anything—no pressure.\"*" }, { text: "Do nothing. You don't want to bother them since they asked not to be talked to.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Often, \"don't talk to me\" is a cry for help. A small private gesture is rarely a mistake." }, { text: "Leave a public comment asking if they're okay and what's wrong.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This forces them to share personal pain in public. It’s disrespectful to their feelings." } ] },
-            { cat: 'social_intelligence', title: "Two of your classmates in a group chat for a project start arguing about who should do what part of the project. Question: What do you do?", icon: "split", choices: [ { text: "Try to mediate the conflict by suggesting a compromise or a new way of dividing the work.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You move the team from arguing to action by focusing on the solution. *Try saying this: \"Hey guys, let’s reset. How about we split the research tasks today, and then work together on the slides tomorrow?\"*" }, { text: "Say nothing and let them work it out on their own.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Ignoring tension leads to project failure. A good communicator steps in to bridge the gap." }, { text: "Take a side and start arguing with one of them to help your friend win.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Picking sides destroys team chemistry. You become part of the problem instead of the solution." } ] },
-            { cat: 'digital_citizenship', title: "You're doing research for a history project and find a blog post with great information, but the author isn't a historian. Question: What do you do?", icon: "globe", choices: [ { text: "Use the information anyway because it's a good source.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** \"Sounds good\" isn't a research method. Using unverified info leads to spreading misinformation." }, { text: "Use the information but cite it as a blog post.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Citing it doesn't make it true. If you can't verify the info elsewhere, don't use it." }, { text: "Cross-reference the information with at least two other, more reliable sources (like a university website or a verified encyclopedia).", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** This is active research. Verifying facts makes your work bulletproof and shows you’re a thinker." } ] },
-            { cat: 'professional_brand', title: "You are asked to review a new learning app for school and find a minor bug. Question: What do you do?", icon: "bug", choices: [ { text: "Privately message the developers with a detailed, constructive report of the bug.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You’re being a constructive contributor. This helps the community improve without damaging reputations. *Try saying this: \"I love the app! Found a small bug on the 'Home' screen when using dark mode. Hope this helps!\"*" }, { text: "Say nothing and hope the developers find the bug themselves.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** If you don't report it, it might never get fixed. Be a proactive user and speak up." }, { text: "Leave a scathing review online, detailing all the bugs you found and how terrible the app is.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Ranting doesn't fix bugs. It just discourages creators. Detailed feedback is always more effective." } ] },
-            { cat: 'social_intelligence', title: "You see a post from your classmate that makes a joke about a sensitive topic, and some people in the comments are hurt by it. Question: What do you do?", icon: "frown", choices: [ { text: "Privately message your classmate, explaining why the post was hurtful and suggesting they take it down.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You acted with courage and empathy. Helping a friend realize their mistake privately saves their reputation. *Try saying this: \"Hey, that joke is getting some heat in the comments. You might want to pull it down before it gets messy.\"*" }, { text: "Do nothing because it's not your problem.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Being a bystander doesn't help. A quick heads-up to a friend is a simple way to be an ally." }, { text: "Leave a comment to tell the person who made the post that they should apologize.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Public call-outs lead to defensive arguments. If you want someone to listen, talk to them 1-on-1." } ] },
-            { cat: 'privacy_security', title: "You are creating a profile for a new app. It asks for your real name, birthdate, and where you live. Question: What do you do?", icon: "user-lock", choices: [ { text: "Provide all the requested information because it's required to create an account.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Every piece of info you give is a data risk. Be stingy with your personal details online." }, { text: "Close the app and don't create an account.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Safety is good, but you can often use the tool while still protecting your privacy with aliases." }, { text: "Create an account with a fake name and birthdate to protect your privacy.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You’re protecting your data. If an app doesn't need your real info to function, don't give it to them." } ] },
-            { cat: 'professional_brand', title: "You are working on a group project with a classmate. You notice they are not doing their part and are just copying and pasting from Wikipedia. Question: What do you do?", icon: "clipboard-copy", choices: [ { text: "Privately message your classmate with a constructive message to tell them that you are worried about their work and offer to help.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You chose collaboration. Helping them now prevents a failing grade for the whole group later. *Try saying this: \"I noticed the Wikipedia text in the draft. Let's rewrite that together so we don't get flagged for plagiarism.\"*" }, { text: "Call them out in the group chat for being lazy and not doing their part.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Embarrassing your teammate stops all productive work. Address the behavior, not the person." }, { text: "Just do their work for them so you get a good grade.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** This is a short-term fix. You're doing more work and they aren't learning. Hold teammates accountable!" } ] },
-            { cat: 'privacy_security', title: "You are asked to create a new password for a new social media account. You are asked to create a strong password, but you just want to get to the app. Question: What do you do?", icon: "lock", choices: [ { text: "Use a simple password that is easy to remember, like 'password123'.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This is like leaving your front door unlocked. Use a mix of characters to stay safe." }, { text: "Use your school email address as your password.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Never use an email as a password. If someone knows your email, they're halfway into your account." }, { text: "Create a password that is complex and unique to this account.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Security is a habit. Taking 30 extra seconds now prevents hours of headache from a hacked account." } ] },
-            { cat: 'social_intelligence', title: "You're in a group chat for a class project, and one of your classmates posts a private message that you sent them to the group chat. Question: What do you do?", icon: "message-square-off", choices: [ { text: "Take a screenshot of the message and post it to social media to call out your classmate.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** \"Eye for an eye\" makes the internet a worse place. Don't sink to toxic behavior to get even." }, { text: "Ask the person to delete the message and explain to them why it was wrong.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You set a clear boundary. Standing up for your privacy is essential for healthy digital relationships. *Try saying this: \"I sent that to you privately. Please delete it from the group chat; I'm not okay with that being public.\"*" }, { text: "Tell the teacher and ask them to remove the classmate from the group.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Teachers can help, but try to resolve conflict directly first. It builds better social skills." } ] },
-            { cat: 'digital_citizenship', title: "You are scrolling through social media, and you see a post from a friend that is promoting a fake charity. Question: What do you do?", icon: "heart-off", choices: [ { text: "Leave a comment on the post saying that the charity is fake.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** You're helping others, but embarrassing your friend. A private message gets the same result." }, { text: "Do nothing and ignore the post, so you don't hurt your friend's feelings.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Letting people get scammed isn't \"nice.\" Being a caring friend means telling the truth." }, { text: "Privately message your friend and explain to them why the charity is fake and why they should take the post down.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You protected your friend’s reputation. Stopping a scam privately is a sign of a true ally. *Try saying this: \"Hey, I checked that charity and it's flagged as a scam. You might want to delete that post before people donate!\"*" } ] },
-            { cat: 'privacy_security', title: "You are completing an online survey for a product you like. It asks for your parents' names, phone numbers, and income. Question: What do you do?", icon: "form-input", choices: [ { text: "Fill out the survey with your real information to get the reward.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** No \"reward\" is worth your family's financial security. This was a clear phishing attempt." }, { text: "Close the survey immediately and do not provide the information.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Financial info and home addresses are high-risk data. You spotted the red flag instantly." }, { text: "Fill out the survey with fake information.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Better than real info, but why stay? Scammers often use these sites to track IP addresses too." } ] },
-            { cat: 'digital_citizenship', title: "You're playing a multiplayer video game and another player is being very aggressive and using offensive language in the chat. Question: What do you do?", icon: "gamepad-2", choices: [ { text: "Report the player's behavior to the platform's moderators and mute/block them.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You used the tools provided. Don't give trolls your energy—block them and move on. *Try saying this: [Report for Harassment] -> [Mute] -> [Block]*" }, { text: "Argue back with them and use your own insults to defend yourself.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This is \"feeding the troll.\" It only makes the toxicity worse and could get you banned." }, { text: "Say nothing and leave the game immediately.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Leaving is fine, but reporting helps protect the next player they meet." } ] },
-            { cat: 'social_intelligence', title: "A friend posts a picture of you online that you think is unflattering. Question: What do you do?", icon: "camera-off", choices: [ { text: "Politely message your friend and ask them to remove the picture, explaining how you feel.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Most friends will respect your request if you just ask nicely. *Try saying this: \"Hey! That photo is a bit rough—could you pull it down for me? I'm just not a fan of it. Thanks!\"*" }, { text: "Post a mean comment on their picture, telling them to take it down.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This turns a small mistake into a public fight. A simple text is much more effective." }, { text: "Ignore it and do nothing. You don't want to make things awkward.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** If it bothers you, speak up. It’s your digital identity—you have a right to manage it." } ] },
-            { cat: 'privacy_security', title: "You receive a message from an unknown number. It says, 'Hey, I think I have the wrong number, but you seem cool. What's your name?' Question: What do you do?", icon: "phone-off", choices: [ { text: "Block the number and don't respond.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** Simple and safe. You recognized a stranger danger risk and shut it down immediately." }, { text: "Reply and give them your name and a brief description of yourself.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Never give info to a stranger. This is how social engineering scams start." }, { text: "Reply and say, 'I think you have the wrong number.'", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Replying confirms your number is active. Scammers love active numbers for future spam." } ] },
-            { cat: 'professional_brand', title: "You're in a video meeting for an online class, and you see a classmate live-tweeting the lecture, making fun of the professor. Question: What do you do?", icon: "tv", choices: [ { text: "Do nothing; it's not your business.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** Watching a friend ruin their professional brand isn't helpful. Be the person who says something." }, { text: "Screenshot the tweets and send them to the professor to get your classmate in trouble.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** This is \"tattling\" without trying to help the peer first. Try to educate before you escalate." }, { text: "Privately message your classmate and explain why what they are doing could be disrespectful and have serious consequences.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You’re being a mentor. Helping them see the professional risk saves them from future trouble. *Try saying this: \"Hey, just a heads-up: those tweets could get back to the school or professor. Might be risky to keep them up.\"*" } ] },
-            { cat: 'social_intelligence', title: "You discover someone has created a fake social media profile using a friend's name and photos to post mean things about other students. Question: What do you do?", icon: "user-round-x", choices: [ { text: "Report the fake account to the social media platform and then block it.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** Reporting is good, but telling your friend is more important. They need to know so they can protect their identity." }, { text: "Privately message your friend and offer to help them report the account and alert others.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** This is true allyship. You helped your friend handle a crisis while offering emotional support. *Try saying this: \"Hey, someone made a fake account of you. I'm reporting it now—do you need help alerting the others so they know it's not you?\"*" }, { text: "Create a public post to warn everyone about the fake account and call out the person who created it.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This adds \"fuel to the fire.\" Keep the focus on the solution (reporting), not the drama." } ] },
-            { cat: 'digital_citizenship', title: "You see a post from a friend that is promoting a charity. The post looks legitimate, but you have never heard of the charity before. Question: What do you do?", icon: "search-check", choices: [ { text: "Donate to the charity and share the post, assuming it's a good cause.", score: 0, effectiveness: "least-effective", feedback: "**The Consequence:** This is how scams spread. Always verify the source before you open your wallet or your feed." }, { text: "Do nothing and ignore the post.", score: 1, effectiveness: "less-effective", feedback: "**The Consequence:** It's safe, but you missed a chance to learn. A quick search only takes a minute!" }, { text: "Research the charity to see if it's legitimate before donating or sharing the post.", score: 3, effectiveness: "most-effective", feedback: "**The \"Why\":** You are an inquirer. Verifying facts before acting protects your money and your reputation." } ] }
+        
+            /* ===================== MONEY (8) =====================
+               Taught by: Money as a Skill. Cases 2-6.
+               Second-person GoodBlock — narrativeStyle: 'second-person'. */
+        
+            // M1 — proportional fairness — Case 2, The Split Decision
+            { cat: 'money', icon: 'split',
+              title: "You and a friend want to buy a $30 speaker together. It'll live at their house and they'll use it most days; you'll use it once or twice a month. They suggest $15 each. Question: What do you do?",
+              choices: [
+                { text: "Say yes to $15 — it's easier than making it awkward.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You paid half for about a fifth of the use. That's allowed — but notice you chose it to avoid a thirty-second conversation." },
+                { text: "Say you'd rather put in less, since you'll use it far less.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Fair doesn't automatically mean equal. Naming the actual usage isn't being difficult — it's being accurate. *Try saying this: \"I'm in, but since it's living at yours could I put in ten instead of fifteen?\"*" },
+                { text: "Agree to $15, then feel annoyed about it later.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** The worst version. You paid the money and kept the resentment. If it wasn't worth saying then, it isn't worth holding now." }
+              ] },
+        
+            // M2 — proportional fairness, recurring — Case 2
+            { cat: 'money', icon: 'users',
+              title: "Your friend wants to split a $12/month subscription with you. They'll use it daily. Realistically you'd open it twice a month. Question: What do you do?",
+              choices: [
+                { text: "Split it evenly — it's only six dollars.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Six dollars is small. Seventy-two dollars a year for twenty-four uses is the same decision, just further away." },
+                { text: "Say you'll pass, but you'd chip in occasionally if you start using it more.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** A recurring cost deserves a harder look than a one-off, because it repeats whether you use it or not. Leaving the door open keeps it friendly." },
+                { text: "Split it and just remember to use it more to get your money's worth.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Now you're using something you don't want in order to justify paying for it. The subscription is deciding your evenings." }
+              ] },
+        
+            // M3 — opportunity cost — Case 3, The Impulse Window
+            { cat: 'money', icon: 'wallet',
+              title: "You've saved $58 of the $60 you need for headphones. In the shop you spot a $12 phone case you like. You can afford it right now. Question: What do you do?",
+              choices: [
+                { text: "Buy it — you've got the money and you like it.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** It cost $12 today and roughly two more weeks of saving. Buying things is fine; not noticing the second price is what gets expensive." },
+                { text: "Leave it. If you still want it in a couple of days, come back.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Most impulse buys feel most urgent in the first twenty minutes. Waiting doesn't mean no — it means letting the version of you that isn't standing in the shop get a vote." },
+                { text: "Buy it and tell yourself you'll make the money back quickly.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** \"I'll make it back\" is a plan you made in about two seconds, standing next to the thing you already wanted." }
+              ] },
+        
+            // M4 — manufactured urgency — Case 3
+            { cat: 'money', icon: 'alert-triangle',
+              title: "A sale ends tonight on something you weren't planning to buy and hadn't thought about until you saw the banner. Question: What do you do?",
+              choices: [
+                { text: "Buy it — the discount won't be there tomorrow.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You saved 30% on something you were going to spend 0% on. The countdown did the deciding." },
+                { text: "Skip it. You didn't want it an hour ago.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** A deadline someone else invented isn't a reason. The real question was never the price — it's whether you wanted the thing before the clock appeared." },
+                { text: "Check whether the same sale runs again later, then decide.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Useful research, wrong question. You're now investigating the discount instead of whether you want it at all." }
+              ] },
+        
+            // M5 — conditions on a yes — Case 4, The Group Fund
+            { cat: 'money', icon: 'coins',
+              title: "Six friends are pooling $60 for something together. Someone says you should hold the money and track who's paid, because you're the responsible one. Question: What do you do?",
+              choices: [
+                { text: "Say yes — they trust you, and it'd be weird to make conditions.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You're now the group's bank with no terms. When someone's late, you either front it, chase it, or eat it — and none of that was in the job." },
+                { text: "Say yes, and say what comes with it: everyone pays before you buy, there's a deadline, and you agree now what happens if someone doesn't.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Naming the conditions isn't being difficult — it's what makes the yes workable. Almost every group-fund mess starts with someone who said yes to the role and nothing else." },
+                { text: "Say yes and cover anyone who's short, to keep things smooth.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You've quietly turned a group purchase into a loan you're making to people who don't know they've borrowed anything." }
+              ] },
+        
+            // M6 — the cost of a yes with no terms — Case 4
+            { cat: 'money', icon: 'message-square',
+              title: "You lent a friend $20 three weeks ago. Nothing was ever agreed about when they'd pay it back, and they haven't mentioned it. Question: What do you do?",
+              choices: [
+                { text: "Say nothing. Bringing it up would make it weird.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** It's already a bit weird — that's why you're thinking about it. Silence doesn't remove the awkwardness, it just moves it inside you." },
+                { text: "Mention it lightly and directly, without accusing them of anything.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** There's a decent chance they simply forgot. A light, specific reminder gives them an easy way to fix it. *Try saying this: \"Hey — no rush at all, but could you get me that twenty when you can?\"*" },
+                { text: "Bring it up sideways with a joke about being broke and hope they take the hint.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Hints put the work on them to decode you. If they miss it you're more annoyed, and you still haven't asked." }
+              ] },
+        
+            // M7 — functional threshold — Case 5, The Upgrade Trap
+            { cat: 'money', icon: 'search-check',
+              title: "You need a school backpack. The $18 one has the compartments you need and solid reviews. The $45 one has more pockets, a brand name, and is 'waterproof.' You can afford either. Question: What do you do?",
+              choices: [
+                { text: "Buy the $45 one — it's better made and will last longer.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Maybe. But you assumed it rather than checked it — and \"waterproof\" on a backpack usually means light rain, not a downpour." },
+                { text: "Read what the extra $27 actually buys, then decide.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** The question isn't whether you can afford the better one. It's what the better one actually does that you'll actually use." },
+                { text: "Buy the $45 one because the cheap one will fall apart.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Price isn't a quality guarantee, it's a price. You decided the $18 bag was bad without opening a single review of it." }
+              ] },
+        
+            // M8 — asking is information, not rudeness — Case 6, The Ask
+            { cat: 'money', icon: 'handshake',
+              title: "You find a $20 phone case you want, but the packaging is dented and there's a scuff on the corner. It's still marked full price. Question: What do you do?",
+              choices: [
+                { text: "Pay the $20 — it's not worth making it awkward over.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Fine to do. Just notice what the ask actually risked: they say no, and you're exactly where you already were." },
+                { text: "Point out the damage and ask whether they'd take a bit less.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** You're not haggling — you're naming a real fact about the item. Shops mark damaged stock down routinely. *Try saying this: \"I'll take it, but the corner's scuffed — any chance of a bit off?\"*" },
+                { text: "Put it back and look for an undamaged one somewhere else.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You wanted this one and it works. You've spent time and got nothing, to avoid a fifteen-second question." }
+              ] },
+        
+            /* ===================== CONFLICT (8) =====================
+               Taught by: Conflict Has a Winner. Cases 2-6. Character: Theo.
+               narrativeStyle: 'character'. */
+        
+            // C1 — integrative option exists — Case 2, The Unspoken Need
+            { cat: 'conflict', icon: 'users',
+              title: "Group project. You want to do one topic, your partner wants another, and you've both now said 'but mine's better' twice. Question: What do you do?",
+              choices: [
+                { text: "Make the strongest case you can for your topic and let them decide.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You're still arguing about which topic wins. Nobody has asked why either of you actually wants yours." },
+                { text: "Ask what they're worried about if you did it your way — and say what you're worried about too.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Positions collide; the needs underneath usually don't. \"I want topic A\" and \"I don't want to get stuck doing the writing\" are different sentences, and only one of them has a solution." },
+                { text: "Give in to keep the peace and do their topic.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Folding isn't compromise, it's just a faster loss. You'll do the project you didn't want and they'll never know there was a problem." }
+              ] },
+        
+            // C2 — naming a pattern vs winning an argument — Case 6
+            { cat: 'conflict', icon: 'message-square-off',
+              title: "A friend has cancelled on you three times in a row. They've just cancelled a fourth. Question: What do you do?",
+              choices: [
+                { text: "Reply 'no worries!' like the other three times.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Four times now you've told them it's fine. They have no reason to think it isn't, and you're getting quietly more annoyed each time." },
+                { text: "Say something sharp about how they always do this.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** The pattern is real, but \"you always\" starts a fight about whether it's always. Now you're arguing about the word instead of the thing." },
+                { text: "Name the pattern plainly, once, without heat.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** One clear statement of what's actually happening gives them something they can respond to. *Try saying this: \"That's the fourth one — is everything alright? I'd rather know than keep guessing.\"*" }
+              ] },
+        
+            // C3 — positions vs interests — Case 2
+            { cat: 'conflict', icon: 'merge',
+              title: "You want a rule changed at home. You've asked, they've said no, and the conversation has become the same exchange every time. Question: What do you do?",
+              choices: [
+                { text: "Keep asking until they get tired of saying no.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You've turned it into a test of stamina. Even if you win, you've taught them that saying yes is how conversations with you end." },
+                { text: "Ask what would have to be true for them to say yes.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** That question moves the conversation from a wall to a list. Their no is usually protecting something specific — and once it's named, you can often address it." },
+                { text: "Drop it. They've made up their mind.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Sometimes right. But you never found out what the no was actually about, so you can't tell whether it was fixed or just final." }
+              ] },
+        
+            // C4 — declining the frame — Case 5, Both of Them Want You
+            { cat: 'conflict', icon: 'users-x',
+              title: "Two friends have fallen out. Both message you separately, and both want you to say they're the one who's right. Question: What do you do?",
+              choices: [
+                { text: "Agree with whichever one you think is actually right.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You might be correct. You've also just become a piece of evidence in their argument, and the other one will hear about it." },
+                { text: "Tell each of them you're not going to be the judge, but you're still here for both.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Declining the frame isn't fence-sitting — fence-sitting is having no opinion. You have one; you're just not handing it over as a verdict. *Try saying this: \"I'm not picking a side on this one, but I'm not going anywhere either.\"*" },
+                { text: "Agree with each of them separately so nobody's upset.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** They will talk to each other eventually. When they do, the only thing they'll agree on is that you weren't straight with either of them." }
+              ] },
+        
+            // C5 — accepting an imperfect repair — Case 4, The Apology That Isn't Great
+            { cat: 'conflict', icon: 'frown',
+              title: "A friend apologises with: 'ok I'm sorry you took it that way, can we drop it.' It has the word sorry in it and not much else. Question: What do you do?",
+              choices: [
+                { text: "Accept it and move on — an apology is an apology.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You can accept a thin repair, and sometimes that's the right call for the friendship. Just don't tell yourself it was a full one." },
+                { text: "Name one specific thing that was missing from it.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** \"That wasn't a real apology\" is a verdict they can only argue with. One specific missing piece is a request they can actually act on. *Try saying this: \"I think what I needed was you saying the thing itself wasn't okay, not just that I reacted to it.\"*" },
+                { text: "Refuse it and hold out until they apologise properly.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** A real apology has to be offered, not extracted. Holding out often means waiting for something that was never on its way." }
+              ] },
+        
+            // C6 — being right vs being effective — Case 3, The Cost of Being Right
+            { cat: 'conflict', icon: 'message-square',
+              title: "A group chat argument is spiralling. You're factually right, you can prove it, and it's now four messages long. Question: What do you do?",
+              choices: [
+                { text: "Keep going — you're right and they should admit it.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You are still right and nobody remembers what about. Past a certain point the thread stops being about the fact and starts being about who won." },
+                { text: "State your point once more clearly, then leave the thread.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Being right is a fact. Being effective is a choice, and they aren't the same button. Saying it once and stepping out keeps the point and drops the fight." },
+                { text: "Leave immediately without replying.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Nothing lost, but nothing said either. There was one clear restatement available that would have cost you nothing." }
+              ] },
+        
+            // C7 — separating idea from person, with an audience — Case 3
+            { cat: 'conflict', icon: 'user-x',
+              title: "In front of the whole group, a teammate calls your idea 'not going to work' and moves on without explaining why. Question: What do you do?",
+              choices: [
+                { text: "Push back right there so the group knows they were out of line.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Now the group is watching a status fight instead of considering your idea. You may win the room and lose the point." },
+                { text: "Ask them, in the moment, what specifically wouldn't work.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** It's not a counterattack and it's not folding. It moves the conversation back onto the idea and quietly requires them to have an actual reason. *Try saying this: \"What part do you think breaks? I'd rather fix it than drop it.\"*" },
+                { text: "Say nothing and let it go.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** The idea dies unexamined and the group learns your ideas can be dismissed with a sentence. Neither of those was true a minute ago." }
+              ] },
+        
+            // C8 — conceding as a move — Case 6, When You're the One Who's Wrong
+            { cat: 'conflict', icon: 'split',
+              title: "Mid-argument, something they say makes it clear you're wrong. You've been pushing your position for a while. Question: What do you do?",
+              choices: [
+                { text: "Say so straight away — 'you're right, that's my mistake.'", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Conceding early costs almost nothing and ends the argument on your terms. Most adults can't do this. You didn't lose — you're the reason it stopped." },
+                { text: "Change the subject slightly so it fades out without anyone conceding.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** It ends the argument and leaves them thinking you never got it. The price of admitting it later just went up." },
+                { text: "Keep arguing — backing down now would look weak.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Every extra message makes conceding more expensive. You'll still have to do it, and now you'll have to explain why you kept going." }
+              ] },
+        
+            /* ===================== READING THE ROOM (8) =====================
+               Taught by: Reading the Room. Cases 2-6. Character: Mira.
+               narrativeStyle: 'character'. */
+        
+            // R1 — a thin signal becomes a conclusion — Case 2, Three Rungs Up
+            { cat: 'reading_room', icon: 'message-square',
+              title: "A friend who's normally chatty has sent you three one-word replies today: 'k', 'sure', 'ok'. Question: What do you do?",
+              choices: [
+                { text: "Assume they're annoyed with you and go quiet back.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You built a whole conclusion out of three words and then acted on it. If they were just busy, you've now created the distance you were worried about." },
+                { text: "Notice that 'k' has several possible meanings and wait for more before deciding.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Three short texts is real information and it's thin. Your read might be right — it just isn't a finding yet." },
+                { text: "Ask them directly whether you've done something.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Direct is good, but this version hands them your conclusion. If they were tired, they now have to reassure you about a problem that didn't exist." }
+              ] },
+        
+            // R2 — an exclusion signal that won't resolve — Case 3, Both Still True
+            { cat: 'reading_room', icon: 'user-round-minus',
+              title: "You see photos from something at the weekend that you weren't invited to. You don't know whether it was deliberate. Question: What do you do?",
+              choices: [
+                { text: "Say nothing and quietly pull back from the group.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** If you weren't being excluded, you've just excluded yourself. If you were, you'll never find out why. Both versions end the same." },
+                { text: "Ask one person, lightly, what the plan was.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** It's the one move that works whether or not it was deliberate — easy if it wasn't, briefly awkward if it was, and it ends the not-knowing either way." },
+                { text: "Post something that makes it clear you noticed.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** If it was innocent, it's confusing and a bit alarming. If it wasn't, you've handed them the story. It's the only option that's worse under both explanations." }
+              ] },
+        
+            // R3 — first impression vs accumulated evidence — Case 4, Five Tuesdays
+            { cat: 'reading_room', icon: 'user-plus',
+              title: "A new student joined last week. On day one they didn't look up or say much, and you read them as stuck-up. Since then you've seen them laugh with someone and greet the caretaker by name. Question: What do you do?",
+              choices: [
+                { text: "Stick with your first read — first impressions are usually right.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Two things have happened that don't fit, and the read hasn't moved. At that point it isn't a read anymore, it's a decision that stopped listening." },
+                { text: "Update it — the newer evidence doesn't match the first day.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Your first read wasn't stupid; day one genuinely looked like that. Updating when new evidence arrives isn't being talked out of your judgement — it's your judgement working." },
+                { text: "Decide you can't tell and stop thinking about it.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Better than locking in, but you had specific evidence pointing somewhere. \"No idea\" throws it away rather than using it." }
+              ] },
+        
+            // R4 — self-reference error, direction one — Case 5, Is This About Me?
+            { cat: 'reading_room', icon: 'book-open-check',
+              title: "Your teacher is short and irritable with the whole class today. You handed work in late this week. Question: What do you do?",
+              choices: [
+                { text: "Assume it's about your late work and keep your head down.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Possible. But they're short with everyone, and the only thing connecting it to you is that you were already thinking about it." },
+                { text: "Notice it's aimed at the whole room, not at you specifically.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Most of what happens near you isn't about you. From inside your own head that's genuinely hard to see, which is exactly why it's worth checking." },
+                { text: "Apologise for the late work to clear the air.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** You've made a general bad mood into a conversation about you — and put yourself on their radar for something they hadn't thought about." }
+              ] },
+        
+            // R5 — self-reference error, opposite direction — Case 5
+            { cat: 'reading_room', icon: 'frown',
+              title: "You make a joke, the group laughs and moves on. A second later you notice one friend's smile drop — the joke touched something they'd told you privately. Question: What do you do?",
+              choices: [
+                { text: "Nothing — everyone laughed, so it landed fine.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** The room told you and you used the group's reaction to overrule the one person it was actually about. That signal was for you." },
+                { text: "Check in with them privately afterwards.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** You caught a half-second signal most people miss. Handling it privately means they don't have to perform being fine in front of everyone. *Try saying this: \"Hey — that joke earlier, I shouldn't have used that. Sorry.\"*" },
+                { text: "Apologise to the whole group right away.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Good instinct, wrong room. A public apology tells everyone there was something private to apologise about." }
+              ] },
+        
+            // R6 — ambiguous signal, sitting with not knowing — Case 3
+            { cat: 'reading_room', icon: 'users',
+              title: "You walk over to a group of friends and the conversation stops. Question: What do you do?",
+              choices: [
+                { text: "Assume they were talking about you.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Conversations stop for a dozen reasons — a punchline landed, someone lost their thread, the topic was private but nothing to do with you. You picked the worst one and treated it as fact." },
+                { text: "Note it, stay normal, and see whether anything else fits that read later.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** One ambiguous moment isn't evidence of anything yet. Filing it instead of acting on it costs you nothing and keeps you from manufacturing the problem." },
+                { text: "Ask them straight out what they were talking about.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Fair question, but on this much evidence it lands as an accusation. There wasn't enough here yet to need an answer." }
+              ] },
+        
+            // R7 — reading past the words without overriding — Case 6, "I'm Fine"
+            { cat: 'reading_room', icon: 'heart-off',
+              title: "A friend says 'I'm fine' and very clearly isn't. Question: What do you do?",
+              choices: [
+                { text: "Take them at their word and change the subject.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** Respectful, and something was on offer that just passed. 'I'm fine' is often a door left slightly open to see if anyone tries it." },
+                { text: "Accept what they said out loud, and leave a door open anyway.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** Nobody gets called a liar and nobody has to admit anything. The door's just open and they know where it is. *Try saying this: \"Okay. I'm around later if you want.\"*" },
+                { text: "Tell them you can obviously see they're not fine and they should just say it.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** Now they have to defend the 'I'm fine' instead of getting past it. Pushing got you less truth, not more." }
+              ] },
+        
+            // R8 — acting on an uncorrected first read — Case 2
+            { cat: 'reading_room', icon: 'user-round-x',
+              title: "You send a long message about something you're excited about. The reply is one word: 'cool'. Question: What do you do?",
+              choices: [
+                { text: "Decide they don't care and stop telling them things.", score: 0, effectiveness: "least-effective",
+                  feedback: "**The Consequence:** One word became a conclusion about who they are, and then a change in how you treat them — all without a single check." },
+                { text: "Notice you're irritated, and that 'cool' doesn't actually tell you much.", score: 3, effectiveness: "most-effective",
+                  feedback: "**The \"Why\":** The feeling is real and the evidence is one word. Both things can be true. Noticing the gap is what stops you acting on the wrong one." },
+                { text: "Send a follow-up asking if they're annoyed with you.", score: 1, effectiveness: "less-effective",
+                  feedback: "**The Consequence:** You've turned your own irritation into a question they now have to manage. There wasn't enough here yet to need reassurance." }
+              ] }
         ];
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -733,8 +1002,10 @@
                     }
                 }
 
-                // Calculate Metrics based on Categories
-                let catPoints = { privacy_security: {s:0, max:0}, social_intelligence: {s:0, max:0}, professional_brand: {s:0, max:0}, digital_citizenship: {s:0, max:0} };
+                // Calculate Metrics based on Categories — clean 1:1, no merging. The Digital
+                // Decisions Challenge merges two categories into Integrity only because it has
+                // four categories and three bars. This has three of each.
+                let catPoints = { money: {s:0, max:0}, conflict: {s:0, max:0}, reading_room: {s:0, max:0} };
                 Object.keys(answeredScenarioScores).forEach(sIdx => {
                     const s = SCENARIO_DATA[sIdx - 1];
                     catPoints[s.cat].s += answeredScenarioScores[sIdx];
@@ -742,16 +1013,16 @@
                 });
 
                 const getPct = (earned, max) => max === 0 ? 0 : Math.round((earned/max)*100);
-                const ctPct = getPct(catPoints.privacy_security.s, catPoints.privacy_security.max);
-                const emPct = getPct(catPoints.social_intelligence.s, catPoints.social_intelligence.max);
-                const inPct = getPct(catPoints.professional_brand.s + catPoints.digital_citizenship.s, catPoints.professional_brand.max + catPoints.digital_citizenship.max);
+                const judgmentPct = getPct(catPoints.money.s, catPoints.money.max);
+                const composurePct = getPct(catPoints.conflict.s, catPoints.conflict.max);
+                const perspectivePct = getPct(catPoints.reading_room.s, catPoints.reading_room.max);
 
-                document.getElementById('metric-critical').textContent = `${ctPct}%`;
-                document.getElementById('bar-critical').style.width = `${ctPct}%`;
-                document.getElementById('metric-empathy').textContent = `${emPct}%`;
-                document.getElementById('bar-empathy').style.width = `${emPct}%`;
-                document.getElementById('metric-integrity').textContent = `${inPct}%`;
-                document.getElementById('bar-integrity').style.width = `${inPct}%`;
+                document.getElementById('metric-judgment').textContent = `${judgmentPct}%`;
+                document.getElementById('bar-judgment').style.width = `${judgmentPct}%`;
+                document.getElementById('metric-composure').textContent = `${composurePct}%`;
+                document.getElementById('bar-composure').style.width = `${composurePct}%`;
+                document.getElementById('metric-perspective').textContent = `${perspectivePct}%`;
+                document.getElementById('bar-perspective').style.width = `${perspectivePct}%`;
 
                 if (currentPageIndex < 2 || currentPageIndex === 3) {
                     document.getElementById('hud-active-mission').textContent = "Standing By";
@@ -1059,7 +1330,7 @@
                     sceneHtml = `
                     <div class="mx-auto max-w-xs bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div class="px-3 py-2 flex items-center justify-between border-b border-gray-100">
-                            <div class="flex items-center space-x-2"><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[1.5px]"><div class="w-full h-full rounded-full bg-white p-[1px] flex items-center justify-center"><i data-lucide="user" class="w-3 h-3 text-gray-400"></i></div></div><div class="leading-none"><div class="text-[10px] font-bold text-gray-900">friend_123</div><div class="text-[8px] text-gray-400">Sponsored</div></div></div><i data-lucide="more-horizontal" class="w-3 h-3 text-gray-400"></i>
+                            <div class="flex items-center space-x-2"><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[1.5px]"><div class="w-full h-full rounded-full bg-white p-[1px] flex items-center justify-center"><i data-lucide="user" class="w-3 h-3 text-gray-400"></i></div></div><div class="leading-none"><div class="text-[10px] font-bold text-gray-900">friend_123</div><div class="text-[8px] text-gray-400">Saturday</div></div></div><i data-lucide="more-horizontal" class="w-3 h-3 text-gray-400"></i>
                         </div>
                         <div class="bg-gray-100 py-6 px-4 flex items-center justify-center text-center"><p class="text-xs font-serif font-medium text-gray-800 italic">"${cleanText}"</p></div>
                         <div class="px-3 py-2"><div class="flex space-x-3 mb-1"><i data-lucide="heart" class="w-4 h-4 text-gray-800"></i><i data-lucide="message-circle" class="w-4 h-4 text-gray-800"></i><i data-lucide="share-2" class="w-4 h-4 text-gray-800"></i></div><div class="text-[9px] font-bold text-gray-900">4,203 likes</div></div>
@@ -1139,8 +1410,8 @@
                     sceneHtml = `
                     <div class="mx-auto max-w-sm bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                         <div class="flex items-start space-x-3">
-                            <div class="bg-gray-50 p-2 rounded-lg border border-gray-100 shadow-sm shrink-0"><i data-lucide="${icon}" class="w-5 h-5 text-allgood-primary"></i></div>
-                            <div><h4 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">System Notification</h4><p class="text-sm text-gray-600 leading-snug">${cleanText}</p></div>
+                            <div class="bg-amber-50 p-2 rounded-lg border border-amber-100 shadow-sm shrink-0"><i data-lucide="${icon}" class="w-5 h-5 text-allgood-primary"></i></div>
+                            <div><h4 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">The Situation</h4><p class="text-sm text-gray-600 leading-snug">${cleanText}</p></div>
                         </div>
                     </div>`;
                 }
@@ -1163,15 +1434,10 @@
                 const data = SCENARIO_DATA[scenarioIndex - 1];
                 const isAnswered = state === 'answered';
 
-                let uiType = 'system';
+                let uiType = 'scene';
                 const icon = data.icon;
-                if (['briefcase'].includes(icon)) uiType = 'email';
-                else if (['tv'].includes(icon)) uiType = 'video';
-                else if (['gamepad-2'].includes(icon)) uiType = 'game';
-                else if (['key', 'lock', 'user-lock', 'form-input', 'wallet', 'bug'].includes(icon)) uiType = 'form';
-                else if (['message-square', 'message-square-off', 'phone-off', 'split'].includes(icon)) uiType = 'chat';
-                else if (['users', 'users-x', 'user-plus', 'heart-off', 'camera-off', 'user-round-minus', 'user-round-x', 'thumbs-down', 'image-up', 'frown'].includes(icon)) uiType = 'social';
-                else if (['search', 'globe', 'search-check', 'book-open-check', 'image'].includes(icon)) uiType = 'browser';
+                if (['message-square', 'message-square-off', 'user-round-x'].includes(icon)) uiType = 'chat';
+                else if (['user-round-minus'].includes(icon)) uiType = 'social';
 
                 let choicesHtml = data.choices.map((choice, index) => {
                     let btnClass = 'w-full text-left p-2.5 rounded-lg text-xs font-medium transition-all shadow-sm mb-2 border';
@@ -1272,7 +1538,7 @@
                     if (window.Telemetry) window.Telemetry.step(Object.keys(answeredScenarioScores).length);
 
                     if (window.AuthCore && window.AuthCore.saveModuleProgress) {
-                        window.AuthCore.saveModuleProgress('digital-decisions', {
+                        window.AuthCore.saveModuleProgress('rwr-challenge', {
                             answeredScenarioScores,
                             totalChallengeScore,
                         });
@@ -1383,15 +1649,15 @@
                 let message = "";
 
                 if (percentage >= 89) {
-                    rank = "Digital Architect";
+                    rank = "Real World Ready";
                     rankColor = "text-green-600";
-                    message = "Exceptional! You consistently demonstrated the Publisher Mindset.";
+                    message = "Exceptional. You checked your read, held your ground when it counted, and asked the question.";
                 } else if (percentage >= 70) {
-                    rank = "Digital Manager";
+                    rank = "Nearly Ready";
                     rankColor = "text-yellow-600";
                     message = "Solid performance. Review your 'less-effective' choices.";
                 } else {
-                    rank = "Digital Learner";
+                    rank = "Still Learning";
                     rankColor = "text-red-600";
                     message = "Good start. Reread the feedback and try again.";
                 }
@@ -1414,7 +1680,7 @@
                      badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Finish Challenge to Unlock';
                      if (certSection) certSection.classList.add('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
                 } else if (!isPassing) {
-                     badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Certification Locked (Score < 80)';
+                     badgeBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 mr-2"></i>Certification Locked (Score < 64)';
                      if (certSection) certSection.classList.add('opacity-50', 'pointer-events-none', 'filter', 'grayscale');
                 } else {
                      // Rating never gates the badge — same as the GoodBlock Case 7 pattern.
@@ -1622,7 +1888,7 @@
                 // from the attempt just abandoned.
                 window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
                 if (window.AuthCore && window.AuthCore.saveModuleProgress) {
-                    window.AuthCore.saveModuleProgress('digital-decisions', {
+                    window.AuthCore.saveModuleProgress('rwr-challenge', {
                         answeredScenarioScores: {},
                         totalChallengeScore: 0,
                     });
@@ -1654,7 +1920,7 @@
 
                 if (window.AuthCore.auth.currentUser) {
                     window.AuthCore.submitCourseFeedback({
-                        gameName: "Digital Decisions Challenge",
+                        gameName: "Real World Ready Challenge",
                         rating: currentStarRating,
                         feedback: feedbackText,
                     }).catch(e => console.error("Course feedback write failed", e));
