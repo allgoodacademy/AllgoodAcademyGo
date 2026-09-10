@@ -89,7 +89,30 @@ function markSignedIn() {
 }
 
 function clearSignedIn() {
-    try { localStorage.removeItem(SIGNED_IN_KEY); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem(SIGNED_IN_KEY); localStorage.removeItem(ACCOUNT_KEY); } catch (e) { /* ignore */ }
+}
+
+// A SECOND, narrower hint: this session belongs to a real, non-anonymous account.
+// ag_signed_in answers "is there a session"; this answers "is it an account", and only
+// this one may trigger an automatic redirect away from the marketing homepage.
+//
+// The distinction matters because the two guards want different questions answered.
+// /dashboard/ asks "is there anything of yours to show" — a guest with an anonymous
+// session qualifies, so they keep access. The homepage asks "should I send this person
+// somewhere else without being asked" — and for a guest the answer is no. Keying the
+// homepage on session-presence trapped every guest who had finished a GoodBlock: they
+// could never see the marketing site again, which broke the returning teacher, the
+// student browsing another pack, and anyone arriving from search.
+//
+// Set only from finalizeThirteenPlusAccount(), the one path that produces a
+// non-anonymous Firebase user. A Learner Recruit is deliberately NOT included: they are
+// identified, but they are still isAnonymous in Firebase terms, and they are a student
+// who may well want the marketing site. They reach the dashboard the same way a guest
+// does — the nav link, the in-lab Dashboard button, or the URL.
+const ACCOUNT_KEY = 'ag_account';
+
+function markAccount() {
+    try { localStorage.setItem(ACCOUNT_KEY, '1'); } catch (e) { /* ignore */ }
 }
 
 const ADJECTIVES = ['Swift', 'Brave', 'Clever', 'Quiet', 'Bold', 'Curious', 'Bright', 'Calm', 'Sharp', 'Steady'];
@@ -590,6 +613,7 @@ async function finalizeThirteenPlusAccount(user) {
 
     await setDoc(ref, payload, { merge: true });
     markSignedIn();
+    markAccount();
     return user;
 }
 
@@ -761,7 +785,7 @@ window.AuthCore = {
     silentSignIn, recruitSignIn, redeemRecruitCode,
     guestStart, guestDisplayName, claimRecruitCode,
     codeToDisplayName, normalizeRecruitCode,
-    markSignedIn, clearSignedIn, signOutAndClear, waitForAuthReady,
+    markSignedIn, markAccount, clearSignedIn, signOutAndClear, waitForAuthReady,
     googleSignIn, createAccountWithEmail, signInWithEmail,
     getAccount,
     randomNickname, randomAvatar, normalizeAvatar, AVATARS,

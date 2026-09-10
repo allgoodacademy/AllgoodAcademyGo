@@ -552,9 +552,13 @@
             localStorage.removeItem('aa_finding_complete'); // NEW: Clear Finding status
             localStorage.removeItem('aa_age_tier');
             localStorage.removeItem('aa_avatar');
-            // Clearing the routing flag is what stops a refresh from bouncing a
-            // signed-out person straight back here. See the head guard above.
+            // Clear BOTH routing flags. ag_signed_in stops a refresh bouncing a signed-out
+            // person straight back here; ag_account stops the homepage bouncing them the
+            // other way. Leaving ag_account set while clearing ag_signed_in puts the two
+            // guards in a redirect loop: / sends them to /dashboard/, which sends them
+            // back to /, forever.
             localStorage.removeItem('ag_signed_in');
+            localStorage.removeItem('ag_account');
 
             launchCount = 0; 
             
