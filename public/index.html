@@ -8,14 +8,27 @@
 <link rel="icon" type="image/png" href="/favicon.png">
 <script>
 /* Routing hint, never an auth check. Firebase resolves auth asynchronously from
-   IndexedDB, so a signed-in visitor would see this marketing page for a beat before
-   any onAuthStateChanged redirect could fire. auth-core.js writes this flag on
-   sign-in and clears it on sign-out; reading it synchronously here, before anything
-   renders, is what makes the hand-off flash-free. Worst case it is stale, someone
-   lands on the wrong page, and one click fixes it. No real content is gated on it. */
+   IndexedDB, so an account holder would see this marketing page for a beat before any
+   onAuthStateChanged redirect could fire; reading a flag synchronously here, before
+   anything renders, is what makes the hand-off flash-free.
+
+   This keys on ag_account (a real, non-anonymous account) and NOT on ag_signed_in
+   (any session, guests included). Only an account holder gets sent somewhere else
+   without asking. A guest with an anonymous session belongs here like anyone else —
+   they may be a returning teacher, a student browsing another pack, or someone who
+   just arrived from search, and bouncing them to the dashboard meant they could never
+   see this page again. Guests keep full access to /dashboard/; it is the automatic
+   redirect that is wrong for them, not the destination.
+
+   Both flags are required, which is what makes a redirect loop impossible rather than
+   merely absent: this page only redirects when ag_signed_in is present, and that is
+   exactly the condition under which /dashboard/ does not redirect back.
+
+   Worst case the flags are stale, someone lands on the wrong page, and one click fixes
+   it. No real content is gated on either. */
 (function(){
   try{
-    if(localStorage.getItem('ag_signed_in')==='1'){location.replace('/dashboard/');}
+    if(localStorage.getItem('ag_account')==='1'&&localStorage.getItem('ag_signed_in')==='1'){location.replace('/dashboard/');}
   }catch(e){/* storage blocked - just show the page */}
 })();
 </script>
@@ -429,6 +442,20 @@ swap.addEventListener('click',function(){answer(swap.dataset.next)});
   var btn=document.querySelector('.nav-signin');
   if(!btn)return;
   btn.addEventListener('click',function(){location.href='/dashboard/?signin=1';});
+
+  /* A guest who has already started something is no longer bounced here (see the head
+     guard), so give them the way back rather than making them remember the URL. Only
+     for a session that exists but is not an account — an account holder never sees this
+     page, and a first-time visitor has nothing to go back to. Reuses the existing
+     .nav-link style and sits before Sign in, so the nav is unchanged for everyone else. */
+  try{
+    if(localStorage.getItem('ag_signed_in')!=='1'||localStorage.getItem('ag_account')==='1')return;
+    var a=document.createElement('a');
+    a.className='nav-link';
+    a.href='/dashboard/';
+    a.textContent='Your dashboard';
+    btn.parentNode.insertBefore(a,btn);
+  }catch(e){/* storage blocked - nav stays as it is */}
 })();
 </script>
 </body>
