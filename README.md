@@ -10,7 +10,10 @@ original local folder, added separately).
 
 ```
 public/
-  index.html                                     # Allgood Academy dashboard (home page)
+  index.html                                     # Marketing landing page (signed-out home) — zero third-party requests
+  for-teachers/index.html                        # Marketing: teacher-facing page
+  about/index.html                               # Marketing: about + contact
+  dashboard/index.html                           # Allgood Academy dashboard (signed-in home)
   insider/index.html                             # Insider (owner BI dashboard: users, courses, classrooms, inbox, tools)
   js/telemetry.js                                # Shared learning-analytics telemetry (sessions + events) — see docs/insider-analytics.md
   educational-games/                              # conflict-resolution, digital-decisions,

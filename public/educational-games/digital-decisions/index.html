@@ -979,10 +979,13 @@
                     startupScreen.style.opacity = '0';
                     setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
 
-                    // Same gate the dashboard uses, run right here — reached directly by a
-                    // bookmarked or shared link, this module can't rely on the dashboard's
-                    // launchCourse having already checked this.
-                    const { user, account } = await window.AuthGate.ensureIdentified();
+                    // GUEST-FIRST ENTRY (founder decision, 2026-09-09): nobody signs in to
+                    // start anything. This establishes an anonymous session and a readable
+                    // auto-assigned name and gets out of the way — no modal, no age
+                    // question, nothing to dismiss — then mounts the always-available
+                    // "Save my progress" affordance. The identify gate now fires at the
+                    // END (see the completion write below), not here.
+                    const { user, account } = await window.AuthGate.startGuestSession();
                     if (!user) return;
 
                     // Sync local display state from what the gate just resolved — the
@@ -1437,6 +1440,14 @@
                     sessionId: window.sessionId
                 });
                 if (window.Telemetry) window.Telemetry.complete({ finalScore: currentScore, maxScore: MAX_SCORE, percentage: percentage, rank: rank });
+
+                // GUEST-FIRST: the completion screen is already rendered and stays rendered.
+                // This offer comes after it, never in front of it, and declining hides nothing.
+                // Offered once per page load; the always-available affordance covers the rest.
+                if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+                    window._agSaveOffered = true;
+                    setTimeout(() => { window.AuthGate.offerSave(); }, 1500);
+                }
             };
 
             // --- TOC LOGIC ---

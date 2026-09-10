@@ -15,11 +15,19 @@
 //            auto-assigned with zero picker screen, exactly as originally spec'd;
 //            the passphrase now doubles as their display name from the first second.
 //
-// window.AuthGate.ensureIdentified() is the one thing a caller needs: it resolves
-// once the *current* session meets the bar above, showing the gate UI first if it
-// doesn't. Call it before unlocking any real content — at dashboard launch time, and
-// at each module's own power-up moment, so a direct/deep-linked visit gets the same
-// gate a dashboard visit does.
+// Three entry points, and which one you want depends on what you are protecting:
+//
+//   startGuestSession()  — what every GoodBlock and Challenge calls at power-up.
+//       Guest-first (founder decision, 2026-09-09): nobody signs in to START anything.
+//       An anonymous session and a readable auto-assigned name, then out of the way.
+//   offerSave()          — the end-of-module offer to keep a guest run, plus the
+//       always-available "Save my progress" affordance. Shown AFTER a completion
+//       screen, never in front of one; declining hides nothing.
+//   ensureIdentified()   — unchanged, and still the real bar. It resolves once the
+//       *current* session is a real 13+ account or a Recruit with a code on file,
+//       showing the gate UI first if it isn't. It guards the dashboard, any roster or
+//       Task Force surface, the insider portal, and the save/claim action itself —
+//       it is no longer on the path into a lesson.
 
 function waitForAuthReady() {
     return new Promise((resolve) => {
@@ -132,12 +140,28 @@ const TEMPLATE = `
         <div id="ag-recruit-new" class="hidden">
             <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">You're in!</h2>
             <p class="text-gray-500 text-xs mb-4 font-body leading-relaxed">This is your Recruit Code. Write it down &mdash; it's the only way to get your progress back on another device.</p>
+            <p id="ag-recruit-note" class="hidden text-[11px] text-allgood-primary mb-3 font-body leading-relaxed"></p>
             <div class="bg-slate-50 border-2 border-dashed border-allgood-secondary rounded-lg py-4 px-3 mb-2">
                 <span id="ag-recruit-code-display" class="text-lg font-heading font-bold text-allgood-secondary tracking-wide break-words"></span>
             </div>
             <button id="ag-btn-copy-code" class="text-xs text-allgood-primary hover:text-allgood-hover underline decoration-dotted mb-4 font-body">Copy code</button>
             <p class="text-[11px] text-gray-400 mb-4 font-body">Don't lose this &mdash; there's no other way back in.</p>
             <button id="ag-btn-recruit-continue" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Let's Go!</button>
+        </div>
+
+        <!-- SAVE / CLAIM: the guest-first end-of-module prompt. Never shown before a
+             completion screen and never blocking one — declining hides nothing. -->
+        <div id="ag-save" class="hidden">
+            <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Want to keep this?</h2>
+            <p class="text-gray-500 text-xs mb-4 font-body leading-relaxed">You've been <strong id="ag-save-name" class="text-allgood-secondary"></strong> this whole time. Save it and your progress comes back next time &mdash; on this device or any other.</p>
+            <p id="ag-save-error" class="text-red-500 text-xs mb-2 hidden font-body"></p>
+            <button id="ag-btn-save-13plus" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase mb-3">
+                I'm 13 or older &mdash; Sign In
+            </button>
+            <button id="ag-btn-save-under13" class="w-full bg-white border-2 border-allgood-secondary text-allgood-secondary hover:bg-allgood-secondary hover:text-white font-bold py-3 rounded shadow-sm transition-all font-body uppercase mb-4">
+                I'm younger than 13 &mdash; Save My Code
+            </button>
+            <button id="ag-btn-save-decline" class="text-xs text-gray-400 hover:text-gray-600 font-bold uppercase font-body">No thanks &mdash; I'm done</button>
         </div>
 
         <!-- REDEEM: entering an existing Recruit Code, either from the root link or a
@@ -166,7 +190,7 @@ function ensureModalInjected() {
 }
 
 function showPanel(id) {
-    ['ag-root', 'ag-signin', 'ag-recruit-new', 'ag-redeem'].forEach((panelId) => {
+    ['ag-root', 'ag-save', 'ag-signin', 'ag-recruit-new', 'ag-redeem'].forEach((panelId) => {
         const el = document.getElementById(panelId);
         if (el) el.classList.toggle('hidden', panelId !== id);
     });
@@ -199,7 +223,12 @@ function hideError(el) {
 
 // One modal, opened lazily and reused across however many times ensureIdentified()
 // needs it in a page's lifetime (it normally only needs it once).
-function openGate(onResolved) {
+function openGate(onResolved, options) {
+    const opts = options || {};
+    // 'ag-root' is the age gate (the dashboard / insider / claim-action path); 'ag-save'
+    // is the end-of-module offer to keep a guest run. Same panels underneath either way —
+    // only the way in differs, so there is exactly one sign-in UI on the site.
+    const entryPanel = opts.entryPanel || 'ag-root';
     ensureModalInjected();
     const modal = document.getElementById('ag-modal');
     const emailInput = document.getElementById('ag-email-input');
@@ -236,7 +265,7 @@ function openGate(onResolved) {
     }
 
     function open() {
-        showPanel('ag-root');
+        showPanel(entryPanel);
         hideError(signinError);
         hideError(redeemError);
         hideError(rootError);
@@ -267,7 +296,7 @@ function openGate(onResolved) {
 
     document.getElementById('ag-back-from-signin').onclick = () => {
         playSfx('click');
-        showPanel('ag-root');
+        showPanel(entryPanel);
     };
 
     document.getElementById('ag-link-toggle-mode').onclick = () => {
@@ -360,6 +389,58 @@ function openGate(onResolved) {
         }
     };
 
+    // --- SAVE PANEL ---------------------------------------------------------
+    const saveError = document.getElementById('ag-save-error');
+    const saveName = document.getElementById('ag-save-name');
+    const recruitNote = document.getElementById('ag-recruit-note');
+    if (saveName) saveName.textContent = opts.guestName || window.AuthCore.guestDisplayName();
+
+    document.getElementById('ag-btn-save-13plus').onclick = () => {
+        playSfx('click');
+        emailMode = 'create';
+        if (emailSubmitBtn) emailSubmitBtn.textContent = 'Create Account';
+        if (toggleModeLink) toggleModeLink.textContent = 'Already have an account? Sign in instead';
+        hideError(signinError);
+        // The existing 13+ path already links a real credential onto this anonymous
+        // session rather than creating a second account, so the uid — and everything
+        // written under it during the guest run — survives the upgrade untouched.
+        showPanel('ag-signin');
+    };
+
+    document.getElementById('ag-btn-save-under13').onclick = async () => {
+        playSfx('click');
+        hideError(saveError);
+        const btn = document.getElementById('ag-btn-save-under13');
+        setBusy(btn, 'Saving...', true);
+        try {
+            const result = await window.AuthCore.claimRecruitCode();
+            pendingRecruitContinue = resolveAndClose;
+            codeDisplay.textContent = result.code;
+            if (recruitNote) {
+                if (result.changed) {
+                    // Say it plainly rather than silently renaming someone who has been
+                    // looking at the old name for the whole module.
+                    recruitNote.textContent = 'Heads up: ' + result.previousName + ' was taken while you were working, so your code is ' + result.displayName + ' instead. That is the one to write down.';
+                    recruitNote.classList.remove('hidden');
+                } else {
+                    recruitNote.classList.add('hidden');
+                }
+            }
+            playSfx('confirm');
+            showPanel('ag-recruit-new');
+        } catch (e) {
+            console.error('Recruit code claim failed', e);
+            showError(saveError, 'Something went wrong saving your progress. Please try again.');
+        } finally {
+            setBusy(btn, null, false);
+        }
+    };
+
+    document.getElementById('ag-btn-save-decline').onclick = () => {
+        playSfx('click');
+        resolveAndClose(true);
+    };
+
     document.getElementById('ag-btn-copy-code').onclick = () => {
         const text = codeDisplay.textContent;
         if (text && navigator.clipboard) navigator.clipboard.writeText(text);
@@ -379,7 +460,7 @@ function openGate(onResolved) {
 
     document.getElementById('ag-back-from-redeem').onclick = () => {
         playSfx('click');
-        showPanel('ag-root');
+        showPanel(entryPanel);
     };
 
     document.getElementById('ag-btn-redeem-submit').onclick = async () => {
@@ -432,4 +513,95 @@ async function ensureIdentified() {
     });
 }
 
-window.AuthGate = { ensureIdentified };
+// --- GUEST-FIRST ENTRY -------------------------------------------------------
+// What a GoodBlock or Challenge calls at its power-up moment now, in place of
+// ensureIdentified(). Founder decision, 2026-09-09: nobody signs in to *start*
+// anything. This establishes the anonymous session and the readable session name and
+// gets out of the way — no modal, no age question, nothing to dismiss — then mounts the
+// always-available "Save my progress" affordance so the offer is never more than one
+// click away. ensureIdentified() itself is unchanged and still guards the dashboard, the
+// roster and Task Force surfaces, the insider portal, and the save/claim action itself.
+async function startGuestSession(options) {
+    const opts = options || {};
+    let result;
+    try {
+        result = await window.AuthCore.guestStart();
+    } catch (e) {
+        // A failed sign-in must never keep a student out of the lesson. They get the
+        // local session name and an unsaved run rather than a blocked page.
+        console.error('[AuthGate] guestStart failed', e);
+        return { user: null, account: null, isGuest: true, displayName: window.AuthCore.guestDisplayName() };
+    }
+    if (result.isGuest && opts.affordance !== false) {
+        mountSaveAffordance(result.displayName);
+    } else if (!result.isGuest) {
+        removeSaveAffordance();
+    }
+    return result;
+}
+
+// The end-of-module offer. Called AFTER the completion screen has rendered, never
+// before it and never as a condition of it — declining hides nothing.
+async function offerSave(options) {
+    const opts = options || {};
+    const user = window.AuthCore.auth.currentUser || await window.AuthCore.waitForAuthReady();
+    if (user) {
+        const account = await window.AuthCore.getAccount(user.uid);
+        if (!user.isAnonymous || isFullyIdentified(user, account)) {
+            // Already saved — nothing to offer.
+            removeSaveAffordance();
+            return { saved: true, alreadySaved: true, user, account };
+        }
+    }
+    return new Promise((resolve) => {
+        openGate(async (cancelled) => {
+            if (cancelled) { resolve({ saved: false }); return; }
+            removeSaveAffordance();
+            const freshUser = window.AuthCore.auth.currentUser;
+            const account = freshUser ? await window.AuthCore.getAccount(freshUser.uid) : null;
+            resolve({ saved: true, user: freshUser, account });
+        }, { entryPanel: 'ag-save', guestName: opts.guestName || window.AuthCore.guestDisplayName() });
+    });
+}
+
+// Self-contained the same way showAuthSpinner is: inline styles only, so it renders
+// identically on all eleven module pages regardless of each page's own Tailwind config.
+// Doubles as the answer to "who am I?" — a guest sees their auto-assigned name here
+// without having typed anything.
+function mountSaveAffordance(displayName) {
+    let el = document.getElementById('ag-save-fab');
+    if (!el) {
+        el = document.createElement('button');
+        el.id = 'ag-save-fab';
+        el.type = 'button';
+        el.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:9000;display:flex;flex-direction:column;' +
+            'align-items:flex-start;gap:2px;max-width:calc(100vw - 28px);background:#FFFFFF;color:#17272C;' +
+            'border:1.5px solid #D8DFE1;border-radius:12px;padding:8px 14px;cursor:pointer;text-align:left;' +
+            'font-family:inherit;box-shadow:0 6px 18px -8px rgba(23,39,44,.5);';
+        el.addEventListener('click', () => { offerSave({}); });
+        document.body.appendChild(el);
+    }
+    el.innerHTML = '';
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:12px;font-weight:700;letter-spacing:.01em;';
+    label.textContent = 'Save my progress';
+    const who = document.createElement('span');
+    who.style.cssText = 'font-size:11px;color:#5C6E75;';
+    who.textContent = "You're " + displayName;
+    el.appendChild(label);
+    el.appendChild(who);
+    el.setAttribute('aria-label', "Save my progress. You're currently " + displayName + '.');
+}
+
+function removeSaveAffordance() {
+    const el = document.getElementById('ag-save-fab');
+    if (el) el.remove();
+}
+
+window.AuthGate = {
+    ensureIdentified,
+    startGuestSession,
+    offerSave,
+    mountSaveAffordance,
+    removeSaveAffordance,
+};

@@ -199,13 +199,13 @@
             document.getElementById('lab-menu-modal').classList.remove('visible-modal');
         };
 
-        // Every lab (this hub included) runs its own identify gate at its own power-up
-        // moment — see /js/identity-gate.js — so a direct/bookmarked visit to a lab still
-        // gets gated. Checking again here just means someone clicking a card from an
-        // already-identified session never sees the gate twice.
+        // GUEST-FIRST ENTRY (founder decision, 2026-09-09): clicking a card opens the
+        // GoodBlock, full stop — no age question in front of it. Establishing the guest
+        // session here rather than only in the lab means this hub's own progress badges
+        // have a session to read from; the lab calls startGuestSession() again at its
+        // power-up moment and passes straight through on an established session.
         window.launchLab = async (name, url) => {
-            const { user } = await window.AuthGate.ensureIdentified();
-            if (!user) return;
+            try { await window.AuthGate.startGuestSession(); } catch (e) { console.error('[Hub] guest session failed', e); }
             if (typeof gtag === 'function') gtag('event', 'launch_module', { module_name: name });
             window.location.href = url;
         };
