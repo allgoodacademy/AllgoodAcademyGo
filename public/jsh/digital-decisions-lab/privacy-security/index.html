@@ -64,6 +64,14 @@
         // a graded quiz), so completion is just a flag, set once Case 6 is actually reached.
         window.logModuleCompletion = async () => {
             if (window.Telemetry) window.Telemetry.complete();
+
+            // GUEST-FIRST: the completion screen is already rendered and stays rendered.
+            // This offer comes after it, never in front of it, and declining hides nothing.
+            // Offered once per page load; the always-available affordance covers the rest.
+            if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+                window._agSaveOffered = true;
+                setTimeout(() => { window.AuthGate.offerSave(); }, 1500);
+            }
             const user = auth.currentUser;
             if (!user) return;
             try {
@@ -1692,7 +1700,13 @@
                     // bookmarked or shared link, this GoodBlock can't rely on the Lab Pack
                     // hub's own launchLab having already checked this. Completion itself is
                     // written later, by advanceFromPage() once Case 6 is actually reached.
-                    await window.AuthGate.ensureIdentified();
+                    // GUEST-FIRST ENTRY (founder decision, 2026-09-09): nobody signs in to
+                    // start anything. This establishes an anonymous session and a readable
+                    // auto-assigned name and gets out of the way — no modal, no age
+                    // question, nothing to dismiss — then mounts the always-available
+                    // "Save my progress" affordance. The identify gate now fires at the
+                    // END (see the completion write below), not here.
+                    await window.AuthGate.startGuestSession();
                 };
                 startup.addEventListener('click', handleStartup);
 

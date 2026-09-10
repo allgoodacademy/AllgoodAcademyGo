@@ -32,7 +32,7 @@ add it here so the next one doesn't repeat it.
 
 ## Dashboard registration
 
-- [ ] Add an entry to `MODULE_REGISTRY` in `public/index.html` (`id`, `name`, `category`,
+- [ ] Add an entry to `MODULE_REGISTRY` in `public/dashboard/index.html` (`id`, `name`, `category`,
   `url`, `gameNames`, `isComplete`). Without this, the dashboard has no way to compute a
   real completed/in-progress/not-started status for the module.
 - [ ] `url` uses a **trailing-slash directory path** (`/jsh/lab-pack/goodblock-name/`), never
@@ -201,7 +201,7 @@ so update them in one pass and run `node scripts/check-modules.js` (also run by 
 `Module registry check` GitHub Actions workflow on every push and pull request) before
 calling it done:
 
-- [ ] `MODULE_REGISTRY` in `public/index.html` — dashboard completion status. Labs use
+- [ ] `MODULE_REGISTRY` in `public/dashboard/index.html` — dashboard completion status. Labs use
   `category: 'lab'`, and every entry carries `pack` (`'digital-decisions'` or
   `'real-world-ready'`). Each pack's dashboard card has its status pill and "N live • M
   coming soon" counter derived from the entries with that pack plus that pack's planned

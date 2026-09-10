@@ -19,7 +19,7 @@ import {
     EmailAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-    getFirestore, doc, setDoc, getDoc, addDoc, collection, serverTimestamp,
+    getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -65,6 +65,27 @@ function markActivity() {
 const skipPowerUp = wasRecentlyActive();
 markActivity();
 document.addEventListener('click', markActivity, { passive: true });
+
+// --- SIGNED-IN ROUTING FLAG: a synchronous hint for the marketing site (/) and the
+// dashboard (/dashboard/), both of which decide which page a visitor belongs on before
+// anything renders. Firebase resolves auth asynchronously from IndexedDB, so an
+// onAuthStateChanged redirect always shows a frame of the wrong page first. This flag is
+// deliberately NOT an auth check and nothing real is ever gated on it — every actual
+// check still runs through identity-gate.js and firestore.rules. Worst case it is stale,
+// someone lands on the wrong page, and one click fixes it.
+//
+// Set only when a session is *identified*: a real 13+ account, or a Learner Recruit with
+// a Recruit Code on file. A plain anonymous guest deliberately does not get it — a guest
+// visiting / belongs on the marketing page, not the dashboard.
+const SIGNED_IN_KEY = 'ag_signed_in';
+
+function markSignedIn() {
+    try { localStorage.setItem(SIGNED_IN_KEY, '1'); } catch (e) { /* ignore */ }
+}
+
+function clearSignedIn() {
+    try { localStorage.removeItem(SIGNED_IN_KEY); } catch (e) { /* ignore */ }
+}
 
 const ADJECTIVES = ['Swift', 'Brave', 'Clever', 'Quiet', 'Bold', 'Curious', 'Bright', 'Calm', 'Sharp', 'Steady'];
 const ANIMALS = ['Falcon', 'Otter', 'Panther', 'Fox', 'Owl', 'Wolf', 'Hawk', 'Lynx', 'Heron', 'Badger'];
@@ -208,6 +229,193 @@ async function generateUniqueRecruitCode() {
     return [randomFrom(RECRUIT_DESCRIPTORS), randomFrom(RECRUIT_ANIMALS), randomFrom(RECRUIT_FLAVORS), Math.floor(Math.random() * 90 + 10)].join('-').toLowerCase();
 }
 
+// --- AUTH READY: one place to await Firebase's first onAuthStateChanged callback, so a
+// page that needs the resolved session (rather than whatever auth.currentUser happens to
+// be mid-restore) doesn't have to hand-roll this. Bounded for the same reason
+// identity-gate.js bounds its own copy: a dropped network during state determination
+// should degrade to "treated as signed out," never to a page that never continues.
+function waitForAuthReady(timeoutMs = 8000) {
+    return new Promise((resolve) => {
+        if (auth.currentUser) { resolve(auth.currentUser); return; }
+        let settled = false;
+        let unsub;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            if (unsub) unsub();
+            console.warn('[AuthCore] auth state did not resolve in time; proceeding as signed-out.');
+            resolve(null);
+        }, timeoutMs);
+        unsub = onAuthStateChanged(auth, (user) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (unsub) unsub();
+            resolve(user);
+        });
+    });
+}
+
+// --- GUEST SESSION NAME: the same descriptor-animal-flavor word space a Recruit Code
+// comes from, drawn LOCALLY with no Firestore read or write. That distinction is the
+// whole design decision here: generateUniqueRecruitCode() reserves a document to prove
+// uniqueness, and calling it on entry would reserve a code for every visitor who bounces,
+// filling the namespace with claims nobody ever made. A guest gets a session *name*; a
+// real code is minted and reserved only at claim time (see claimRecruitCode below).
+//
+// Kept in localStorage so the name is stable across pages and reloads within a browser —
+// someone who has been "Arctic Fox Trot" for twenty minutes should still be Arctic Fox
+// Trot on the next GoodBlock, and should keep that name if they choose to claim it.
+const GUEST_CODE_KEY = 'ag_guest_code';
+
+function drawLocalCode() {
+    return [randomFrom(RECRUIT_DESCRIPTORS), randomFrom(RECRUIT_ANIMALS), randomFrom(RECRUIT_FLAVORS)].join('-').toLowerCase();
+}
+
+function getOrCreateGuestCode() {
+    try {
+        const stored = normalizeRecruitCode(localStorage.getItem(GUEST_CODE_KEY));
+        if (stored && stored.split('-').length === 3) return stored;
+    } catch (e) { /* storage blocked — fall through and draw a fresh one per page */ }
+    const code = drawLocalCode();
+    try { localStorage.setItem(GUEST_CODE_KEY, code); } catch (e) { /* ignore */ }
+    return code;
+}
+
+function clearGuestCode() {
+    try { localStorage.removeItem(GUEST_CODE_KEY); } catch (e) { /* ignore */ }
+}
+
+// --- GUEST-FIRST ENTRY: what a GoodBlock or Challenge calls at its power-up moment,
+// replacing the identify gate that used to fire there. Nobody signs in to *start*
+// anything — an anonymous session and a readable name are established silently and the
+// content renders. Identity is asked for at the end, or when they choose to save.
+//
+// Deliberately non-destructive: a session that is already identified (a real 13+ account,
+// or a Recruit with a code on file) passes straight through with its own name intact.
+// Never writes ageTier and never touches recruit_codes.
+async function guestStart() {
+    let user = await waitForAuthReady();
+    if (!user) {
+        user = (await signInAnonymously(auth)).user;
+    }
+
+    const account = await getAccount(user.uid);
+    if (!user.isAnonymous || account.recruitCode) {
+        return {
+            user,
+            account,
+            isGuest: false,
+            displayName: account.displayName || user.displayName || null,
+        };
+    }
+
+    const code = getOrCreateGuestCode();
+    const displayName = codeToDisplayName(code);
+    if (user.displayName !== displayName) {
+        try { await updateProfile(user, { displayName }); } catch (e) { console.error('[AuthCore] updateProfile failed', e); }
+    }
+
+    const payload = {
+        displayName,
+        email: null,
+        isGuest: true,
+        role: account.role || 'student',
+        guestCode: code,
+        lastLogin: serverTimestamp(),
+    };
+    try {
+        await setDoc(userRef(user.uid), payload, { merge: true });
+    } catch (e) {
+        // A failed profile write must not stop the lesson from opening — the name is
+        // already on the auth object and in localStorage either way.
+        console.error('[AuthCore] guestStart profile write failed', e);
+    }
+
+    return { user, account: { ...account, displayName, role: account.role || 'student' }, isGuest: true, displayName };
+}
+
+function guestDisplayName() {
+    return codeToDisplayName(getOrCreateGuestCode());
+}
+
+// Copies whatever this session already wrote to module_progress onto the code document
+// at claim time. saveModuleProgress mirrors going forward, but everything written while
+// they were still an unclaimed guest predates the code existing — without this, an
+// under-13 who claims at the end of a GoodBlock would redeem their code on a second
+// device and find it empty.
+async function backfillRecruitProgress(uid, code) {
+    try {
+        const snaps = await getDocs(collection(db, 'artifacts', appId, 'users', uid, 'module_progress'));
+        const progress = {};
+        snaps.forEach((d) => { progress[d.id] = d.data(); });
+        if (Object.keys(progress).length === 0) return;
+        await setDoc(recruitCodeRef(code), { progress, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+        console.error('[AuthCore] backfillRecruitProgress failed', e);
+    }
+}
+
+// --- CLAIM (under 13): the ONLY path that mints and reserves a real Recruit Code. Tries
+// the name they have been looking at all session first, so claiming doesn't rename them
+// out from under themselves; falls back to a fresh unique code if that one has been taken
+// in the meantime, and reports `changed: true` so the caller can say so plainly on screen.
+// Collects no name, no email, no birthday — same as recruitSignIn.
+async function claimRecruitCode() {
+    const user = auth.currentUser || (await waitForAuthReady()) || (await signInAnonymously(auth)).user;
+
+    const existing = await getAccount(user.uid);
+    if (existing.recruitCode) {
+        return {
+            code: existing.recruitCode,
+            displayName: existing.displayName || codeToDisplayName(existing.recruitCode),
+            changed: false,
+            alreadyClaimed: true,
+        };
+    }
+
+    const preferred = getOrCreateGuestCode();
+    let code = preferred;
+    let changed = false;
+    const taken = await getDoc(recruitCodeRef(preferred));
+    if (taken.exists()) {
+        code = await generateUniqueRecruitCode();
+        changed = true;
+    }
+
+    const displayName = codeToDisplayName(code);
+    const avatar = normalizeAvatar(existing.avatar) || randomAvatar();
+
+    await setDoc(recruitCodeRef(code), {
+        uid: user.uid,
+        displayName,
+        avatar,
+        progress: {},
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    });
+
+    try { await updateProfile(user, { displayName }); } catch (e) { console.error('[AuthCore] updateProfile failed', e); }
+
+    await setDoc(userRef(user.uid), {
+        displayName,
+        avatar,
+        email: null,
+        isGuest: true,
+        role: existing.role || 'student',
+        ageTier: 'under13',
+        recruitCode: code,
+        lastLogin: serverTimestamp(),
+    }, { merge: true });
+
+    await backfillRecruitProgress(user.uid, code);
+
+    try { localStorage.setItem(GUEST_CODE_KEY, code); } catch (e) { /* ignore */ }
+    markSignedIn();
+
+    return { code, displayName, changed, previousName: codeToDisplayName(preferred), alreadyClaimed: false };
+}
+
 // --- LEARNER RECRUIT FLOW: under 13. Fully COPPA-compliant — no name/email field, ever,
 // and no picker screen either: nickname + avatar are both auto-assigned so nothing blocks
 // their first course launch. The nickname now comes from their Recruit Code rather than
@@ -255,6 +463,7 @@ async function recruitSignIn() {
     if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
 
     await setDoc(ref, payload, { merge: true });
+    markSignedIn();
     return { user, code, displayName, avatar, isNewCode };
 }
 
@@ -313,6 +522,9 @@ async function redeemRecruitCode(rawCode) {
 
     await setDoc(codeRef, { uid: user.uid, updatedAt: serverTimestamp() }, { merge: true });
 
+    try { localStorage.setItem(GUEST_CODE_KEY, code); } catch (e) { /* ignore */ }
+    markSignedIn();
+
     return { ok: true, displayName, avatar };
 }
 
@@ -361,6 +573,7 @@ async function finalizeThirteenPlusAccount(user) {
     if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
 
     await setDoc(ref, payload, { merge: true });
+    markSignedIn();
     return user;
 }
 
@@ -518,9 +731,21 @@ async function loadModuleProgress(moduleSlug) {
     }
 }
 
+// Sign-out that also clears the routing flag and the local guest name, so the next
+// visitor on this browser starts genuinely fresh instead of inheriting the last one's
+// session name or being bounced to a dashboard they aren't signed in to.
+async function signOutAndClear() {
+    clearSignedIn();
+    clearGuestCode();
+    return signOut(auth);
+}
+
 window.AuthCore = {
     auth, db, appId,
     silentSignIn, recruitSignIn, redeemRecruitCode,
+    guestStart, guestDisplayName, claimRecruitCode,
+    codeToDisplayName, normalizeRecruitCode,
+    markSignedIn, clearSignedIn, signOutAndClear, waitForAuthReady,
     googleSignIn, createAccountWithEmail, signInWithEmail,
     getAccount,
     randomNickname, randomAvatar, normalizeAvatar, AVATARS,

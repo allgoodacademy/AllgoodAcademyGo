@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Cross-checks the hand-maintained module lists so they can't drift apart silently:
-//   - MODULE_REGISTRY (+ its `pack` field), LAB_PACK_PLANNED / RWR_PACK_PLANNED in public/index.html
+//   - MODULE_REGISTRY (+ its `pack` field), LAB_PACK_PLANNED / RWR_PACK_PLANNED in public/dashboard/index.html
 //   - COURSES in public/insider/index.html (Insider analytics)
 //   - live cards / coming-soon placeholders on EACH Lab Pack hub:
 //       public/jsh/digital-decisions-lab/index.html and public/jsh/real-world-ready-lab/index.html
@@ -38,7 +38,7 @@ const PACKS = {
 };
 
 // --- dashboard
-const dash = read('public/index.html');
+const dash = read('public/dashboard/index.html');
 const registrySrc = (dash.match(/const MODULE_REGISTRY = \[([\s\S]*?)\n\s*\];/) || [])[1];
 if (!registrySrc) fail('dashboard: MODULE_REGISTRY not found');
 const registry = [];

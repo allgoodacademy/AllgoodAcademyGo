@@ -61,6 +61,14 @@
         // page is reached and the rating is submitted.
         window.logModuleCompletion = async () => {
             if (window.Telemetry) window.Telemetry.complete();
+
+            // GUEST-FIRST: the completion screen is already rendered and stays rendered.
+            // This offer comes after it, never in front of it, and declining hides nothing.
+            // Offered once per page load; the always-available affordance covers the rest.
+            if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+                window._agSaveOffered = true;
+                setTimeout(() => { window.AuthGate.offerSave(); }, 1500);
+            }
             const user = auth.currentUser;
             if (!user) return;
             try {
@@ -2163,7 +2171,13 @@
                     setTimeout(() => { startup.style.display = 'none'; }, 700);
                     // INTEGRATION (Claude Code): same gate the dashboard uses. Guarded so the
                     // GoodBlock still previews standalone before the shared modules are wired.
-                    if (window.AuthGate && window.AuthGate.ensureIdentified) await window.AuthGate.ensureIdentified();
+                    // GUEST-FIRST ENTRY (founder decision, 2026-09-09): nobody signs in to
+                    // start anything. This establishes an anonymous session and a readable
+                    // auto-assigned name and gets out of the way — no modal, no age
+                    // question, nothing to dismiss — then mounts the always-available
+                    // "Save my progress" affordance. The identify gate now fires at the
+                    // END (see the completion write below), not here.
+                    await window.AuthGate.startGuestSession();
                 };
                 startup.addEventListener('click', handleStartup);
 
