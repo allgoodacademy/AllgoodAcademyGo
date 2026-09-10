@@ -118,23 +118,26 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:700;margin:0;line-height:1.06;let
 .choices.done .choice{cursor:default}
 .choices.done .choice:not(.chosen):hover{border-color:var(--hairline);background:var(--surface)}
 
-/* audience pressure meter — the real mechanism from the GoodBlock */
+/* audience count — the real mechanism from the GoodBlock. Deliberately a literal
+   count of people, not a filling bar: a bar reads as a progress/loading indicator, and
+   it smuggles scoring back in through geometry (100% looks "complete", 6% looks
+   "incomplete"). Neither is what audience size means here. One dot, one person. */
 .reframe{display:none;margin-top:20px}
 .reframe.on{display:block}
 @media(prefers-reduced-motion:no-preference){
   .reframe.on{animation:lift .44s cubic-bezier(.2,.7,.3,1) both}
   @keyframes lift{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 }
-.meter{margin:20px 0 16px}
-.meter-top{display:flex;justify-content:space-between;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;color:var(--ink-faint);margin-bottom:7px}
-.meter-top b{color:var(--ink);font-weight:700}
-.track{height:9px;background:var(--chat);border-radius:99px;overflow:hidden}
-.fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--orange));transition:width .75s cubic-bezier(.2,.7,.3,1)}
-@media(prefers-reduced-motion:reduce){.fill{transition:none}}
-.meter-scale{display:flex;justify-content:space-between;font-family:Verdana,Geneva,sans-serif;font-size:9.5px;color:var(--ink-faint);margin-top:6px}
+.aud{margin:20px 0 16px}
+.aud-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;color:var(--ink-faint);margin-bottom:10px}
+.aud-top b{color:var(--ink);font-weight:700;white-space:nowrap}
+.dots{display:flex;flex-wrap:wrap;gap:5px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--teal);opacity:0;animation:dot-in .18s ease-out forwards}
+@keyframes dot-in{to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.dot{animation:none;opacity:1}}
 
-.reframe-inner{background:var(--teal-wash);border-radius:16px;padding:19px;display:flex;gap:14px}
-.jodi{flex:0 0 40px;height:40px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:18px;font-weight:700}
+.reframe-inner{background:var(--teal-wash);border-radius:16px;padding:19px;display:flex;gap:16px}
+.jodi{flex:0 0 56px;width:56px;height:56px;border-radius:50%;background:var(--teal);object-fit:cover;display:block}
 .jodi-label{font-family:Verdana,Geneva,sans-serif;font-size:10.5px;color:var(--teal-deep);margin:0 0 6px;font-weight:700}
 .reframe p.body{margin:0 0 13px;font-size:14.5px;line-height:1.66;color:var(--ink)}
 .swap{font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--teal-deep);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
@@ -143,9 +146,14 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:700;margin:0;line-height:1.06;let
 
 /* proof */
 .proof{background:var(--surface);padding:76px 0;border-radius:44px 44px 0 0}
-.proof-head{max-width:23ch;margin:0 0 20px}
+/* Two columns. The old single-column head capped the h2 at 23ch, which is ~460px of a
+   1130px row - it ran six lines and left two thirds of the row empty. The column now
+   sets the measure and Jodi occupies the space that was dead. */
+.proof-top{display:grid;grid-template-columns:1.3fr 1fr;gap:64px;align-items:center;margin-bottom:52px}
+.proof-head{max-width:none;margin:0 0 20px}
 .proof-head h2{font-size:clamp(30px,3.4vw,42px)}
-.proof-note{font-family:Verdana,Geneva,sans-serif;font-size:14.5px;color:var(--ink-soft);max-width:58ch;margin:0 0 52px;line-height:1.65}
+.proof-jodi{width:100%;max-width:340px;height:auto;justify-self:center;display:block}
+.proof-note{font-family:Verdana,Geneva,sans-serif;font-size:14.5px;color:var(--ink-soft);max-width:58ch;margin:0;line-height:1.65}
 .proof-note b{color:var(--teal-deep)}
 .three{display:grid;grid-template-columns:repeat(3,1fr);gap:52px}
 .three h3{font-size:19px;color:var(--teal-deep);margin-bottom:11px;letter-spacing:-.02em}
@@ -173,6 +181,11 @@ footer{background:var(--surface);padding:0 0 44px}
 .social svg{width:15px;height:15px;fill:var(--teal-deep)}
 .legal{border-top:1px solid var(--hairline);margin-top:32px;padding-top:20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:Verdana,Geneva,sans-serif;font-size:11.5px;color:var(--ink-faint)}
 .legal a{display:inline;color:var(--ink-faint);margin-left:20px;font-size:11.5px}
+
+@media(max-width:900px){
+  .proof-top{grid-template-columns:1fr;gap:30px;margin-bottom:44px}
+  .proof-jodi{order:-1;max-width:200px}
+}
 
 @media(max-width:960px){
   .hero .wrap{grid-template-columns:1fr;gap:46px}
@@ -245,15 +258,16 @@ footer{background:var(--surface);padding:0 0 44px}
           <button class="choice" data-c="c"><span class="key" aria-hidden="true">C</span><span>Message Marcus privately before doing anything public.</span></button>
         </div>
 
-        <div class="meter" id="meter" hidden>
-          <div class="meter-top"><span>Who can see this</span><b id="mlabel">—</b></div>
-          <div class="track"><span class="fill" id="mfill"></span></div>
-          <div class="meter-scale"><span>Just Marcus</span><span>The whole channel</span></div>
+        <div class="aud" id="aud" hidden>
+          <div class="aud-top"><span>Who can see this</span><b id="mlabel">—</b></div>
+          <!-- The dots restate the count beside them, so they are decorative to a
+               screen reader; the label carries the meaning. -->
+          <div class="dots" id="dots" aria-hidden="true"></div>
         </div>
 
         <div class="reframe on" id="reframe">
           <div class="reframe-inner">
-            <div class="jodi" aria-hidden="true">J</div>
+            <img class="jodi" id="jodi-av" src="/assets/jodi/jodi-neutral.svg" alt="" width="400" height="400">
             <div>
               <p class="jodi-label">Jodi · she teaches every lesson</p>
               <p class="body" id="said">Well hey there. Pick whichever reaction you'd honestly have — not the one that sounds best — and I'll show you what it sets off. Nothing here gets marked wrong.</p>
@@ -270,8 +284,13 @@ footer{background:var(--surface);padding:0 0 44px}
 
 <section class="proof">
   <div class="wrap">
-    <div class="proof-head"><h2>Most lessons test what a student already knows.</h2></div>
-    <p class="proof-note">Ours explain the thing nobody told them. Each lesson is a <b>GoodBlock™</b> — one self-contained interactive lab a student finishes in a sitting. Seven are live.</p>
+    <div class="proof-top">
+      <div>
+        <div class="proof-head"><h2>Most lessons test what a student already knows.</h2></div>
+        <p class="proof-note">Ours explain the thing nobody told them. Each lesson is a <b>GoodBlock™</b> — one self-contained interactive lab a student finishes in a sitting. Seven are live.</p>
+      </div>
+      <img class="proof-jodi" src="/assets/jodi/jodi-neutral.svg" alt="Jodi, the teacher who appears inside every GoodBlock" width="400" height="400">
+    </div>
     <div class="three">
       <div>
         <div class="rule" aria-hidden="true"></div>
@@ -342,22 +361,40 @@ footer{background:var(--surface);padding:0 0 44px}
    Jodi's voice, matched to the shipped lesson. The mechanism is audience size.
    No option is the right one and none of these lines say otherwise. */
 var CASES={
-  a:{p:100,label:'41 people',
+  a:{n:41,label:'41 people',
      text:"Alright, watch what just happened to Marcus. Forty-one people are looking at him. He's not weighing your point anymore \u2014 he's working out how not to look small in front of a crowd. That's the Audience Effect, and it fires whether you're right or not. The room decides what he's able to hear."},
-  b:{p:32,label:'Your friends',
+  b:{n:5,label:'5 friends',
      text:"So notice nothing's actually reached Marcus yet. The story's moving, it's just moving sideways. Here's what that sets up: when it does get back to him \u2014 and it will \u2014 he learns that five other people knew before he did. That's a different conversation than the one you were about to have."},
-  c:{p:6,label:'One person',
+  c:{n:1,label:'1 person',
      text:"One person, nobody watching. Marcus can just fix the slide, because backing down doesn't cost him anything in here. Now, don't confuse private with soft \u2014 same words, same ask. You just moved the room out of the way first."}
 };
 var choices=document.getElementById('choices'),
     reframe=document.getElementById('reframe'),
-    meter=document.getElementById('meter'),
+    aud=document.getElementById('aud'),
+    dots=document.getElementById('dots'),
+    jodiAv=document.getElementById('jodi-av'),
     said=document.getElementById('said'),
     swap=document.getElementById('swap'),
-    mfill=document.getElementById('mfill'),
     mlabel=document.getElementById('mlabel'),
     btns=choices.querySelectorAll('.choice'),
     order=['a','b','c'];
+
+/* One dot per person who can see it. Dots fade in on a stagger tight enough that the
+   whole group lands under 500ms even at 41 - it should read as a crowd arriving, never
+   as something filling up. prefers-reduced-motion drops the animation in CSS. */
+function drawDots(n){
+  dots.innerHTML='';
+  var DUR=180, BUDGET=480;
+  var step=n>1?Math.min(12,(BUDGET-DUR)/(n-1)):0;
+  var frag=document.createDocumentFragment();
+  for(var i=0;i<n;i++){
+    var d=document.createElement('span');
+    d.className='dot';
+    d.style.animationDelay=Math.round(i*step)+'ms';
+    frag.appendChild(d);
+  }
+  dots.appendChild(frag);
+}
 
 function answer(k){
   var d=CASES[k];
@@ -369,13 +406,13 @@ function answer(k){
   choices.classList.add('done');
   said.textContent=d.text;
   mlabel.textContent=d.label;
-  meter.hidden=false;
+  aud.hidden=false;
+  drawDots(d.n);
+  jodiAv.src='/assets/jodi/jodi-thinking.svg';
   swap.hidden=false;
   reframe.classList.remove('on');
   void reframe.offsetWidth;
   reframe.classList.add('on');
-  mfill.style.width='0%';
-  setTimeout(function(){mfill.style.width=d.p+'%'},60);
   var i=order.indexOf(k);
   swap.dataset.next=order[(i+1)%order.length];
 }
