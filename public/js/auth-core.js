@@ -74,9 +74,14 @@ document.addEventListener('click', markActivity, { passive: true });
 // check still runs through identity-gate.js and firestore.rules. Worst case it is stale,
 // someone lands on the wrong page, and one click fixes it.
 //
-// Set only when a session is *identified*: a real 13+ account, or a Learner Recruit with
-// a Recruit Code on file. A plain anonymous guest deliberately does not get it — a guest
-// visiting / belongs on the marketing page, not the dashboard.
+// Set whenever a session RESOLVES, anonymous included. It answers "does this browser have
+// a session at all", not "is this person identified" — the marketing homepage is for
+// visitors with none. A guest who finished a GoodBlock has progress of their own to look
+// at, so bouncing them off /dashboard/ was hiding their own work from them.
+//
+// Identity is a separate question and is still asked separately: Task Force setup, the
+// roster and the insider portal all go through ensureIdentified() (or, for the roster,
+// firestore.rules), and none of them accept an anonymous session.
 const SIGNED_IN_KEY = 'ag_signed_in';
 
 function markSignedIn() {
@@ -164,17 +169,23 @@ async function recordContinuityEntry(moduleSlug, key, value) {
 async function silentSignIn() {
     const cred = await signInAnonymously(auth);
     const user = cred.user;
-    const nickname = randomNickname();
-
-    await updateProfile(user, { displayName: nickname });
 
     const ref = userRef(user.uid);
     const existing = await getDoc(ref);
     const existingData = existing.exists() ? existing.data() : null;
     const role = (existingData && existingData.role) ? existingData.role : 'student';
 
+    // Don't rename someone who already has a name. signInAnonymously() returns the
+    // EXISTING anonymous user when there is one, so a student arriving here straight from
+    // a GoodBlock is the same uid that just earned a passphrase name — overwriting it with
+    // a fresh random nickname made the dashboard disown the run they had just finished.
+    const nickname = (existingData && existingData.displayName) || user.displayName || randomNickname();
+    if (user.displayName !== nickname) {
+        try { await updateProfile(user, { displayName: nickname }); } catch (e) { console.error('[AuthCore] updateProfile failed', e); }
+    }
+
     const payload = {
-        displayName: (existingData && existingData.displayName) || nickname,
+        displayName: nickname,
         email: null,
         isGuest: true,
         role,
@@ -183,6 +194,7 @@ async function silentSignIn() {
     if (existingData && existingData.classroomCode) payload.classroomCode = existingData.classroomCode;
 
     await setDoc(ref, payload, { merge: true });
+    markSignedIn();
     return user;
 }
 
@@ -299,6 +311,10 @@ async function guestStart() {
     if (!user) {
         user = (await signInAnonymously(auth)).user;
     }
+
+    // A session exists from here on, so the routing flag goes up now — before any
+    // Firestore write that could fail and strand the student on the marketing page.
+    markSignedIn();
 
     const account = await getAccount(user.uid);
     if (!user.isAnonymous || account.recruitCode) {

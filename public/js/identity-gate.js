@@ -149,19 +149,22 @@ const TEMPLATE = `
             <button id="ag-btn-recruit-continue" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Let's Go!</button>
         </div>
 
-        <!-- SAVE / CLAIM: the guest-first end-of-module prompt. Never shown before a
-             completion screen and never blocking one — declining hides nothing. -->
+        <!-- SAVE / CLAIM: the end-of-module offer, in Jodi's voice. It is an offer to keep
+             the run, not a demand to sign in — so it names what the student would lose
+             rather than what the product wants. Shown only once the completion reveal is on
+             screen (each module calls offerSave() from revealCompletion()), and "Not now" is
+             a real, full-width control: declining leaves the completion screen untouched. -->
         <div id="ag-save" class="hidden">
-            <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Want to keep this?</h2>
-            <p class="text-gray-500 text-xs mb-4 font-body leading-relaxed">You've been <strong id="ag-save-name" class="text-allgood-secondary"></strong> this whole time. Save it and your progress comes back next time &mdash; on this device or any other.</p>
+            <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Nice work.</h2>
+            <p class="text-gray-500 text-xs mb-5 font-body leading-relaxed">Want me to hang onto this? You're <strong id="ag-save-name" class="text-allgood-secondary"></strong> right now &mdash; save it and that sticks around, on this device or any other.</p>
             <p id="ag-save-error" class="text-red-500 text-xs mb-2 hidden font-body"></p>
             <button id="ag-btn-save-13plus" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase mb-3">
-                I'm 13 or older &mdash; Sign In
+                I'm 13 or older &mdash; Save it
             </button>
-            <button id="ag-btn-save-under13" class="w-full bg-white border-2 border-allgood-secondary text-allgood-secondary hover:bg-allgood-secondary hover:text-white font-bold py-3 rounded shadow-sm transition-all font-body uppercase mb-4">
-                I'm younger than 13 &mdash; Save My Code
+            <button id="ag-btn-save-under13" class="w-full bg-white border-2 border-allgood-secondary text-allgood-secondary hover:bg-allgood-secondary hover:text-white font-bold py-3 rounded shadow-sm transition-all font-body uppercase mb-3">
+                I'm younger than 13 &mdash; Save it
             </button>
-            <button id="ag-btn-save-decline" class="text-xs text-gray-400 hover:text-gray-600 font-bold uppercase font-body">No thanks &mdash; I'm done</button>
+            <button id="ag-btn-save-decline" class="w-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-allgood-dark font-bold py-2.5 rounded text-xs uppercase font-body transition-colors">Not now</button>
         </div>
 
         <!-- REDEEM: entering an existing Recruit Code, either from the root link or a
@@ -540,8 +543,11 @@ async function startGuestSession(options) {
     return result;
 }
 
-// The end-of-module offer. Called AFTER the completion screen has rendered, never
-// before it and never as a condition of it — declining hides nothing.
+// The end-of-module offer. Each module calls this from its own revealCompletion(), i.e.
+// once the badge and next steps are actually on screen — never on a timer racing the
+// reveal, and never as a condition of it. The rating is optional and this does not depend
+// on it: a student who skips the stars still reaches the reveal and still gets the offer.
+// Declining hides nothing.
 async function offerSave(options) {
     const opts = options || {};
     const user = window.AuthCore.auth.currentUser || await window.AuthCore.waitForAuthReady();
