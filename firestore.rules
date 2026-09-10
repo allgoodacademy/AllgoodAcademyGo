@@ -35,6 +35,23 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(code)).data.teacherUid == uid;
     }
 
+    // Is the owner of this telemetry session a student in a classroom this uid teaches?
+    // Same pivot as classroomOwnedBy above and rules #4/#6: authorization comes from the
+    // CLASSROOM document, never from role/classroomCode on the requester's own profile,
+    // which #2 lets them write. Guarded with a shape check and exists() before get() for the
+    // same reason classroomOwnedBy is — rules do not reliably short-circuit, so a malformed
+    // or absent uid must fail a well-formed check rather than raise an evaluation error.
+    function sessionOwnerIsMyStudent(appId, uid, teacherUid) {
+      return uid is string
+        && uid != NONE()
+        && uid.matches('^[A-Za-z0-9_-]{1,128}$')
+        && exists(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid))
+        && get(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid)).data.get('role', NONE()) == 'student'
+        && classroomOwnedBy(appId,
+             get(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid)).data.get('classroomCode', NONE()),
+             teacherUid);
+    }
+
     // A classroom code the client may legitimately move to: unchanged, cleared, or one
     // that actually exists (join-by-code — knowing the code is the trust model, as in #5).
     function classroomCodeOk(appId, priorCode) {
@@ -198,6 +215,26 @@ service cloud.firestore {
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == resource.data.uid;
       allow read, delete: if isAllowlistedAdmin();
+    }
+
+    // 10b. NEW — Mission Control (public/mission-control/) is a teacher's own view of their
+    //      own Task Force, and time-on-task is the one figure it cannot source anywhere else:
+    //      activeMs exists only on a session document. game_scores and module_progress cover
+    //      completion and position, but neither records how long anyone actually spent.
+    //      Read-only, and scoped to students in a classroom this uid demonstrably teaches —
+    //      the same boundary rule #6 already draws around those students' subcollections, so
+    //      this exposes no learner a teacher could not already see.
+    //
+    //      Mission Control queries this ONE UID AT A TIME (where('uid','==',studentUid)), and
+    //      that is load-bearing rather than a style choice. Rules allow at most 10 document
+    //      access calls per query and the lookups below are cached per distinct path within a
+    //      request, so a query pinned to a single uid resolves the same two paths for every
+    //      document it returns and costs 2. A classroom-wide query would need a fresh user
+    //      lookup per document and would start failing once a classroom passed a handful of
+    //      students — quietly, and only in the classrooms big enough to hit it.
+    match /artifacts/{appId}/sessions/{sessionId} {
+      allow read: if request.auth != null
+        && sessionOwnerIsMyStudent(appId, resource.data.get('uid', NONE()), request.auth.uid);
     }
 
     // 11. NEW — Telemetry events (append-only stream: module_open, step, choice,

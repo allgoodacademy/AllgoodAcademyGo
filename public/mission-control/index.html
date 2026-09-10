@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission Control — Allgood Academy</title>
+<link rel="icon" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0A0F1E;
+    --navy-mid: #111827;
+    --navy-surface: #1A2235;
+    --navy-raised: #1F2D44;
+    --navy-border: #243048;
+    --teal: #00D4B8;
+    --teal-glow: rgba(0, 212, 184, 0.12);
+    --amber: #F59E0B;
+    --amber-glow: rgba(245, 158, 11, 0.15);
+    --rose: #F43F5E;
+    --rose-glow: rgba(244, 63, 94, 0.15);
+    --green: #10B981;
+    --green-glow: rgba(16, 185, 129, 0.15);
+    --text-primary: #E8EDF5;
+    --text-secondary: #8B9AB8;
+    --text-muted: #4E607A;
+    --sidebar-w: 280px;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--navy);
+    color: var(--text-primary);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    min-height: 56px;
+    background: var(--navy-mid);
+    border-bottom: 1px solid var(--navy-border);
+    display: flex;
+    align-items: center;
+    padding: 8px 20px;
+    gap: 16px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; }
+  .brand-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--teal); box-shadow: 0 0 10px var(--teal);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--teal); }
+    50% { opacity: 0.6; box-shadow: 0 0 14px var(--teal); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .brand-dot, .live-dot { animation: none; }
+  }
+  .brand-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.18em; color: var(--teal);
+  }
+  .brand-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-muted); letter-spacing: 0.08em;
+  }
+  .topbar-divider { width: 1px; height: 28px; background: var(--navy-border); margin: 0 4px; }
+  .topbar-classroom {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px; font-weight: 600; color: var(--text-primary);
+  }
+  .topbar-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-muted);
+    background: var(--navy-surface); border: 1px solid var(--navy-border);
+    padding: 2px 8px; border-radius: 4px;
+  }
+  .topbar-stats { margin-left: auto; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+  .tstat { text-align: right; }
+  .tstat-val {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px; font-weight: 700; color: var(--text-primary); line-height: 1;
+  }
+  .tstat-val.teal { color: var(--teal); }
+  .tstat-val.amber { color: var(--amber); }
+  .tstat-val.rose { color: var(--rose); }
+  .tstat-label { font-size: 10px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
+  .topbar-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-muted);
+    border-left: 1px solid var(--navy-border); padding-left: 16px;
+  }
+  .topbar-exit {
+    background: none; border: 1px solid var(--navy-border); color: var(--text-muted);
+    font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.06em; padding: 5px 10px; border-radius: 5px; cursor: pointer;
+  }
+  .topbar-exit:hover { color: var(--text-primary); border-color: var(--text-muted); }
+
+  /* ── BODY LAYOUT ── */
+  .layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--navy-mid);
+    border-right: 1px solid var(--navy-border);
+    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+  }
+  .sidebar-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--navy-border); }
+  .sidebar-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    letter-spacing: 0.1em; margin-bottom: 8px;
+  }
+  .sidebar-search {
+    width: 100%; background: var(--navy-surface);
+    border: 1px solid var(--navy-border); border-radius: 6px;
+    padding: 6px 10px; font-size: 12px; color: var(--text-primary);
+    font-family: 'Inter', sans-serif; outline: none;
+  }
+  .sidebar-search::placeholder { color: var(--text-muted); }
+  .sidebar-search:focus { border-color: var(--teal); }
+
+  .roster { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .roster::-webkit-scrollbar, .detail-body::-webkit-scrollbar, .overview-panel::-webkit-scrollbar { width: 4px; }
+  .roster::-webkit-scrollbar-track, .detail-body::-webkit-scrollbar-track, .overview-panel::-webkit-scrollbar-track { background: transparent; }
+  .roster::-webkit-scrollbar-thumb, .detail-body::-webkit-scrollbar-thumb, .overview-panel::-webkit-scrollbar-thumb { background: var(--navy-border); border-radius: 2px; }
+
+  .roster-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px; cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.12s, border-color 0.12s;
+    width: 100%; background: none; border-top: 0; border-right: 0; border-bottom: 0;
+    text-align: left; font: inherit; color: inherit;
+  }
+  .roster-item:hover { background: var(--navy-surface); }
+  .roster-item.active { background: var(--teal-glow); border-left-color: var(--teal); }
+  .roster-item:focus-visible, .ov-card:focus-visible, .module-card-header:focus-visible {
+    outline: 2px solid var(--teal); outline-offset: -2px;
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .roster-info { flex: 1; min-width: 0; }
+  .roster-name {
+    font-size: 13px; font-weight: 500; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1; margin-bottom: 3px;
+  }
+  .roster-meta { display: flex; align-items: center; gap: 6px; }
+  .mini-bar { flex: 1; height: 3px; background: var(--navy-border); border-radius: 2px; overflow: hidden; }
+  .mini-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .roster-pct { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── MAIN PANEL ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+  .main-toolbar {
+    display: flex; align-items: center; padding: 10px 24px;
+    border-bottom: 1px solid var(--navy-border);
+    gap: 12px; flex-shrink: 0; background: var(--navy-mid); flex-wrap: wrap;
+  }
+  .toolbar-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 600; color: var(--text-secondary); flex: 1;
+  }
+  .toolbar-title span { color: var(--text-primary); }
+  .view-tabs {
+    display: flex; background: var(--navy-surface); border-radius: 7px;
+    padding: 3px; border: 1px solid var(--navy-border);
+    width: fit-content; margin-left: auto; flex-shrink: 0;
+  }
+  .view-tab {
+    padding: 5px 14px; border-radius: 5px; font-size: 11px;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+    color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+    letter-spacing: 0.03em; background: none; border: none;
+  }
+  .view-tab.active { background: var(--navy-raised); color: var(--teal); }
+
+  /* ── OVERVIEW ── */
+  .overview-panel { display: none; flex: 1; overflow-y: auto; padding: 20px 24px; gap: 16px; flex-direction: column; }
+  .overview-panel.visible { display: flex; }
+  .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .ov-card {
+    background: var(--navy-surface); border: 1px solid var(--navy-border);
+    border-radius: 10px; padding: 14px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: left; font: inherit; color: inherit; width: 100%;
+  }
+  .ov-card:hover { border-color: var(--teal); background: var(--teal-glow); }
+  .ov-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .ov-name {
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600;
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ov-modules { display: flex; flex-direction: column; gap: 5px; }
+  .ov-mod-row { display: flex; align-items: center; gap: 7px; }
+  .ov-mod-bar { flex: 1; height: 3px; background: var(--navy-border); border-radius: 2px; overflow: hidden; }
+  .ov-mod-fill { height: 100%; border-radius: 2px; }
+  .ov-mod-pct { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); width: 26px; text-align: right; }
+
+  /* ── DETAIL ── */
+  .detail { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+  .detail.visible { display: flex; }
+  .detail-header {
+    padding: 18px 24px 14px; border-bottom: 1px solid var(--navy-border);
+    display: flex; align-items: center; gap: 14px;
+    background: var(--navy-mid); flex-shrink: 0; flex-wrap: wrap;
+  }
+  .detail-avatar {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700;
+  }
+  .detail-name { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .detail-meta { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .dmeta { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-secondary); }
+  .dmeta-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .detail-quickstats { margin-left: auto; display: flex; gap: 12px; flex-wrap: wrap; }
+  .qstat {
+    text-align: center; padding: 6px 14px; background: var(--navy-surface);
+    border: 1px solid var(--navy-border); border-radius: 8px;
+  }
+  .qstat-val { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; line-height: 1; }
+  .qstat-label { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+  .detail-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* Module card */
+  .module-card { background: var(--navy-surface); border: 1px solid var(--navy-border); border-radius: 10px; overflow: hidden; }
+  .module-card-header {
+    padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+    cursor: pointer; user-select: none; transition: background 0.12s;
+    width: 100%; background: none; border: none; text-align: left; font: inherit; color: inherit;
+  }
+  .module-card-header:hover { background: var(--navy-raised); }
+  .module-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .module-name { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
+  .module-status-pill {
+    font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 20px;
+    font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.03em;
+    flex-shrink: 0; white-space: nowrap;
+  }
+  .pill-done { background: var(--green-glow); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+  .pill-progress { background: var(--teal-glow); color: var(--teal); border: 1px solid rgba(0,212,184,0.3); }
+  .pill-not-started { background: rgba(139,154,184,0.1); color: var(--text-muted); border: 1px solid var(--navy-border); }
+
+  .module-progress-row { display: flex; align-items: center; gap: 10px; padding: 0 16px 14px; }
+  .module-progress-bar { flex: 1; height: 4px; background: var(--navy-border); border-radius: 2px; overflow: hidden; }
+  .module-progress-fill { height: 100%; border-radius: 2px; }
+  .module-progress-txt {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); flex-shrink: 0; width: 36px; text-align: right;
+  }
+  .module-chevron { font-size: 12px; color: var(--text-muted); transition: transform 0.2s; margin-left: 4px; flex-shrink: 0; }
+  .module-card.expanded .module-chevron { transform: rotate(90deg); }
+
+  /* Drill-down */
+  .module-steps {
+    display: none; border-top: 1px solid var(--navy-border);
+    padding: 12px 16px 16px; background: var(--navy);
+    flex-direction: column; gap: 8px;
+  }
+  .module-card.expanded .module-steps { display: flex; }
+  .steps-label {
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+    letter-spacing: 0.08em; margin-bottom: 4px; font-family: 'Space Grotesk', sans-serif;
+  }
+  .step-row {
+    display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px;
+    background: var(--navy-surface); border: 1px solid var(--navy-border); border-radius: 7px;
+  }
+  .step-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-muted); padding-top: 2px; flex-shrink: 0; width: 22px;
+  }
+  .step-content { flex: 1; min-width: 0; }
+  .step-title { font-size: 12px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; line-height: 1.35; }
+  .step-choice {
+    display: flex; align-items: baseline; gap: 6px; font-size: 11px;
+    color: var(--text-secondary); background: var(--navy-mid);
+    border: 1px solid var(--navy-border); border-radius: 4px;
+    padding: 4px 8px; margin-top: 4px; flex-wrap: wrap;
+  }
+  .choice-label {
+    font-family: 'Space Grotesk', sans-serif; font-size: 9px; font-weight: 600;
+    color: var(--text-muted); letter-spacing: 0.06em; flex-shrink: 0;
+  }
+  .step-score { font-family: 'JetBrains Mono', monospace; font-size: 11px; flex-shrink: 0; padding-top: 1px; }
+  .step-indicator { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+  .step-pending { border: 1px dashed var(--navy-border); background: transparent; }
+  .step-not-reached { opacity: 0.5; }
+  .step-not-reached .step-title { color: var(--text-muted); }
+  .current-marker { font-size: 9px; color: var(--teal); font-family: 'Space Grotesk', sans-serif; }
+  .replay-tag {
+    font-size: 9px; color: var(--amber); font-family: 'Space Grotesk', sans-serif;
+    border: 1px solid rgba(245,158,11,0.3); border-radius: 3px; padding: 0 4px;
+  }
+
+  .time-on-task {
+    display: flex; align-items: center; gap: 6px; margin-top: 10px;
+    padding: 8px 12px; background: var(--navy-surface);
+    border: 1px solid var(--navy-border); border-radius: 7px;
+    font-size: 12px; color: var(--text-secondary); flex-wrap: wrap;
+  }
+  .tot-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+  /* Banners */
+  .alert-banner {
+    margin: 14px 24px 0; padding: 10px 14px; border-radius: 8px;
+    font-size: 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .alert-amber { background: var(--amber-glow); border: 1px solid rgba(245,158,11,0.3); color: var(--amber); }
+  .alert-rose { background: var(--rose-glow); border: 1px solid rgba(244,63,94,0.3); color: var(--rose); }
+  .alert-green { background: var(--green-glow); border: 1px solid rgba(16,185,129,0.3); color: var(--green); }
+
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--green-glow); border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 20px; padding: 2px 8px; font-size: 10px; font-weight: 600;
+    color: var(--green); font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.05em;
+  }
+  .live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
+
+  /* Full-screen states */
+  .screen {
+    position: fixed; inset: 0; background: var(--navy); z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; text-align: center;
+  }
+  .screen[hidden] { display: none; }
+  .screen-title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; color: var(--text-primary); }
+  .screen-body { font-size: 13px; color: var(--text-secondary); max-width: 460px; line-height: 1.6; }
+  .screen-link {
+    color: var(--navy); background: var(--teal); text-decoration: none;
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700;
+    padding: 9px 18px; border-radius: 20px; letter-spacing: 0.04em;
+  }
+  .spinner {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--navy-border); border-top-color: var(--teal);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-note { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; line-height: 1.7; }
+  .degraded {
+    margin: 0 24px 16px; padding: 9px 12px; border-radius: 7px;
+    background: rgba(139,154,184,0.08); border: 1px solid var(--navy-border);
+    color: var(--text-muted); font-size: 11px; line-height: 1.6;
+  }
+
+  @media (max-width: 820px) {
+    body { overflow: auto; height: auto; min-height: 100vh; }
+    .layout { flex-direction: column; overflow: visible; }
+    .sidebar { width: 100%; max-height: 240px; border-right: none; border-bottom: 1px solid var(--navy-border); }
+    .main { overflow: visible; }
+    .detail-quickstats { margin-left: 0; }
+    .topbar-stats { margin-left: 0; width: 100%; justify-content: space-between; gap: 12px; }
+    .topbar-time { border-left: none; padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading / gate / error states sit above everything until the roster is ready. -->
+<div class="screen" id="screen-loading">
+  <div class="spinner"></div>
+  <div class="screen-body" id="loading-note">Contacting Mission Control…</div>
+</div>
+
+<div class="screen" id="screen-gate" hidden>
+  <div class="brand-label">MISSION CONTROL</div>
+  <div class="screen-title" id="gate-title">Teachers only</div>
+  <div class="screen-body" id="gate-body"></div>
+  <a class="screen-link" id="gate-link" href="/dashboard/">Go to the dashboard</a>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-dot"></div>
+    <div>
+      <div class="brand-label">MISSION CONTROL</div>
+      <div class="brand-sub">Allgood Academy · Teacher View</div>
+    </div>
+  </div>
+  <div class="topbar-divider"></div>
+  <div>
+    <div class="topbar-classroom" id="classroom-name">—</div>
+  </div>
+  <div class="topbar-code" id="classroom-code">—</div>
+
+  <div class="topbar-stats">
+    <div class="tstat">
+      <div class="tstat-val teal" id="stat-active">—</div>
+      <div class="tstat-label">active this week</div>
+    </div>
+    <div class="tstat">
+      <div class="tstat-val amber" id="stat-behind">—</div>
+      <div class="tstat-label">need attention</div>
+    </div>
+    <div class="tstat">
+      <div class="tstat-val rose" id="stat-risk">—</div>
+      <div class="tstat-label">at risk</div>
+    </div>
+    <div class="tstat">
+      <div class="tstat-val" id="stat-avg">—</div>
+      <div class="tstat-label">class avg score</div>
+    </div>
+  </div>
+  <div class="topbar-time" id="clock">—</div>
+  <button class="topbar-exit" onclick="window.location.href='/dashboard/'">EXIT</button>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title" id="sidebar-title">AGENTS</div>
+      <input class="sidebar-search" id="roster-filter" type="text" placeholder="Search agents..." aria-label="Search agents">
+    </div>
+    <div class="roster" id="roster"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="main-toolbar">
+      <div class="toolbar-title" id="toolbar-title"><span>Class overview</span></div>
+      <div class="view-tabs">
+        <button class="view-tab active" id="tab-overview" type="button">Class Overview</button>
+        <button class="view-tab" id="tab-detail" type="button">Agent Detail</button>
+      </div>
+    </div>
+
+    <div class="overview-panel visible" id="overview-panel">
+      <div id="overview-note"></div>
+      <div class="overview-grid" id="overview-grid"></div>
+    </div>
+
+    <div class="detail" id="detail-panel">
+      <div class="detail-header" id="detail-header"></div>
+      <div id="alert-slot"></div>
+      <div class="detail-body" id="detail-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Identity/init lives in auth-core.js, as on every other Allgood Academy page. -->
+<script type="module" src="/js/auth-core.js"></script>
+<script type="module">
+import {
+    doc, getDoc, getDocs, collection, query, where,
+} from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import { MODULE_DATA } from './module-data.js';
+import {
+    relativeTime, buildStudent, classAverage, countActiveThisWeek, choiceTextFor,
+} from './derive.js';
+
+const { db, appId, auth, waitForAuthReady } = window.AuthCore;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PRESENTATION ONLY. Every step title, choice label and step count comes from
+   module-data.js, which is generated from the modules themselves — see
+   scripts/build-mission-control-data.js. What lives here is the icon and colour a
+   module is drawn in, which nothing else owns.
+   ───────────────────────────────────────────────────────────────────────────── */
+const MODULE_STYLE = {
+    'ddc':                  { icon: '🎯', color: '#00D4B8' },
+    'social-intelligence':  { icon: '🧠', color: '#818CF8' },
+    'privacy-security':     { icon: '🔒', color: '#F59E0B' },
+    'professional-brand':   { icon: '💼', color: '#F43F5E' },
+    'digital-citizenship':  { icon: '🌐', color: '#10B981' },
+};
+const FALLBACK_STYLE = { icon: '📘', color: '#8B9AB8' };
+const styleFor = (id) => MODULE_STYLE[id] || FALLBACK_STYLE;
+
+// Avatar tints, picked from the uid so a student keeps the same colour between visits.
+const AVATAR_COLORS = ['#00D4B8', '#818CF8', '#F43F5E', '#F59E0B', '#10B981'];
+
+/* ── helpers ───────────────────────────────────────────────────────────────── */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+));
+
+const isToday = (ms) => !!ms && new Date(ms).toDateString() === new Date().toDateString();
+
+function colorForUid(uid) {
+    let h = 0;
+    for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
+    return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+function tint(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+const STATUS_COLOR = { 'on-track': '#10B981', 'needs-attention': '#F59E0B', 'at-risk': '#F43F5E' };
+const STATUS_LABEL = { 'on-track': 'On Track', 'needs-attention': 'Needs Attention', 'at-risk': 'At Risk' };
+const SCORE_LABEL = ['Missed', 'Fair', 'Good', 'Best'];
+const SCORE_COLOR = ['#F43F5E', '#F59E0B', '#00D4B8', '#10B981'];
+
+/* ── state ─────────────────────────────────────────────────────────────────── */
+const state = {
+    classroom: null,
+    code: null,
+    students: [],
+    assigned: [],
+    activeUid: null,
+    view: 'overview',
+    filter: '',
+    sessionsReadable: true,   // rules may deny a teacher the sessions collection — see load()
+    expanded: {},             // moduleId -> bool, so a card stays open across re-renders
+};
+
+/* ── clock ─────────────────────────────────────────────────────────────────── */
+const clockEl = document.getElementById('clock');
+function tickClock() {
+    clockEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+/* ── loading ───────────────────────────────────────────────────────────────── */
+function showGate(title, body, linkText, linkHref) {
+    document.getElementById('screen-loading').hidden = true;
+    document.getElementById('gate-title').textContent = title;
+    document.getElementById('gate-body').textContent = body;
+    const link = document.getElementById('gate-link');
+    link.textContent = linkText;
+    link.href = linkHref;
+    document.getElementById('screen-gate').hidden = false;
+}
+
+/* Reads everything Mission Control shows, for one classroom.
+
+   Firestore rules decide what a teacher may see, and they are not uniform:
+     - the roster (users where classroomCode == code, role == student) is rule #4
+     - a student's game_scores / scenario_attempts / module_progress are rule #6
+     - the sessions collection is rule #10, which is ADMIN-ONLY today
+   The last one is why every session read is wrapped and a denial degrades instead of
+   failing: without it there is no activeMs, so "time on task" cannot be shown, but every
+   other number here has a second source (module_progress and game_scores both carry
+   lastUpdated) and the dashboard stays useful. */
+async function load() {
+    const user = await waitForAuthReady();
+    if (!user) {
+        showGate('Sign in first', 'Mission Control reads your Task Force roster, so it needs to know who you are.', 'Go to the dashboard', '/dashboard/');
+        return;
+    }
+
+    const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+    const me = meSnap.exists() ? meSnap.data() : {};
+    if (me.role !== 'teacher' || !me.classroomCode) {
+        showGate(
+            'Teachers only',
+            'Mission Control shows a Task Force roster and every agent’s progress in it. Your account isn’t set up as a teacher with a Task Force yet — you can create one from the dashboard.',
+            'Go to the dashboard', '/dashboard/',
+        );
+        return;
+    }
+
+    state.code = me.classroomCode;
+    const classSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', state.code));
+    state.classroom = classSnap.exists() ? classSnap.data() : {};
+    state.assigned = (state.classroom.assignedModules || []).filter((id) => MODULE_DATA[id]);
+
+    document.getElementById('classroom-name').textContent = state.classroom.teacherName
+        ? `${state.classroom.teacherName} — Task Force`
+        : 'Task Force';
+    document.getElementById('classroom-code').textContent = state.code;
+
+    document.getElementById('loading-note').textContent = 'Loading your roster…';
+    const studentsSnap = await getDocs(query(
+        collection(db, 'artifacts', appId, 'users'),
+        where('classroomCode', '==', state.code),
+        where('role', '==', 'student'),
+    ));
+
+    const rows = studentsSnap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+    document.getElementById('loading-note').textContent = `Reading progress for ${rows.length} agent${rows.length === 1 ? '' : 's'}…`;
+
+    state.students = await Promise.all(rows.map(loadStudent));
+    state.students.sort((a, b) => a.name.localeCompare(b.name));
+
+    document.getElementById('screen-loading').hidden = true;
+    renderAll();
+}
+
+async function loadStudent(row) {
+    const base = collection(db, 'artifacts', appId, 'users', row.uid, 'game_scores');
+
+    const [scoreSnap, progressSnap, sessions] = await Promise.all([
+        getDocs(base).catch(() => null),
+        getDocs(collection(db, 'artifacts', appId, 'users', row.uid, 'module_progress')).catch(() => null),
+        readSessions(row.uid),
+    ]);
+
+    const scores = scoreSnap ? scoreSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
+
+    // scenario_attempts hangs off each game_scores document. Reading them all up front keeps
+    // the drill-down instant when a teacher expands a module, at the cost of one read per
+    // visit a student has made.
+    const attempts = [];
+    if (scoreSnap) {
+        await Promise.all(scoreSnap.docs.map(async (sd) => {
+            try {
+                const aSnap = await getDocs(collection(sd.ref, 'scenario_attempts'));
+                aSnap.docs.forEach((a) => attempts.push({ id: a.id, scoreId: sd.id, gameName: sd.data().gameName, ...a.data() }));
+            } catch (e) { /* a visit with no attempts, or a read denied — neither is fatal */ }
+        }));
+    }
+
+    const progress = {};
+    if (progressSnap) progressSnap.docs.forEach((d) => { progress[d.id] = d.data(); });
+
+    const s = buildStudent({
+        row, assigned: state.assigned, moduleData: MODULE_DATA, scores, attempts, progress, sessions,
+    });
+    // Presentation the shaping layer deliberately has no opinion about.
+    s.color = colorForUid(row.uid);
+    s.bg = tint(s.color, 0.2);
+    return s;
+}
+
+async function readSessions(uid) {
+    // Queried per student rather than for the whole classroom at once: a rules grant for
+    // sessions has to prove the teacher owns the student's classroom, and doing that with a
+    // get() per DOCUMENT blows Firestore's ten-document-access budget on a wide query. Pinned
+    // to one uid, the same get() is cached across every row the query returns.
+    if (!state.sessionsReadable) return [];
+    try {
+        const snap = await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('uid', '==', uid)));
+        return snap.docs.map((d) => d.data());
+    } catch (e) {
+        // One denial means the grant isn't deployed; stop asking for the rest of the roster.
+        state.sessionsReadable = false;
+        return [];
+    }
+}
+
+/* ── rendering ─────────────────────────────────────────────────────────────── */
+function renderAll() {
+    // The overview is the landing view, so its heading is set here rather than only in
+    // switchView() — which does not run until a tab is actually clicked.
+    document.getElementById('toolbar-title').innerHTML =
+        `Class overview — <span>${state.students.length} agent${state.students.length === 1 ? '' : 's'}</span>`;
+    renderStats();
+    renderRoster();
+    renderOverview();
+    if (state.activeUid) renderDetail(state.activeUid);
+}
+
+function renderStats() {
+    const active = countActiveThisWeek(state.students);
+    const behind = state.students.filter((s) => s.status === 'needs-attention').length;
+    const risk = state.students.filter((s) => s.status === 'at-risk').length;
+    const avg = classAverage(state.students, state.assigned);
+
+    document.getElementById('stat-active').textContent = active;
+    document.getElementById('stat-behind').textContent = behind;
+    document.getElementById('stat-risk').textContent = risk;
+    document.getElementById('stat-avg').textContent = avg == null ? '—' : `${avg}%`;
+
+    const n = state.students.length;
+    document.getElementById('sidebar-title').textContent = `AGENTS — ${n} ENROLLED`;
+}
+
+function visibleStudents() {
+    if (!state.filter) return state.students;
+    const f = state.filter.toLowerCase();
+    return state.students.filter((s) => s.name.toLowerCase().includes(f));
+}
+
+function renderRoster() {
+    const list = visibleStudents();
+    const el = document.getElementById('roster');
+    if (!state.students.length) {
+        el.innerHTML = '<div class="empty-note">No agents have joined this Task Force yet.<br>Share your code to get started.</div>';
+        return;
+    }
+    if (!list.length) {
+        el.innerHTML = '<div class="empty-note">No agent matches that search.</div>';
+        return;
+    }
+    el.innerHTML = list.map((s) => {
+        const c = STATUS_COLOR[s.status];
+        return `<button type="button" class="roster-item${s.uid === state.activeUid ? ' active' : ''}" data-uid="${esc(s.uid)}">
+          <div class="avatar" style="background:${s.bg};color:${s.color}">${esc(s.initials)}</div>
+          <div class="roster-info">
+            <div class="roster-name">${esc(s.name)}</div>
+            <div class="roster-meta">
+              <div class="mini-bar"><div class="mini-bar-fill" style="width:${s.pct}%;background:${c}"></div></div>
+              <div class="roster-pct">${s.pct}%</div>
+            </div>
+          </div>
+          <div class="status-dot" style="background:${c}" title="${esc(STATUS_LABEL[s.status])}"></div>
+        </button>`;
+    }).join('');
+}
+
+function renderOverview() {
+    const note = document.getElementById('overview-note');
+    note.innerHTML = !state.assigned.length
+        ? '<div class="degraded">No modules are assigned to this Task Force yet, so there is no progress to show. Assign modules from the dashboard and they will appear here.</div>'
+        : (state.sessionsReadable ? '' : degradedNote());
+
+    const grid = document.getElementById('overview-grid');
+    const list = visibleStudents();
+    if (!list.length) { grid.innerHTML = ''; return; }
+
+    grid.innerHTML = list.map((s) => `
+      <button type="button" class="ov-card" data-uid="${esc(s.uid)}">
+        <div class="ov-top">
+          <div class="avatar" style="background:${s.bg};color:${s.color};width:28px;height:28px;font-size:11px;border-radius:6px">${esc(s.initials)}</div>
+          <div class="ov-name">${esc(s.name)}</div>
+          <div class="status-dot" style="background:${STATUS_COLOR[s.status]}" title="${esc(STATUS_LABEL[s.status])}"></div>
+        </div>
+        <div class="ov-modules">
+          ${state.assigned.map((id) => {
+            const m = s.modules[id];
+            const st = styleFor(id);
+            return `<div class="ov-mod-row" title="${esc(m.meta.name)}">
+              <div style="font-size:11px;flex-shrink:0" aria-hidden="true">${st.icon}</div>
+              <div class="ov-mod-bar"><div class="ov-mod-fill" style="width:${m.pct}%;background:${m.completed ? '#10B981' : st.color}"></div></div>
+              <div class="ov-mod-pct">${m.pct}%</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">Last active: ${esc(relativeTime(s.lastActive))}</div>
+      </button>`).join('');
+}
+
+function degradedNote() {
+    return '<div class="degraded"><strong>Time on task is unavailable.</strong> It comes from the telemetry <code>sessions</code> collection, which Firestore rules currently open to admins only — everything else on this page is read from each agent’s own records and is complete. Deploying the teacher read grant in firestore.rules turns these figures on.</div>';
+}
+
+function renderDetail(uid) {
+    const s = state.students.find((x) => x.uid === uid);
+    if (!s) return;
+    const c = STATUS_COLOR[s.status];
+
+    document.getElementById('toolbar-title').innerHTML = `Viewing <span>${esc(s.name)}</span>`;
+    document.getElementById('detail-header').innerHTML = `
+      <div class="detail-avatar" style="background:${s.bg};color:${s.color}">${esc(s.initials)}</div>
+      <div>
+        <div class="detail-name">${esc(s.name)}</div>
+        <div class="detail-meta">
+          <div class="dmeta"><div class="dmeta-dot" style="background:${c}"></div>${esc(STATUS_LABEL[s.status])}</div>
+          <div class="dmeta">Last active: ${esc(relativeTime(s.lastActive))}</div>
+          <div class="dmeta">${state.assigned.length} module${state.assigned.length === 1 ? '' : 's'} assigned</div>
+          ${isToday(s.lastActive) ? '<div class="live-badge"><div class="live-dot"></div>Active today</div>' : ''}
+        </div>
+      </div>
+      <div class="detail-quickstats">
+        <div class="qstat">
+          <div class="qstat-val" style="color:${c}">${s.pct}%</div>
+          <div class="qstat-label">overall</div>
+        </div>
+        <div class="qstat">
+          <div class="qstat-val">${state.sessionsReadable ? `${Math.round(s.activeMs / 60000)}m` : '—'}</div>
+          <div class="qstat-label">time on task</div>
+        </div>
+        <div class="qstat">
+          <div class="qstat-val">${s.completedCount}/${state.assigned.length}</div>
+          <div class="qstat-label">completed</div>
+        </div>
+      </div>`;
+
+    document.getElementById('alert-slot').innerHTML = alertFor(s);
+
+    const body = document.getElementById('detail-body');
+    if (!state.assigned.length) {
+        body.innerHTML = '<div class="empty-note">No modules are assigned to this Task Force yet.</div>';
+        return;
+    }
+    body.innerHTML = (state.sessionsReadable ? '' : degradedNote())
+        + state.assigned.map((id) => moduleCard(s, s.modules[id])).join('');
+}
+
+function alertFor(s) {
+    if (s.status === 'at-risk') {
+        return `<div class="alert-banner alert-rose">⚠ At risk — ${esc(s.lastActive ? `nothing since ${relativeTime(s.lastActive)}` : 'has never opened an assigned module')}. Worth a direct check-in.</div>`;
+    }
+    if (s.status === 'needs-attention') {
+        const stuck = state.assigned.map((id) => s.modules[id]).find((m) => !m.completed);
+        return `<div class="alert-banner alert-amber">⚡ Falling behind the class pace. ${esc(s.name.split(' ')[0])} may need a nudge on ${esc(stuck ? stuck.meta.name : 'their current module')}.</div>`;
+    }
+    if (s.allDone) {
+        return '<div class="alert-banner alert-green">✓ All assigned modules complete. Consider assigning additional content.</div>';
+    }
+    return '';
+}
+
+function moduleCard(s, m) {
+    const st = styleFor(m.id);
+    const barColor = m.completed ? '#10B981' : st.color;
+    const pill = m.completed
+        ? { cls: 'pill-done', txt: 'Complete' }
+        : (m.maxStep === 0
+            ? { cls: 'pill-not-started', txt: 'Not started' }
+            : { cls: 'pill-progress', txt: `Step ${m.maxStep}/${m.meta.stepsTotal}` });
+
+    const scoreLine = typeof m.score === 'number'
+        ? `<div style="margin-top:2px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">Best score: <span style="color:${barColor}">${m.score}%</span></div>`
+        : '';
+
+    const open = state.expanded[m.id] ? ' expanded' : '';
+
+    return `<div class="module-card${open}" id="mcard-${esc(m.id)}">
+      <button type="button" class="module-card-header" data-module="${esc(m.id)}" aria-expanded="${state.expanded[m.id] ? 'true' : 'false'}">
+        <div class="module-icon" style="background:${tint(st.color, 0.15)};color:${st.color}" aria-hidden="true">${st.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div class="module-name">${esc(m.meta.name)}</div>
+          ${scoreLine}
+        </div>
+        <div class="module-status-pill ${pill.cls}">${pill.txt}</div>
+        <div class="module-chevron" aria-hidden="true">▶</div>
+      </button>
+      <div class="module-progress-row">
+        <div class="module-progress-bar"><div class="module-progress-fill" style="width:${m.pct}%;background:${barColor}"></div></div>
+        <div class="module-progress-txt">${m.pct}%</div>
+      </div>
+      <div class="module-steps">
+        <div class="steps-label">STEP-BY-STEP BREAKDOWN</div>
+        ${m.meta.steps.map((step, i) => stepRow(m, step, i)).join('')}
+        <div class="time-on-task">
+          <span aria-hidden="true">⏱</span>
+          <span>Time in module:</span>
+          <span class="tot-val">${state.sessionsReadable ? `${Math.round(m.activeMs / 60000)}m` : 'unavailable'}</span>
+          ${m.completed ? '<span style="color:var(--green);font-size:11px;margin-left:auto">✓ Completed</span>' : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function stepRow(m, step, i) {
+    const num = String(i + 1).padStart(2, '0');
+    const reached = i < m.maxStep;
+    const rows = m.attempts[i] || [];
+
+    if (!reached && !rows.length) {
+        return `<div class="step-row step-not-reached">
+          <div class="step-num">${num}</div>
+          <div class="step-content"><div class="step-title">${esc(step.title)}</div></div>
+          <div class="step-indicator step-pending"></div>
+        </div>`;
+    }
+
+    const isCurrent = !m.completed && m.maxStep > 0 && i === m.maxStep - 1;
+    // More than one document for a step means the Case grades several items at once — the
+    // Scam Sort's five messages, Friday's three picks — because those are the only commits
+    // that pass an attemptKey. A student who simply CHANGES an answer overwrites the one
+    // document for that step and sets replay on it, so a revision is one row, not two.
+    const multi = rows.length > 1;
+
+    let choiceHtml = '';
+    let score = null;
+
+    if (rows.length) {
+        if (multi) {
+            // A Case that grades several items at once — the Scam Sort, Friday's three picks.
+            // One line per item reads better here than a single verdict for the whole Case.
+            choiceHtml = rows.map((a) => {
+                const label = choiceTextFor(step, a);
+                return `<div class="step-choice"><span class="choice-label">${a.replay ? 'REDID' : 'CHOSE'}</span>${esc(label)}${
+                    typeof a.score === 'number' ? ` <span style="color:${SCORE_COLOR[a.score] || 'var(--text-muted)'};font-family:'JetBrains Mono',monospace">${esc(scoreLabel(a))}</span>` : ''
+                }</div>`;
+            }).join('');
+            const scored = rows.filter((a) => typeof a.score === 'number');
+            if (scored.length) score = Math.round(scored.reduce((n, a) => n + a.score, 0) / scored.length);
+        } else {
+            const a = rows[0];
+            const label = choiceTextFor(step, a);
+            choiceHtml = `<div class="step-choice"><span class="choice-label">CHOSE</span>${esc(label)}${
+                a.replay ? ' <span class="replay-tag">revised</span>' : ''
+            }</div>`;
+            if (typeof a.score === 'number') score = a.score;
+        }
+    }
+
+    const color = score == null ? 'var(--teal)' : (SCORE_COLOR[score] || 'var(--teal)');
+
+    return `<div class="step-row">
+      <div class="step-num">${num}</div>
+      <div class="step-content">
+        <div class="step-title">${esc(step.title)}${isCurrent ? ' <span class="current-marker">← current</span>' : ''}</div>
+        ${choiceHtml}
+      </div>
+      ${score == null ? '' : `<div class="step-score" style="color:${color}">${SCORE_LABEL[score] || ''}</div>`}
+      <div class="step-indicator" style="background:${color}"></div>
+    </div>`;
+}
+
+
+// Prefers the score the module wrote, so 0–3 always reads the same way across every module,
+// and falls back to whatever effectiveness label came with the attempt.
+function scoreLabel(a) {
+    if (typeof a.score === 'number' && SCORE_LABEL[a.score]) return SCORE_LABEL[a.score];
+    return a.effectiveness || '';
+}
+
+/* ── interaction ───────────────────────────────────────────────────────────── */
+function switchView(view) {
+    state.view = view;
+    document.getElementById('tab-overview').classList.toggle('active', view === 'overview');
+    document.getElementById('tab-detail').classList.toggle('active', view === 'detail');
+    document.getElementById('overview-panel').classList.toggle('visible', view === 'overview');
+    document.getElementById('detail-panel').classList.toggle('visible', view === 'detail');
+    if (view === 'overview') {
+        document.getElementById('toolbar-title').innerHTML = `Class overview — <span>${state.students.length} agent${state.students.length === 1 ? '' : 's'}</span>`;
+        state.activeUid = null;
+        renderRoster();
+        renderOverview();
+    } else if (!state.activeUid && state.students.length) {
+        selectStudent(visibleStudents()[0] ? visibleStudents()[0].uid : state.students[0].uid);
+    }
+}
+
+function selectStudent(uid) {
+    state.activeUid = uid;
+    state.expanded = {};
+    renderRoster();
+    renderDetail(uid);
+    switchViewTabsOnly('detail');
+}
+
+function switchViewTabsOnly(view) {
+    state.view = view;
+    document.getElementById('tab-overview').classList.toggle('active', view === 'overview');
+    document.getElementById('tab-detail').classList.toggle('active', view === 'detail');
+    document.getElementById('overview-panel').classList.toggle('visible', view === 'overview');
+    document.getElementById('detail-panel').classList.toggle('visible', view === 'detail');
+}
+
+document.getElementById('tab-overview').addEventListener('click', () => switchView('overview'));
+document.getElementById('tab-detail').addEventListener('click', () => switchView('detail'));
+
+document.getElementById('roster').addEventListener('click', (e) => {
+    const btn = e.target.closest('.roster-item');
+    if (btn) selectStudent(btn.dataset.uid);
+});
+
+document.getElementById('overview-grid').addEventListener('click', (e) => {
+    const btn = e.target.closest('.ov-card');
+    if (btn) selectStudent(btn.dataset.uid);
+});
+
+document.getElementById('detail-body').addEventListener('click', (e) => {
+    const btn = e.target.closest('.module-card-header');
+    if (!btn) return;
+    const id = btn.dataset.module;
+    state.expanded[id] = !state.expanded[id];
+    const card = document.getElementById(`mcard-${id}`);
+    if (card) card.classList.toggle('expanded', state.expanded[id]);
+    btn.setAttribute('aria-expanded', state.expanded[id] ? 'true' : 'false');
+});
+
+document.getElementById('roster-filter').addEventListener('input', (e) => {
+    state.filter = e.target.value;
+    renderRoster();
+    renderOverview();
+});
+
+load().catch((err) => {
+    console.error('[Mission Control] load failed', err);
+    showGate(
+        'Could not load Mission Control',
+        `Something went wrong reading your Task Force: ${err && err.message ? err.message : 'unknown error'}`,
+        'Back to the dashboard', '/dashboard/',
+    );
+});
+</script>
+</body>
+</html>
