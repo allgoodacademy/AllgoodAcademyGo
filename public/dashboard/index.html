@@ -287,8 +287,11 @@
         // real sense (see /js/identity-gate.js) until they actually launch something.
         window.silentSignIn = async () => {
             try {
-                const user = await window.AuthCore.silentSignIn();
-                const account = await window.AuthCore.getAccount(user.uid);
+                // Same guest-first entry every GoodBlock uses, so a student who walks in
+                // from a lesson keeps the passphrase name they already have rather than
+                // being handed a second, different one by the dashboard.
+                const { user, account } = await window.AuthGate.startGuestSession({ affordance: false });
+                if (!user) return;
                 applyIdentityToUI(user, account);
             } catch (error) {
                 console.error("Silent sign-in failed:", error);

@@ -1707,12 +1707,14 @@
                 });
                 if (window.Telemetry) window.Telemetry.complete({ finalScore: currentScore, maxScore: MAX_SCORE, percentage: percentage, rank: rank });
 
-                // GUEST-FIRST: the completion screen is already rendered and stays rendered.
-                // This offer comes after it, never in front of it, and declining hides nothing.
-                // Offered once per page load; the always-available affordance covers the rest.
-                if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+                // Same shape as the GoodBlocks' revealCompletion(): the offer hangs off the
+                // completion reveal being on screen, once, and only when the run is actually
+                // finished — there is nothing to congratulate a half-done Challenge on, and
+                // nothing worth asking them to keep. The rating is optional here too and this
+                // does not depend on it. Declining hides nothing.
+                if (isComplete && !window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
                     window._agSaveOffered = true;
-                    setTimeout(() => { window.AuthGate.offerSave(); }, 1500);
+                    setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
                 }
             };
 
@@ -1866,7 +1868,7 @@
             };
 
             window.handleSystemExit = () => {
-                window.location.href = '/';
+                window.location.href = '/dashboard/';
             };
 
             document.getElementById('current-year').textContent = new Date().getFullYear();
