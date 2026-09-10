@@ -111,6 +111,24 @@
             position: relative; overflow: hidden;
         }
 
+        /* Nuclear startup dismiss: the power-up screen fades itself out at 3.5s with no
+           JS involved, so a stalled, failed or stale-cached script can never leave a
+           student stuck behind it. display: none is not animatable, hence visibility.
+           The JS path still sets display: none when it works.
+
+           PRECEDENCE, because it is counter-intuitive: CSS animations sit ABOVE inline
+           styles in the cascade, so while this animation is filling it overrides
+           element.style.opacity — not the other way round. That is why handleStartup()
+           sets style.animation = 'none'. That line is load-bearing: remove it and a
+           normal click-dismiss gets its opacity stomped back to 1 at the 3.5s mark. */
+        #startup-screen {
+            animation: startup-autodismiss 0.7s ease-out 3.5s forwards;
+        }
+        @keyframes startup-autodismiss {
+            from { opacity: 1; visibility: visible; pointer-events: auto; }
+            to   { opacity: 0; visibility: hidden;  pointer-events: none; }
+        }
+
         .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
         .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
         .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
@@ -1331,6 +1349,7 @@
                     // startGuestSession() — a throw, a hang, a slow network — can leave a
                     // student staring at a half-faded power-up screen.
                     startup.style.opacity = '0';
+                    startup.style.animation = 'none'; // stand down the CSS fallback; JS has this
                     setTimeout(() => { startup.style.display = 'none'; }, 700);
 
                     // GUEST-FIRST ENTRY (founder decision, 2026-09-09): nobody signs in to
