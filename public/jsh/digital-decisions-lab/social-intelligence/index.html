@@ -1317,16 +1317,7 @@
         // openMessageModal/closeMessageModal are provided by /js/message-hq.js.
 
         document.addEventListener('DOMContentLoaded', () => {
-            if(window.lucide) window.lucide.createIcons();
-            // Safety net: icons were confirmed missing on initial render at least twice this
-            // session (the coffee badge, then this startup screen's radar icon) despite the
-            // icon names themselves being valid - suggesting a load-timing race with the Lucide
-            // CDN script rather than a bad icon name. Retrying several times at increasing
-            // delays is a brute-force fix that doesn't depend on pinning down the exact cause.
-            [100, 400, 1000, 2000].forEach(delay => {
-                setTimeout(() => { if(window.lucide) window.lucide.createIcons(); }, delay);
-            });
-            window.addEventListener('load', () => { if(window.lucide) window.lucide.createIcons(); });
+            if (window.lucide) window.lucide.createIcons();
 
             const startup = document.getElementById('startup-screen');
             if (startup) {
@@ -1347,6 +1338,14 @@
                     await window.AuthGate.startGuestSession();
                 };
                 startup.addEventListener('click', handleStartup);
+
+                // Safety net: auto-dismiss after 3s if click never fired (broken icon
+                // render or click target failure)
+                setTimeout(() => {
+                    if (startup && startup.style.display !== 'none' && !startupTriggered) {
+                        handleStartup();
+                    }
+                }, 3000);
 
                 // Someone actively moving between pages within the last hour shouldn't see
                 // this screen again — same rolling-activity pattern DDC uses.

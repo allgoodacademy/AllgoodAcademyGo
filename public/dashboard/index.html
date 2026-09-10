@@ -1191,9 +1191,6 @@
             const ddcComplete = localStorage.getItem('aa_ddc_complete') === 'true';
             if (ddcComplete) badgeCount++; // 4. Cyber Agent
 
-            const jlcComplete = localStorage.getItem('aa_jlc_complete') === 'true';
-            if (jlcComplete) badgeCount++; // 5. Certified Entrepreneur
-
             const intelSent = localStorage.getItem('aa_intel_sent') === 'true';
             if (intelSent) badgeCount++; // 6. Intel Officer
 
@@ -1211,8 +1208,6 @@
             updateBadgeSlot('badge-slot-3', launchCount > 0);
             // Badge 4 (Cyber)
             updateBadgeSlot('badge-slot-4', ddcComplete);
-            // Badge 5 (Entrepreneur - JLC)
-            updateBadgeSlot('badge-slot-5', jlcComplete);
             // Badge 8 (Intel Officer)
             updateBadgeSlot('badge-slot-8', intelSent);
             // Badge 9 (Origin Scout)
@@ -1316,11 +1311,6 @@
                     title = "Cyber Agent";
                     desc = "Awarded for demonstrating superior judgment in the Digital Decisions Challenge (Score > 80%).";
                     largeIconHtml = `<i data-lucide="shield-check" class="w-12 h-12 ${finalUnlocked ? 'text-allgood-primary' : 'text-slate-400'}"></i>`;
-                    break;
-                case 'entrepreneur': 
-                    title = "Certified Entrepreneur";
-                    desc = "Awarded for achieving $800+ profit in Jolene's Lemonade Challenge. Demonstrates business acumen.";
-                    largeIconHtml = `<span class="text-5xl ${finalUnlocked ? '' : 'grayscale opacity-50'}">🍋</span>`;
                     break;
                 case 'intel': // NEW CASE 8
                     title = "Intel Officer";
@@ -2694,13 +2684,13 @@
                                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cyber</span>
                                     </div>
 
-                                    <!-- 5. Certified Entrepreneur -->
-                                    <div id="badge-slot-5" class="flex flex-col items-center gap-2 group cursor-pointer" onclick="showBadgeDetails('entrepreneur', this)">
-                                        <div class="badge-token token-locked group-hover:scale-105">
-                                            <span class="text-2xl badge-content">🍋</span>
-                                            <div class="badge-lock absolute -top-1 -right-1 bg-slate-400 text-white rounded-full p-1"><i data-lucide="lock" class="w-3 h-3"></i></div>
+                                    <!-- 5. Jolene's Lemonade is retired (see the removed-card note near
+                                         the module list above) — this slot is classified, not earnable. -->
+                                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-50 hover:opacity-80 transition-opacity" onclick="showBadgeDetails('classified', this)">
+                                        <div class="badge-token token-locked border-dashed border-slate-300">
+                                            <i data-lucide="lock" class="badge-content w-6 h-6 text-slate-300"></i>
                                         </div>
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Founder</span>
+                                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Classified</span>
                                     </div>
 
                                     <!-- 8. Intel Officer (NEW) -->
@@ -3114,7 +3104,11 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
-            
+
+            // Jolene's Lemonade is retired — clear any stale completion flags from
+            // testing or old sessions so the badge never appears as earned
+            localStorage.removeItem('aa_jlc_complete');
+
             // Home is a single tap now — no hidden hold-to-logout gesture. Logging out
             // stays reachable from the profile menu; this button just scrolls home.
             const homeBtn = document.getElementById('btn-home');
