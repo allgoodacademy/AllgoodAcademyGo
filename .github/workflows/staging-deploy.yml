@@ -1,0 +1,38 @@
+# Deploys any sprint branch (claude/**) to the SAME persistent `staging` Hosting
+# channel, so work in progress can be looked at on a real URL without going near
+# main. Nothing here touches the live site — channelId is `staging`, never `live`.
+#
+# firebase-hosting-staging.yml does the same thing for pushes to the `staging`
+# branch. Both write one channel, so whichever pushed last is what is being served;
+# the concurrency group below only serialises runs of THIS workflow.
+#
+# On the service account secret: every other workflow in this repo reads
+# FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY. A secret named FIREBASE_SERVICE_ACCOUNT
+# was added separately for this one. An unset secret is an empty string, which is
+# falsy, so this takes the new name when it exists and otherwise falls back to the
+# name the rest of the repo has been deploying with — rather than failing on an
+# empty credential if the two ever get out of step.
+name: Deploy sprint branch to Firebase Hosting Staging Channel
+
+'on':
+  push:
+    branches:
+      - 'claude/**'
+
+# One deploy at a time. Two pushes racing to the same channel can otherwise land
+# out of order and leave the older commit serving.
+concurrency:
+  group: firebase-staging-channel
+  cancel-in-progress: false
+
+jobs:
+  build_and_preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}'
+          channelId: staging
+          projectId: allgood-academy
