@@ -124,6 +124,15 @@ Three options, in order of effort:
   of that workflow, re-run after a service-account permission fix). If a later rules deploy
   fails, Insider shows an amber "some data sources didn't load" strip naming the affected
   sources; check the workflow run before assuming a code problem.
+- A source can also be denied because the rules simply don't grant what Insider asks for.
+  Insider LISTS whole collections, and in Firestore a `list` grant only takes effect on a
+  match statement that addresses a DOCUMENT (`/users/{userId}`); a statement addressing the
+  collection (`/users`) matches no request and silently grants nothing. `tests/firestore-rules.test.mjs`
+  now asserts every one of the ten sources plus `recruit_codes` for the admin allowlist —
+  run `npm run test:rules` (needs Java) after touching `firestore.rules`. A denied `users`
+  is the loudest failure: `userIndex` still fills from the other sources, but every entry is
+  flagged `orphan` and the Overview and Users pages filter orphans out, so both render empty
+  while the session and event counters keep showing numbers.
 - Firebase Hosting serves HTML with a one-hour `Cache-Control: max-age=3600` by default, so
   a freshly deployed Insider (or dashboard) can stay stale in a browser for up to an hour.
   A hard refresh (or a private window) shows the deployed version.

@@ -60,11 +60,6 @@ service cloud.firestore {
         && classroomCodeOk(appId, priorCode);
     }
 
-    // 1. Allow the admin allowlist to list the entire "users" collection (Insider directory)
-    match /artifacts/{appId}/users {
-      allow list: if isAllowlistedAdmin();
-    }
-
     // 2. The user's own PROFILE document. Split out from its subcollections (2b) because
     //    this is the one document whose contents decide authorization elsewhere, so its
     //    writes are field-constrained rather than wide open.
@@ -78,6 +73,17 @@ service cloud.firestore {
     //    bought a full classroom roster: names, emails, ageTier, recruit codes and progress.
     match /artifacts/{appId}/users/{userId} {
       allow get: if isOwner(userId) || isAllowlistedAdmin();
+
+      // 1. Insider's user directory enumerates the whole collection. A LIST grant has to
+      //    sit on the DOCUMENT match like this one: a `match /artifacts/{appId}/users`
+      //    statement addresses the collection itself, which no request path ever matches,
+      //    so the grant that used to live there was dead code. It went unnoticed because
+      //    2b was once a single `{document=**}` rule whose zero-segment match covered this
+      //    profile document, and `read` there implied `list`. Splitting the rules for the
+      //    privilege fix took the admin's list grant with it and Insider's `users` source
+      //    started coming back permission-denied. Admin-only: rule #4 is what lets a
+      //    teacher list their own roster, and nobody else may enumerate learners.
+      allow list: if isAllowlistedAdmin();
 
       allow create: if isOwner(userId) && profileFieldsOk(appId, NONE(), NONE());
       allow update: if isOwner(userId)

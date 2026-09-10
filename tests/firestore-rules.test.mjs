@@ -9,7 +9,9 @@
 import {
   initializeTestEnvironment, assertFails, assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import {
+  doc, getDoc, setDoc, collection, collectionGroup, getDocs, query, where, orderBy, limit,
+} from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
 const APP = 'allgood-academy';
@@ -36,11 +38,22 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(U(db, 'student_1'), { role: 'student', classroomCode: 'KM7QPD', displayName: 'Arctic Fox Trot', ageTier: 'under13', recruitCode: 'arctic-fox-trot' });
   await setDoc(PROGRESS(db, 'student_1', 'social-intelligence'), { highestUnlocked: 6 });
   await setDoc(U(db, 'guest_1'), { role: 'student', isGuest: true, displayName: 'Sunny Bear Glide' });
+  // One doc in every collection Insider reads, so an allowed query returns a row rather
+  // than being indistinguishable from a denied one.
+  await setDoc(doc(db, 'artifacts', APP, 'messages', 'm1'), { senderUid: 'student_1', timestamp: 1 });
+  await setDoc(doc(db, 'artifacts', APP, 'course_feedback', 'f1'), { uid: 'student_1', timestamp: 1, rating: 5 });
+  await setDoc(doc(db, 'artifacts', APP, 'recruit_codes', 'arctic-fox-trot'), { uid: 'student_1' });
+  await setDoc(doc(db, 'artifacts', APP, 'sessions', 's1'), { uid: 'student_1', module: 'social-intelligence', startedAt: 1 });
+  await setDoc(doc(db, 'artifacts', APP, 'events', 'e1'), { uid: 'student_1', event: 'module_open', ts: 1 });
+  await setDoc(doc(db, 'artifacts', APP, 'users', 'student_1', 'launches', 'l1'), { courseName: 'Digital Decisions' });
+  await setDoc(doc(db, 'artifacts', APP, 'users', 'student_1', 'game_scores', 'g1'), { gameName: 'Social Intelligence', completed: true });
+  await setDoc(doc(db, 'artifacts', APP, 'users', 'student_1', 'game_scores', 'g1', 'scenario_attempts', '0'), { score: 3 });
 });
 
 const guest = env.authenticatedContext('guest_1', { provider_id: 'anonymous' }).firestore();
 const teacher = env.authenticatedContext('teacher_1', { email: 't@school.org' }).firestore();
 const student = env.authenticatedContext('student_1').firestore();
+const admin = env.authenticatedContext('admin_1', { email: 'balgood93@gmail.com' }).firestore();
 
 console.log('\nTHE EXPLOIT — an anonymous guest must not become a teacher');
 await it('guest CANNOT merge role:teacher + someone else\'s classroomCode onto its own profile', async () => {
@@ -111,6 +124,38 @@ await it('teacher_1 CANNOT read a student in a classroom they do not own', async
     await setDoc(U(db, 'student_2'), { role: 'student', classroomCode: 'OTHER1', displayName: 'Bold Owl Dash' });
   });
   await assertFails(getDoc(U(teacher, 'student_2')));
+});
+
+// Insider (public/insider/index.html) is one Promise.all of ten reads. A source the rules
+// deny does not fail loudly — safe() swallows it, the page renders with that source empty,
+// and the amber strip is the only tell. `users` was denied for two days after the privilege
+// fix split rule #2, because the admin's list grant had been riding on that rule's
+// zero-segment {document=**} match. So assert every source, not just the interesting ones.
+console.log('\nINSIDER — the admin allowlist can read every source loadEverything() asks for');
+const INSIDER_SOURCES = {
+  users: db => getDocs(collection(db, 'artifacts', APP, 'users')),
+  classrooms: db => getDocs(collection(db, 'artifacts', APP, 'classrooms')),
+  messages: db => getDocs(query(collection(db, 'artifacts', APP, 'messages'), orderBy('timestamp', 'desc'), limit(300))),
+  course_feedback: db => getDocs(query(collection(db, 'artifacts', APP, 'course_feedback'), orderBy('timestamp', 'desc'), limit(1000))),
+  launches: db => getDocs(collectionGroup(db, 'launches')),
+  game_scores: db => getDocs(collectionGroup(db, 'game_scores')),
+  scenario_attempts: db => getDocs(collectionGroup(db, 'scenario_attempts')),
+  module_progress: db => getDocs(collectionGroup(db, 'module_progress')),
+  sessions: db => getDocs(query(collection(db, 'artifacts', APP, 'sessions'), orderBy('startedAt', 'desc'), limit(5000))),
+  events: db => getDocs(query(collection(db, 'artifacts', APP, 'events'), orderBy('ts', 'desc'), limit(3000))),
+  recruit_codes: db => getDocs(collection(db, 'artifacts', APP, 'recruit_codes')),
+};
+for (const [name, read] of Object.entries(INSIDER_SOURCES)) {
+  await it(`admin CAN read ${name}`, async () => { await assertSucceeds(read(admin)); });
+}
+await it('a signed-in non-admin CANNOT enumerate the users collection', async () => {
+  await assertFails(getDocs(collection(guest, 'artifacts', APP, 'users')));
+  await assertFails(getDocs(collection(teacher, 'artifacts', APP, 'users')));
+});
+await it('a signed-in non-admin CANNOT read the telemetry sources', async () => {
+  await assertFails(getDocs(collection(guest, 'artifacts', APP, 'sessions')));
+  await assertFails(getDocs(collection(guest, 'artifacts', APP, 'events')));
+  await assertFails(getDocs(collectionGroup(guest, 'game_scores')));
 });
 
 await env.cleanup();
