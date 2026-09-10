@@ -1326,26 +1326,40 @@
                     if (startupTriggered) return;
                     startupTriggered = true;
                     if (window.sfx) window.sfx.powerOn();
+
+                    // Commit the dismissal before any async work. Nothing that happens in
+                    // startGuestSession() — a throw, a hang, a slow network — can leave a
+                    // student staring at a half-faded power-up screen.
                     startup.style.opacity = '0';
                     setTimeout(() => { startup.style.display = 'none'; }, 700);
 
                     // GUEST-FIRST ENTRY (founder decision, 2026-09-09): nobody signs in to
                     // start anything. This establishes an anonymous session and a readable
                     // auto-assigned name and gets out of the way — no modal, no age
-                    // question, nothing to dismiss — then mounts the always-available
-                    // "Save my progress" affordance. The identify gate now fires at the
+                    // question, nothing to dismiss. The identify gate now fires at the
                     // END (see the completion write below), not here.
-                    await window.AuthGate.startGuestSession();
+                    try {
+                        await window.AuthGate.startGuestSession();
+                    } catch (e) {
+                        console.warn('[startup] startGuestSession failed, continuing as guest', e);
+                    }
                 };
                 startup.addEventListener('click', handleStartup);
 
-                // Safety net: auto-dismiss after 3s if click never fired (broken icon
-                // render or click target failure)
+                // Safety net: a screen still on top at 4s is a stuck screen, whatever the
+                // reason — click never landed, dismiss stalled part-way. Deliberately does
+                // NOT check startupTriggered: that flag was what blocked the old net from
+                // rescuing a dismiss that had already started and then stalled.
                 setTimeout(() => {
-                    if (startup && startup.style.display !== 'none' && !startupTriggered) {
+                    if (startup && startup.style.display !== 'none') {
+                        startup.style.opacity = '0';
+                        setTimeout(() => { startup.style.display = 'none'; }, 300);
+                        // Still start the session the click would have started, so a rescued
+                        // screen doesn't cost the student their progress tracking.
+                        // handleStartup() is idempotent, so this no-ops after a real click.
                         handleStartup();
                     }
-                }, 3000);
+                }, 4000);
 
                 // Someone actively moving between pages within the last hour shouldn't see
                 // this screen again — same rolling-activity pattern DDC uses.
