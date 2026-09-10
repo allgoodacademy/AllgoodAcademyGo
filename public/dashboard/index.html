@@ -21,18 +21,48 @@
       })();
     </script>
 
-    <!-- ADDED: Google Analytics (GA4) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EN4M7T3BLQ"></script>
+    <!--
+    GA4 / UNDER-13 COMPLIANCE NOTE — 2026-09-10
+    GA4 loads on: /dashboard/ only (public/dashboard/index.html). No other page in
+      public/ loads the googletagmanager.com/gtag/js library; two Lab Pack hub pages
+      call gtag() defensively but never load it, so those calls are inert no-ops.
+    Fires for anonymous sessions: previously YES (unconditional in <head>, before any
+      auth/identity check ran) — NOW NO. The GA4 library and the initial pageview hit
+      are gated below on ag_account === '1', the flag auth-core.js's markAccount()
+      sets only from finalizeThirteenPlusAccount(), i.e. only for a confirmed,
+      non-anonymous 13+ account. A Learner Recruit (isAnonymous === true, even one
+      holding a claimed Recruit Code) never has ag_account set and will not load or
+      fire GA4. Caveat: the check is a synchronous localStorage read at page load, so
+      a 13+ visitor completing sign-up for the first time in this same session won't
+      retroactively enable GA4 until their next page load — that visitor is 13+, not
+      a COPPA-covered Recruit, so this is a missed pageview, not a compliance gap.
+    COPPA/school DPA exposure: eliminated for Learner Recruits — GA4 (cookies, IP-
+      derived geo, Google-side processing) no longer runs for any anonymous/under-13
+      session on the page they land on after completing a GoodBlock.
+    Founder decision needed: NO — this closes the gap flagged in
+      docs/insider-analytics.md (GA4 was live on /dashboard/ with no age gate on the
+      snippet itself, only telemetry.js's forwarded custom events were gated). No
+      further decision is required unless GA4's own child-directed-treatment setting
+      also needs to be enabled as defense in depth.
+    -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-EN4M7T3BLQ');
+      (function(){
+        try {
+          if (localStorage.getItem('ag_account') !== '1') return; // not a confirmed 13+ account — skip GA4 entirely
+        } catch (e) { return; } // storage blocked — fail closed, no GA4
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-EN4M7T3BLQ';
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function(){ dataLayer.push(arguments); };
+        gtag('js', new Date());
+        gtag('config', 'G-EN4M7T3BLQ');
+      })();
     </script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/assets/css/tailwind.min.css">
+    <script src="/assets/js/lucide.min.js"></script>
 
     <!-- Shared identity/login module — see /js/auth-core.js. Must load before the
          inline module script below, since it relies on window.AuthCore already existing
@@ -1911,28 +1941,6 @@
                     }
                 })();
             }
-        }
-    </script>
-    
-    <!-- Tailwind Config -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'allgood-primary': '#D34716',
-                        'allgood-secondary': '#357889',
-                        'allgood-dark': '#4C4C4C',
-                        'allgood-light': '#F7F7F7',
-                        'allgood-hover': '#EB8D69',
-                        'allgood-accent': '#2D6473',
-                    },
-                    fontFamily: {
-                        'heading': ['Georgia', 'serif'],
-                        'body': ['Verdana', 'sans-serif'],
-                    },
-                },
-            },
         }
     </script>
 
