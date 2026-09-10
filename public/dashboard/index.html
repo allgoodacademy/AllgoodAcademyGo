@@ -320,7 +320,7 @@
                 // Same guest-first entry every GoodBlock uses, so a student who walks in
                 // from a lesson keeps the passphrase name they already have rather than
                 // being handed a second, different one by the dashboard.
-                const { user, account } = await window.AuthGate.startGuestSession({ affordance: false });
+                const { user, account } = await window.AuthGate.startGuestSession();
                 if (!user) return;
                 applyIdentityToUI(user, account);
             } catch (error) {
@@ -495,14 +495,17 @@
         }
 
         window.launchCourse = async (courseName, url, element) => {
-            // The shared gate (see /js/identity-gate.js) resolves immediately if this
-            // session is already fully identified (a real 13+ account, or a Learner
-            // Recruit with a Recruit Code on file); otherwise it shows the age/sign-in/
-            // recruit-code UI itself and resolves once that's done — no separate
-            // pending-launch stash needed, since this just picks back up right here.
-            const { user, account } = await window.AuthGate.ensureIdentified();
-            if (!user || !account) return;
-            applyIdentityToUI(user, account);
+            // Dashboard module launch: anonymous guests can launch modules.
+            // ensureIdentified() is only for save/claim/roster — not for starting a lesson.
+            // It used to guard this path, which silently dead-ended every guest who walked
+            // in from a GoodBlock: the gate never cleared for an anonymous session, so the
+            // card click resolved to no user and returned before navigating.
+            let user = window.AuthCore.auth.currentUser;
+            if (!user) {
+                const result = await window.AuthGate.startGuestSession();
+                user = result.user;
+            }
+            if (!user) return; // Firebase completely unavailable — bail
 
             let finalUrl = url;
             try {

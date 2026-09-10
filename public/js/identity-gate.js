@@ -520,12 +520,17 @@ async function ensureIdentified() {
 // What a GoodBlock or Challenge calls at its power-up moment now, in place of
 // ensureIdentified(). Founder decision, 2026-09-09: nobody signs in to *start*
 // anything. This establishes the anonymous session and the readable session name and
-// gets out of the way — no modal, no age question, nothing to dismiss — then mounts the
-// always-available "Save my progress" affordance so the offer is never more than one
-// click away. ensureIdentified() itself is unchanged and still guards the dashboard, the
-// roster and Task Force surfaces, the insider portal, and the save/claim action itself.
+// gets out of the way — no modal, no age question, nothing to dismiss.
+//
+// It deliberately does NOT mount the "Save my progress" affordance: mounting it here put
+// the FAB on screen mid-Case, in front of the lesson it was meant to follow. The save
+// offer belongs after a completion, so offerSave() owns it now. ensureIdentified() itself
+// is unchanged and still guards the dashboard, the roster and Task Force surfaces, the
+// insider portal, and the save/claim action itself.
+//
+// options.affordance is still accepted and ignored so existing callers that pass
+// { affordance: false } keep working.
 async function startGuestSession(options) {
-    const opts = options || {};
     let result;
     try {
         result = await window.AuthCore.guestStart();
@@ -535,9 +540,7 @@ async function startGuestSession(options) {
         console.error('[AuthGate] guestStart failed', e);
         return { user: null, account: null, isGuest: true, displayName: window.AuthCore.guestDisplayName() };
     }
-    if (result.isGuest && opts.affordance !== false) {
-        mountSaveAffordance(result.displayName);
-    } else if (!result.isGuest) {
+    if (!result.isGuest) {
         removeSaveAffordance();
     }
     return result;
