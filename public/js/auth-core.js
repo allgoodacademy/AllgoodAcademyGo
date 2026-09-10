@@ -540,7 +540,7 @@ async function redeemRecruitCode(rawCode) {
     const existing = await getDoc(ref);
     const existingData = existing.exists() ? existing.data() : null;
 
-    await setDoc(ref, {
+    const restored = {
         displayName,
         avatar,
         email: null,
@@ -549,7 +549,18 @@ async function redeemRecruitCode(rawCode) {
         ageTier: 'under13',
         recruitCode: code,
         lastLogin: serverTimestamp(),
-    }, { merge: true });
+    };
+    // Classroom membership travels with the code too. Redeeming lands the student on a NEW
+    // uid (see the note on this function), and their classroomCode lived on the old profile
+    // — so without this a Recruit who switched devices silently dropped off their teacher's
+    // roster while looking, to them, perfectly signed in. Only ever re-applied from the
+    // code document, which only their own sessions write.
+    const mirroredClassroom = codeData.classroomCode;
+    if (mirroredClassroom && !(existingData && existingData.classroomCode)) {
+        restored.classroomCode = mirroredClassroom;
+    }
+
+    await setDoc(ref, restored, { merge: true });
 
     // Copy each module's mirrored progress into this device's own module_progress
     // subcollection, so the existing resume-where-you-left-off logic (loadModuleProgress)
@@ -567,6 +578,24 @@ async function redeemRecruitCode(rawCode) {
     return { ok: true, displayName, avatar };
 }
 
+// Called the moment a student joins a Task Force, so membership reaches the code document
+// even if they never open another module afterwards — mirrorRecruitProgress() below would
+// otherwise not carry it across until their next lesson. A no-op for anyone without a
+// Recruit Code (13+ accounts keep their classroom on the profile their real sign-in
+// returns to).
+async function mirrorRecruitClassroom(classroomCode) {
+    const user = auth.currentUser;
+    if (!user || !classroomCode) return;
+    try {
+        const snap = await getDoc(userRef(user.uid));
+        const code = snap.exists() ? snap.data().recruitCode : null;
+        if (!code) return;
+        await setDoc(recruitCodeRef(code), { classroomCode, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+        console.error('[AuthCore] mirrorRecruitClassroom failed', e);
+    }
+}
+
 // Mirrors one module's progress onto the recruit's code document (in addition to the
 // normal per-uid module_progress write in saveModuleProgress below) so it survives a
 // device switch. A no-op for 13+ accounts, which reconnect via their real Google/email
@@ -574,12 +603,18 @@ async function redeemRecruitCode(rawCode) {
 async function mirrorRecruitProgress(uid, moduleSlug, progress) {
     try {
         const snap = await getDoc(userRef(uid));
-        const code = snap.exists() ? snap.data().recruitCode : null;
+        const data = snap.exists() ? snap.data() : null;
+        const code = data ? data.recruitCode : null;
         if (!code) return;
-        await setDoc(recruitCodeRef(code), {
+        const payload = {
             [`progress.${moduleSlug}`]: progress,
             updatedAt: serverTimestamp(),
-        }, { merge: true });
+        };
+        // Carried on the same snapshot this function already reads, so keeping classroom
+        // membership current on the code document costs nothing extra. redeemRecruitCode()
+        // reads it back when the student returns on another device.
+        if (data && data.classroomCode) payload.classroomCode = data.classroomCode;
+        await setDoc(recruitCodeRef(code), payload, { merge: true });
     } catch (e) {
         console.error('[AuthCore] mirrorRecruitProgress failed', e);
     }
@@ -792,6 +827,7 @@ window.AuthCore = {
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
     saveModuleProgress, loadModuleProgress,
+    mirrorRecruitClassroom,
     recordContinuityEntry,
     onAuthStateChanged, signOut,
     skipPowerUp,
