@@ -109,14 +109,19 @@
   .topbar-exit:hover { color: var(--text-primary); border-color: var(--text-muted); }
 
   /* ── BODY LAYOUT ── */
-  .layout { display: flex; flex: 1; overflow: hidden; }
+  /* min-height:0 throughout: a flex item defaults to min-height:auto, which will not
+     shrink below its content. Each element below is a flex item wrapping a scroll area, so
+     without this it grows to its full content height instead, the nearest overflow:hidden
+     ancestor clips the overhang, and the inner overflow-y:auto never engages — a finished
+     Digital Decisions run rendered all 30 steps with only the first four reachable. */
+  .layout { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
   /* ── SIDEBAR ── */
   .sidebar {
     width: var(--sidebar-w);
     background: var(--navy-mid);
     border-right: 1px solid var(--navy-border);
-    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; min-height: 0;
   }
   .sidebar-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--navy-border); }
   .sidebar-title {
@@ -133,7 +138,7 @@
   .sidebar-search::placeholder { color: var(--text-muted); }
   .sidebar-search:focus { border-color: var(--teal); }
 
-  .roster { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .roster { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0; }
   .roster::-webkit-scrollbar, .detail-body::-webkit-scrollbar, .overview-panel::-webkit-scrollbar { width: 4px; }
   .roster::-webkit-scrollbar-track, .detail-body::-webkit-scrollbar-track, .overview-panel::-webkit-scrollbar-track { background: transparent; }
   .roster::-webkit-scrollbar-thumb, .detail-body::-webkit-scrollbar-thumb, .overview-panel::-webkit-scrollbar-thumb { background: var(--navy-border); border-radius: 2px; }
@@ -170,7 +175,7 @@
   .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
   /* ── MAIN PANEL ── */
-  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; min-height: 0; }
 
   .main-toolbar {
     display: flex; align-items: center; padding: 10px 24px;
@@ -196,7 +201,7 @@
   .view-tab.active { background: var(--navy-raised); color: var(--teal); }
 
   /* ── OVERVIEW ── */
-  .overview-panel { display: none; flex: 1; overflow-y: auto; padding: 20px 24px; gap: 16px; flex-direction: column; }
+  .overview-panel { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; gap: 16px; flex-direction: column; }
   .overview-panel.visible { display: flex; }
   .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
   .ov-card {
@@ -218,7 +223,7 @@
   .ov-mod-pct { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); width: 26px; text-align: right; }
 
   /* ── DETAIL ── */
-  .detail { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+  .detail { display: none; flex-direction: column; height: 100%; overflow: hidden; min-height: 0; }
   .detail.visible { display: flex; }
   .detail-header {
     padding: 18px 24px 14px; border-bottom: 1px solid var(--navy-border);
@@ -242,7 +247,16 @@
   .qstat-val { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; line-height: 1; }
   .qstat-label { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
 
-  .detail-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+  .detail-body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* These three are column flex CONTAINERS, so their children inherit flex-shrink:1 and get
+     compressed to fit rather than overflowing — which is why the scroll containers above
+     reported scrollHeight === clientHeight even after min-height:0: there was nothing to
+     scroll because the content had been squashed into the available height instead.
+     A finished Digital Decisions run is 30 step rows crushed into the height of about four. */
+  .detail-body > *,
+  .overview-panel > *,
+  .module-steps > * { flex-shrink: 0; }
 
   /* Module card */
   .module-card { background: var(--navy-surface); border: 1px solid var(--navy-border); border-radius: 10px; overflow: hidden; }
