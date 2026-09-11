@@ -1,0 +1,89 @@
+# Weekly retention report. REPORT ONLY — this workflow never deletes anything.
+#
+# public/privacy.html §4 promises that under-13 telemetry is purged after 90 days of
+# inactivity. Until 2026-09-11 nothing in this repository ran that prune: no workflow,
+# no npm script, no scheduled job of any kind, and scripts/prune-telemetry.js had never
+# been executed (it crashed on its first run — see the initializeApp note in that file).
+# This job exists so the gap between what the policy says and what the database holds is
+# visible every week instead of discovered during an audit.
+#
+# It deliberately does NOT delete. The 90-day window is an open question with counsel as
+# of 2026-09-11, and deleting children's data on a schedule nobody has signed off is not
+# a decision CI should be making. The command below is --dry-run only; there is no input,
+# flag or branch of this workflow that makes it destructive.
+#
+# On the service account: staging-deploy.yml reads
+# `FIREBASE_SERVICE_ACCOUNT || FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY` because a second
+# secret name was introduced later. This matches that pattern rather than inventing a
+# third name — an unset secret is an empty string, which is falsy, so this takes the newer
+# name where it exists and otherwise falls back to the one the rest of the repo deploys with.
+name: Retention report (dry run — deletes nothing)
+
+on:
+  schedule:
+    # 07:00 UTC every Monday. Weekly, and early enough that the week's first working day
+    # starts with a current answer to "how much data is past our published window?"
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+# A retention report is a read. Nothing here needs write access to the repository.
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # Fail before touching Firestore if there is no credential at all. A retention job
+      # that skips quietly reports zero overdue records, which is indistinguishable from
+      # a clean result and is precisely how this gap persisted.
+      - name: Check the service account secret is present
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error title=No Firebase credential::Neither FIREBASE_SERVICE_ACCOUNT nor FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY is set. This job fails rather than reporting a false all-clear."
+            exit 1
+          fi
+          echo "Service account secret found."
+
+      - name: Write the credential to a file
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}
+        run: |
+          printf '%s' "$SA" > "${RUNNER_TEMP}/sa.json"
+          # Validate it parses before handing it to the SDK, so a mangled secret fails
+          # here with a clear message instead of deep inside firebase-admin.
+          node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "${RUNNER_TEMP}/sa.json" \
+            || { echo "::error title=Malformed credential::The Firebase service account secret is not valid JSON."; exit 1; }
+
+      - name: Retention dry run
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: |
+          npm run prune:dry-run -- --summary="$GITHUB_STEP_SUMMARY"
+
+      # Runs even if the step above failed, so a failed run says so on the summary page
+      # rather than leaving it blank and looking like it simply found nothing.
+      - name: Note a failed run on the summary
+        if: failure()
+        run: |
+          {
+            echo "# Retention report — FAILED"
+            echo
+            echo "This run did not complete, so **the retention position is unknown**."
+            echo "An empty or missing report is not an all-clear. Check the job log above."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the credential
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/sa.json"

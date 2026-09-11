@@ -13,6 +13,9 @@
 //      artifact in the repo supports
 //   5. recruit-code close guard  — a child must not be able to dismiss their only copy
 //      of their Recruit Code with an unguarded tap
+//   6. retention promise backing — a published deletion deadline must have a scheduled
+//      job behind it. privacy.html promised a 90-day purge from the day it shipped and
+//      nothing ever ran it (2026-09-11)
 //
 // No dependencies; run with `node scripts/check-invariants.js`. Exits 1 on any violation.
 const fs = require('fs');
@@ -232,6 +235,75 @@ if (exists('public/js/identity-gate.js')) {
         `check for the ag-recruit-new panel and no confirmation. A child can dismiss the only ` +
         `copy of their Recruit Code and lose their work permanently.`);
     }
+  }
+}
+
+// --- 6. A published retention promise needs a job behind it ---------------------
+// Same failure as check 4, one domain over. Check 4 catches a marketing claim with no
+// document behind it; this catches a PROMISE TO DELETE with no mechanism behind it.
+// public/privacy.html has said since it shipped that under-13 telemetry is "permanently
+// purged from our systems after 90 days of inactivity". scripts/prune-telemetry.js was
+// written to do that and then referenced by nothing — no workflow, no npm script, no
+// scheduled job of any kind — so it had never run even once. Nobody noticed because
+// nothing was watching, which is the same reason every other check here exists.
+//
+// Policy is NOT "remove the promise". A promise to delete children's data is a
+// compliance floor, not a marketing line. The fix is always to run the job.
+const RETENTION_PAGES = ['public/privacy.html', 'public/privacy/index.html', 'public/about/index.html'];
+// A deletion verb within ~120 characters of a duration. Deliberately narrow: prose about
+// "deleting your account" with no timeframe is not a retention promise, and a duration with
+// no deletion verb ("90 days of access") is not one either. Both halves, close together.
+const RETENTION_CLAIM = /(purge[ds]?|delet(?:e|ed|ion)|erase[ds]?|retain(?:ed)?|remov(?:e|ed|al))[\s\S]{0,120}?\b\d+\s*(day|days|month|months|year|years)\b|\b\d+\s*(day|days|month|months|year|years)\b[\s\S]{0,120}?(purge[ds]?|delet(?:e|ed|ion)|erase[ds]?|retain(?:ed)?|remov(?:e|ed|al))/i;
+
+const PRUNE_SCRIPT = 'scripts/prune-telemetry.js';
+
+function workflowsReferencing(needle) {
+  const dir = '.github/workflows';
+  if (!exists(dir)) return [];
+  return fs.readdirSync(path.join(root, dir))
+    .filter((f) => /\.ya?ml$/.test(f))
+    .filter((f) => read(path.join(dir, f)).includes(needle));
+}
+
+// A workflow only counts if it actually fires on its own. A prune wired to
+// workflow_dispatch alone is still a job nobody runs.
+function isScheduled(file) {
+  const src = read(path.join('.github/workflows', file));
+  return /^\s*schedule:/m.test(src);
+}
+
+{
+  const promisePages = [];
+  for (const file of RETENTION_PAGES) {
+    if (!exists(file)) continue;
+    const text = read(file).replace(/<[^>]*>/g, ' ');
+    if (RETENTION_CLAIM.test(text)) promisePages.push(file);
+  }
+
+  const pkg = exists('package.json') ? JSON.parse(read('package.json')) : { scripts: {} };
+  const npmRefs = Object.entries(pkg.scripts || {}).filter(([, cmd]) => cmd.includes(PRUNE_SCRIPT));
+  const wfRefs = workflowsReferencing(PRUNE_SCRIPT)
+    .concat(workflowsReferencing('prune:dry-run'))
+    .filter((f, i, a) => a.indexOf(f) === i);
+  const scheduledRefs = wfRefs.filter(isScheduled);
+
+  if (promisePages.length && !scheduledRefs.length) {
+    fail('retention',
+      `${promisePages.join(', ')} promise${promisePages.length === 1 ? 's' : ''} a deletion ` +
+      `deadline, but no SCHEDULED workflow exercises ${PRUNE_SCRIPT}. ` +
+      (wfRefs.length
+        ? `${wfRefs.join(', ')} reference${wfRefs.length === 1 ? 's' : ''} it but ${wfRefs.length === 1 ? 'has' : 'have'} no \`schedule:\` trigger, so it only runs when somebody remembers. `
+        : `Nothing references it at all. `) +
+      `A published promise to delete a child's data, with nothing running to honour it, is a ` +
+      `promise the product is not keeping — and the only way anyone finds out is an audit or a ` +
+      `parent asking. Add a scheduled workflow. Do not remove the promise to make this pass.`);
+  }
+
+  if (exists(PRUNE_SCRIPT) && !npmRefs.length && !wfRefs.length) {
+    fail('retention',
+      `${PRUNE_SCRIPT} exists but is referenced by no npm script and no workflow. It cannot be ` +
+      `run without someone reconstructing the command and its credentials from the source. A ` +
+      `retention job that is this hard to run is one that does not get run.`);
   }
 }
 
