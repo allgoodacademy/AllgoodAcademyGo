@@ -1,6 +1,6 @@
 # Real World Ready — Coverage Map v1
 
-**Status:** DRAFT — awaiting sign-off
+**Status:** Awaiting sign-off — Instructional Designer / Curriculum & Learning Science
 **Authored:** 2026-09-07
 **Authority:** This document is the single source both the Real World Ready Challenge and all three GoodBlocks draw from. Per the GoodBlock Builder skill (Phase 1, item 0), when a challenge and its labs are designed together the mapping is *authored* rather than discovered, and whichever is written first is authoritative.
 
@@ -165,6 +165,114 @@ That last rule is the one that matters most. See the terminology note below.
 | R8 | A curt one-word reply arrives and you assume the worst | The cost of acting on an uncorrected first read |
 
 **Standalone check:** Per the skill's hard rule, no student-facing copy in this GoodBlock may reference Conflict Has a Winner, Money as a Skill, or any Digital Decisions module — Lab Pack modules can be taken in any order. R5 and C7 are thematically adjacent; neither may reference the other in student-facing text. Design rationale like this note stays in the storyboard and never gets copied into dialogue.
+
+---
+
+## Standards coverage — CASEL and ISTE
+
+**Added 2026-09-11.** Everything above this line is the Challenge/lab design map, written before the three GoodBlocks were built. This section is the standards mapping, written *after* they were built, against the shipped Cases.
+
+`public/for-teachers/index.html` tells teachers that every GoodBlock is designed around one CASEL competency, and prints a table naming a specific competency for each of the seven. Nothing in this repository stood behind that table until now — `grep -ric casel docs/` returned zero. A department head who emailed `learning@allgoodacademy.com` for the mapping could not be sent anything.
+
+**Frameworks referenced:** the five core competencies of the **CASEL 5**. The ISTE claim on the For Teachers page is scoped to the Digital Decisions pack only — *"the Digital Decisions pack maps to ISTE Standard 2 for students"* — so **no ISTE mapping is claimed or asserted for Real World Ready**, and none is invented here. Digital Decisions' ISTE evidence is in `digital-decisions-coverage-map.md`.
+
+**The method, because it changes how much this is worth.** Each mapping was written from the lesson content *upward*: read what the Case actually asks a student to do, describe that, and only then name the competency it exercises. It was not written by taking the claimed competency and hunting for Cases that could be made to fit. A map produced the other way round will always confirm whatever it set out to confirm.
+
+**This is not a sign-off.** Claude Code authored it and is not the signing authority.
+
+---
+
+### Money as a Skill
+
+| | |
+|---|---|
+| **Builds (live table)** | Judgment |
+| **CASEL claimed (live table)** | Responsible Decision-Making · Self-Management |
+| **Challenge category** | `money` — 8 of 24 RWR scenarios |
+| **Structure** | 7 Cases (1 overview, 2–6 interactive, 7 handoff) |
+
+Second person throughout — the overview says *"Not a character. Every one of these is aimed at you."* Worth noting for a reviewer: the student is the decision-maker here, not an observer of one, which is unusual across the seven.
+
+| Case | What the student is asked to do | Competency exercised |
+|---|---|---|
+| **2 — The Split Decision** | A $30 speaker that a friend will keep and use daily, that the student will use once or twice a month. The friend proposes 50/50. Pay the $15, propose $8, or pass — and Jodi says what each one actually bought. | **Responsible Decision-Making.** Evaluating an offer against its actual terms rather than its default. Jodi's close is *"fair doesn't always mean equal."* |
+| **3 — The Impulse Window** | $58 saved toward $60 headphones. A $12 phone case is available now and would set the goal back to $46. Buy, wait, or ask to see the maths — and after seeing it, still have to decide. | **Self-Management.** Textbook delayed gratification and impulse control, with the goal made numerically concrete ("$14 back from a goal you were $2 from — probably two more weeks"). Also **Responsible Decision-Making**. The strongest Self-Management instance in the pack. |
+| **4 — The Group Fund** | Six friends pooling $60; the student is asked to hold and track it. Toggle conditions on or off — paid before purchase, a deadline, an agreed consequence, or hand it to someone else — and the commit button changes to match what is actually being agreed to. | **Responsible Decision-Making** and **Self-Management** together: agency over the terms of a commitment before making it. Jodi's close is *"saying yes to responsibility without saying what comes with it isn't generosity — it's just setting yourself up."* |
+| **5 — The Upgrade Trap** | An $18 backpack that has what is needed against a $45 one with more features. Two "looks" to spend investigating, or buy without spending them. | **Responsible Decision-Making.** A bounded investigation budget makes the cost of checking explicit; the question is reframed from affordability to functional threshold. |
+| **6 — The Ask** | A $20 phone case with dented packaging and a scuffed corner, still marked $20. Pay it, ask for a reduction, or reason through the worst case first — then still decide. | **Self-Management** — initiative and self-motivation, against a social inhibition the Case names directly (*"I don't want to make it weird"*). Also **Responsible Decision-Making**. |
+
+**Trait confirmation.** The RWR HUD renders **Judgment** from the `money` category (`public/educational-games/real-world-ready/index.html:249`). Matches the Builds column. ✅
+
+**Both claimed competencies hold.** Responsible Decision-Making runs through all five interactive Cases; Self-Management is carried independently by Cases 3, 4 and 6. Neither is thin.
+
+---
+
+### Conflict Has a Winner
+
+| | |
+|---|---|
+| **Builds (live table)** | Composure |
+| **CASEL claimed (live table)** | Relationship Skills · Self-Management |
+| **Challenge category** | `conflict` — 8 of 24 RWR scenarios |
+| **Structure** | 7 Cases (1 overview, 2–6 interactive, 7 handoff) |
+
+| Case | What the student is asked to do | Competency exercised |
+|---|---|---|
+| **2 — The Unspoken Need** | Theo and Sam want different project topics and have stopped listening. Under each stated position are three candidate needs; only one per person is a real need, the other two are the same position in softer words. Find both, then look for the option that serves both. | **Relationship Skills.** Resolving conflict constructively — a named CASEL sub-skill — practised as the specific separation of position from interest. Jodi's close: *"positions collide. Needs usually don't."* |
+| **3 — The Cost of Being Right** | Jonah has told six people Theo is wrong about a deadline. Theo has the form; it says Friday; Theo is right. Four rounds of escalate / hold and restate / leave the thread, against two meters — *Is Theo right* and *Is this working*. One of them never moves. | **Self-Management** — managing emotion when being right is not producing the outcome. The frozen 100% "Right" meter beside a falling "Is this working" is the mechanism, not a caption. Jodi's close: *"being right is a fact. Being effective is a choice."* |
+| **4 — The Apology That Isn't** | Ravi broke a confidence. His message reads *"ok I'm sorry you took it that way, can we drop it."* Audit it against the four components of a real apology, mark each present or missing — the answer is in the words, not in how it feels — then choose what to do with a one-out-of-four. | **Relationship Skills** (repairing a relationship, and communicating about the repair itself) with **Social Awareness** in reading what was and was not said. |
+| **5 — Both of Them Want You** | Amira and Jess have fallen out; both are Theo's friends; both want him to say they are right. Read both threads before answering either. A fourth option stays greyed out until both have actually been read. | **Relationship Skills.** Resisting social pressure — a named sub-skill — with the third option gated behind actually hearing both sides rather than appearing from nowhere. Jodi's close: *"sitting on the fence is having no opinion. Declining to be the judge is having one, and keeping it."* |
+| **6 — When You're the One Who's Wrong** | Theo has been telling Nia movie night is Saturday. She sends the screenshot. It says Friday. He has read it. Each turn: concede, deflect, or double down — conceding is always available and its price rises every turn he does not take it. | **Self-Management** — impulse control and self-discipline, with the cost of delay made visible turn by turn rather than asserted at the end. Jodi's close: *"conceding isn't losing the argument. It's ending it."* |
+
+**Trait confirmation.** The RWR HUD renders **Composure** from the `conflict` category (`:256`). Matches the Builds column. ✅
+
+**Both claimed competencies hold.** Relationship Skills is carried by Cases 2, 4 and 5; Self-Management by Cases 3 and 6. The GoodBlock alternates between them deliberately rather than leaning on one.
+
+---
+
+### Reading the Room
+
+| | |
+|---|---|
+| **Builds (live table)** | Perspective |
+| **CASEL claimed (live table)** | Social Awareness |
+| **Challenge category** | `reading_room` — 8 of 24 RWR scenarios |
+| **Structure** | 7 Cases (1 overview, 2–6 interactive, 7 handoff) |
+
+| Case | What the student is asked to do | Competency exercised |
+|---|---|---|
+| **2 — Three Rungs Up** | Three one-word replies from a normally chatty friend have become *"she's mad at me, and she's being petty about it."* A ladder runs from what was actually said up to what Mira concluded. Place her conclusion on the rung it actually sits on. | **Social Awareness.** Separating observation from inference about another person — the ladder makes the distance measurable rather than asserted. Jodi's close: *"there's a real difference between 'I think' and 'I know', and it's about three rungs wide."* |
+| **3 — Both Still True** | Six photos from a lake day nobody invited Mira to. Two explanations stay live — genuinely not thought of, or deliberately excluded. Test at least two possible actions against *both* explanations before committing to one. | **Social Awareness.** Holding two readings of another group's behaviour simultaneously, and choosing the action that survives either. The Case ends *"still doesn't know. Acted anyway."* |
+| **4 — Five Tuesdays** | Kofi is new, said little, did not look up, and Mira's read is *"he's stuck-up."* One observation per day for five days; move the dial or leave it. Nothing is marked right or wrong, and the student's history across the five days is what gets shown at the end. | **Social Awareness.** Examining one's own bias against accumulating evidence — a named CASEL sub-skill — with the design choice that the *revisability* of the read is what gets measured, not the read. Jodi's close: *"a read that can't move isn't a read any more. It's a decision that stopped listening."* |
+| **5 — Is This About Me?** | Two moments from one Wednesday. Call each one: about her, or not about her. Either call replays the same seconds from the other person's chair — Ms. Adeyemi's, then Dani's. Scene A was not about her. Scene B was. | **Social Awareness.** Literal perspective-taking: the same event rendered from another person's position. The purest instance of the competency anywhere in the seven GoodBlocks, and the Case refuses the easy moral — *"the lesson isn't 'it's never about you.' That's just being wrong in a new direction."* |
+| **6 — "I'm Fine"** | Leah is on the wall after school, phone face down, visibly not fine, and has just said she is fine. Three ways to answer, then a second turn regardless — a first-turn misstep is recoverable, it just costs more. | **Social Awareness** — recognising another person's state without overriding their stated account of it. Also **Relationship Skills**. Jodi's close: *"take her at her word out loud, and answer what's underneath at the same time."* |
+
+**Trait confirmation.** The RWR HUD renders **Perspective** from the `reading_room` category (`:263`). Matches the Builds column. ✅
+
+**The claim holds, and this is the best-evidenced row of the seven.** All five interactive Cases exercise Social Awareness directly; it is the subject of the GoodBlock rather than a competency it can be mapped onto.
+
+---
+
+### Findings — Real World Ready
+
+**Every row traces to Case-level evidence.** All three Real World Ready rows of the For Teachers table are backed by named Cases above. **No `⚠️ CLAIM NOT SUPPORTED` block is raised** for this Lab Pack. That is a result rather than an absence of scrutiny — the equivalent write-up for Digital Decisions records where its Professional Brand row is narrower than its content.
+
+**Trait reporting is clean 1:1 here.** Real World Ready has three categories and three HUD bars, so each trait is computed from exactly one GoodBlock's scenarios. This is the thing Digital Decisions cannot do — it squeezes four categories into three bars and merges Integrity across two GoodBlocks (see `digital-decisions-coverage-map.md`, Finding 2). For Real World Ready, the For Teachers sentence *"what a GoodBlock is built to develop is the same thing it reports on"* is exactly true.
+
+**Scenario counts verified.** Counted from the live `SCENARIO_DATA`: `money` 8, `conflict` 8, `reading_room` 8, totalling the declared 24.
+
+**Not resolved by this section.** The open Q2 icon flag, the Money as a Skill as-built fixes and the Privacy & Security badge count recorded elsewhere in this document are build items, untouched by the standards work and still open on their own terms.
+
+### Standards sign-off
+
+- [x] All three Real World Ready GoodBlocks mapped from Case content upward
+- [x] CASEL competency named exactly as the live For Teachers table claims it
+- [x] Trait names verified against Challenge source, not against this document
+- [x] ISTE deliberately not claimed — the live page scopes ISTE to Digital Decisions only
+- [ ] **Instructional Designer** — read against the live modules and sign
+- [ ] **Curriculum & Learning Science** — read against the live modules and sign
+
+**Until both signatures are present this section is not a standards alignment.** It is an evidenced draft of one.
 
 ---
 

@@ -87,6 +87,15 @@ until a user reported it after cases were already live.
   `isComplete` checks whatever field this GoodBlock actually writes (a flag vs. a score
   threshold) — these three things silently drift out of sync if written in different
   sessions without cross-checking.
+- [ ] **`logModuleCompletion()` fires on *reaching* the final Case, from the final-Case
+  branch of `advanceFromPage()` — never from inside `finalizeCaseRating()`.** The rating is
+  optional feedback; it must never decide whether the roster write happens. Five of the
+  first seven GoodBlocks got this wrong, and the `Skip — show me the badge` button made it
+  worse: it goes straight to `revealCompletion()`, so it awarded a badge for a run the
+  teacher never saw as finished. Copy the shape from
+  `public/jsh/digital-decisions-lab/social-intelligence/index.html`.
+- [ ] Completion is written **exactly once** — adding it to `advanceFromPage()` without
+  removing it from `finalizeCaseRating()` double-writes for every student who does rate.
 
 ## Message HQ ("Direct Line")
 
@@ -240,3 +249,46 @@ disagree.
 - [ ] Confirm every launch point (dashboard card, hub card, hub menu entry) opens in the
   same tab and lands on a clean trailing-slash URL.
 - [ ] `node --check` every inline `<script>` block after structural edits.
+
+---
+
+## `npm run check:invariants` must pass
+
+**This is not optional and it is not advisory.** GoodBlock #8 does not ship with this
+failing.
+
+```
+npm run check:invariants
+```
+
+It asserts the behaviours that have silently regressed in this repo before, and it is
+wired into CI (`.github/workflows/invariants-check.yml`) on pushes to `main` and
+`claude/**`, and on every pull request. Each check exists because the thing it checks
+actually broke in production once:
+
+| Check | What it will fail you for |
+|---|---|
+| `[completion]` | Coupling the completion write to the optional star rating, or leaving the `Skip` path with no completion write at all. See the Completion tracking section above. |
+| `[ga4]` | Loading the GA4 library on any surface an anonymous or under-13 Learner Recruit can reach. COPPA, not preference. |
+| `[cdn]` | Pulling layout or icons from `unpkg` / `cdn.tailwindcss.com`. School firewalls block both; bundle locally. |
+| `[standards]` | Adding a GoodBlock to a marketing standards table with no coverage map behind it, or with one that is DRAFT, unsigned, or has no readable Status line. |
+| `[recruit-code]` | Letting the gate's shared close button dismiss the Recruit Code panel without a guard. |
+
+**When you ship GoodBlock #8, two lists need it added, not one:**
+
+1. `GOODBLOCKS` in `scripts/check-invariants.js` — otherwise the new module is simply not
+   checked, and the suite passes by not looking.
+2. A row in a coverage map under `docs/goodblocks/`, if the GoodBlock is named in the
+   For Teachers standards table — with Case-level evidence, written from the lesson
+   content upward rather than from the competency down.
+
+**If a check fires and you believe it is wrong, fix the check — do not weaken it.** A
+check that has been loosened to go green is worse than no check, because it still reads
+as coverage. The `[standards]` check was strengthened on 2026-09-11 for exactly this
+reason: it had been treating "not marked DRAFT" as "signed off," which would have
+reported a marketing claim as backed by a document nobody had reviewed.
+
+**One violation is expected to stand for now**: `[standards] awaiting sign-off`. The two
+coverage maps are written and evidenced but need a human reviewer — Instructional Design
+and Curriculum & Learning Science — to sign them. That is not closable in code and is not
+yours to close by editing the Status line yourself.

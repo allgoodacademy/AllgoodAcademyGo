@@ -146,34 +146,76 @@ const GOODBLOCK_NAMES = [
 ];
 const claimPages = ['public/for-teachers/index.html', 'public/index.html', 'public/about/index.html'];
 const claimingPages = claimPages.filter((p) => exists(p) && /CASEL/.test(read(p)));
+
+// A coverage map is in exactly one of three states, read from its Status line:
+//   DRAFT          — not evidence yet. Hard fail.
+//   awaiting       — written and evidenced, but no human has signed it. Fail, reported as
+//                    the outstanding sign-off rather than as missing documentation.
+//   signed         — a named reviewer has signed it off. The only state that clears.
+// The middle state was added 2026-09-11. Without it this check treated "not marked DRAFT"
+// as "signed off", so authoring the maps alone would have flipped it green and reported a
+// marketing claim as backed by a document nobody had reviewed — the precise failure mode
+// this script exists to catch, reproduced inside the script.
+function mapStatus(text) {
+  const line = (text.match(/^\s*\*\*Status:\*\*(.*)$/mi) || text.match(/^\s*Status:(.*)$/mi) || [])[1];
+  if (line == null) return 'unknown';
+  if (/DRAFT/i.test(line)) return 'draft';
+  if (/awaiting sign-?off/i.test(line)) return 'awaiting';
+  if (/signed[- ]?off/i.test(line)) return 'signed';
+  return 'unknown';
+}
+
 if (claimingPages.length) {
   const docsDir = 'docs/goodblocks';
-  let signedOff = [];
+  const evidenced = [];   // maps that name CASEL and are not DRAFT
+  const awaiting = [];    // ...of those, the ones no human has signed yet
   if (exists(docsDir)) {
     for (const f of fs.readdirSync(path.join(root, docsDir))) {
       if (!/coverage-map/.test(f)) continue;
       const d = read(path.join(docsDir, f));
-      if (/Status:\s*\**\s*DRAFT/i.test(d)) {
+      const status = mapStatus(d);
+      if (status === 'draft') {
         fail('standards', `${docsDir}/${f} is still marked DRAFT while marketing asserts a CASEL mapping. Sign it off or the claim is unbacked.`);
         continue;
       }
-      if (/CASEL/i.test(d)) signedOff.push({ file: f, text: d });
+      if (status === 'unknown') {
+        fail('standards',
+          `${docsDir}/${f} has no readable Status line. A coverage map with no stated status ` +
+          `cannot be told apart from a signed-off one, so it is not counted as evidence. Use ` +
+          `"**Status:** DRAFT", "**Status:** Awaiting sign-off — <reviewers>", or a signed-off status.`);
+        continue;
+      }
+      if (!/CASEL/i.test(d)) continue;
+      evidenced.push({ file: f, text: d });
+      if (status === 'awaiting') awaiting.push(f);
     }
   }
-  if (!signedOff.length) {
+  if (!evidenced.length) {
     fail('standards',
-      `${claimingPages.join(', ')} assert a CASEL mapping, but no signed-off coverage map in ` +
+      `${claimingPages.join(', ')} assert a CASEL mapping, but no coverage map in ` +
       `${docsDir} names CASEL. Write the maps — do not remove the claim without a founder decision.`);
   } else {
-    const all = signedOff.map((m) => m.text).join('\n');
+    const all = evidenced.map((m) => m.text).join('\n');
     for (const name of GOODBLOCK_NAMES) {
       const shipped = GOODBLOCKS.some((g) => g.includes(name.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '')));
       if (!shipped) continue;
       if (!all.includes(name)) {
         fail('standards',
           `"${name}" is claimed in a marketing standards table but has no entry in any ` +
-          `signed-off coverage map. Every claimed row needs evidence behind it.`);
+          `coverage map. Every claimed row needs evidence behind it.`);
       }
+    }
+    // Evidence exists and covers every claimed row; the human step is what is outstanding.
+    // This is deliberately still a violation: a claim backed only by an unreviewed document
+    // is not yet a backed claim. It clears when a reviewer edits the Status line — not by
+    // anything Claude Code or CI can do on its own.
+    if (awaiting.length) {
+      fail('standards',
+        `awaiting sign-off — ${awaiting.map((f) => `${docsDir}/${f}`).join(', ')} ` +
+        `${awaiting.length === 1 ? 'is' : 'are'} written and evidenced but not yet signed off by ` +
+        `the Instructional Designer / Curriculum & Learning Science. Marketing asserts the CASEL ` +
+        `mapping today, so the claim stands on a document no reviewer has accepted. This is the ` +
+        `human step and is not closable in code.`);
     }
   }
 }
