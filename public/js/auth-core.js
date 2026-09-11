@@ -756,15 +756,29 @@ async function sendMessage({ text, source }) {
 }
 
 // --- COURSE FEEDBACK: flat top-level collection, separate from game_scores ---
+// ageTier is stamped on the document because this is the one collection that stores
+// free text a child typed. Without it an under-13 submission is indistinguishable from
+// a 13+ one, so a parent asking us to delete their child's comment could not be
+// answered without joining every row back to its user doc. It comes from getAccount()
+// — the same single read identity-gate.js and telemetry.js use — rather than a new
+// source of truth. A failed read must never cost us the feedback itself, so the tier
+// falls back to null and the write still happens; null means "unknown", not "13+".
 async function submitCourseFeedback({ gameName, rating, feedback }) {
     const user = auth.currentUser;
     if (!user) return;
+    let ageTier = null;
+    try {
+        ageTier = (await getAccount(user.uid)).ageTier;
+    } catch (e) {
+        console.error('[auth-core] course feedback: age tier lookup failed', e);
+    }
     await addDoc(collection(db, 'artifacts', appId, 'course_feedback'), {
         uid: user.uid,
         name: user.displayName || 'Anonymous',
         gameName,
         rating: typeof rating === 'number' ? rating : null,
         feedback: feedback || '',
+        ageTier: ageTier || null,
         timestamp: serverTimestamp(),
     });
 }

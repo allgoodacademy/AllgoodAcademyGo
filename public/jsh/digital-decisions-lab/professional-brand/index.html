@@ -1139,6 +1139,10 @@
                 window.playPageIntro(pageNum);
                 if (window.Telemetry) window.Telemetry.step(pageNum + 1);
                 saveProgress();
+                // Completion is recorded here, on reaching the final case (the handoff
+                // screen with the rating), not inside finalizeCaseRating() — the rating
+                // is optional feedback and must never gate whether completion is logged.
+                if (pageNum === TOTAL_PAGES - 1 && window.logModuleCompletion) window.logModuleCompletion();
             }
             // Case 5's clock is started by the student pressing "Join the call" - never here,
             // so it can't run behind a lock overlay or on a restored visit they didn't ask for.
@@ -2224,7 +2228,6 @@
             if (window.AuthCore && window.AuthCore.submitCourseFeedback) {
                 window.AuthCore.submitCourseFeedback({ gameName: 'Professional Brand', rating: selectedStars, feedback: feedbackText });
             }
-            if (window.logModuleCompletion) window.logModuleCompletion();
             if (window.sfx) window.sfx.success();
             setTimeout(() => { window.revealCompletion(); }, 400);
         };
