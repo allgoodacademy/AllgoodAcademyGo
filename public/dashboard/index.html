@@ -1953,7 +1953,16 @@
             }
 
             if (wantsSignIn) {
-                powerUp(true);
+                // Deliberately NOT powerUp(true) here. powerUp() calls silentSignIn() when
+                // the browser has no stored session, which mints an anonymous guest — so
+                // someone who came here by pressing "Sign in" was handed a throwaway
+                // identity before being asked who they were, and landed on the dashboard as
+                // a guest. It also pushed googleSignIn() down its linkWithPopup() branch,
+                // linking a real Google account onto that throwaway uid instead of simply
+                // signing in. Show the gate against the power-up screen instead, and only
+                // power up if they back out.
+                startupScreen.style.opacity = '0';
+                startupScreen.style.display = 'none';
                 (async () => {
                     // signIn(), not ensureIdentified(): arriving via the marketing site's
                     // "Sign in" button says plainly that this person already has an account,
@@ -1961,6 +1970,7 @@
                     const { user, account } = await window.AuthGate.signIn();
                     if (user && account) {
                         applyIdentityToUI(user, account);
+                        window.initDashboard();
                         history.replaceState(null, '', '/dashboard/');
                     } else {
                         // Dismissed the gate — back to the marketing page rather than

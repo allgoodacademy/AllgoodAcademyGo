@@ -70,7 +70,7 @@ function showAuthSpinner() {
     if (!el) {
         el = document.createElement('div');
         el.id = 'ag-loading';
-        el.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(255,255,255,0.6);display:flex;align-items:center;justify-content:center;';
+        el.style.cssText = 'position:fixed;inset:0;z-index:2147482999;background:rgba(255,255,255,0.6);display:flex;align-items:center;justify-content:center;';
         el.innerHTML = '<div style="width:32px;height:32px;border:3px solid #D34716;border-top-color:transparent;border-radius:50%;animation:ag-spin 0.7s linear infinite;"></div>' +
             '<style>@keyframes ag-spin{to{transform:rotate(360deg)}}</style>';
         document.body.appendChild(el);
@@ -90,8 +90,28 @@ function isFullyIdentified(user, account) {
     return false;
 }
 
+// The three properties that decide whether this gate is SEEN AT ALL are set inline, not by
+// Tailwind classes — the same reasoning showAuthSpinner() and the save FAB already use, and
+// for the same reason: this markup is injected into eleven different pages, each with its
+// own CSS build, and it must not depend on what any of them happened to compile.
+//
+// Both halves of that mattered here, and together they were the "Sign In does nothing" bug:
+//
+//   position/inset — the div is appended to document.body, so `absolute inset-0` resolved
+//   against the nearest POSITIONED ancestor, and the dashboard sets `body{position:relative}`.
+//   The gate was laid out against the body box instead of the viewport and rendered ~700px
+//   down, below the fold. It opened every time; nobody could see it. Lab pages were fine
+//   only because their body is unpositioned, so absolute happened to hit the initial
+//   containing block.
+//
+//   z-index — `z-[9999]` appears nowhere but this file, and the dashboard ships a PURGED
+//   Tailwind bundle built by scanning .html only. The class was never compiled, so the gate
+//   computed to `z-index:auto` and painted UNDERNEATH the profile modal (z-260), the slide-out
+//   menu (z-100) and the power-up screen (z-5000). Opening it from any of those looked like
+//   nothing happening. The classes are kept for pages that do compile them; the inline styles
+//   are what actually guarantee it.
 const TEMPLATE = `
-<div id="ag-modal" class="absolute inset-0 z-[9999] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
+<div id="ag-modal" style="position:fixed;inset:0;z-index:2147483000;" class="fixed inset-0 z-[9999] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
     <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary relative">
         <button id="ag-btn-close" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors" title="Close" aria-label="Close">
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
