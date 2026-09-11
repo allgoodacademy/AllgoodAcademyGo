@@ -113,7 +113,11 @@ function isFullyIdentified(user, account) {
 const TEMPLATE = `
 <div id="ag-modal" style="position:fixed;inset:0;z-index:2147483000;" class="fixed inset-0 z-[9999] bg-allgood-dark/95 flex items-center justify-center p-6 hidden-modal modal-transition backdrop-blur-sm">
     <div class="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-allgood-primary relative">
-        <button id="ag-btn-close" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors" title="Close" aria-label="Close">
+        <!-- The tap target is 44x44 (WCAG 2.5.5 minimum), sized inline for the same reason the
+             z-index above is: the w-11/h-11 and flex-centering utilities it needs are not in
+             every page's Tailwind bundle. The icon itself stays 20px - only the tappable area
+             grows, so a child reaching for it on a phone can actually land on it. -->
+        <button id="ag-btn-close" style="position:absolute;top:4px;right:4px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;" class="text-gray-400 hover:text-red-500 transition-colors" title="Close" aria-label="Close">
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
         <div class="mb-6"><h2 class="text-3xl font-heading font-bold text-allgood-dark">Allgood<span class="text-allgood-primary">Academy</span></h2></div>
@@ -203,6 +207,18 @@ const TEMPLATE = `
             <button id="ag-btn-recruit-continue" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase">Let's Go!</button>
         </div>
 
+        <!-- CLOSE GUARD for the Recruit Code reveal only. The X is shared by every panel, and
+             on this one panel it sits beside the single copy of a child's Recruit Code - the
+             only route back to their work on another device. Tapping it therefore asks first,
+             here, in the gate's own vocabulary rather than a browser confirm(), and the
+             recovering choice is the primary one. Every other panel closes as it always did. -->
+        <div id="ag-recruit-confirm" class="hidden">
+            <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Did you write it down?</h2>
+            <p class="text-gray-500 text-xs mb-4 font-body leading-relaxed">Your Recruit Code is the only way to get back to your work on another device. Close this and we can&rsquo;t show it to you again.</p>
+            <button id="ag-btn-recruit-keep" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase mb-3">Take me back to my code</button>
+            <button id="ag-btn-recruit-discard" class="w-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-allgood-dark font-bold py-2.5 rounded text-xs uppercase font-body transition-colors">I&rsquo;ve got it written down &mdash; close</button>
+        </div>
+
         <!-- SAVE / CLAIM: the end-of-module offer, in Jodi's voice. It is an offer to keep
              the run, not a demand to sign in — so it names what the student would lose
              rather than what the product wants. Shown only once the completion reveal is on
@@ -247,7 +263,7 @@ function ensureModalInjected() {
 }
 
 function showPanel(id) {
-    ['ag-root', 'ag-save', 'ag-signin', 'ag-recruit-new', 'ag-redeem', 'ag-returning'].forEach((panelId) => {
+    ['ag-root', 'ag-save', 'ag-signin', 'ag-recruit-new', 'ag-recruit-confirm', 'ag-redeem', 'ag-returning'].forEach((panelId) => {
         const el = document.getElementById(panelId);
         if (el) el.classList.toggle('hidden', panelId !== id);
     });
@@ -339,6 +355,26 @@ function openGate(onResolved, options) {
     // as "still not identified" instead of mistaking the pre-existing anonymous session
     // for a real answer.
     document.getElementById('ag-btn-close').onclick = () => {
+        playSfx('click');
+        // One panel is not safe to dismiss on a single tap: ag-recruit-new is showing the only
+        // copy of a brand-new Recruit's code. Divert to the confirm panel instead of closing.
+        // Nothing is resolved here, so the gate stays open and the code is still recoverable.
+        const recruitPanel = document.getElementById('ag-recruit-new');
+        if (recruitPanel && !recruitPanel.classList.contains('hidden')) {
+            showPanel('ag-recruit-confirm');
+            return;
+        }
+        resolveAndClose(true);
+    };
+
+    // Cancel: straight back to the code, still readable, gate still open.
+    document.getElementById('ag-btn-recruit-keep').onclick = () => {
+        playSfx('click');
+        showPanel('ag-recruit-new');
+    };
+
+    // Confirm: this is the close the X originally did - resolved as cancelled, same as before.
+    document.getElementById('ag-btn-recruit-discard').onclick = () => {
         playSfx('click');
         resolveAndClose(true);
     };

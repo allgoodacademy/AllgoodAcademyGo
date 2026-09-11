@@ -1,0 +1,25 @@
+name: Invariants check
+
+# Behavioural invariants that have silently regressed before — completion writes,
+# GA4 surface scope, bundled assets, standards-claim backing, recruit-code guard.
+# Companion to module-registry-check.yml, which checks list drift rather than behaviour.
+#
+# This job is expected to FAIL on main until the open items it reports are fixed.
+# That is the point: the failure is the live status of the backlog, not a broken build.
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check behavioural invariants
+        run: node scripts/check-invariants.js

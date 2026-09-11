@@ -1049,6 +1049,10 @@
                 window.playPageIntro(pageNum);
                 if (window.Telemetry) window.Telemetry.step(pageNum + 1);
                 saveProgress();
+                // Completion is recorded here, on reaching the final case (the handoff
+                // screen with the rating), not inside finalizeCaseRating() — the rating
+                // is optional feedback and must never gate whether completion is logged.
+                if (pageNum === TOTAL_PAGES - 1 && window.logModuleCompletion) window.logModuleCompletion();
             }
             const nextPageEl = document.getElementById(`page-${pageNum + 1}`);
             if (nextPageEl) nextPageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1847,7 +1851,6 @@
             if (window.AuthCore && window.AuthCore.submitCourseFeedback) {
                 window.AuthCore.submitCourseFeedback({ gameName: 'Conflict Has a Winner', rating: selectedStars, feedback: feedbackText });
             }
-            if (window.logModuleCompletion) window.logModuleCompletion();
             if (window.sfx) window.sfx.success();
             setTimeout(() => { window.revealCompletion(); }, 400);
         };
