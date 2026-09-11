@@ -4,6 +4,17 @@
 **Audited:** 2026-09-11, against `claude/retention-infrastructure` (branched from `claude/hopeful-gates-vezwqu`).
 **Author:** Claude Code, Retention Infrastructure sprint, Goal 1.
 
+> **RESOLVED 2026-09-11** — *Legal pages reconciliation — one privacy policy, updated terms.*
+> There is now one privacy policy. `public/privacy/index.html` was deleted, `public/privacy.html`
+> was replaced with a document that carries the disclosures which previously existed only on the
+> orphan (parent/teacher deletion route, teacher data, classroom code, advertising disclaimer)
+> plus Google Analytics, free-text handling and Local Storage, and `firebase.json` now 301s
+> `/privacy`, `/privacy/` and `/privacy/**` to `/privacy.html`. The retention prose (recommendation 4,
+> still escalated) was carried over **byte-identical** and is now Section 8. The generated
+> "last updated" date (recommendation 3) is gone with the file that contained it; both legal
+> pages now carry a hardcoded date. The findings below are kept as the record of what was
+> reconciled and why — they describe the state before this change, not the state today.
+
 ---
 
 ## Headline
