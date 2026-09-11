@@ -333,7 +333,7 @@
         // but reads differently depending on whether you're already a teacher.
         window.applyRoleUI = (role) => {
             const label = document.getElementById('menu-classroom-label');
-            if (label) label.textContent = role === 'teacher' ? 'My Task Force' : 'Set Up a Task Force';
+            if (label) label.textContent = role === 'teacher' ? 'Mission Control' : 'Set Up Mission Control';
         };
 
         // Smart entry point: teachers land in their existing classroom, everyone else is
@@ -928,6 +928,10 @@
                     return;
                 }
                 await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
+                // Mirror onto the Recruit Code so membership survives a device switch —
+                // redeeming lands on a new uid, and this is what carries the classroom over.
+                // No-op for anyone without a code.
+                if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(code);
                 if (statusEl) { statusEl.textContent = "Joined! Your Task Force Leader can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
                 if (window.sfx) window.sfx.confirm();
             } catch (e) {
@@ -1551,7 +1555,22 @@
         let _currentAssignedModuleIds = [];
         let _studentStatusCache = {};
 
+        // The teacher's Task Force view is Mission Control (public/mission-control/) now.
+        // It re-checks role and classroom ownership against Firestore on its own and shows
+        // its own explanation if either fails, so there is deliberately no lookup here —
+        // duplicating that check would only add a round trip before the redirect.
         window.openTeacherDashboard = async () => {
+            const menu = document.getElementById('menu-modal');
+            if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
+            sfx.confirm();
+            window.location.href = '/mission-control/';
+        };
+
+        // The previous inline Task Force page, still wired to #page-admin and still
+        // working. Nothing in the normal teacher flow reaches it now that the menu goes to
+        // Mission Control, but it is the roster renderer saveAssignments() re-runs after a
+        // change, and #page-admin is deliberately left in the document rather than removed.
+        window.renderTaskForcePage = async () => {
             const menu = document.getElementById('menu-modal');
             if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
 
@@ -1851,7 +1870,7 @@
             await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), { assignedModules: checked }, { merge: true });
             showStatusMessage("Assignments updated.", 'info');
             window.closeAssignmentPicker();
-            window.openTeacherDashboard(); // refresh roster against the new assignment set
+            window.renderTaskForcePage(); // refresh roster against the new assignment set
         };
 
         window.exportRosterCSV = () => {
@@ -1908,6 +1927,19 @@
             // later in the SAME page load, and it needs to still be clickable then.
             startupScreen.addEventListener('click', () => powerUp(false));
 
+            // "Already have an account? Sign in" on the power-up screen. Deliberately does
+            // NOT power up first: doing so would mint the anonymous guest this path exists
+            // to avoid. The gate is opened on its returning-user panel instead, and only a
+            // successful sign-in dismisses the screen — cancelling leaves the visitor
+            // exactly where they were, still able to power up as a guest.
+            window.startupSignIn = async () => {
+                const { user, account } = await window.AuthGate.signIn();
+                if (!user || !account) return;
+                startupScreen.style.display = 'none';
+                applyIdentityToUI(user, account);
+                window.initDashboard();
+            };
+
             // Arriving from the marketing site's Sign in button. Those three pages
             // deliberately load no Firebase (zero third-party requests on first paint),
             // so they hand off to the gate here, where its markup and styles already are.
@@ -1921,11 +1953,24 @@
             }
 
             if (wantsSignIn) {
-                powerUp(true);
+                // Deliberately NOT powerUp(true) here. powerUp() calls silentSignIn() when
+                // the browser has no stored session, which mints an anonymous guest — so
+                // someone who came here by pressing "Sign in" was handed a throwaway
+                // identity before being asked who they were, and landed on the dashboard as
+                // a guest. It also pushed googleSignIn() down its linkWithPopup() branch,
+                // linking a real Google account onto that throwaway uid instead of simply
+                // signing in. Show the gate against the power-up screen instead, and only
+                // power up if they back out.
+                startupScreen.style.opacity = '0';
+                startupScreen.style.display = 'none';
                 (async () => {
-                    const { user, account } = await window.AuthGate.ensureIdentified();
+                    // signIn(), not ensureIdentified(): arriving via the marketing site's
+                    // "Sign in" button says plainly that this person already has an account,
+                    // so opening on the age question was asking the wrong thing first.
+                    const { user, account } = await window.AuthGate.signIn();
                     if (user && account) {
                         applyIdentityToUI(user, account);
+                        window.initDashboard();
                         history.replaceState(null, '', '/dashboard/');
                     } else {
                         // Dismissed the gate — back to the marketing page rather than
@@ -2342,6 +2387,17 @@
                         </div>
 
                         <p id="startup-message" class="text-slate-500 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-allgood-primary transition-colors animate-pulse font-body">CLICK TO POWER UP</p>
+
+                        <!-- Powering up creates a NEW anonymous session. For a first-time
+                             visitor that is exactly right; for someone who already has an
+                             account it was the only control on the screen, so getting back
+                             in and starting over were the same click. This is the other
+                             door. It stops propagation so it never doubles as a power-up. -->
+                        <button id="startup-signin"
+                                class="mt-10 text-slate-400 hover:text-white text-[11px] font-body underline decoration-dotted underline-offset-4 transition-colors relative z-20 px-4 py-2"
+                                onclick="event.stopPropagation(); window.startupSignIn();">
+                            Already have an account? Sign in
+                        </button>
                     </div>
                 </div>
 
@@ -2362,8 +2418,8 @@
                     <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
                         <button onclick="window.closeBecomeTeacherModal()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
                         <i data-lucide="graduation-cap" class="w-10 h-10 text-allgood-secondary mx-auto mb-3"></i>
-                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Set Up a Task Force?</h3>
-                        <p class="text-xs text-gray-500 mb-5">This gives you a Task Force code to share with students, and a roster where you can see their progress. You can do this anytime — no rush.</p>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Set Up Mission Control?</h3>
+                        <p class="text-xs text-gray-500 mb-5">Setting this up gives you Mission Control — a code to share with students, and a roster where you can see their progress. You can do this anytime — no rush.</p>
                         <button onclick="window.beginClassroomSetup()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide mb-2">Yes, Set It Up</button>
                         <button onclick="window.closeBecomeTeacherModal()" class="w-full text-gray-400 hover:text-gray-600 text-xs font-bold uppercase py-2">Not Right Now</button>
                     </div>
@@ -2373,7 +2429,7 @@
                      created. Records a timestamped acceptance — this is the compliance record. -->
                 <div id="teacher-consent-modal" class="hidden-modal absolute inset-0 z-[3700] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
                     <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-left border-t-4 border-allgood-secondary relative">
-                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-3 text-center">Before You Set Up a Task Force</h3>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-3 text-center">Before You Set Up Mission Control</h3>
                         <div class="text-xs text-gray-600 leading-relaxed space-y-2 mb-4 bg-slate-50 border border-slate-100 rounded p-3">
                             <p><strong class="text-allgood-dark">What we collect from your students:</strong> a nickname they choose (never a real name or email), their scores, and their activity in the lessons you assign. That's it.</p>
                             <p><strong class="text-allgood-dark">Why:</strong> so you can see their progress and so we can run the lessons themselves.</p>
@@ -2460,7 +2516,7 @@
                             <!-- CLASSROOM ENTRY: always visible. Smart destination - teachers land in their
                                  classroom, everyone else gets the option to set one up. -->
                             <button id="menu-btn-classroom" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openClassroomEntry()">
-                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i><span id="menu-classroom-label">Set Up a Task Force</span>
+                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i><span id="menu-classroom-label">Set Up Mission Control</span>
                             </button>
                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openAboutModal()">
                                 <i data-lucide="info" class="w-4 h-4 mr-3 text-slate-500"></i>About Us

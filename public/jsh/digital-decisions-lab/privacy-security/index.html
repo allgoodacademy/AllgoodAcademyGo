@@ -75,6 +75,38 @@
                 }, { merge: true });
             } catch (e) { console.error("[PS] Completion write failed", e); }
         };
+
+        // Per-Case commit write. Two destinations, deliberately:
+        //   1. Telemetry.choice() — the shared analytics event stream Insider reads.
+        //   2. game_scores/{sessionId}/scenario_attempts/{n} — the same shape the Digital
+        //      Decisions Challenge already writes, and the only one of the two a TEACHER can
+        //      read back: firestore.rules #6 covers a classroom student's subcollections,
+        //      while the events collection Telemetry writes to is admin-only (#11). Mission
+        //      Control's step-by-step breakdown reads this path, so a choice sent only to
+        //      Telemetry would be invisible to the teacher it was collected for.
+        // The parent game_scores doc is merged at the same time because a subcollection under
+        // a document that was never written does not appear when the dashboard lists
+        // game_scores — the attempts would be unreachable without it. `completed` is
+        // deliberately NOT written here: merging false would undo a finished lab when a
+        // student goes back and revises an answer.
+        // attemptKey exists for Cases that commit more than once — the Scam Sort grades each
+        // message separately, and all five would collapse onto one document otherwise.
+        window.logCaseAttempt = async (data) => {
+            if (window.Telemetry) window.Telemetry.choice(data);
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                const scoreRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+                await setDoc(scoreRef, {
+                    gameName: "Privacy & Security",
+                    lastUpdated: serverTimestamp(),
+                    user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail || null }
+                }, { merge: true });
+                await setDoc(doc(scoreRef, 'scenario_attempts', data.attemptKey || `scenario_${data.scenarioIndex}`), {
+                    ...data, timestamp: serverTimestamp()
+                });
+            } catch (e) { console.error("[PS] Case attempt write failed", e); }
+        };
     </script>
 
     <script>
@@ -787,6 +819,46 @@
     <script>
         const CASE_TITLES = ["One Saturday, Four Moments", "The Scam Sort", "The Permission Calibration", "The Password Pressure Test", "The DM Redirect", "Handoff"];
 
+        // ── PER-CASE COMMIT TELEMETRY ─────────────────────────────────────────────────
+        // One entry per Case, in Case order. Each entry is the ordered option list a stored
+        // choiceIndex points into, and Mission Control reads THIS array — extracted by
+        // scripts/build-mission-control-data.js — to turn a choiceIndex back into the words
+        // the student actually saw. Its order must therefore match the handlers that call
+        // commitCase() below. `null` marks a Case with nothing to grade: Case 1 is the intro
+        // montage and Case 6 the handoff, which is why pageCompletion starts them both true.
+        // Case 2 is the one Case that commits per item rather than once — its two entries are
+        // the verdict on a single message, not on the Case.
+        const CASE_CHOICES = [
+            null,
+            ["Called it correctly", "Let it past"],
+            ["Left the flashlight on, denied the rest"],
+            ["Cleared the bar", "Well past the bar"],
+            ["Named all three asks, and nothing that wasn't there"],
+            null
+        ];
+
+        // Fires a Case's commit exactly once. If the student changes an answer they had
+        // already committed, the call repeats carrying replay: true, so Mission Control shows
+        // the answer they settled on without losing that they revised it.
+        // replay rides INSIDE this object rather than as a second argument: telemetry.js's
+        // choice(meta) takes exactly one and a second would be silently discarded, and
+        // telemetry.js is out of scope to change here.
+        const caseCommitted = {};
+        function commitCase(caseIndex, choiceIndex, score, meta) {
+            const replay = !!caseCommitted[caseIndex];
+            caseCommitted[caseIndex] = true;
+            if (!window.logCaseAttempt) return;
+            window.logCaseAttempt({
+                scenarioIndex: caseIndex,
+                choiceIndex: choiceIndex,
+                score: score,
+                effectiveness: ['Missed', 'Fair', 'Good', 'Best'][score] || 'Missed',
+                question: CASE_TITLES[caseIndex],
+                ...(replay ? { replay: true } : {}),
+                ...(meta || {})
+            });
+        }
+
         window.openCaseMenu = () => {
             const list = document.getElementById('case-menu-list');
             list.innerHTML = '';
@@ -1149,6 +1221,9 @@
         let sortMissed = [];
         let sortAnswered = false;
         let sortRetryRound = false;
+        // Distinguishes a fresh deal from a second run for telemetry. sortSetIndex can cycle
+        // back to 0 on a third replay, so it can't answer this on its own.
+        let sortReplayed = false;
         let firstScamCallback = null;
 
         function currentSortSet() { return SORT_SETS[sortSetIndex]; }
@@ -1233,6 +1308,22 @@
             nextWrap.classList.remove('hidden');
             nextWrap.classList.add('flex');
 
+            // Case 2 commits per message, not once for the Case: each of the five is its own
+            // judgment call, and a single Case-level verdict would hide which ones got past
+            // them. Each gets its own attempts document for the same reason.
+            if (window.logCaseAttempt) window.logCaseAttempt({
+                scenarioIndex: 1,
+                choiceIndex: correct ? 0 : 1,
+                score: correct ? 3 : 0,
+                effectiveness: correct ? 'Best' : 'Missed',
+                question: `${CASE_TITLES[1]} — ${item.sender}`,
+                attemptKey: `scenario_1_${item.id}`,
+                itemId: item.id,
+                sortedAs: choice,
+                correctAnswer: item.answer,
+                ...((sortRetryRound || sortReplayed) ? { replay: true } : {})
+            });
+
             window.updateWhiteboard(panel.title, panel.desc, 2);
             window.sayJodi(bubble.text, bubble.mood);
             if (window.sfx) { correct ? window.sfx.tick() : window.sfx.click(); }
@@ -1288,6 +1379,7 @@
             sortSetIndex = (sortSetIndex + 1) % SORT_SETS.length;
             sortQueue = currentSortSet().items.map(i => i.id);
             sortPos = 0; sortMissed = []; sortAnswered = false; sortRetryRound = false;
+            sortReplayed = true;
             window.sayJodi("That\u2019s the spirit. Fresh batch \u2014 same question every time: what does this one need her to do before she thinks?", 'happy');
             window.renderSortCard();
             document.getElementById('page-2').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1334,8 +1426,14 @@
             }
         };
 
+        // Four toggles is the shortest route from the default (everything on) to the correct
+        // set, so this counts how far past that the student wandered — the one real signal
+        // this Case produces, since it gates on an exact end state everybody reaches.
+        let permToggles = 0;
+
         window.togglePerm = (perm, btn) => {
             permState[perm] = !permState[perm];
+            permToggles++;
             btn.classList.toggle('on', permState[perm]);
             const content = PERM_CONTENT[perm];
             window.updateWhiteboard(content.title, content.desc, 3);
@@ -1353,6 +1451,7 @@
                     3
                 );
                 window.sayJodi("There it is. And notice what you didn't do — you didn't shut it all off. You left the one thing it actually needed to do its job. That's the part folks miss. The question was never 'is this app shady.' It's 'does what it's asking for match what it's for.' A flashlight needs a light. It does not need to know where she is, who she knows, or what she sounds like.", 'happy');
+                commitCase(2, 0, permToggles <= 4 ? 3 : (permToggles <= 6 ? 2 : 1), { toggles: permToggles });
                 window.markReady(2);
             }
         };
@@ -1492,6 +1591,7 @@
                     4
                 );
                 window.sayJodi("There we go. And here's the part that stings a little: the one that felt clever was the weakest thing on the list. Swapping an A for an @ doesn't fool a machine — that's the first thing it tries. What actually beats it is boring old length. A passphrase you can remember, that nobody would ever put together.", 'happy');
+                commitCase(3, bits >= 80 ? 1 : 0, bits >= 80 ? 3 : 2, { bits: Math.round(bits) });
                 window.markReady(3);
             }
         };
@@ -1526,10 +1626,16 @@
             wrong: { title: "Read It Once More", desc: "That one isn't actually in the message. The skill here is naming exactly what's being asked, not everything that could have been — because if you flag everything, you can't tell anyone which part was the dangerous bit." }
         };
 
+        // Counts the decoys ticked on the way to the right answer. The Case gates on an exact
+        // final state, so without this every student who finishes looks identical — and the
+        // whole point of this one is that flagging everything is not the skill.
+        let fishWrongPicks = 0;
+
         window.toggleFish = (el) => {
             const id = el.dataset.fish;
             const isCorrect = el.dataset.correct === 'yes';
             fishState[id] = !fishState[id];
+            if (fishState[id] && !isCorrect) fishWrongPicks++;
 
             const box = el.querySelector('.fish-box');
             el.classList.remove('checked-correct', 'checked-wrong');
@@ -1569,6 +1675,7 @@
                 window.sayJodi("Mhm. Three questions, real friendly, and not one of them was actually about her — they were about where she goes, where she is, and who's home. That's not a conversation. That's a checklist somebody else is filling out. And now that you can see it for what it is, you know exactly what to do with it.", 'happy');
                 document.getElementById('block-zone').classList.remove('hidden');
                 if (window.lucide) window.lucide.createIcons();
+                commitCase(4, 0, fishWrongPicks === 0 ? 3 : (fishWrongPicks === 1 ? 2 : 1), { decoysTicked: fishWrongPicks });
                 window.markReady(4);
             }
         };

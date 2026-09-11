@@ -8,6 +8,7 @@
 //   - each module page's Telemetry.init({ module, gameName, stepsTotal }) call
 //   - each lab's completion-badge "N scenarios" figure vs the real category count in its
 //     pack's Challenge SCENARIO_DATA (the Privacy & Security "9 vs 8" bug class)
+//   - public/mission-control/module-data.js is in sync with the arrays it is generated from
 // No dependencies; run with `node scripts/check-modules.js`. Exits 1 on any mismatch.
 const fs = require('fs');
 const path = require('path');
@@ -225,6 +226,17 @@ for (const [id, page] of Object.entries(modulePages)) {
   // A "scenario" page label collides with the Challenge unit (every page is a Case).
   if (/<span[^>]*tracking-widest[^>]*>\s*Scenario \d/.test(src)) fail(`${page}: a page label reads "Scenario N" — page labels are "Case N"; "scenario" is reserved for Challenge items`);
   if (/tracking-widest[^>]*>Before We Start</.test(src)) fail(`${page}: intro label still reads "Before We Start" — every page is a Case, numbered from 1`);
+}
+
+// Mission Control renders the words a student saw from public/mission-control/module-data.js,
+// which is generated from SCENARIO_DATA / CASE_TITLES / CASE_CHOICES. If those arrays are
+// edited and the file isn't rebuilt, the dashboard keeps attributing the OLD sentence to a
+// student's stored choiceIndex — wrong, and silently so. Rebuild rather than hand-edit.
+try {
+  require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'build-mission-control-data.js'), '--check'], { stdio: 'pipe' });
+} catch (e) {
+  fail('public/mission-control/module-data.js is stale or invalid — run: node scripts/build-mission-control-data.js'
+    + ((e.stderr && e.stderr.toString().trim()) ? `\n     (${e.stderr.toString().trim().split('\n')[0]})` : ''));
 }
 
 if (problems.length) {

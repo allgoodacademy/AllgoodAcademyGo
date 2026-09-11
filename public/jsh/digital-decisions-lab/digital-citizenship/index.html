@@ -75,6 +75,36 @@
                 }, { merge: true });
             } catch (e) { console.error("[DC] Completion write failed", e); }
         };
+
+        // Per-Case commit write. Two destinations, deliberately:
+        //   1. Telemetry.choice() — the shared analytics event stream Insider reads.
+        //   2. game_scores/{sessionId}/scenario_attempts/{n} — the same shape the Digital
+        //      Decisions Challenge already writes, and the only one of the two a TEACHER can
+        //      read back: firestore.rules #6 covers a classroom student's subcollections,
+        //      while the events collection Telemetry writes to is admin-only (#11). Mission
+        //      Control's step-by-step breakdown reads this path, so a choice sent only to
+        //      Telemetry would be invisible to the teacher it was collected for.
+        // The parent game_scores doc is merged at the same time because a subcollection under
+        // a document that was never written does not appear when the dashboard lists
+        // game_scores — the attempts would be unreachable without it. `completed` is
+        // deliberately NOT written here: merging false would undo a finished lab when a
+        // student goes back and revises an answer.
+        window.logCaseAttempt = async (data) => {
+            if (window.Telemetry) window.Telemetry.choice(data);
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                const scoreRef = doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId);
+                await setDoc(scoreRef, {
+                    gameName: "Digital Citizenship",
+                    lastUpdated: serverTimestamp(),
+                    user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail || null }
+                }, { merge: true });
+                await setDoc(doc(scoreRef, 'scenario_attempts', data.attemptKey || `scenario_${data.scenarioIndex}`), {
+                    ...data, timestamp: serverTimestamp()
+                });
+            } catch (e) { console.error("[DC] Case attempt write failed", e); }
+        };
     </script>
 
     <script>
@@ -929,6 +959,45 @@
     <script>
         const CASE_TITLES = ["One Week, Five Moments", "The Source Check", "The Credit Trail", "The One You've Never Heard Of", "The One You Know Is Fake", "The Toxic Lobby", "Handoff"];
 
+        // ── PER-CASE COMMIT TELEMETRY ─────────────────────────────────────────────────
+        // One entry per Case, in Case order. Each entry is the ordered option list a stored
+        // choiceIndex points into, and Mission Control reads THIS array — extracted by
+        // scripts/build-mission-control-data.js — to turn a choiceIndex back into the words
+        // the student actually saw. Its order must therefore match the handlers that call
+        // commitCase() below. `null` marks a Case with nothing to grade: Case 1 is the intro
+        // montage and Case 7 the handoff, which is why pageCompletion starts them both true.
+        const CASE_CHOICES = [
+            null,
+            ["Built a stack that holds"],
+            ["Named her, linked her, asked her"],
+            ["Didn't share it"],
+            ["Told Della first, then reported", "Reported first, then told Della"],
+            ["Used the tools and never answered him", "Used the tools, but replied first"],
+            null
+        ];
+
+        // Fires a Case's commit exactly once. If the student changes an answer they had
+        // already committed, the call repeats carrying replay: true, so Mission Control shows
+        // the answer they settled on without losing that they revised it.
+        // replay rides INSIDE this object rather than as a second argument: telemetry.js's
+        // choice(meta) takes exactly one and a second would be silently discarded, and
+        // telemetry.js is out of scope to change here.
+        const caseCommitted = {};
+        function commitCase(caseIndex, choiceIndex, score, meta) {
+            const replay = !!caseCommitted[caseIndex];
+            caseCommitted[caseIndex] = true;
+            if (!window.logCaseAttempt) return;
+            window.logCaseAttempt({
+                scenarioIndex: caseIndex,
+                choiceIndex: choiceIndex,
+                score: score,
+                effectiveness: ['Missed', 'Fair', 'Good', 'Best'][score] || 'Missed',
+                question: CASE_TITLES[caseIndex],
+                ...(replay ? { replay: true } : {}),
+                ...(meta || {})
+            });
+        }
+
         window.openCaseMenu = () => {
             const list = document.getElementById('case-menu-list');
             list.innerHTML = '';
@@ -1442,6 +1511,9 @@
                 ? " And look what you did with the middle two: you didn't bin them. A family story and a reprint are both real — they just aren't evidence for this. That's the part most folks get wrong in the other direction."
                 : ` Go on ahead. I'll say there ${contested === 1 ? "is one I'd" : "are " + contested + " I'd"} still argue with you about — the marked ones are there if you want another run at them.`;
             window.sayJodi(base + tail, 'happy');
+            // The stack holding is the gate; what varies between students is how many of the
+            // seven cards they and Jodi still disagree about, so that is the score.
+            commitCase(1, 0, contested === 0 ? 3 : (contested <= 2 ? 2 : 1), { contested: contested, settled: correct || 0 });
             window.markReady(1);
         };
 
@@ -1567,14 +1639,21 @@
             window.sayJodi("Alright — that's her. Now: how does he use it?", 'neutral');
         };
 
+        // 'none' and 'vague' return without unlocking, so they are attempts rather than
+        // answers — counted here so the commit can reflect whether the student went straight
+        // to naming her or had to be talked out of a shrug first.
+        let attribMisfires = 0;
+
         window.chooseAttrib = (kind) => {
             if (kind === 'none') {
+                attribMisfires++;
                 window.updateWhiteboard("Found Isn't Free",
                     "Being easy to find is not the same as being free to use. She drew it; whether it's convenient doesn't enter into it.", 3);
                 window.sayJodi("Mm. It being easy to find doesn't make it his. She sat down and drew that.", 'thinking');
                 return;
             }
             if (kind === 'vague') {
+                attribMisfires++;
                 window.updateWhiteboard("A Shrug With A Bow On It",
                     "“Credit to the creator” credits nobody. You just spent four clicks learning her actual handle - the whole point was to be able to name her.", 3);
                 window.sayJodi("'Credit to the creator.' Now who is that, exactly? You just did four clicks of work to learn her name — use it.", 'thinking');
@@ -1584,6 +1663,7 @@
             window.updateWhiteboard("Four Hops Back",
                 "Named, linked, and asked. That's the whole obligation - and it took four clicks, which is roughly four clicks more than almost anyone does.", 3);
             window.sayJodi("Four hops. That's what it took. And every single person in that chain figured somebody else had already done the checking. That's how a thing ends up everywhere with nobody's name on it — not malice, just four people in a row who didn't click back once.", 'happy');
+            commitCase(2, 0, attribMisfires === 0 ? 3 : (attribMisfires === 1 ? 2 : 1), { misfires: attribMisfires });
             window.markReady(2);
             if (window.sfx) window.sfx.success();
         };
@@ -1683,6 +1763,10 @@
             window.updateWhiteboard("Ask The People Whose Job It Is",
                 "The decisive checks all had one thing in common: they asked something outside the post. The register, the search, the account age. The reassuring ones all asked the post about itself.", 4);
             window.sayJodi("And look which ones actually told you anything. Not the logo — anybody can buy a nice logo for nine dollars. Not asking Della; she's the one who got fooled. The register told you, because the register is somebody whose whole job is knowing. Ask the person whose job it is.", 'happy');
+            // Only this branch commits: the share branch and the no-evidence branch both return
+            // above without unlocking. The score is how much of the evidence actually settled
+            // anything, which is the skill the Case is after.
+            commitCase(3, 0, decisive >= 2 ? 3 : 2, { decisiveChecks: decisive, checksUsed: checksUsed.slice() });
             window.markReady(3);
         };
 
@@ -1833,6 +1917,9 @@
             let line = "Both. That's the answer — and it's the ordering people miss. Telling her protects her. Reporting protects everybody scrolling past it at two in the morning who'll never know his name. You don't have to pick which of those matters.";
             if (extras.length) line += ` I'd drop ${extras.join(' and ')} — once he's told her directly, that's doing the same job with a bigger audience.`;
             window.sayJodi(line, 'happy');
+            // Both actions are required to lock, so the ordering is what separates students —
+            // telling her first is the version that costs least, per the Case's own verdict.
+            commitCase(4, dmFirst ? 0 : 1, dmFirst ? 3 : 2, { order: actSeq.slice() });
             window.markReady(4);
         };
 
@@ -2020,11 +2107,13 @@
                     ? " The one he didn't reach for was Block — that's the permanent one, and it means that fella can't find him in a lobby again next week."
                     : (!lobbyTools.mute ? " He skipped Mute, and that's fine — Mute only ever fixes your own evening. Block does the same and keeps doing it." : "");
                 window.sayJodi("And you never said a word to him. Notice that wasn't the same as doing nothing — you did things. They just weren't aimed at him. That's the difference between walking away and actually closing the door." + missed, 'happy');
+                commitCase(5, 0, 3, { replies: lobbyReplies, tools: Object.keys(lobbyTools) });
                 window.markReady(5);
             } else if (usedReport && usedSilence && lobbyReplies > 0) {
                 window.updateWhiteboard("Right Tools, One Detour",
                     "The tools were the correct move. The reply in the middle is the part worth noticing - it cost nothing to skip, and it sped the whole thing up while it lasted.", 6);
                 window.sayJodi("Right tools in the end. Just notice the detour in the middle — it cost him a couple of minutes and it fed the thing while it lasted.", 'thinking');
+                commitCase(5, 1, 2, { replies: lobbyReplies, tools: Object.keys(lobbyTools) });
                 window.markReady(5);
             }
         };

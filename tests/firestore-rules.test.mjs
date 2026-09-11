@@ -126,6 +126,66 @@ await it('teacher_1 CANNOT read a student in a classroom they do not own', async
   await assertFails(getDoc(U(teacher, 'student_2')));
 });
 
+console.log('\nMISSION CONTROL — a teacher reads their own students\' telemetry sessions, nobody else\'s');
+const SESSIONS = (db) => collection(db, 'artifacts', APP, 'sessions');
+// The page queries one uid at a time on purpose: pinned to a single uid the rule's user and
+// classroom lookups resolve the same two paths for every document returned, so the query
+// stays inside the ten-document-access budget however many sessions that student has.
+const sessionsFor = (db, uid) => getDocs(query(SESSIONS(db), where('uid', '==', uid)));
+
+await it('teacher CAN read a session belonging to a student in their own classroom', async () => {
+  await assertSucceeds(sessionsFor(teacher, 'student_1'));
+});
+await it('...and that read actually returns the row, not an empty allowed result', async () => {
+  const snap = await sessionsFor(teacher, 'student_1');
+  if (snap.empty) throw new Error('query allowed but returned nothing — the grant is not matching');
+});
+await it('teacher CAN still read a session with many documents for one student', async () => {
+  // Guards the document-access budget: the rule must not re-resolve its lookups per row.
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    for (let i = 0; i < 12; i++) {
+      await setDoc(doc(db, 'artifacts', APP, 'sessions', `bulk_${i}`), { uid: 'student_1', module: 'privacy-security', startedAt: i, activeMs: 1000 });
+    }
+  });
+  const snap = await sessionsFor(teacher, 'student_1');
+  if (snap.size < 12) throw new Error(`expected at least 12 sessions, got ${snap.size}`);
+});
+await it('teacher CANNOT read sessions of a student in a classroom they do not own', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'artifacts', APP, 'sessions', 's_other'), { uid: 'student_2', module: 'digital-citizenship', startedAt: 1 });
+  });
+  await assertFails(sessionsFor(teacher, 'student_2'));
+});
+await it('teacher CANNOT enumerate the whole sessions collection', async () => {
+  // The grant is per-student by construction; an unfiltered list must stay admin-only.
+  await assertFails(getDocs(SESSIONS(teacher)));
+});
+await it('teacher CANNOT read another TEACHER\'s own sessions', async () => {
+  // The rule requires the session owner to be role:'student', so a teacher's own module
+  // visits are not readable by a peer even inside the same classroom.
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'artifacts', APP, 'sessions', 's_teach'), { uid: 'teacher_1', module: 'ddc', startedAt: 1 });
+  });
+  await assertFails(sessionsFor(teacher, 'teacher_1'));
+});
+await it('a guest CANNOT read a student\'s sessions by pinning the uid', async () => {
+  await assertFails(sessionsFor(guest, 'student_1'));
+});
+await it('a student CANNOT read a classmate\'s sessions', async () => {
+  await assertFails(sessionsFor(student, 'student_2'));
+});
+await it('teacher still CANNOT write or delete a session', async () => {
+  await assertFails(setDoc(doc(teacher, 'artifacts', APP, 'sessions', 's1'), { uid: 'student_1', activeMs: 999 }, { merge: true }));
+});
+await it('teacher CAN read a classroom student\'s scenario_attempts (the drill-down)', async () => {
+  // Rule #6 already covers this; asserted here because Mission Control's step-by-step
+  // breakdown is unreadable without it, and #6 is the rule a future roster change is most
+  // likely to touch.
+  await assertSucceeds(getDocs(collection(teacher, 'artifacts', APP, 'users', 'student_1', 'game_scores', 'g1', 'scenario_attempts')));
+});
+
 // Insider (public/insider/index.html) is one Promise.all of ten reads. A source the rules
 // deny does not fail loudly — safe() swallows it, the page renders with that source empty,
 // and the amber strip is the only tell. `users` was denied for two days after the privilege
