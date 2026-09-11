@@ -56,7 +56,38 @@ by the module ids listed above if you need a per-pack view.
 A 20-minute visit costs roughly 25 to 30 Firestore writes (one session rewrite per 45s plus
 the events), which is well inside the free tier at current traffic.
 
-## 2. What Insider shows
+## 2. How long any of this is kept
+
+Everything above is deleted **90 days after the last activity on the record.** This is not a
+target, it is what the published privacy policy already promises under *"Data Retention &
+Minimization (Under 13)"* — so the job of the prune job is to make the database match the
+promise, not to set a new one.
+
+| Collection | Clock starts from | Window |
+|---|---|---|
+| `events/{id}` | `ts` — when the event was written | 90 days |
+| `sessions/{sessionId}` | `lastSeenAt` — refreshed while the visit is ongoing | 90 days |
+| `course_feedback/{id}` | `timestamp` — when the student pressed submit | 90 days |
+
+A record still receiving activity is not deleted; the clock restarts each time it is touched.
+Nothing here expires on its own — deletion happens when `scripts/prune-telemetry.js` is run,
+so somebody has to run it (`--dry-run` first reports what would go without deleting anything).
+
+**`course_feedback` is the one that needs care.** It is the only collection holding free text a
+student typed, and the students typing it are often under 13. Two things make a parental
+deletion request answerable:
+
+- Every document carries **`ageTier`** (`under13`, `13plus`, or `null` when the account lookup
+  failed — `null` means unknown, never "13 or older"). An under-13 comment can be found
+  without joining back to any other collection.
+- **Nobody but an allowlisted admin can read or delete this collection** — not teachers, not
+  the public (`firestore.rules` #8). That has not changed and should not.
+
+So: a parent writes in, an admin filters `course_feedback` by that child's `uid` or by
+`ageTier == 'under13'`, finds the comment, and deletes it. Past 90 days the prune job has
+already removed it.
+
+## 3. What Insider shows
 
 - **Overview**: accounts, active learners, module visits, completions, activity by day, user
   mix, courses at a glance, latest messages, live event feed.
@@ -78,7 +109,7 @@ The date-range picker (7d / 30d / 90d / All) applies to time-stamped activity (v
 sessions, ratings, trend charts). Completion rate and funnels are all-time, so a learner's
 status is never wrong just because they finished before the window.
 
-## 3. Getting this into a BI tool
+## 4. Getting this into a BI tool
 
 Three options, in order of effort:
 
@@ -117,7 +148,7 @@ Three options, in order of effort:
    (telemetry.js already knows `ageTier`) or turn on GA4's child-directed treatment. The
    Lab Pack hub calls `gtag` today but never loads it, so those launch events are dropped.
 
-## 4. Things worth adding next
+## 5. Things worth adding next
 
 - The end-of-module rating prompt exists only in Digital Decisions. Jolene's and both labs
   have the shared `AuthCore.submitCourseFeedback()` available; adding the prompt makes the
@@ -128,7 +159,7 @@ Three options, in order of effort:
 - A `Telemetry.track('hint_used')` or similar custom event costs one line wherever it is
   useful; it will show up in the event stream and the CSV export automatically.
 
-## 5. Deploy checklist
+## 6. Deploy checklist
 
 - `firestore.rules` gained rules for `sessions`, `events`, collection-group reads and
   recruit-code deletion. They deploy automatically on merge to `main` (see

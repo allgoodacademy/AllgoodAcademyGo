@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 // Deletes telemetry that has aged past the retention window described in
 // public/privacy.html ("Data Retention & Minimization (Under 13)"):
-//   artifacts/{appId}/events        — append-only event stream (module_open, step, ...)
-//   artifacts/{appId}/sessions      — one doc per module visit
+//   artifacts/{appId}/events          — append-only event stream (module_open, step, ...)
+//   artifacts/{appId}/sessions        — one doc per module visit
+//   artifacts/{appId}/course_feedback — end-of-lab star rating + free-text comment
 //
 // Cutoff is based on each collection's own "last activity" field, not creation time:
-//   - events:   ts        (when the event was written; events are never updated)
-//   - sessions: lastSeenAt (updated on every flush while a visit is ongoing)
+//   - events:          ts         (when the event was written; events are never updated)
+//   - sessions:        lastSeenAt (updated on every flush while a visit is ongoing)
+//   - course_feedback: timestamp  (written once at submit; a comment is never edited)
 // A session/event newer than the cutoff is left alone even if the *account* is old.
+//
+// course_feedback is on the same 90-day window as the rest, and it is the collection
+// that matters most here: it is the only place a child's own free text is stored. The
+// published policy already promises that anonymous interaction data is purged after 90
+// days of inactivity, so leaving these rows to accumulate indefinitely was the product
+// failing to match the promise. Each row carries ageTier (see auth-core.js), so an
+// under-13 comment can be located for a parental deletion request before the window
+// expires, without joining back to any other collection.
 //
 // Requires the firebase-admin package (not a repo dependency today — install with
 // `npm install firebase-admin --no-save` before running) and a service-account
@@ -88,9 +98,13 @@ async function main() {
   const sessionsDeleted = await pruneCollection(db, {
     appId: args.appId, collectionName: 'sessions', timestampField: 'lastSeenAt', cutoff, dryRun: args.dryRun,
   });
+  const feedbackDeleted = await pruneCollection(db, {
+    appId: args.appId, collectionName: 'course_feedback', timestampField: 'timestamp', cutoff, dryRun: args.dryRun,
+  });
 
   console.log(
-    `[prune-telemetry] done. events=${eventsDeleted} sessions=${sessionsDeleted}` +
+    `[prune-telemetry] done. events=${eventsDeleted} sessions=${sessionsDeleted} ` +
+    `course_feedback=${feedbackDeleted}` +
     (args.dryRun ? ' (dry run — nothing was actually deleted)' : '')
   );
 }
