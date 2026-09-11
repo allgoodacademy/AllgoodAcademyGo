@@ -46,9 +46,21 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:700;margin:0;line-height:1.08;let
 @media(prefers-reduced-motion:reduce){.btn:hover{transform:none}}
 
 .hero{padding:70px 0 74px}
+/* Two columns: the headline block keeps its own measure on the left, and the
+   spec card fills what used to be dead space on the right. Same fix as .proof
+   on the homepage. */
+.hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:64px;align-items:center}
 .hero h1{font-size:clamp(38px,4.6vw,62px);max-width:16ch}
 .hero .lede{font-family:Verdana,Geneva,sans-serif;font-size:16.5px;line-height:1.65;color:var(--ink-soft);max-width:54ch;margin:26px 0 34px;letter-spacing:-.01em}
 .actions{display:flex;gap:12px;flex-wrap:wrap}
+
+/* at a glance - a spec sheet, not a feature grid */
+.glance{background:var(--surface);border-radius:24px;box-shadow:var(--shadow-card);padding:28px 30px 30px}
+.glance h2{font-family:Verdana,Geneva,sans-serif;font-size:11px;font-weight:700;color:var(--teal-deep);letter-spacing:.14em;text-transform:uppercase;margin:0 0 6px;line-height:1.4}
+.glance dl{margin:0}
+.glance-row{display:flex;justify-content:space-between;align-items:baseline;gap:18px;padding:13px 0;border-top:1px solid var(--hairline)}
+.glance-row dt{font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--ink-faint);flex:0 0 auto;letter-spacing:-.01em}
+.glance-row dd{font-family:Georgia,'Times New Roman',serif;font-size:15px;color:var(--ink);margin:0;text-align:right;line-height:1.45}
 
 /* what a goodblock is */
 .define{background:var(--surface);padding:70px 0;border-radius:44px 44px 0 0}
@@ -154,6 +166,7 @@ footer{background:var(--surface);padding:0 0 44px}
 .legal a{display:inline;color:var(--ink-faint);margin-left:20px;font-size:11.5px}
 
 @media(max-width:980px){.lab-grid{grid-template-columns:repeat(2,1fr)}.define-card{grid-template-columns:1fr;gap:34px}}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:36px}}
 @media(max-width:820px){
   .hero{padding:42px 0 54px}
   .steps{grid-template-columns:1fr;gap:34px}
@@ -197,11 +210,27 @@ footer{background:var(--surface);padding:0 0 44px}
 
 <section class="hero">
   <div class="wrap">
-    <h1>Everything you'd want to know before assigning this.</h1>
-    <p class="lede">Seven interactive GoodBlocks on digital decisions and real-world skills. Twenty minutes each. Free for your students permanently — not free for a trial period. Here's exactly what it is, what it collects, and what it builds.</p>
-    <div class="actions">
-      <a class="btn btn-primary" href="#goodblocks">See the GoodBlocks</a>
-      <a class="btn btn-secondary" href="/jsh/digital-decisions-lab/social-intelligence/">Try one yourself</a>
+    <div class="hero-grid">
+      <div>
+        <h1>Everything you'd want to know before assigning this.</h1>
+        <p class="lede">Seven interactive GoodBlocks on digital decisions and real-world skills. Twenty minutes each. Free for your students permanently — not free for a trial period. Here's exactly what it is, what it collects, and what it builds.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#goodblocks">See the GoodBlocks</a>
+          <a class="btn btn-secondary" href="/jsh/digital-decisions-lab/social-intelligence/">Try one yourself</a>
+        </div>
+      </div>
+      <aside class="glance">
+        <h2>At a glance</h2>
+        <dl>
+          <div class="glance-row"><dt>GoodBlocks live</dt><dd>7, across 2 Lab Packs</dd></div>
+          <div class="glance-row"><dt>Time each</dt><dd>About 20 minutes</dd></div>
+          <div class="glance-row"><dt>Grade band</dt><dd>Middle school (6–9)</dd></div>
+          <div class="glance-row"><dt>Cost</dt><dd>Free forever, for every student</dd></div>
+          <div class="glance-row"><dt>Student accounts</dt><dd>Not required to start</dd></div>
+          <div class="glance-row"><dt>Under-13 email</dt><dd>Never collected</dd></div>
+          <div class="glance-row"><dt>Ads</dt><dd>None, ever</dd></div>
+        </dl>
+      </aside>
     </div>
   </div>
 </section>
