@@ -93,11 +93,23 @@ Three options, in order of effort:
    alone answers time-on-task, drop-off and completion trend questions with plain SQL.
    Backfill of existing docs is a one-time script the extension provides.
 
-3. **Google Analytics 4.** The measurement ID `G-EN4M7T3BLQ` is already configured on the
-   dashboard, which fires `launch_module`. `telemetry.js` forwards every event to `gtag`
-   when it is present on the page, so adding the GA snippet to a module page would send
-   `module_open`, `step`, `choice` and `module_complete` to GA4 as well, where they can be
-   used in Explorations or Looker Studio's GA4 connector.
+3. **Google Analytics 4.** Two properties, kept on strictly separate surfaces:
+
+   | Property | Loads on | Gate |
+   |---|---|---|
+   | `G-EN4M7T3BLQ` (product) | `/dashboard/` only | `ag_account === '1'` (confirmed 13+ account) |
+   | `G-P6DZJ685W6` (public marketing) | `/`, `/for-teachers/`, `/about/` | none needed — signed-out pages |
+
+   The product property fires `launch_module` from the dashboard. `telemetry.js` forwards
+   every event to `gtag` when it is present on the page, so adding the GA snippet to a
+   module page would send `module_open`, `step`, `choice` and `module_complete` to GA4 as
+   well, where they can be used in Explorations or Looker Studio's GA4 connector.
+
+   The marketing property is scoped to the three signed-out pages so that top-of-funnel
+   traffic can be measured without any authenticated-student surface being instrumented.
+   Those pages load no auth, no identity gate and no `telemetry.js`, so a hit there can
+   carry no learner identity. Do not add `G-P6DZJ685W6` to `/dashboard/`, `/jsh/`,
+   `/educational-games/` or `/mission-control/`.
 
    **COPPA note before enabling GA on modules:** Learner Recruits are under 13. GA4 sets
    cookies and collects device identifiers, which is a different privacy posture from the

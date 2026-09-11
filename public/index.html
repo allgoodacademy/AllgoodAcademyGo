@@ -28,14 +28,42 @@
    it. No real content is gated on either. */
 (function(){
   try{
-    if(localStorage.getItem('ag_account')==='1'&&localStorage.getItem('ag_signed_in')==='1'){location.replace('/dashboard/');}
+    if(localStorage.getItem('ag_account')==='1'&&localStorage.getItem('ag_signed_in')==='1'){window.__agRedirectingToDashboard=true;location.replace('/dashboard/');}
   }catch(e){/* storage blocked - just show the page */}
 })();
+</script>
+
+<!-- GA4 (public marketing property G-P6DZJ685W6) — this page, /about/ and /for-teachers/
+     only. Deliberately placed AFTER the routing hint above: an account holder is sent to
+     /dashboard/ before this runs, so the public property is not asked to load on a page an
+     authenticated user is only passing through. Authenticated surfaces (/dashboard/, /jsh/,
+     /educational-games/, /mission-control/) must never carry this tag — the dashboard has
+     its own separately gated property, see the compliance note in dashboard/index.html. -->
+<!-- Google tag (gtag.js) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  /* Injected rather than written as a plain <script async src>, for one reason:
+     location.replace() above does not stop the parser, so an account holder on their
+     way to /dashboard/ would still fetch gtag.js and send a pageview for a page they
+     never see. The flag skips both. A signed-out visitor — everyone this tag is
+     actually for — always takes the branch below. Same shape as the gated loader in
+     dashboard/index.html; /about/ and /for-teachers/ need no guard and carry the
+     stock snippet. */
+  if (!window.__agRedirectingToDashboard) {
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-P6DZJ685W6';
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', 'G-P6DZJ685W6');
+  }
 </script>
 <style>
 /* ============================================================
    ALLGOOD ACADEMY — LANDING (signed out)
-   Zero external requests. Georgia + Verdana ship with every OS.
+   No external requests on the render path — GA4 is the one outbound call and it is
+   async, so it never blocks paint. Georgia + Verdana ship with every OS.
    Renders on first byte.
    Demo below is Case 2 of the live Social Intelligence GoodBlock.
    ============================================================ */

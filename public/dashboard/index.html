@@ -22,10 +22,18 @@
     </script>
 
     <!--
-    GA4 / UNDER-13 COMPLIANCE NOTE — 2026-09-10
-    GA4 loads on: /dashboard/ only (public/dashboard/index.html). No other page in
-      public/ loads the googletagmanager.com/gtag/js library; two Lab Pack hub pages
-      call gtag() defensively but never load it, so those calls are inert no-ops.
+    GA4 / UNDER-13 COMPLIANCE NOTE — 2026-09-10 (coverage updated 2026-09-11)
+    Two separate GA4 properties are in play, and they never share a page:
+      - G-EN4M7T3BLQ (product) loads on /dashboard/ only — this page — and only behind
+        the ag_account gate below.
+      - G-P6DZJ685W6 (public marketing) loads on the three signed-out marketing pages
+        only: /, /for-teachers/ and /about/. Those pages load no auth, no identity gate
+        and no telemetry.js, so they cannot attach a learner identity to a hit. It is
+        deliberately absent from /dashboard/, /jsh/, /educational-games/ and
+        /mission-control/; do not add it to an authenticated surface.
+      No other page in public/ loads the googletagmanager.com/gtag/js library; two Lab
+      Pack hub pages call gtag() defensively but never load it, so those calls are
+      inert no-ops.
     Fires for anonymous sessions: previously YES (unconditional in <head>, before any
       auth/identity check ran) — NOW NO. The GA4 library and the initial pageview hit
       are gated below on ag_account === '1', the flag auth-core.js's markAccount()
