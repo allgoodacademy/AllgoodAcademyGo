@@ -126,6 +126,24 @@ This interacts with the escalation already open in the Decisions & Context Log (
 
 ---
 
+## Collections written since this audit, and what they hold
+
+Added so a new collection is never invisible when the retention question comes back from counsel. This audit is about what the two policies *say*; this section is about what the product actually *writes*, which is the thing counsel will need alongside them.
+
+| Collection | Holds | ageTier stamped? | Student-readable? | Under the 90-day prune? |
+|---|---|---|---|---|
+| `artifacts/{appId}/course_feedback` | End-of-lab star rating and free-text comment | Yes | No — admin-read only | Yes |
+| `artifacts/{appId}/topic_selections` | **New (Comms pass one).** What a student picked in answer to "what do you want to get better at?" — a category, the module suggested, and whether they confirmed | Yes | No — admin-read only | Yes — listed in `scripts/prune-telemetry.js` |
+| `artifacts/{appId}/users/{uid}/comms_receipts` | **New (Comms pass one).** The student's own readable copy of a note they sent — a 140-character excerpt, not the full text | No — the doc lives under the student's own uid, so the tier is one read away on their profile | **Yes** — owner-readable, by design; it is the only way Comms can show that a note exists | **No — see below** |
+
+**`topic_selections` is not free text, and is still a record about a child.** It is one row per tap saying what a student believes they are bad at. It is not student-readable for that reason: nothing in the product reads it back to them, so nothing should be able to. It carries `ageTier` on every document so an under-13 row can be found for a parental deletion request without joining back to the user profile — the same property that made `course_feedback` answerable.
+
+**`comms_receipts` is deliberately outside the prune script, and that is a decision worth seeing.** It lives under `artifacts/{appId}/users/{uid}/`, which the prune job does not walk — that job sweeps flat top-level collections by a timestamp field. Deleting a receipt at 90 days would also silently delete the acknowledgement item the student sees in Comms. It holds a 140-character excerpt of text the student themselves wrote and can read back. **If counsel's answer on the 90-day window covers everything a child typed, this collection needs a sweep the current script cannot perform, because per-user subtrees are not in its model.** Flagged here rather than quietly assumed to be covered.
+
+**No inbound message ever stores operator text.** Every item Comms renders is generated from a fixed template in `/js/message-hq.js`. There is no collection holding an adult's words addressed to a child, because there is no path that writes one.
+
+---
+
 ## Recommendations — recommendations only, nothing was changed
 
 Ranked. None of these were carried out; all of them touch legal copy.

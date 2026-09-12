@@ -153,25 +153,29 @@
               gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 80,
               badgeThreshold: 80, maxScore: 90, durationMinutes: 25 },
             { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/social-intelligence/',
-              gameNames: ['Social Intelligence'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
+              gameNames: ['Social Intelligence'], topic: 'Reading people', blurb: 'How a group read lands, and what it costs to get it wrong.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/privacy-security/',
-              gameNames: ['Privacy & Security'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
+              gameNames: ['Privacy & Security'], topic: 'Staying private', blurb: 'What you leave behind online, and who can pick it up.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'digital-citizenship', name: 'Digital Citizenship', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/digital-citizenship/',
-              gameNames: ['Digital Citizenship'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
+              gameNames: ['Digital Citizenship'], topic: 'Being online', blurb: 'The version of you that shows up when you post.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'professional-brand', name: 'Professional Brand', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/professional-brand/',
-              gameNames: ['Professional Brand'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
+              gameNames: ['Professional Brand'], topic: 'How you come across', blurb: 'What a stranger decides about you in six seconds.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'money-as-a-skill', name: 'Money as a Skill', category: 'lab', pack: 'real-world-ready', url: '/jsh/real-world-ready-lab/money-as-a-skill/',
-              gameNames: ['Money as a Skill'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
+              gameNames: ['Money as a Skill'], topic: 'Money', blurb: 'Money is a skill you practise, not a personality you have.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'conflict-has-a-winner', name: 'Conflict Has a Winner', category: 'lab', pack: 'real-world-ready', url: '/jsh/real-world-ready-lab/conflict-has-a-winner/',
-              gameNames: ['Conflict Has a Winner'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
+              gameNames: ['Conflict Has a Winner'], topic: 'Handling conflict', blurb: 'Who actually wins an argument, and what it cost them.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'reading-the-room', name: 'Reading the Room', category: 'lab', pack: 'real-world-ready', url: '/jsh/real-world-ready-lab/reading-the-room/',
-              gameNames: ['Reading the Room'], isComplete: (d) => d.completed === true, durationMinutes: 15 },
+              gameNames: ['Reading the Room'], topic: 'Reading the room', blurb: 'Five first reads, and what checking one would have changed.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             // 64 of 72 — the Real World Ready Challenge's own threshold, NOT the DDC's 80 of 90.
             { id: 'rwr-challenge', name: 'Real World Ready Challenge', category: 'challenge', pack: 'real-world-ready', url: '/educational-games/real-world-ready/',
               gameNames: ['Real World Ready Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
               badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
+        // Comms (/js/message-hq.js) derives its topic chips and the lab it suggests from
+        // this exact array. Exposed rather than duplicated: a second hardcoded list is how
+        // the hub counters drifted before, and check-modules.js only guards THIS one.
+        window.MODULE_REGISTRY = MODULE_REGISTRY;
 
         // One standalone card per Challenge in the Challenges tab, each at the same level and
         // independent of its Lab Pack hub — the hub links to its Challenge as well, so both
@@ -616,21 +620,12 @@
             window.updateBadges();
         });
 
-        // Message HQ notification dot: a one-time "you haven't tried this yet" hint
-        // on this page's icon only (not on any module's copy of the button) that
-        // disappears the moment the visitor actually opens the modal, whether or not
-        // they end up sending anything.
-        (function () {
-            const dot = document.getElementById('message-notification');
-            if (dot && localStorage.getItem('aa_dashboard_msg_seen') === 'true') {
-                dot.style.display = 'none';
-            }
-        })();
-        document.addEventListener('messagehq:opened', () => {
-            localStorage.setItem('aa_dashboard_msg_seen', 'true');
-            const dot = document.getElementById('message-notification');
-            if (dot) dot.style.display = 'none';
-        });
+        // The notification dot is owned by /js/message-hq.js and driven by real unread
+        // items, so this page no longer touches it. What used to be here was a one-time
+        // "you haven't tried this yet" hint keyed on localStorage aa_dashboard_msg_seen,
+        // which lit the dot for every first-time visitor and cleared it the moment the
+        // modal opened — it signalled nothing about whether anything was actually waiting.
+        // The key is gone; nothing reads or writes it anymore.
 
         window.handleLogout = async () => {
             sfx.powerOff();
@@ -2537,9 +2532,9 @@
                             <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                         </button>
                         <div class="h-6 w-px bg-white/20 mx-1"></div>
-                        <button id="btn-message" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Direct Message HQ" onclick="window.openMessageModal()">
+                        <button id="btn-message" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Comms" onclick="window.openMessageModal()">
                             <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
-                            <span id="message-notification" class="absolute top-1 right-1 flex h-2.5 w-2.5">
+                            <span id="message-notification" style="display:none;" class="absolute top-1 right-1 flex h-2.5 w-2.5">
                               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                               <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                             </span>

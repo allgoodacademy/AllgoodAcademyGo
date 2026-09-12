@@ -763,7 +763,7 @@ async function sendMessage({ text, source }) {
 // — the same single read identity-gate.js and telemetry.js use — rather than a new
 // source of truth. A failed read must never cost us the feedback itself, so the tier
 // falls back to null and the write still happens; null means "unknown", not "13+".
-async function submitCourseFeedback({ gameName, rating, feedback }) {
+async function submitCourseFeedback({ gameName, rating, feedback, source }) {
     const user = auth.currentUser;
     if (!user) return;
     let ageTier = null;
@@ -779,8 +779,134 @@ async function submitCourseFeedback({ gameName, rating, feedback }) {
         rating: typeof rating === 'number' ? rating : null,
         feedback: feedback || '',
         ageTier: ageTier || null,
+        // Where the rating was collected. Every row today is 'lesson' — the end-of-GoodBlock
+        // star panel — but Comms will eventually be able to ask for a rating too, and once
+        // two sources write here a row with no source is indistinguishable from a lesson
+        // rating that predates the second one. Defaulted here rather than passed by each of
+        // the seven GoodBlocks so there is one place to change and no call site can forget.
+        source: source || 'lesson',
         timestamp: serverTimestamp(),
     });
+}
+
+// --- TOPIC SELECTIONS: what a student said they want to get better at ---------------
+// Flat and top-level, exactly like course_feedback above and for the same reasons, with
+// the same ageTier treatment: this is a statement a child made about themselves, so an
+// under-13 row has to be findable for a parental deletion request without joining back
+// to the user document. Same fallback rule too — a failed tier read must never cost us
+// the row, and null means "unknown", not "13+".
+//
+// Deliberately NOT student-readable (see firestore.rules): a student picking "money"
+// three times in a week is a behavioural record about a child, and nothing in the
+// product needs to read it back to them. Create-for-self, admin-read, same as feedback.
+async function recordTopicSelection({ category, moduleId, moduleName }) {
+    const user = auth.currentUser;
+    if (!user || !category) return;
+    let ageTier = null;
+    try {
+        ageTier = (await getAccount(user.uid)).ageTier;
+    } catch (e) {
+        console.error('[auth-core] topic selection: age tier lookup failed', e);
+    }
+    await addDoc(collection(db, 'artifacts', appId, 'topic_selections'), {
+        uid: user.uid,
+        category,
+        moduleId: moduleId || null,
+        moduleName: moduleName || null,
+        ageTier: ageTier || null,
+        source: 'comms',
+        timestamp: serverTimestamp(),
+    });
+}
+
+// --- COMMS: the student's own copy of a note they sent, and their read state ---------
+// Both live under the student's own profile subtree, which rule 2b already makes
+// owner-read/owner-write, so neither needs a firestore.rules change.
+//
+// Why a separate receipt at all, when the note itself is already written to
+// artifacts/{appId}/messages: that collection is admin-read ONLY. A student cannot read
+// back a single thing they sent. Without a copy they can read, Comms has no way to show
+// an acknowledgement item, because it cannot see that the note exists.
+//
+// readAt is written null and nothing sets it yet. An acknowledgement in this pass
+// confirms the note REACHED HQ, which is true at the moment of writing and is what the
+// copy says. A genuine "a person has read this" receipt needs an admin write into the
+// student's subtree, and rule 2b grants admins read and delete but not write — so that
+// is a rules change, and it was out of scope for this pass. The field exists now so
+// pass two can light it up without a migration.
+function commsReceiptsRef(uid) {
+    return collection(db, 'artifacts', appId, 'users', uid, 'comms_receipts');
+}
+
+async function recordCommsReceipt({ text, source }) {
+    const user = auth.currentUser;
+    if (!user || !text) return;
+    try {
+        await addDoc(commsReceiptsRef(user.uid), {
+            excerpt: String(text).slice(0, 140),
+            source: source || 'Unknown portal',
+            sentAt: serverTimestamp(),
+            readAt: null,
+        });
+    } catch (e) {
+        console.error('[AuthCore] recordCommsReceipt failed', e);
+    }
+}
+
+async function loadCommsReceipts() {
+    const user = auth.currentUser;
+    if (!user) return [];
+    try {
+        const snap = await getDocs(commsReceiptsRef(user.uid));
+        const rows = [];
+        snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+        // Sorted client-side rather than with orderBy() so this needs no composite index
+        // and no extra import; a student's own receipt count is small by construction.
+        rows.sort((a, b) => (msOf(b.sentAt) - msOf(a.sentAt)));
+        return rows;
+    } catch (e) {
+        console.error('[AuthCore] loadCommsReceipts failed', e);
+        return [];
+    }
+}
+
+// serverTimestamp() resolves to a Firestore Timestamp on read, but is null for the
+// moment between a local write and the server round trip. Treat that as "just now".
+function msOf(ts) {
+    if (!ts) return Date.now();
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+    return Date.now();
+}
+
+function commsStateRef(uid) {
+    return doc(db, 'artifacts', appId, 'users', uid, 'comms_state', 'state');
+}
+
+async function loadCommsRead() {
+    const user = auth.currentUser;
+    if (!user) return null;
+    try {
+        const snap = await getDoc(commsStateRef(user.uid));
+        const data = snap.exists() ? snap.data() : {};
+        return Array.isArray(data.readIds) ? data.readIds : [];
+    } catch (e) {
+        console.error('[AuthCore] loadCommsRead failed', e);
+        return null;
+    }
+}
+
+async function saveCommsRead(readIds) {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+        await setDoc(commsStateRef(user.uid), {
+            readIds: Array.isArray(readIds) ? readIds.slice(-200) : [],
+            lastUpdated: serverTimestamp(),
+        }, { merge: true });
+    } catch (e) {
+        console.error('[AuthCore] saveCommsRead failed', e);
+    }
 }
 
 // --- MODULE PROGRESS: one canonical doc per student per module, so a returning
@@ -840,6 +966,8 @@ window.AuthCore = {
     randomNickname, randomAvatar, normalizeAvatar, AVATARS,
     hasAcceptedTeacherConsent, recordTeacherConsent,
     sendMessage, submitCourseFeedback,
+    recordTopicSelection,
+    recordCommsReceipt, loadCommsReceipts, loadCommsRead, saveCommsRead,
     saveModuleProgress, loadModuleProgress,
     mirrorRecruitClassroom,
     recordContinuityEntry,

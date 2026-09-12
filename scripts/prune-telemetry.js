@@ -4,11 +4,19 @@
 //   artifacts/{appId}/events          — append-only event stream (module_open, step, ...)
 //   artifacts/{appId}/sessions        — one doc per module visit
 //   artifacts/{appId}/course_feedback — end-of-lab star rating + free-text comment
+//   artifacts/{appId}/topic_selections — what a student picked in Comms to get better at
 //
 // Cutoff is based on each collection's own "last activity" field, not creation time:
 //   - events:          ts         (when the event was written; events are never updated)
 //   - sessions:        lastSeenAt (updated on every flush while a visit is ongoing)
 //   - course_feedback: timestamp  (written once at submit; a comment is never edited)
+//   - topic_selections: timestamp (written once at selection; never edited)
+//
+// topic_selections is here from the day it ships rather than being retrofitted. It is not
+// free text, but it is still a statement a child made about themselves, it accumulates one
+// row per tap, and it carries ageTier for the same parental-deletion reason as the row
+// above. A collection nobody lists is a collection outside the published window, and the
+// only way that gets discovered is an audit or a parent asking.
 // A session/event newer than the cutoff is left alone even if the *account* is old.
 //
 // course_feedback is on the same 90-day window as the rest, and it is the collection
@@ -72,6 +80,7 @@ const COLLECTIONS = [
   { name: 'events', timestampField: 'ts', what: 'Event log — module opens, in-module choices, completions' },
   { name: 'sessions', timestampField: 'lastSeenAt', what: 'One record per module visit — time on task, steps reached' },
   { name: 'course_feedback', timestampField: 'timestamp', what: 'End-of-lab star rating and free-text comment' },
+  { name: 'topic_selections', timestampField: 'timestamp', what: 'What a student picked in Comms as something to get better at' },
 ];
 
 // Firestore's max writes per batch; delete in chunks well under that so one prune
