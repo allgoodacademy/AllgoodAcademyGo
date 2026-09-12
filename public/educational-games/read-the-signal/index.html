@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Read the Signal — Allgood Academy</title>
+<link rel="stylesheet" href="/assets/css/tailwind.min.css">
+<script src="/assets/js/lucide.min.js"></script>
 <!-- Shared identity module — see /js/auth-core.js. Loaded only for db/appId/auth
      access so a signed-in visitor's Recruit Code can be attached to telemetry.
      Deliberately NOT loading /js/identity-gate.js: this game has no login wall. -->
@@ -25,17 +27,151 @@
     --danger-bg: #FDEAEA;
   }
 
+  /* =============================================
+     DASHBOARD CHASSIS — copied verbatim from public/dashboard/index.html
+     (.tablet-frame, .tablet-frame::before, .screen-container, .navbar-content,
+     and the space-background/mobile-collapse rules that go with them). Do not
+     hand-tune these values here — change the dashboard, then re-copy.
+     ============================================= */
   body {
     font-family: Verdana, sans-serif;
+    background-color: #0f172a;
+    min-height: 100vh;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #bg-video-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: -50;
+    overflow: hidden;
+  }
+
+  #bg-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 1.0;
+  }
+
+  .tablet-frame {
+    height: 88vh;
+    width: auto;
+    aspect-ratio: 16/10;
+    max-width: min(1700px, 94vw);
+    max-height: 96vh;
+    min-height: 0;
+    min-width: 0;
+    background-image:
+        radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+        radial-gradient(circle at 100% 100%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+        linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow:
+        inset 1px 1px 2px rgba(255,255,255, 0.6),
+        inset -1px -1px 2px rgba(0,0,0, 0.8),
+        0 30px 60px -12px rgba(0, 0, 0, 0.8),
+        0 0 0 1px #111;
+    border: 1px solid #333;
+    position: relative;
+    margin: 20px auto;
+    transition: width 0.3s, height 0.3s, padding 0.3s;
+  }
+
+  .tablet-frame::before {
+    content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border-radius: 6px; background: #111; z-index: 0;
+  }
+
+  .screen-container {
+    width: 100%; height: 100%;
+    background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    position: relative; z-index: 1; overflow: hidden;
+    display: flex; flex-direction: column;
+    border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+  }
+
+  .navbar-content { flex: 0 0 60px; z-index: 30; background: rgba(53, 120, 137, 0.85); backdrop-filter: blur(5px); border-bottom: 1px solid rgba(255,255,255,0.1); color: white; position: relative; }
+
+  @media (max-width: 640px) {
+    body {
+        padding: 0;
+        background-image: none;
+        background-color: #f8fafc;
+    }
+    .tablet-frame {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background-image: none !important;
+        aspect-ratio: auto !important;
+    }
+    .tablet-frame::before { display: none; }
+    .screen-container {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  /* --- Game screen (unchanged game visuals — everything below here is the
+     same design that shipped before the chassis, just re-homed inside
+     .screen-container's content area instead of <body>). --- */
+  .rts-page {
+    flex: 1 1 auto;
+    position: relative;
+    overflow-y: auto;
     background: var(--dark);
     color: var(--cream);
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 16px;
   }
+
+  /* Home popover */
+  .home-popover-wrap { position: relative; }
+  .home-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    padding: 6px;
+    min-width: 190px;
+    z-index: 50;
+  }
+  .home-popover.show { display: block; }
+  .home-popover button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: Verdana, sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0F1923;
+    cursor: pointer;
+  }
+  .home-popover button:hover { background: #f0f0f0; }
 
   /* INTRO SCREEN */
   #intro {
@@ -285,7 +421,7 @@
   /* FEEDBACK */
   .feedback-overlay {
     display: none;
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: rgba(15,25,35,0.92);
     z-index: 100;
@@ -459,6 +595,40 @@
 </head>
 <body>
 
+<!-- ORBITAL LINK: Static Feed Injection — same space background as the dashboard -->
+<div id="bg-video-container">
+  <img id="bg-image" src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Orbital View">
+</div>
+
+<main class="flex-grow flex items-center justify-center py-8">
+  <div class="tablet-frame">
+    <div class="screen-container" id="screen">
+
+      <header class="navbar-content flex items-center justify-between px-6 shadow-md relative z-30">
+        <div class="flex items-center overflow-hidden">
+          <div class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate select-none uppercase">
+            ALLGOOD ACADEMY <span class="opacity-60 text-sm font-normal">| Games</span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-1 shrink-0 relative">
+          <div class="home-popover-wrap">
+            <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home" onclick="toggleHomePopover(event)">
+              <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+            </button>
+            <div class="home-popover" id="home-popover">
+              <button onclick="window.location.href='/'">Return to dashboard</button>
+              <button onclick="handleRestartFromPopover()">Restart game</button>
+              <button onclick="window.location.href='/educational-games/'">Browse games</button>
+            </div>
+          </div>
+          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.location.href='/educational-games/'">
+            <i data-lucide="gamepad-2" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="rts-page">
+
 <!-- INTRO -->
 <div id="intro">
   <div class="pill-row">
@@ -530,6 +700,11 @@
   </div>
   <div class="wordmark">Allgood Academy · Free for all learners, always.</div>
 </div>
+
+      </div>
+    </div>
+  </div>
+</main>
 
 <script>
 // answer: 'safe' | 'not-safe' — binary, matching the two on-screen choices.
@@ -959,6 +1134,36 @@ function restartGame() {
   document.getElementById('end').style.display = 'none';
   startGame();
 }
+
+// --- Chassis nav: home popover (inline dropdown, not a modal) ---
+function toggleHomePopover(event) {
+  event.stopPropagation();
+  document.getElementById('home-popover').classList.toggle('show');
+}
+
+function closeHomePopover() {
+  document.getElementById('home-popover').classList.remove('show');
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.home-popover-wrap');
+  if (wrap && !wrap.contains(e.target)) closeHomePopover();
+});
+
+function handleRestartFromPopover() {
+  closeHomePopover();
+  // Restart whichever screen is live: mid-game uses restartGame(), the
+  // intro screen (game never started) uses startGame() directly.
+  if (document.getElementById('game').style.display === 'block' ||
+      document.getElementById('end').style.display === 'block') {
+    restartGame();
+  } else {
+    startGame();
+  }
+}
+
+if (window.lucide) lucide.createIcons();
+document.addEventListener('DOMContentLoaded', () => { if (window.lucide) lucide.createIcons(); });
 </script>
 </body>
 </html>
