@@ -228,9 +228,33 @@
         // one of these; the card's counter, duration and status pill are all derived from the
         // registry filtered by that pack, so nothing here is hand-counted.
         const LAB_PACKS = {
-            'digital-decisions': { planned: LAB_PACK_PLANNED, pillId: 'labpack-status-pill', counterId: 'labpack-counter', durationId: 'labpack-duration' },
-            'real-world-ready':  { planned: RWR_PACK_PLANNED,  pillId: 'rwr-status-pill',     counterId: 'rwr-counter',     durationId: 'rwr-duration' },
-            'room-to-think':     { planned: RTT_PACK_PLANNED,  pillId: 'rtt-status-pill',     counterId: 'rtt-counter',     durationId: 'rtt-duration' },
+            'digital-decisions': { planned: LAB_PACK_PLANNED, pillId: 'labpack-status-pill', counterId: 'labpack-counter', durationId: 'labpack-duration', displayName: 'Digital Decisions Lab Pack' },
+            'real-world-ready':  { planned: RWR_PACK_PLANNED,  pillId: 'rwr-status-pill',     counterId: 'rwr-counter',     durationId: 'rwr-duration', displayName: 'Real World Ready Lab Pack' },
+            'room-to-think':     { planned: RTT_PACK_PLANNED,  pillId: 'rtt-status-pill',     counterId: 'rtt-counter',     durationId: 'rtt-duration', displayName: 'Room to Think Lab Pack' },
+        };
+
+        // Per-Challenge category subscore config for the Profile page's "My Progress" tab —
+        // field keys and colors copied verbatim from each Challenge's own CATEGORIES const
+        // (see public/educational-games/digital-decisions/index.html and .../room-to-think/
+        // index.html). categoryScores on a game_scores doc is keyed by these same keys (see
+        // each Challenge's categoryScorePayload()). Not every category set is the same shape,
+        // so this is looked up per Challenge id rather than assumed uniform.
+        const CHALLENGE_CATEGORIES = {
+            'ddc': {
+                social_intelligence: { label: 'Empathy', accent: '#357889' },
+                privacy_security:    { label: 'Critical Thinking', accent: '#2B5FA8' },
+                digital_citizenship: { label: 'Integrity', accent: '#7A2B45' },
+                professional_brand:  { label: 'Foresight', accent: '#C97D1A' },
+            },
+            'rtt-challenge': {
+                source_counting:   { label: 'Discernment', accent: '#9F1239' },
+                question_framing:  { label: 'Curiosity',   accent: '#B91C1C' },
+                audience_choice:   { label: 'Discretion',  accent: '#7F1D1D' },
+                starting_early:    { label: 'Initiative',  accent: '#DC2626' },
+            },
+            // Real World Ready Challenge doesn't write categoryScores today — no entry here
+            // means the Profile page skips the subscore bars for it rather than fabricating
+            // categories that don't exist in its game_scores docs.
         };
         function renderLabPackStatus() {
             Object.entries(LAB_PACKS).forEach(([pack, cfg]) => {
@@ -801,10 +825,19 @@
                 menu.classList.remove('visible-modal');
             }
 
-            const modal = document.getElementById('profile-modal');
-            modal.classList.remove('hidden-modal');
-            modal.classList.add('visible-modal');
+            // Full-page swap, same mechanism as #page-admin (see applyIdentityToUI /
+            // closeTeacherDashboard) — not a modal overlay anymore, so the Profile can hold
+            // real content (tabs, accordions) without fighting a fixed-height dialog.
+            document.getElementById('page-dashboard').style.display = 'none';
+            const adminPage = document.getElementById('page-admin');
+            if (adminPage) { adminPage.style.display = 'none'; adminPage.classList.remove('active'); }
+            const profilePage = document.getElementById('page-profile');
+            profilePage.style.display = 'block';
+            profilePage.classList.add('active');
             if(window.sfx) window.sfx.click();
+
+            window.switchProfileTab('progress');
+            window.loadProfilePageData();
 
             // Populate Data
             const user = auth.currentUser;
@@ -884,9 +917,10 @@
         }
 
         window.closeProfileModal = () => {
-            const modal = document.getElementById('profile-modal');
-            modal.classList.add('hidden-modal');
-            modal.classList.remove('visible-modal');
+            const profilePage = document.getElementById('page-profile');
+            profilePage.style.display = 'none';
+            profilePage.classList.remove('active');
+            document.getElementById('page-dashboard').style.display = 'block';
             // Reset Edit Mode
             window.toggleProfileEdit(false);
             if(window.sfx) window.sfx.click();
@@ -900,6 +934,329 @@
                 applyIdentityToUI(user, account);
                 window.openProfileModal();
             }
+        };
+
+        // --- PROFILE PAGE: TABS ---
+        window.switchProfileTab = (tab) => {
+            ['progress', 'assigned', 'record'].forEach(t => {
+                const panel = document.getElementById(`profile-tab-${t}`);
+                const btn = document.getElementById(`profile-tabbtn-${t}`);
+                if (panel) panel.classList.toggle('hidden', t !== tab);
+                if (btn) {
+                    btn.classList.toggle('text-allgood-primary', t === tab);
+                    btn.classList.toggle('border-allgood-primary', t === tab);
+                    btn.classList.toggle('text-slate-400', t !== tab);
+                    btn.classList.toggle('border-transparent', t !== tab);
+                }
+            });
+        };
+
+        // --- PROFILE PAGE: ACCORDION ---
+        window.toggleProfileAccordion = (packId) => {
+            const body = document.getElementById(`profile-pack-body-${packId}`);
+            const chevron = document.getElementById(`profile-pack-chevron-${packId}`);
+            if (!body) return;
+            const isOpen = !body.classList.contains('hidden');
+            body.classList.toggle('hidden', isOpen);
+            if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+        };
+        window.toggleProfileHistory = (challengeId) => {
+            const el = document.getElementById(`profile-history-${challengeId}`);
+            if (el) el.classList.toggle('hidden');
+        };
+
+        function fmtDate(ts) {
+            try {
+                if (ts && typeof ts.toDate === 'function') return ts.toDate().toLocaleDateString();
+            } catch (e) {}
+            return '—';
+        }
+
+        // Renders the per-category subscore bars for one Challenge attempt, using the
+        // categoryScores payload each Challenge writes (see categoryScorePayload() in
+        // digital-decisions/index.html and room-to-think/index.html). Skips categories
+        // this Challenge doesn't define in CHALLENGE_CATEGORIES rather than guessing them.
+        function renderCategoryBars(challengeId, categoryScores) {
+            const cfg = CHALLENGE_CATEGORIES[challengeId];
+            if (!cfg || !categoryScores) return '';
+            return Object.keys(cfg).map(key => {
+                const cat = cfg[key];
+                const c = categoryScores[key];
+                if (!c) return '';
+                const pct = typeof c.percentage === 'number' ? c.percentage : 0;
+                return `
+                    <div class="mb-2">
+                        <div class="flex justify-between items-center mb-0.5">
+                            <span class="text-[10px] font-bold uppercase tracking-wide" style="color:${cat.accent}">${cat.label}</span>
+                            <span class="text-[10px] font-bold text-slate-400">${pct}%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full" style="width:${pct}%; background:${cat.accent};"></div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        // Finds the strongest category subscore across the most recent COMPLETED attempt
+        // (of any Challenge) that actually carries categoryScores — never fabricated when
+        // no such attempt exists yet.
+        function computeStrongestCategory(scoreDocs) {
+            const completedWithCats = scoreDocs
+                .filter(d => d.completed === true && d.categoryScores && CHALLENGE_CATEGORIES[(CHALLENGE_CARDS.find(c => c.gameNames.includes(d.gameName)) || {}).id])
+                .sort((a, b) => {
+                    const ta = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0;
+                    const tb = b.timestamp && b.timestamp.toMillis ? b.timestamp.toMillis() : 0;
+                    return tb - ta;
+                });
+            if (!completedWithCats.length) return null;
+            const latest = completedWithCats[0];
+            const challengeCard = CHALLENGE_CARDS.find(c => c.gameNames.includes(latest.gameName));
+            const cfg = CHALLENGE_CATEGORIES[challengeCard.id];
+            let best = null;
+            Object.keys(cfg).forEach(key => {
+                const c = latest.categoryScores[key];
+                if (!c) return;
+                if (!best || c.percentage > best.percentage) best = { label: cfg[key].label, percentage: c.percentage };
+            });
+            return best;
+        }
+
+        // Builds one Lab Pack accordion card for the My Progress tab: lab checklist + the
+        // pack's Challenge (best score, badge pill, category bars, full attempt history).
+        function renderPackCard(packKey, cfg, scoreDocs, startedModuleIds, isMostRecent) {
+            const labs = MODULE_REGISTRY.filter(m => m.pack === packKey && m.category === 'lab');
+            const challenge = MODULE_REGISTRY.find(m => m.pack === packKey && m.category === 'challenge');
+
+            const labRows = labs.map(m => {
+                const st = computeModuleStatus(m.id, scoreDocs, startedModuleIds);
+                const done = st.status === 'completed';
+                const inProgress = st.status === 'in_progress';
+                const icon = done ? 'check-circle-2' : (inProgress ? 'circle-dot' : 'circle');
+                const color = done ? 'text-emerald-500' : (inProgress ? 'text-blue-500' : 'text-slate-300');
+                return `<div class="flex items-center gap-2 py-1.5 text-xs">
+                    <i data-lucide="${icon}" class="w-4 h-4 ${color} shrink-0"></i>
+                    <span class="text-slate-600 ${done ? 'font-bold' : ''}">${m.name}</span>
+                    <span class="ml-auto text-[9px] uppercase font-bold ${done ? 'text-emerald-500' : (inProgress ? 'text-blue-500' : 'text-slate-300')}">${done ? 'Done' : (inProgress ? 'In Progress' : 'Pending')}</span>
+                </div>`;
+            }).join('');
+
+            let challengeHtml = '';
+            let hasCompletion = false;
+            if (challenge) {
+                const attempts = scoreDocs
+                    .filter(d => challenge.gameNames.includes(d.gameName))
+                    .sort((a, b) => {
+                        const ta = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0;
+                        const tb = b.timestamp && b.timestamp.toMillis ? b.timestamp.toMillis() : 0;
+                        return ta - tb; // oldest first, so we can compute deltas as we go
+                    });
+                const completedAttempts = attempts.filter(a => a.completed === true && typeof a.finalScore === 'number');
+                const bestScore = completedAttempts.length ? Math.max(...completedAttempts.map(a => a.finalScore)) : null;
+                hasCompletion = bestScore !== null && bestScore >= challenge.badgeThreshold;
+
+                const latestWithCats = [...attempts].reverse().find(a => a.categoryScores);
+                const barsHtml = latestWithCats ? renderCategoryBars(challenge.id, latestWithCats.categoryScores) : '';
+
+                const historyRows = [...attempts].reverse().map((a, idx, arr) => {
+                    const prev = arr[idx + 1];
+                    let delta = '';
+                    if (prev && typeof prev.finalScore === 'number' && typeof a.finalScore === 'number') {
+                        const d = a.finalScore - prev.finalScore;
+                        delta = d === 0 ? '<span class="text-slate-300">±0</span>' : (d > 0 ? `<span class="text-emerald-500">+${d}</span>` : `<span class="text-red-400">${d}</span>`);
+                    }
+                    return `<div class="flex justify-between items-center text-[11px] py-1 border-b border-slate-50 last:border-0">
+                        <span class="text-slate-400">${fmtDate(a.timestamp)}</span>
+                        <span class="text-slate-600 font-bold">${typeof a.finalScore === 'number' ? a.finalScore : '—'} / ${challenge.maxScore}</span>
+                        <span class="${a.completed === true ? 'text-emerald-500' : 'text-slate-300'} text-[9px] uppercase font-bold">${a.completed === true ? 'Completed' : 'Incomplete'}</span>
+                        <span class="w-10 text-right">${delta}</span>
+                    </div>`;
+                }).join('');
+
+                challengeHtml = `
+                    <div class="mt-3 pt-3 border-t border-slate-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-700">${challenge.name}</span>
+                            <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${hasCompletion ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'}">
+                                ${hasCompletion ? 'Badge Earned' : (bestScore !== null ? `${Math.max(0, challenge.badgeThreshold - bestScore)} pts to badge` : 'Not started')}
+                            </span>
+                        </div>
+                        ${bestScore !== null ? `<p class="text-[11px] text-slate-400 mb-2">Best score: ${bestScore} / ${challenge.maxScore}</p>` : ''}
+                        ${barsHtml}
+                        ${attempts.length ? `
+                        <button onclick="window.toggleProfileHistory('${challenge.id}')" class="mt-2 text-[10px] font-bold text-allgood-primary uppercase tracking-wide underline decoration-dotted">Full history (${attempts.length})</button>
+                        <div id="profile-history-${challenge.id}" class="hidden mt-2 bg-slate-50 rounded p-2">${historyRows}</div>
+                        ` : ''}
+                    </div>`;
+            }
+
+            const packDone = labs.length > 0 && labs.every(m => computeModuleStatus(m.id, scoreDocs, startedModuleIds).status === 'completed');
+
+            return `
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-3">
+                <button onclick="window.toggleProfileAccordion('${packKey}')" class="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50 transition-colors">
+                    <div class="flex items-center gap-2">
+                        <span class="font-heading font-bold text-slate-700 text-sm uppercase">${cfg.displayName}</span>
+                        ${packDone ? '<i data-lucide="badge-check" class="w-4 h-4 text-emerald-500"></i>' : ''}
+                    </div>
+                    <i id="profile-pack-chevron-${packKey}" data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform" style="transform: rotate(${isMostRecent ? '180deg' : '0deg'})"></i>
+                </button>
+                <div id="profile-pack-body-${packKey}" class="${isMostRecent ? '' : 'hidden'} px-4 pb-4">
+                    ${labRows}
+                    ${challengeHtml}
+                </div>
+            </div>`;
+        }
+
+        // Loads game_scores + module_progress + classroom data once, on Profile open, and
+        // renders all three tabs. Not a live listener (the dashboard's own cards already
+        // have one via startModuleStatusListener) — the Profile is opened deliberately, so a
+        // fresh read on open is enough and avoids a second permanent subscription.
+        window.loadProfilePageData = async () => {
+            const uid = localStorage.getItem('aa_uid');
+            const progressTiles = document.getElementById('profile-progress-tiles');
+            const packsHost = document.getElementById('profile-progress-packs');
+            const assignedHost = document.getElementById('profile-tab-assigned');
+            if (packsHost) packsHost.innerHTML = '<p class="text-xs text-gray-400 italic p-4">Loading progress...</p>';
+
+            // Join-a-classroom box vs "already joined" display in the left rail.
+            let classroomCode = null;
+            try {
+                if (uid) {
+                    const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+                    if (userSnap.exists()) classroomCode = userSnap.data().classroomCode || null;
+                }
+            } catch (e) { console.error("Couldn't read profile user doc:", e); }
+
+            const joinBox = document.getElementById('profile-join-box');
+            const joinedBox = document.getElementById('profile-joined-box');
+            if (classroomCode) {
+                if (joinBox) joinBox.classList.add('hidden');
+                if (joinedBox) {
+                    joinedBox.classList.remove('hidden');
+                    const codeEl = document.getElementById('profile-joined-code');
+                    if (codeEl) codeEl.textContent = classroomCode;
+                }
+            } else {
+                if (joinBox) joinBox.classList.remove('hidden');
+                if (joinedBox) joinedBox.classList.add('hidden');
+            }
+
+            if (!uid) {
+                if (packsHost) packsHost.innerHTML = '<p class="text-xs text-gray-400 italic p-4">Sign in to see your progress.</p>';
+                if (assignedHost) assignedHost.innerHTML = '<p class="text-xs text-gray-400 italic p-4">Sign in to see what\'s assigned to you.</p>';
+                lucide.createIcons();
+                return;
+            }
+
+            let scoreDocs = [];
+            let startedModuleIds = new Set();
+            try {
+                const scoresSnap = await getDocs(collection(db, 'artifacts', appId, 'users', uid, 'game_scores'));
+                scoreDocs = scoresSnap.docs.map(d => d.data());
+            } catch (e) { console.error("Couldn't read game_scores for Profile:", e); }
+            try {
+                const progressSnap = await getDocs(collection(db, 'artifacts', appId, 'users', uid, 'module_progress'));
+                startedModuleIds = new Set(progressSnap.docs.map(d => d.id));
+            } catch (e) { console.error("Couldn't read module_progress for Profile:", e); }
+
+            // --- MY PROGRESS TAB ---
+            const packKeys = Object.keys(LAB_PACKS);
+            let labsCompleted = 0, labsTotal = 0, badgesEarned = 0, totalAttempts = 0;
+            let mostRecentPack = null, mostRecentTime = -1;
+
+            packKeys.forEach(packKey => {
+                const labs = MODULE_REGISTRY.filter(m => m.pack === packKey && m.category === 'lab');
+                labsTotal += labs.length;
+                labs.forEach(m => {
+                    const st = computeModuleStatus(m.id, scoreDocs, startedModuleIds);
+                    if (st.status === 'completed') labsCompleted++;
+                });
+                const challenge = MODULE_REGISTRY.find(m => m.pack === packKey && m.category === 'challenge');
+                if (challenge) {
+                    const attempts = scoreDocs.filter(d => challenge.gameNames.includes(d.gameName));
+                    totalAttempts += attempts.length;
+                    const completed = attempts.filter(a => a.completed === true && typeof a.finalScore === 'number');
+                    if (completed.length && Math.max(...completed.map(a => a.finalScore)) >= challenge.badgeThreshold) badgesEarned++;
+                    attempts.forEach(a => {
+                        if (a.completed !== true) return;
+                        const t = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0;
+                        if (t > mostRecentTime) { mostRecentTime = t; mostRecentPack = packKey; }
+                    });
+                }
+                labs.forEach(m => {
+                    if (computeModuleStatus(m.id, scoreDocs, startedModuleIds).status === 'completed') {
+                        // A completed lab also counts as recent activity for auto-expand,
+                        // though it carries no timestamp — only used when no Challenge
+                        // attempt exists yet to pick from.
+                        if (mostRecentPack === null) mostRecentPack = packKey;
+                    }
+                });
+            });
+
+            const strongest = computeStrongestCategory(scoreDocs);
+
+            if (progressTiles) {
+                const tiles = [
+                    { label: 'Labs Completed', value: `${labsCompleted} / ${labsTotal}` },
+                    { label: 'Badges Earned', value: badgesEarned },
+                    { label: 'Total Attempts', value: totalAttempts },
+                ];
+                if (strongest) tiles.push({ label: 'Strongest Category', value: strongest.label });
+                progressTiles.innerHTML = tiles.map(t => `
+                    <div class="p-3 bg-slate-50 rounded border border-slate-100 text-center">
+                        <span class="block text-lg font-bold text-slate-700">${t.value}</span>
+                        <span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">${t.label}</span>
+                    </div>`).join('');
+            }
+
+            if (packsHost) {
+                packsHost.innerHTML = packKeys.map(packKey =>
+                    renderPackCard(packKey, LAB_PACKS[packKey], scoreDocs, startedModuleIds, packKey === mostRecentPack)
+                ).join('');
+            }
+
+            // --- ASSIGNED TO ME TAB ---
+            if (assignedHost) {
+                if (!classroomCode) {
+                    assignedHost.innerHTML = `
+                        <div class="text-center p-8 bg-white rounded-xl border border-gray-200">
+                            <i data-lucide="clipboard-list" class="w-8 h-8 text-slate-300 mx-auto mb-3"></i>
+                            <p class="text-sm text-slate-500 mb-1">Nothing assigned yet.</p>
+                            <p class="text-xs text-slate-400">Join a classroom to see what's assigned to you — use the Task Force Code box on the left.</p>
+                        </div>`;
+                } else {
+                    try {
+                        const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', classroomCode));
+                        const assignedIds = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
+                        if (!assignedIds.length) {
+                            assignedHost.innerHTML = `<div class="text-center p-8 bg-white rounded-xl border border-gray-200"><p class="text-sm text-slate-500">Your Task Force Leader hasn't assigned anything yet.</p></div>`;
+                        } else {
+                            const rows = assignedIds.map(id => {
+                                const mod = getModuleById(id);
+                                if (!mod) return '';
+                                const st = computeModuleStatus(id, scoreDocs, startedModuleIds);
+                                const label = st.status === 'completed' ? 'Completed' : (st.status === 'in_progress' ? 'In Progress' : 'Not Started');
+                                const cls = st.status === 'completed' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (st.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200');
+                                return `<div class="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 mb-2">
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-700">${mod.name}</p>
+                                        <p class="text-[10px] text-slate-400 uppercase tracking-wide">${mod.category === 'challenge' ? 'Challenge' : 'Lab'}</p>
+                                    </div>
+                                    <span class="text-[9px] font-bold uppercase px-2 py-1 rounded-full border ${cls}">${label}</span>
+                                </div>`;
+                            }).join('');
+                            assignedHost.innerHTML = `
+                                <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-3">Task Force Code: <span class="text-allgood-secondary font-mono">${classroomCode}</span></p>
+                                ${rows}`;
+                        }
+                    } catch (e) {
+                        console.error("Couldn't read classroom assignment for Profile:", e);
+                        assignedHost.innerHTML = `<p class="text-xs text-red-400 italic p-4">Couldn't load your assignments right now.</p>`;
+                    }
+                }
+            }
+
+            lucide.createIcons();
         };
 
         window._selectedAvatar = null;
@@ -3035,6 +3392,139 @@
 
             </div>
 
+            <!-- 6. PROFILE PAGE (Dossier + Identity Editor + My Progress / Assigned to Me / Service Record) -->
+            <div class="page" id="page-profile" style="display:none;">
+
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 class="text-2xl font-heading font-bold text-allgood-dark uppercase">My Profile</h1>
+                        <p class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Agent Dossier</p>
+                    </div>
+                    <button onclick="window.closeProfileModal()" class="text-slate-500 hover:text-allgood-primary px-4 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2">
+                        <i data-lucide="log-out" class="w-4 h-4"></i> Return to OS
+                    </button>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-6">
+
+                    <!-- LEFT RAIL: identity, rank, classroom -->
+                    <div class="w-full md:w-72 shrink-0 bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center text-center h-fit">
+                        <div class="w-24 h-24 rounded-full bg-white border-4 border-white shadow-md mb-4 overflow-hidden relative group">
+                            <div class="absolute inset-0 bg-allgood-secondary/10 flex items-center justify-center">
+                                <i id="profile-avatar-fallback-icon" data-lucide="user" class="w-10 h-10 text-allgood-secondary"></i>
+                                <span id="profile-avatar-display" class="w-12 h-12 hidden [&>svg]:w-full [&>svg]:h-full"></span>
+                            </div>
+                        </div>
+
+                        <!-- VIEW MODE: NAME -->
+                        <div id="profile-view-name" class="w-full">
+                            <h3 class="text-xl font-heading font-bold text-slate-800" id="profile-name-display">Agent Name</h3>
+                            <button onclick="window.toggleProfileEdit(true)" class="text-[10px] uppercase font-bold text-allgood-primary hover:text-allgood-hover underline decoration-dotted mt-1">Edit Identity</button>
+                        </div>
+
+                        <!-- SIGN-IN PROMPT: shown only when this session hasn't gone through
+                             the identify gate yet (still the invisible power-up placeholder) —
+                             reaching Profile directly from the navbar is the point where
+                             someone can start that without needing to launch a course first. -->
+                        <div id="profile-signin-prompt" class="w-full mt-3 hidden">
+                            <button onclick="window.openSignInFromProfile()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2 rounded shadow-md text-xs uppercase tracking-wide">Sign In</button>
+                        </div>
+
+                        <!-- EDIT MODE: NAME + AVATAR. The avatar picker only matters for guest
+                             (anonymous) accounts — a Task Force Leader's real Google identity
+                             doesn't use an avatar. -->
+                        <div id="profile-edit-name" class="w-full hidden">
+                            <input type="text" id="profile-name-input" class="w-full text-center border border-allgood-secondary rounded p-1 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;" placeholder="Enter Alias">
+                            <div id="profile-avatar-picker" class="hidden flex-wrap justify-center gap-1 mb-2"></div>
+                            <div class="flex gap-2 justify-center">
+                                <button onclick="window.saveProfileIdentity()" class="bg-allgood-secondary text-white px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent">Save</button>
+                                <button onclick="window.toggleProfileEdit(false)" class="bg-gray-200 text-gray-500 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-gray-300">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 w-full">
+                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm">
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Clearance Rank</p>
+                                <p class="text-sm font-bold text-allgood-secondary" id="profile-rank-display">FIELD AGENT</p>
+                            </div>
+                        </div>
+
+                        <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup.
+                             Shown/hidden by window.loadProfilePageData() depending on whether
+                             the signed-in student already has a classroomCode on file. -->
+                        <div class="mt-3 w-full" id="profile-join-box">
+                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Task Force Code?</p>
+                                <div class="flex gap-2">
+                                    <input type="text" id="profile-classroom-input" placeholder="e.g. 2RP878" maxlength="8" class="flex-1 min-w-0 border border-gray-300 rounded p-2 text-xs uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;">
+                                    <button onclick="window.joinClassroom()" class="bg-allgood-secondary text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent shrink-0">Join</button>
+                                </div>
+                                <p id="profile-classroom-status" class="text-[10px] text-gray-400 mt-1"></p>
+                            </div>
+                        </div>
+
+                        <!-- ALREADY JOINED: no teacher display name is readily available on
+                             this document (only the classroom code), so that's what's shown —
+                             no fabricated "assigned by" name. -->
+                        <div class="mt-3 w-full hidden" id="profile-joined-box">
+                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1 flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Your Task Force</p>
+                                <p class="text-sm font-bold text-allgood-secondary font-mono" id="profile-joined-code">------</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: TABS -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
+                            <button id="profile-tabbtn-progress" onclick="window.switchProfileTab('progress')" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 text-allgood-primary border-allgood-primary whitespace-nowrap transition-colors">My Progress</button>
+                            <button id="profile-tabbtn-assigned" onclick="window.switchProfileTab('assigned')" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 text-slate-400 border-transparent hover:text-allgood-primary whitespace-nowrap transition-colors">Assigned to Me</button>
+                            <button id="profile-tabbtn-record" onclick="window.switchProfileTab('record')" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 text-slate-400 border-transparent hover:text-allgood-primary whitespace-nowrap transition-colors">Service Record</button>
+                        </div>
+
+                        <!-- MY PROGRESS -->
+                        <div id="profile-tab-progress" class="profile-tab-panel">
+                            <div id="profile-progress-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+                            <div id="profile-progress-packs"></div>
+                        </div>
+
+                        <!-- ASSIGNED TO ME -->
+                        <div id="profile-tab-assigned" class="profile-tab-panel hidden"></div>
+
+                        <!-- SERVICE RECORD (relocated verbatim from the old modal) -->
+                        <div id="profile-tab-record" class="profile-tab-panel hidden">
+                            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <div class="grid grid-cols-2 gap-4 mb-6">
+                                    <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                                        <span class="block text-2xl font-bold text-slate-700" id="profile-stat-launches">0</span>
+                                        <span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Missions Launched</span>
+                                    </div>
+                                    <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                                        <span class="block text-2xl font-bold text-slate-700" id="profile-stat-badges">0</span>
+                                        <span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Badges Earned</span>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
+                                        <span class="text-slate-500 font-bold uppercase">Agent ID</span>
+                                        <span class="font-mono text-slate-400 select-all" id="profile-id-display">UNKNOWN</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
+                                        <span class="text-slate-500 font-bold uppercase">Account Status</span>
+                                        <span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full uppercase text-[10px]">Active</span>
+                                    </div>
+                                     <div class="flex justify-between items-center text-xs pb-2">
+                                        <span class="text-slate-500 font-bold uppercase">Join Date</span>
+                                        <span class="font-mono text-slate-400" id="profile-join-date">--/--/----</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ABOUT US MODAL -->
             <div id="about-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="closeAboutModal()">
                 <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
@@ -3070,113 +3560,6 @@
                     <button onclick="closeAboutModal()" class="mt-6 w-full bg-allgood-dark hover:bg-black text-white font-bold py-3 rounded text-xs shadow-md transition-all transform active:scale-95 uppercase tracking-wide flex items-center justify-center gap-2">
                         <i data-lucide="power-off" class="w-3 h-3"></i> Close Protocol
                     </button>
-                </div>
-            </div>
-
-            <!-- NEW: PROFILE MODAL (Dossier + Identity Editor + Mission Log) -->
-            <div id="profile-modal" class="hidden-modal absolute inset-0 z-[260] bg-allgood-dark/90 flex items-center justify-center p-4 modal-transition backdrop-blur-sm" onclick="window.closeProfileModal()">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border-t-4 border-allgood-secondary relative flex flex-col md:flex-row" onclick="event.stopPropagation()">
-                    
-                    <!-- Close Button -->
-                    <button onclick="window.closeProfileModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 z-50 p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
-
-                    <!-- Left: ID Card Visual -->
-                    <div class="w-full md:w-2/5 bg-slate-50 border-b md:border-b-0 md:border-r border-gray-200 p-6 flex flex-col items-center text-center">
-                        <div class="w-24 h-24 rounded-full bg-white border-4 border-white shadow-md mb-4 overflow-hidden relative group">
-                            <div class="absolute inset-0 bg-allgood-secondary/10 flex items-center justify-center">
-                                <i id="profile-avatar-fallback-icon" data-lucide="user" class="w-10 h-10 text-allgood-secondary"></i>
-                                <span id="profile-avatar-display" class="w-12 h-12 hidden [&>svg]:w-full [&>svg]:h-full"></span>
-                            </div>
-                        </div>
-
-                        <!-- VIEW MODE: NAME -->
-                        <div id="profile-view-name" class="w-full">
-                            <h3 class="text-xl font-heading font-bold text-slate-800" id="profile-name-display">Agent Name</h3>
-                            <button onclick="window.toggleProfileEdit(true)" class="text-[10px] uppercase font-bold text-allgood-primary hover:text-allgood-hover underline decoration-dotted mt-1">Edit Identity</button>
-                        </div>
-
-                        <!-- SIGN-IN PROMPT: shown only when this session hasn't gone through
-                             the identify gate yet (still the invisible power-up placeholder) —
-                             reaching this modal directly from the navbar is the point where
-                             someone can start that without needing to launch a course first. -->
-                        <div id="profile-signin-prompt" class="w-full mt-3 hidden">
-                            <button onclick="window.openSignInFromProfile()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2 rounded shadow-md text-xs uppercase tracking-wide">Sign In</button>
-                        </div>
-
-                        <!-- EDIT MODE: NAME + AVATAR. The avatar picker only matters for guest
-                             (anonymous) accounts — a Task Force Leader's real Google identity
-                             doesn't use an avatar. -->
-                        <div id="profile-edit-name" class="w-full hidden">
-                            <input type="text" id="profile-name-input" class="w-full text-center border border-allgood-secondary rounded p-1 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;" placeholder="Enter Alias">
-                            <div id="profile-avatar-picker" class="hidden flex-wrap justify-center gap-1 mb-2"></div>
-                            <div class="flex gap-2 justify-center">
-                                <button onclick="window.saveProfileIdentity()" class="bg-allgood-secondary text-white px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent">Save</button>
-                                <button onclick="window.toggleProfileEdit(false)" class="bg-gray-200 text-gray-500 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-gray-300">Cancel</button>
-                            </div>
-                        </div>
-
-                        <div class="mt-6 w-full">
-                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm">
-                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Clearance Rank</p>
-                                <p class="text-sm font-bold text-allgood-secondary" id="profile-rank-display">FIELD AGENT</p>
-                            </div>
-                        </div>
-
-                        <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup -->
-                        <div class="mt-3 w-full">
-                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
-                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Task Force Code?</p>
-                                <div class="flex gap-2">
-                                    <input type="text" id="profile-classroom-input" placeholder="e.g. 2RP878" maxlength="8" class="flex-1 min-w-0 border border-gray-300 rounded p-2 text-xs uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;">
-                                    <button onclick="window.joinClassroom()" class="bg-allgood-secondary text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent shrink-0">Join</button>
-                                </div>
-                                <p id="profile-classroom-status" class="text-[10px] text-gray-400 mt-1"></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Right: Mission Log & Stats -->
-                    <div class="w-full md:w-3/5 p-6 bg-white">
-                        <div class="mb-6">
-                            <h3 class="text-lg font-heading font-bold text-slate-700 uppercase tracking-tight flex items-center gap-2">
-                                <i data-lucide="clipboard-list" class="w-4 h-4 text-slate-400"></i> Service Record
-                            </h3>
-                            <div class="h-px w-full bg-gray-100 mt-2"></div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 mb-6">
-                            <div class="p-3 bg-slate-50 rounded border border-slate-100">
-                                <span class="block text-2xl font-bold text-slate-700" id="profile-stat-launches">0</span>
-                                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Missions Launched</span>
-                            </div>
-                            <div class="p-3 bg-slate-50 rounded border border-slate-100">
-                                <span class="block text-2xl font-bold text-slate-700" id="profile-stat-badges">0</span>
-                                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Badges Earned</span>
-                            </div>
-                        </div>
-
-                        <div class="space-y-3">
-                            <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
-                                <span class="text-slate-500 font-bold uppercase">Agent ID</span>
-                                <span class="font-mono text-slate-400 select-all" id="profile-id-display">UNKNOWN</span>
-                            </div>
-                            <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
-                                <span class="text-slate-500 font-bold uppercase">Account Status</span>
-                                <span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full uppercase text-[10px]">Active</span>
-                            </div>
-                             <div class="flex justify-between items-center text-xs pb-2">
-                                <span class="text-slate-500 font-bold uppercase">Join Date</span>
-                                <span class="font-mono text-slate-400" id="profile-join-date">--/--/----</span>
-                            </div>
-                        </div>
-
-                        <div class="mt-8 pt-4 border-t border-gray-100 text-center md:text-right">
-                             <button onclick="window.closeProfileModal()" class="text-xs font-bold text-slate-400 hover:text-allgood-primary transition-colors uppercase tracking-wide">
-                                Close Dossier
-                            </button>
-                        </div>
-                    </div>
-
                 </div>
             </div>
 
