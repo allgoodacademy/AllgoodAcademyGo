@@ -2155,9 +2155,10 @@
                 const feedContainer = document.getElementById('scenario-feed-container');
                 if (feedContainer) feedContainer.innerHTML = '';
                 updateTOC();
-                const startup = document.getElementById('startup-screen');
-                startup.style.display = 'flex';
-                setTimeout(() => startup.style.opacity = '1', 10);
+                // A retake never replays the power-up splash: that screen is for genuine
+                // first entry from /dashboard, and it already spent its one-shot dismiss
+                // handler on the way in — re-showing it here just leaves it stuck on
+                // screen with no way to close it.
                 window.showPage(0);
                 sfx.powerOff();
             }
