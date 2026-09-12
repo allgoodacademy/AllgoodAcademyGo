@@ -4,11 +4,11 @@
 **Authored:** 2026-09-12, against the live repo.
 **Build state:** 🟢 **AS BUILT (partial)** — reconciled 2026-09-12 against the staging build on
 `claude/new-session-f6ve19`. The hub, **Ten Voices, One Source** and the **full 24-scenario
-Challenge** are built and on staging. **The Question Decides the Answer**, **Where You Say It**
-and **The Cost of Later** are storyboarded in full below and are **not built** — they show as
-coming-soon on the hub and do not navigate. Everything in §9, §10 and §11 is therefore
-specification, not description. See "AS BUILT reconciliation" at the end of this document for
-what changed between the storyboard and the build, and why.
+Challenge** are built. **The Question Decides the Answer**, **Where You Say It** and **The Cost
+of Later** are storyboarded in full below and are **not built** — they show as coming-soon on
+the hub and do not navigate. Everything in §9, §10 and §11 is therefore specification, not
+description. **This copy supersedes the one shipped with the first build**: it carries the three
+corrected counts and R9 (§13). See §15 for what changed between spec and build, and why.
 **Authority:** This document is the single source both the Room to Think Challenge and all four GoodBlocks draw from. Per the GoodBlock Builder skill (Phase 1, item 0), when a Challenge and its labs are designed together the mapping is *authored* rather than discovered, and whichever is written first is authoritative. **The Challenge scenario map below is authoritative. GoodBlocks conform to it.**
 
 ---
@@ -319,11 +319,11 @@ Continue ↓ is available immediately. **No bullet list of what's coming.**
 
 Same mechanic, different data. **Deliberate re-use inside the GoodBlock, because practice is the point** — it is not a second registry entry.
 
-**Entry state.** Seven cards about a bus route being cut. Counter: **7**.
+**Entry state.** **Six** cards about a bus route being cut. Counter: **6**.
 
 > **Jodi (neutral):** "Same job, different mess. Careful though — last time the answer was 'fewer than it looked.' That doesn't make it the answer every time."
 
-**The data.** Seven resolve to **four**: a council notice, a driver told directly at work, a parent who rang and asked, and three reposts of the notice.
+**The data.** Six cards, **four** origins, and the enumeration is exhaustive — do not add a seventh: the council's published notice (1), a driver told directly at work (2), a parent who rang and asked (3), and three reposts of the notice (4). 1 + 1 + 1 + 3 = 6 cards. 4 origins.
 
 | Action | Result |
 |---|---|
@@ -460,9 +460,9 @@ Covers Q6 — the same mechanism in a question you *write* rather than type.
 
 **Mechanic: framing-mix bibliography from a provenance-tagged pool.** New (#35).
 
-**Entry state.** Eleven source cards collected across Runs 1–3 and the rebuild, each carrying a provenance tag — `from: "why are they good?"` and so on. Five empty slots labelled **Sources you're submitting**. A framing readout beneath.
+**Entry state.** **Twelve** source cards — the four returned by each of Runs 1–3, and no others; the rebuild in Case 4 re-ranks this pool rather than adding to it. Each carries a provenance tag — `from: "why are they good?"` and so on. Five empty slots labelled **Sources you're submitting**. A framing readout beneath.
 
-> **Jodi (neutral):** "Five on the sheet. Those tags show where each one came from — and I promise you, your teacher can work that out even without them."
+> **Jodi (neutral):** "Five of those twelve on the sheet. Those tags show where each one came from — and I promise you, your teacher can work that out even without them."
 
 | Action | Result |
 |---|---|
@@ -470,7 +470,7 @@ Covers Q6 — the same mechanism in a question you *write* rather than type.
 | All five from one framing | Plain statement, not a rebuke: *"Every one of those was found by asking the same way. That's not five pieces of evidence — that's one search, five times."* **Does not pass** |
 | All five from the opposing framing | *"You've swung the other way and done exactly the same thing."* **Does not pass.** Over-correction is a different mistake and is not quietly rewarded |
 | Remove a card | Returns to pool, readout updates. Must respond |
-| Slot one of the two weak sources (an unsourced blog post, a 14-person survey from one class) | Names the weakness, then: *"You can use it. Just know what it is."* **They do not block completion. This is deliberate — do not turn it into a gate** |
+| Slot one of the two weak sources — an unsourced blog post from Run 1, a 14-person survey from one class in Run 2 | Names the weakness, then: *"You can use it. Just know what it is."* **They do not block completion. This is deliberate — do not turn it into a gate** |
 | Reset ("Clear the sheet") | Empties all five |
 
 **Gate vs exploration.** Skill-practice, gated on framing mix.
@@ -670,7 +670,7 @@ Screen: a finished project page, handed in, with a mark and two lines of comment
 
 **Mechanic: dependency-aware scheduling where late placement makes options unreachable.** New (#41).
 
-**Entry state.** A three-week calendar, today at the left, deadline at the right. A tray of **seven session cards**, some carrying dependency badges:
+**Entry state.** A three-week calendar, today at the left, deadline at the right. A tray of **seven session cards**. Two of them occupy **two consecutive days** each, marked ×2 — so seven cards, nine days of work. **Seven is the number in all copy and in the completion gate; nine is never said aloud.**
 
 | Session | Dependency |
 |---|---|
@@ -817,6 +817,7 @@ To be added to `references/storyboard-checklist.md` as **entries 29–43**, cont
 - **R6 — Character names.** All cleared against `public/` and `docs/`. Three obvious first choices — `Priya`, `Dev`, `Nadia` — collide with Privacy & Security and were replaced.
 - **R7 — Registry numbering.** 29–43, continuing from 28, with two adjacency notes recorded rather than hidden.
 - **R8 — The Case 1 syllabus problem.** Every Case 1 here is a cold open. One pack's answer to a live open ask, not a fix for the other seven.
+- **R9 — Enumeration audit.** Every stated card, session and source count in this document has been checked against its own enumeration. Three did not close and are fixed: GB1 Case 4 said seven cards and listed six; GB4 Case 3 said seven cards where two carry ×2, making nine days; GB2 Case 5 said eleven sources where three runs of four produce twelve. **Standing rule: any Case that states a count must enumerate it exhaustively in the same paragraph.** A count without an enumeration is how a builder ends up authoring content nobody designed.
 
 ## Sign-off
 
@@ -1113,16 +1114,17 @@ built as written.
 
 ## Deviations from the storyboard
 
-**D1 — Case 4 needed a seventh card that the storyboard does not name.** §8 Case 4 specifies
-"seven cards" resolving to "**four**", then enumerates the origins as *a council notice, a
-driver told directly at work, a parent who rang and asked, and three reposts of the notice* —
-which is six cards across three origins, not seven across four. Dropping to six cards or three
-origins would both have broken the Case's stated answer of four, which the whole Case exists to
-produce. A fourth independent origin was authored at build time: **`@corner_shop` — "Asked the
-bus company about our delivery slot. 61 stops end of term." / *asked the operator directly***.
-It is independent for the same reason the driver and the parent are: somebody went and asked,
-and asked a different body than the parent did. Group sizes are now notice ×4, driver ×1,
-parent ×1, operator ×1 = 7 cards, 4 origins. **The honest number is still four.**
+**D1 — RESOLVED, and the authored card is gone.** The first build hit a spec that said Case 4
+had "seven cards" resolving to "four" and then enumerated six cards across three origins. A
+seventh card (`@corner_shop`) was authored to make the answer of four hold, and flagged as
+authored-not-designed. The spec has since closed the gap the other way: **six cards, four
+origins — notice ×1, driver ×1, parent ×1, reposts ×3.** The authored card has been removed,
+the counter starts at 6, and the gate is still 4. Nothing authored survives in this Case.
+
+This is the deviation that produced **R9** (§13): *any Case that states a count must enumerate
+it exhaustively in the same paragraph.* Two further counts in this document were wrong the same
+way and were fixed under the same rule — §11 Case 3's seven session cards carrying nine days of
+work, and §9 Case 5's twelve sources rather than eleven. Neither is built yet.
 
 **D2 — the Challenge renders every scenario with the plain "scene" card.** The Real World Ready
 chassis picks a device mockup per scenario from its `icon` field (chat, social, browser, email,
@@ -1186,7 +1188,13 @@ animate a card in Case 3. Scoped to the Case's own board.
 against an empty feed logged a number that counted nothing. Now armed on the first post.
 
 **F-4 (static pass) — Case 4's merge line said "All three of these…" when four cards were
-stacked.** Split into a size-3 and a size-4 line.
+stacked.** Split into a size-3 and a size-4 line. Superseded by the six-card rebuild: the
+storyboard's line now fires on a three-card stack, which is the largest stack in the Case.
+
+**F-6 (bible pass) — Case 6's recap named the wrong count.** "Seven voices and four" survived
+the six-card correction in both the spoken line and the badge blurb. Both now read "six voices
+and four", and the bible checker asserts every count Jodi says against the real on-screen card
+counts so this cannot drift silently again.
 
 ## Do-not-undo, carried forward
 
@@ -1223,12 +1231,48 @@ Two more from the Challenge, on the same footing:
    finishing ten days early then sitting on the draft scores 0. Front-loading and going quiet are
    not the lessons either.
 
+## ⚠️ Raised by the six-card rebuild — for the Instructional Designer
+
+**The reposts are counted as an origin separate from the notice, and the Case's springback line
+for that pair is build-authored.** The corrected enumeration makes the three reposts their own
+origin group so the honest answer lands on four. But the Case's own feedback line for merging
+them together is *"All three of these are the same notice with a different caption on top"* —
+which says their origin *is* the notice. Under that reading the honest count is three, not four.
+
+The build follows the spec exactly (6 cards, 4 origins, gate 4) and does **not** author a
+resolution. The one pair the storyboard gives no line for is notice + repost, and rather than
+assert a provenance the spec has not settled, that line describes only what the student can see
+on the cards: *"That's the council saying it once. The other three are it coming back round.
+Count the saying and the coming-round separately."* It is marked in the source as not signed off.
+**This is the kind of thing R9 exists to catch and is worth one ID decision** — either the
+reposts are a fourth origin and the "same notice" line needs rewording, or they fold into the
+notice and the honest number is three.
+
 ## Still open
 
-- **F1 — the Jodi character bible.** `/mnt/project/jodi-character-bible.md` does not exist in the
-  build sandbox (`/mnt/project` is not mounted). **Every Jodi line in the built GoodBlock is
-  therefore unchecked against the bible.** They are the storyboard's lines, drafted against the
-  seven shipped scripts, entered verbatim and not improvised. This flag does not close.
+- **F1 — the Jodi character bible. CLOSED.** The bible is not on disk and `/mnt/project` is
+  still not mounted, but it exists in Notion as **"Jodi — Character Bible"** (under *Jodi Avatar
+  System — SVG States & Usage*) and was read from there. **Ten Voices, One Source has now had a
+  real bible pass**, checked line by line against what the bible actually states rather than
+  against a memory of her voice:
+
+  | Bible rule | Result |
+  |---|---|
+  | *"She never says 'wrong.'"* — a choice that didn't work out is reframed, not corrected | ✅ no line tells the student anything of theirs is wrong |
+  | Southern charm in *"word choice and storytelling rhythm, not phonetic spelling"* | ✅ no written-out drawl anywhere |
+  | Never *"anything that talks down"* | ✅ clean |
+  | *"Warm on contact… she doesn't build up to liking you"* | ✅ opens "Well hey there", the bible's own sample opener |
+  | Closing cadence — *"Go on now — go be somebody's good day"* | ✅ Case 6 closes "Go on now. Go count something." |
+  | *"Callbacks are load-bearing, not decorative"* | ✅ Case 5 quotes the student's own Case 2 number back by name, and branches when they never set one |
+
+  One line was examined closely and **kept**: *"Nothing wrong with that number."* A token-level
+  reading flags it; the bible's actual rule is that she never tells a student their choice was
+  wrong, and this line is her explicitly refusing to judge. It is the most bible-aligned line in
+  the module and removing it would have been a regression.
+
+  The pass also caught a real defect: Case 6's recap said *"seven voices and four"*, which the
+  six-card correction above had just made false. Now "six voices and four", in both the spoken
+  line and the completion badge.
 - **F2 — the two icon names. CLOSED.** `scan-search` and `megaphone` were both verified against
   `public/assets/js/lucide.min.js`, the bundled library that actually renders, along with
   `git-merge`, `calendar-clock`, `compass`, `shuffle` and every icon used in the Challenge.

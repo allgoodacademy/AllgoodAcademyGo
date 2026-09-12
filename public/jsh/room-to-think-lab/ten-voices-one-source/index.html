@@ -607,7 +607,7 @@
                         <div class="mb-5">
                             <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Board That Looks the Same</h2>
-                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Different week, different mess. The 61 bus is supposedly being cut, and seven people have said so.</p>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Different week, different mess. The 61 bus is supposedly being cut, and six people have said so.</p>
                         </div>
 
                         <div id="step-4" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Same job. Stack the ones that came from the same place &mdash; and <strong>only</strong> the ones that did.</span></div>
@@ -615,7 +615,7 @@
                         <div class="count-panel mb-3">
                             <div>
                                 <p class="count-label">Independent sources</p>
-                                <p id="c4-count" class="count-value">7</p>
+                                <p id="c4-count" class="count-value">6</p>
                             </div>
                             <div class="text-right">
                                 <p class="text-[9px] text-slate-400 uppercase tracking-wide tracking-widest">Route 61 &middot; St George's</p>
@@ -735,7 +735,7 @@
                             <div class="mb-6">
                                 <span class="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Counting Lab Cleared</span>
                                 <h2 class="text-3xl sm:text-4xl font-heading font-bold text-gray-900 mt-4">You Counted It</h2>
-                                <p class="text-sm text-gray-600 max-w-md mx-auto mt-3 leading-relaxed">Nine voices and two sources, seven voices and four, and one question worth all the scrolling put together.</p>
+                                <p class="text-sm text-gray-600 max-w-md mx-auto mt-3 leading-relaxed">Nine voices and two sources, six voices and four, and one question worth all the scrolling put together.</p>
                             </div>
 
                             <div class="card-shimmer rounded-2xl p-8 shadow-md border border-gb-accent/30 mb-8 max-w-lg w-full relative overflow-hidden mx-auto">
@@ -866,17 +866,19 @@
         // distribution follows the shipped scripts (heavily `neutral`), not the reference
         // doc's percentages — see the storyboard, §6.
         //
-        // ⚠️ These lines are drafted against the seven shipped GoodBlock scripts, NOT against
-        // the Jodi character bible: that file lives at /mnt/project/jodi-character-bible.md
-        // and was not reachable from the build sandbox. They are unchecked. Do not
-        // "improve" them by improvising her voice — get the bible pass done instead.
+        // ✅ BIBLE-PASSED. These lines were checked against docs/jodi-character-bible.md by
+        // the Instructional Designer and are entered here VERBATIM from the storyboard
+        // (§8). Do not re-interpret her from the bible at build time — that pass is done,
+        // and §6 records that a first attempt at it lifted the bible's sample lines
+        // word-for-word into places they did not belong. A line that matches a bible sample
+        // verbatim is a defect, not a compliance.
         const jodiScript = [
-            { text: "Well hey there. That's Yara, and that post has been in front of her for about nine seconds. Four moments today, and every one of them runs on the same little lie: if enough people are saying it, that's a lot of evidence. Let's go find out how much evidence there actually is.", mood: 'neutral' },
+            { text: "Well hey there. That's Yara, and that post has been sitting in front of her about nine seconds now. Four moments today, and every one of them turns on the same little lie — that if enough people are saying a thing, it must add up to a lot of evidence. It doesn't. Let's go find out what it does add up to.", mood: 'neutral' },
             { text: "She's got fifteen minutes before the bus. Watch it with her — and press that button the second you'd believe it. Not when you're certain. When you'd believe it.", mood: 'neutral' },
             { text: "Nine people said it. Now — read the little line under each one, the bit nobody ever reads, and tell me how many of them actually went and found out anything.", mood: 'neutral' },
             { text: "Same job, different mess. Careful though — last time the answer was 'fewer than it looked.' That doesn't make it the answer every time.", mood: 'neutral' },
             { text: "Now — here's five things Yara could do next. Pick one and watch that number.", mood: 'thinking' },
-            { text: "So that's four moments. Nine voices and two sources, seven voices and four, and one question that was worth all the scrolling put together. Repeating is cheap and finding out costs something — that's why most of what you see is the cheap kind. Go on now. Go count something.", mood: 'happy' }
+            { text: "So that's four moments — nine voices and two sources, six voices and four, and one little question worth more than all that scrolling put together. Here's the whole thing: repeating costs nothing and finding out costs something, which is exactly why most of what lands in front of you is the cheap kind. That's enough out of me today. Go on now — go count something.", mood: 'happy' }
         ];
 
         // ---- Jodi recall state ----
@@ -1165,24 +1167,27 @@
             { handle: '@hana.kell',    initials: 'HK', claim: "I was in the office when they counted it on Friday. Nothing was missing.",                attr: 'I was there',                               origin: 'firsthand' }
         ];
 
-        /* Case 4's seven posts about the 61 bus. Four origins, and the honest count really is
+        /* Case 4's SIX posts about the 61 bus. Four origins, and the honest count really is
            four — over-merging here is the mistake the Case exists to make scoreable.
-              A. the council notice, plus three reposts of it   (4 cards, 1 origin)
-              B. a driver told at the depot                     (1 card,  1 origin)
-              C. a parent who rang the council and asked        (1 card,  1 origin)
-              D. a shop that asked the bus operator directly    (1 card,  1 origin)
-           Group D is a build-time addition: the storyboard specifies "seven resolve to four"
-           and then enumerates six cards' worth of origins. Rather than quietly drop to six
-           cards or to three groups — either of which would break the Case's stated answer of
-           four — a fourth independent origin is authored here. Recorded as a deviation. */
+              A. the council's published notice   (1 card)
+              B. a driver told at the depot       (1 card)
+              C. a parent who rang and asked      (1 card)
+              D. three reposts going round        (3 cards)
+           1 + 1 + 1 + 3 = 6 cards, 4 origins. This enumeration is EXHAUSTIVE and the
+           storyboard says so in terms: do not add a seventh card.
+           
+           This replaced an earlier build where the spec said seven cards and enumerated six,
+           and a seventh was authored to make the answer of four hold. The spec now closes the
+           gap the other way and the authored card is gone. See storyboard §13 R9: a count
+           without an exhaustive enumeration beside it is how a builder ends up authoring
+           content nobody designed. */
         const BUS_POSTS = [
-            { handle: '@stgeorges_council', initials: 'SC', claim: "Service 61 will not run after the end of term. Notice posted 14 Sept.", attr: 'the council notice itself',            origin: 'notice' },
-            { handle: '@marcy_fenn',        initials: 'MF', claim: "the 61 is being cut, it's on the council site",                         attr: 'copied from the council notice',       origin: 'notice' },
-            { handle: '@yr10_chat',         initials: 'YC', claim: "no more 61 after this term ❌",                                          attr: 'screenshot of the council notice',     origin: 'notice' },
-            { handle: '@d.ackroyd',         initials: 'DA', claim: "61 gone. brilliant. how am I meant to get in",                          attr: 'the notice again, with a caption',     origin: 'notice' },
+            { handle: '@stgeorges_council', initials: 'SC', claim: "Service 61 will not run after the end of term. Notice posted 14 Sept.", attr: 'the council, posting it themselves',   origin: 'notice' },
             { handle: '@rae_on_route',      initials: 'RR', claim: "Told at the depot this morning — 61 comes off the roster in December.",  attr: 'told directly at work',                origin: 'driver' },
             { handle: '@mrs_ademola',       initials: 'MA', claim: "Rang the council and asked. Confirmed, and the 12 is being extended.",   attr: 'rang and asked',                       origin: 'parent' },
-            { handle: '@corner_shop',       initials: 'CS', claim: "Asked the bus company about our delivery slot. 61 stops end of term.",   attr: 'asked the operator directly',          origin: 'operator' }
+            { handle: '@marcy_fenn',        initials: 'MF', claim: "the 61 is being cut, saw it going round earlier",                       attr: 'passing on what came through',         origin: 'repost' },
+            { handle: '@yr10_chat',         initials: 'YC', claim: "no more 61 after this term ❌",                                          attr: 'same thing, screenshotted again',      origin: 'repost' },
+            { handle: '@d.ackroyd',         initials: 'DA', claim: "61 gone. brilliant. how am I meant to get in",                          attr: 'the same one, with a caption on it',   origin: 'repost' }
         ];
 
         /* ===================== CASE 2: HOW MANY DOES IT TAKE =====================
@@ -1551,7 +1556,7 @@
                     ? 'Ruben told both of them. That\'s one person, twice.'
                     : `Ruben again. That\'s ${size} names and still one person.`)
                 : 'Same origin. One pile.',
-            pairLines: () => 'Different origins. One saw it herself, one got it from Ruben. Keep them apart.',
+            pairLines: () => 'Mm — hold those two apart a second. One of them saw it herself. One got it from Ruben. Different people finding out is not the same as one person repeating.',
             onComplete: () => {
                 window.setStep(3, 1, 'Two sources. Eight names, one of him &mdash; and one person who actually looked.', true);
                 window.teachSplit(3, 'Nine voices, two sources',
@@ -1561,7 +1566,7 @@
                 // concerned is at the situation, never at the student — and she lands on
                 // thinking, which is where the Case leaves her.
                 scheduleUI(() => {
-                    window.sayJodi('That\'s the bit that gets me, sugar. The one who checked is the quietest one on there.', 'thinking');
+                    window.sayJodi('That\'s the bit that gets me, sugar. The one person who actually went and looked is the quietest voice on that whole board — and not one of those nine thought to go ask the girl it\'s about.', 'thinking');
                 }, 2200);
                 showReframe(3);
                 document.getElementById('c3-status').textContent = 'Two independent sources';
@@ -1590,28 +1595,36 @@
         // Same mechanic, and the honest number here is FOUR. Over-merging is a real error
         // with its own feedback, because deciding everything is an echo is a different
         // mistake from believing all nine.
-        const ORIGIN_NAMES = { notice: 'the council notice', driver: 'the driver', parent: 'the parent who rang', operator: 'the shop who asked the bus company' };
+        const ORIGIN_NAMES = { notice: 'the council notice', driver: 'the driver', parent: 'the parent who rang', repost: 'the three going round' };
         const case4Board = makeMergeBoard({
             caseNum: 4,
             posts: BUS_POSTS,
             target: 4,
             liftOrigin: null,
             boardId: 'c4-board', countId: 'c4-count', logId: 'c4-log', statusId: 'c4-status',
-            sameLine: (origin, size) => origin === 'notice'
-                ? (size === 3
+            // Only the three reposts can merge. The storyboard's line for the full stack is
+            // quoted exactly; the pair-sized line is the same thought, one card short.
+            sameLine: (origin, size) => origin === 'repost'
+                ? (size >= 3
                     ? 'All three of these are the same notice with a different caption on top.'
-                    : size >= 4
-                        ? 'That\'s the notice and every repost of it. One council, one piece of paper.'
-                        : 'Same notice, different caption. One source.')
+                    : 'Same thing, different caption. That\'s one source, twice.')
                 : 'Same origin. One pile.',
             pairLines: (a, b) => {
                 const pair = [a, b].sort().join('|');
-                if (pair === 'driver|notice') return 'The driver didn\'t read the notice. He got told at work. That\'s a second person finding out, not a second person repeating.';
+                // The storyboard's own line, quoted exactly.
+                if (pair === 'driver|notice') return 'Now hold on, that one\'s different. The driver never read the notice — somebody told him at work. That\'s a second person finding out, and that counts.';
+                if (pair === 'driver|repost') return 'He was told at the depot. They were told by their phones. Not the same thing at all.';
                 if (pair === 'notice|parent') return 'She rang and asked. The answer came back to her, not off the notice — and she got told something the notice doesn\'t say.';
-                if (pair === 'notice|operator') return 'The shop asked the bus company, not the council. Different people, asked separately, same answer. That\'s worth something.';
                 if (pair === 'driver|parent') return 'A depot briefing and a phone call to the council. Two people found out, two different ways.';
-                if (pair === 'driver|operator') return 'Both asked at work, but not the same work. Keep them apart.';
-                if (pair === 'operator|parent') return 'One rang the council, one asked the bus company. Two askings, not one.';
+                if (pair === 'parent|repost') return 'She picked up the phone. They picked up a screenshot. Keep those apart.';
+                // ⚠️ notice|repost is the one pair the storyboard does not give a line for, and
+                // it is the one that needs care: the reposts ARE reposts of the notice, and yet
+                // the spec counts them as a separate origin so the honest answer lands on four.
+                // This line therefore describes what the student can SEE on the cards — the
+                // council posting once versus the same thing coming round again — rather than
+                // asserting a provenance the spec has not settled. Flagged for the
+                // Instructional Designer; do not treat this wording as signed off.
+                if (pair === 'notice|repost') return 'That\'s the council saying it once. The other three are it coming back round. Count the saying and the coming-round separately.';
                 return `${ORIGIN_NAMES[a] || a} and ${ORIGIN_NAMES[b] || b} found out separately. Keep them apart.`;
             },
             onComplete: () => {
@@ -1628,15 +1641,15 @@
 
         window.resetCase4 = function() {
             case4Board.reset(false);
-            document.getElementById('c4-count').textContent = '7';
+            document.getElementById('c4-count').textContent = '6';
             window.setStep(4, 1, 'Same job. Stack the ones that came from the same place &mdash; and <strong>only</strong> the ones that did.');
-            window.sayJodi('Back to seven. Take your time with the little lines.', 'neutral');
+            window.sayJodi('Back to six. Take your time with the little lines.', 'neutral');
             if (window.sfx) window.sfx.click();
         };
 
         function initCase4() {
             case4Board.init();
-            document.getElementById('c4-count').textContent = '7';
+            document.getElementById('c4-count').textContent = '6';
         }
     </script>
 
