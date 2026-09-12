@@ -138,7 +138,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    /* justify-content:center clips the top of overflowing content in a
+       scrollable flex container (the browser centers past the scrollport's
+       start, and that region isn't reachable by scrolling in every engine).
+       margin:auto on the screen itself (below) centers when it fits and
+       falls back to top-aligned + scrollable when it doesn't. */
+    justify-content: flex-start;
     padding: 16px;
   }
 
@@ -177,6 +182,7 @@
   #intro {
     text-align: center;
     max-width: 420px;
+    margin: auto 0;
   }
 
   #intro h1 {
@@ -234,7 +240,7 @@
   .pill-danger { background: var(--danger-bg); color: var(--danger); }
 
   /* GAME SCREEN */
-  #game { display: none; width: 100%; max-width: 480px; }
+  #game { display: none; width: 100%; max-width: 480px; margin: auto 0; }
 
   .hud {
     display: flex;
@@ -491,6 +497,7 @@
     text-align: center;
     max-width: 420px;
     width: 100%;
+    margin: auto 0;
   }
 
   .end-score {
