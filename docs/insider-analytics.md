@@ -47,6 +47,7 @@ the moments that matter. Steps per module:
 | Reading the Room | cases reached | 7 |
 | Real World Ready Challenge | scenarios answered | 24 |
 | Ten Voices, One Source | cases reached | 6 |
+| Where You Say It | cases reached | 6 |
 | Room to Think Challenge | scenarios answered | 24 |
 
 Modules belong to a Lab Pack. The dashboard's `MODULE_REGISTRY` (`public/dashboard/index.html`) carries a

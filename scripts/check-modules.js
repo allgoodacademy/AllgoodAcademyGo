@@ -42,7 +42,7 @@ const PACKS = {
     hubPrefix: '/jsh/room-to-think-lab/',
     challengeId: 'rtt-challenge',
     challengePage: 'public/educational-games/room-to-think/index.html',
-    badgeCategory: { 'ten-voices-one-source': 'source_counting' },
+    badgeCategory: { 'ten-voices-one-source': 'source_counting', 'where-you-say-it': 'audience_choice' },
   },
 };
 

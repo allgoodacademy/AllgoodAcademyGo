@@ -89,7 +89,18 @@
                 <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
             </div>
 
-            <!-- THE QUESTION DECIDES THE ANSWER — Coming Soon. Storyboarded in full, not built.
+        </section>
+
+        <!-- STILL TO COME. A separate section, not a gap in the grid above: a student should
+             be able to see at a glance what they can play now. It also keeps each unbuilt
+             lab's Coming Soon pill well clear of the live cards — check-modules.js looks for
+             that pill within 400 characters after a lab's NAME, and with live and unbuilt
+             cards interleaved a live lab was picking up its neighbour's pill. -->
+        <section class="mb-6">
+            <h2 class="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">Still to come</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+            <!-- THE QUESTION DECIDES THE ANSWER — not built yet. Storyboarded in full.
                  Deliberately has no onclick: tapping it must do nothing at all. -->
             <div class="lab-card soon bg-white/60 rounded-2xl border border-dashed border-jodi-border shadow-none p-6 flex flex-col select-none">
                 <div class="flex items-start mb-4">
@@ -103,20 +114,22 @@
                 <span class="mt-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Storyboarded &mdash; not built yet</span>
             </div>
 
-            <!-- WHERE YOU SAY IT — Coming Soon. No onclick, on purpose. -->
-            <div class="lab-card soon bg-white/60 rounded-2xl border border-dashed border-jodi-border shadow-none p-6 flex flex-col select-none">
-                <div class="flex items-start mb-4">
-                    <div class="w-14 h-14 rounded-full flex items-center justify-center bg-slate-100 border border-slate-200">
-                        <i data-lucide="megaphone" class="w-7 h-7 text-slate-400"></i>
+            <!-- WHERE YOU SAY IT — live. megaphone / wine #9B3B5A, matching the
+                 GoodBlock's own startup screen and completion badge. -->
+            <div onclick="window.launchLab('Where You Say It', '/jsh/room-to-think-lab/where-you-say-it/')"
+                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FBEAF0; border:1px solid #EBC6D3;">
+                        <i data-lucide="megaphone" class="w-7 h-7" style="color:#9B3B5A;"></i>
                     </div>
+                    <span id="lab-status-where-you-say-it" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
                 </div>
-                <h3 class="font-bold text-slate-500 text-lg mb-2 uppercase">Where You Say It</h3>
-                <span class="self-start bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide mb-2">Coming Soon</span>
-                <p class="text-xs text-slate-400 leading-relaxed flex-grow">The same sentence lands four different ways.</p>
-                <span class="mt-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Storyboarded &mdash; not built yet</span>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Where You Say It</h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow">The same sentence lands four different ways.</p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
             </div>
 
-            <!-- THE COST OF LATER — Coming Soon. No onclick, on purpose. -->
+            <!-- THE COST OF LATER — not built yet. No onclick, on purpose. -->
             <div class="lab-card soon bg-white/60 rounded-2xl border border-dashed border-jodi-border shadow-none p-6 flex flex-col select-none">
                 <div class="flex items-start mb-4">
                     <div class="w-14 h-14 rounded-full flex items-center justify-center bg-slate-100 border border-slate-200">
@@ -128,7 +141,10 @@
                 <p class="text-xs text-slate-400 leading-relaxed flex-grow">The options run out before the deadline does.</p>
                 <span class="mt-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Storyboarded &mdash; not built yet</span>
             </div>
+            </div>
+        </section>
 
+        <section class="grid grid-cols-1 gap-5 mb-6">
             <!-- ROOM TO THINK CHALLENGE — live, and NOT gated. No lock, no completion
                  requirement: a student who has finished nothing can start here. Consistent
                  with the 2026-09-11 dashboard decision on both existing Challenges. -->
@@ -212,8 +228,8 @@
                 <button disabled class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
                     <span>The Question Decides the Answer</span><span class="text-[9px] uppercase tracking-wide">Not open yet</span>
                 </button>
-                <button disabled class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
-                    <span>Where You Say It</span><span class="text-[9px] uppercase tracking-wide">Not open yet</span>
+                <button onclick="window.closeLabMenu(); window.launchLab('Where You Say It', '/jsh/room-to-think-lab/where-you-say-it/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rtt-accent text-xs font-bold flex items-center justify-between">
+                    <span>Where You Say It</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
                 <button disabled class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
                     <span>The Cost of Later</span><span class="text-[9px] uppercase tracking-wide">Not open yet</span>
@@ -268,6 +284,7 @@
         // copying 80 across would make the badge unreachable, since a perfect score is 72.
         const LAB_STATUS_REGISTRY = [
             { id: 'ten-voices-one-source', gameName: 'Ten Voices, One Source', badgeId: 'lab-status-ten-voices-one-source', isComplete: (d) => d.completed === true },
+            { id: 'where-you-say-it', gameName: 'Where You Say It', badgeId: 'lab-status-where-you-say-it', isComplete: (d) => d.completed === true },
             { id: 'rtt-challenge', gameName: 'Room to Think Challenge', badgeId: 'lab-status-rtt-challenge', isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64, dark: true },
         ];
 

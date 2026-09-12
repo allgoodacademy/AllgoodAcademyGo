@@ -37,6 +37,7 @@ const GOODBLOCKS = [
   'public/jsh/real-world-ready-lab/conflict-has-a-winner/index.html',
   'public/jsh/real-world-ready-lab/reading-the-room/index.html',
   'public/jsh/room-to-think-lab/ten-voices-one-source/index.html',
+  'public/jsh/room-to-think-lab/where-you-say-it/index.html',
 ];
 
 // Pages an anonymous / under-13 session can reach. GA4 must never load unconditionally here.
