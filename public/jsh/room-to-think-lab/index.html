@@ -70,8 +70,8 @@
             </p>
         </section>
 
-        <!-- FOUR GOODBLOCKS + THE CHALLENGE. Three are live; one is honestly coming soon
-             and does not navigate. The Challenge is not gated behind any of them. -->
+        <!-- FOUR GOODBLOCKS + THE CHALLENGE. All four GoodBlocks are live and the pack is
+             complete. The Challenge is not gated behind any of them. -->
         <section id="labs" class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
 
             <!-- TEN VOICES, ONE SOURCE — live. git-merge / wine #9B3B5A, matching the
@@ -119,30 +119,21 @@
                 <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
             </div>
 
-        </section>
-
-        <!-- STILL TO COME. A separate section, not a gap in the grid above: a student should
-             be able to see at a glance what they can play now. It also keeps each unbuilt
-             lab's Coming Soon pill well clear of the live cards — check-modules.js looks for
-             that pill within 400 characters after a lab's NAME, and with live and unbuilt
-             cards interleaved a live lab was picking up its neighbour's pill. -->
-        <section class="mb-6">
-            <h2 class="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">Still to come</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-            <!-- THE COST OF LATER — not built yet. No onclick, on purpose. -->
-            <div class="lab-card soon bg-white/60 rounded-2xl border border-dashed border-jodi-border shadow-none p-6 flex flex-col select-none">
-                <div class="flex items-start mb-4">
-                    <div class="w-14 h-14 rounded-full flex items-center justify-center bg-slate-100 border border-slate-200">
-                        <i data-lucide="calendar-clock" class="w-7 h-7 text-slate-400"></i>
+            <!-- THE COST OF LATER — live. calendar-clock / wine #9B3B5A, matching the
+                 GoodBlock's own startup screen and completion badge. -->
+            <div onclick="window.launchLab('The Cost of Later', '/jsh/room-to-think-lab/the-cost-of-later/')"
+                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FBEAF0; border:1px solid #EBC6D3;">
+                        <i data-lucide="calendar-clock" class="w-7 h-7" style="color:#9B3B5A;"></i>
                     </div>
+                    <span id="lab-status-the-cost-of-later" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
                 </div>
-                <h3 class="font-bold text-slate-500 text-lg mb-2 uppercase">The Cost of Later</h3>
-                <span class="self-start bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide mb-2">Coming Soon</span>
-                <p class="text-xs text-slate-400 leading-relaxed flex-grow">The options run out before the deadline does.</p>
-                <span class="mt-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Storyboarded &mdash; not built yet</span>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">The Cost of Later</h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow">The options run out before the deadline does.</p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
             </div>
-            </div>
+
         </section>
 
         <section class="grid grid-cols-1 gap-5 mb-6">
@@ -207,17 +198,15 @@
         </div>
     </main>
 
-    <!-- LAB MENU: jump to the live lab or the Challenge. A second, separate list with its own
-         hardcoded onclicks (see the integration checklist). The three unbuilt GoodBlocks are
-         listed here too, as disabled rows — visible, honest, and not navigable.
+    <!-- LAB MENU: jump to any of the four labs or the Challenge. A second, separate list with
+         its own hardcoded onclicks (see the integration checklist).
 
-         These rows read "Not open yet", not "Coming Soon", on purpose. The cards above are
-         where each unbuilt lab carries its Coming Soon placeholder, and check-modules.js
-         looks for that placeholder within 400 characters of a lab's NAME — a second "Coming
-         Soon" here sits just inside that window of the live lab's menu row and makes the
-         checker report Ten Voices, One Source as both live and coming soon. Each unbuilt
-         card above carries its own pill directly under its own title, so no card depends on
-         its neighbour to look correctly marked. -->
+         Every row is live now that the pack is complete, so there is no unbuilt-lab wording
+         left in here. For the record of why it mattered while labs were still landing:
+         check-modules.js looks for a coming-soon placeholder within 400 characters of a
+         lab's NAME, and a second such pill in this menu sat just inside that window of a
+         live lab's row and made the checker report that lab as both live and coming soon.
+         Any future unbuilt row here should read "Not open yet", never "Coming Soon". -->
     <div id="lab-menu-modal" class="hidden-modal fixed inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
         <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-rtt-accent">
             <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Lab</h2>
@@ -232,8 +221,8 @@
                 <button onclick="window.closeLabMenu(); window.launchLab('Where You Say It', '/jsh/room-to-think-lab/where-you-say-it/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rtt-accent text-xs font-bold flex items-center justify-between">
                     <span>Where You Say It</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
-                <button disabled class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
-                    <span>The Cost of Later</span><span class="text-[9px] uppercase tracking-wide">Not open yet</span>
+                <button onclick="window.closeLabMenu(); window.launchLab('The Cost of Later', '/jsh/room-to-think-lab/the-cost-of-later/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rtt-accent text-xs font-bold flex items-center justify-between">
+                    <span>The Cost of Later</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
                 <button onclick="window.closeLabMenu(); window.launchLab('Room to Think Challenge', '/educational-games/room-to-think/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rtt-accent text-xs font-bold flex items-center justify-between">
                     <span>Room to Think Challenge</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
@@ -287,6 +276,7 @@
             { id: 'ten-voices-one-source', gameName: 'Ten Voices, One Source', badgeId: 'lab-status-ten-voices-one-source', isComplete: (d) => d.completed === true },
             { id: 'the-question-decides-the-answer', gameName: 'The Question Decides the Answer', badgeId: 'lab-status-the-question-decides-the-answer', isComplete: (d) => d.completed === true },
             { id: 'where-you-say-it', gameName: 'Where You Say It', badgeId: 'lab-status-where-you-say-it', isComplete: (d) => d.completed === true },
+            { id: 'the-cost-of-later', gameName: 'The Cost of Later', badgeId: 'lab-status-the-cost-of-later', isComplete: (d) => d.completed === true },
             { id: 'rtt-challenge', gameName: 'Room to Think Challenge', badgeId: 'lab-status-rtt-challenge', isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64, dark: true },
         ];
 

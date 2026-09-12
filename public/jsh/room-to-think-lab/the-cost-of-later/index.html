@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Jodi's Schoolhouse: The Cost of Later</title>
+
+    <link rel="stylesheet" href="/assets/css/tailwind.room-to-think.min.css">
+    <script src="/assets/js/lucide.min.js"></script>
+
+    <!-- The four shared modules, loaded exactly as Ten Voices, One Source loads them.
+         Nothing here re-implements them; data-message-source is the only per-module config. -->
+    <script type="module" src="/js/auth-core.js"></script>
+    <script type="module" src="/js/identity-gate.js"></script>
+    <script type="module" src="/js/telemetry.js"></script>
+    <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: The Cost of Later"></script>
+
+    <script type="module">
+        import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const appId = window.AuthCore.appId;
+        const auth = window.AuthCore.auth;
+        const db = window.AuthCore.db;
+
+        window.currentUserName = "Agent Learner";
+        window.currentUserEmail = "";
+        window.sessionId = "session_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+        // One "step" = one Case. Six total; Case 1 is open the moment the lab loads. Six is
+        // the Case count, NOT the badge's "6 scenarios" — those measure different things and
+        // matching here is a coincidence of this pack.
+        if (window.Telemetry) {
+            window.Telemetry.init({ module: 'the-cost-of-later', gameName: 'The Cost of Later', stepsTotal: 6 });
+            window.Telemetry.step(1);
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                window.currentUserName = user.displayName || "Agent Learner";
+                window.currentUserEmail = user.email || "";
+                if (window.AuthCore && window.AuthCore.loadModuleProgress) {
+                    const progress = await window.AuthCore.loadModuleProgress('the-cost-of-later');
+                    if (progress && window.restoreModuleProgress) window.restoreModuleProgress(progress);
+                }
+            }
+        });
+
+        window.logModuleCompletion = async () => {
+            if (window.Telemetry) window.Telemetry.complete();
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'game_scores', window.sessionId), {
+                    gameName: "The Cost of Later",
+                    completed: true,
+                    narrativeStyle: 'character',
+                    lastUpdated: serverTimestamp(),
+                    user: { uid: user.uid, displayName: window.currentUserName, email: window.currentUserEmail || null }
+                }, { merge: true });
+            } catch (e) { console.error("[COL] Completion write failed", e); }
+        };
+    </script>
+
+    <script>
+        function playSfx(name) {
+            if (window.sfx && typeof window.sfx[name] === 'function') window.sfx[name]();
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: Verdana, sans-serif; background-color: #F7F7F7;
+            min-height: 100vh; min-height: 100dvh; margin: 0; padding: 0; overflow: hidden;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+
+        .app-shell { width: 100%; height: 100dvh; display: flex; flex-direction: column; background-color: #F7F7F7; position: relative; overflow: hidden; }
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .content-column::-webkit-scrollbar { width: 10px; }
+        .content-column::-webkit-scrollbar-track { background: transparent; border-left: 1px solid #e5e7eb; }
+        .content-column::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 5px; border: 2px solid #F9FAFB; }
+
+        .navbar-content { flex: 0 0 48px; z-index: 30; position: relative; }
+        .footer-content { flex: 0 0 36px; z-index: 30; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
+        #flex-progress-bar { height: 4px; width: 100%; background-color: rgba(255,255,255,0.22); position: absolute; bottom: 0; left: 0; }
+        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+
+        .split-layout { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
+        .sidebar-jodi {
+            width: 100%; height: auto; min-height: 140px; background-color: #FBF6EE;
+            border-bottom: 1px solid #E8DFCE; display: flex; align-items: flex-end; padding: 10px;
+            position: relative; z-index: 10; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden;
+        }
+        .content-column { flex: 1; overflow-y: auto; position: relative; background-color: #F9FAFB; padding-bottom: 20px; }
+
+        .page { width: 100%; padding: 20px 20px 50px; position: relative; scroll-margin-top: 20px; }
+        .page.locked { pointer-events: none; user-select: none; }
+        .page.locked .page-inner { filter: blur(4px) grayscale(0.4); opacity: 0.55; transition: filter 0.4s ease, opacity 0.4s ease; }
+        .page:not(.locked) .page-inner { animation: fadeIn 0.5s ease-out; }
+        .lock-overlay { display: none; }
+        .page.locked .lock-overlay { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .continue-prompt { display: none; }
+        .continue-prompt.ready { display: flex; animation: fadeIn 0.4s ease-out; }
+
+        .jodi-wrapper { display: flex; flex-direction: row; align-items: center; width: 100%; max-width: 600px; margin: 0 auto; min-height: 0; max-height: 100%; }
+        .jodi-avatar.jodi-stage { width: 120px; height: 120px; flex-shrink: 0; margin-right: 15px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1)); }
+        .jodi-avatar.jodi-stage img, .jodi-avatar.jodi-stage svg { width: 100%; height: 100%; display: block; }
+
+        .jodi-bubble {
+            background: white; border: 1px solid #E8DFCE; border-radius: 16px; border-bottom-left-radius: 0;
+            padding: 14px 16px; font-size: 0.85rem; color: #4C4C4C; line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; flex: 1;
+            transform-origin: bottom left; opacity: 0; transition: opacity 0.3s;
+            max-height: 30vh; overflow-y: auto; overscroll-behavior: contain;
+        }
+        .jodi-bubble.visible { opacity: 1; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .jodi-bubble::-webkit-scrollbar { width: 5px; }
+        .jodi-bubble::-webkit-scrollbar-thumb { background-color: #D8CDBA; border-radius: 3px; }
+        .jodi-bubble::-webkit-scrollbar-track { background: transparent; }
+
+        #jodi-whiteboard { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; overflow: hidden; transition: opacity 0.3s ease, max-height 0.3s ease; }
+        #jodi-whiteboard.wb-populated { opacity: 1; max-height: min(320px, 38vh); overflow-y: auto; padding-top: 1rem; padding-bottom: 1rem; margin-bottom: 0.75rem; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+        @media (min-width: 768px) {
+            .split-layout { flex-direction: row; }
+            .sidebar-jodi { width: 25%; min-width: 300px; height: 100%; border-bottom: none; border-right: 1px solid #E8DFCE; flex-direction: column; justify-content: flex-end; padding: 20px; }
+            .content-column { width: 75%; }
+            .jodi-wrapper { flex-direction: column-reverse; align-items: center; width: 100%; }
+            .jodi-avatar.jodi-stage { width: min(200px, 26vh); height: min(200px, 26vh); margin-right: 0; margin-top: 20px; }
+            .jodi-bubble.tucked { opacity: 0 !important; max-height: 0; margin-bottom: 0; padding: 0; border-width: 0; overflow: hidden; pointer-events: none; }
+            .jodi-bubble { border-radius: 16px; border-bottom-left-radius: 16px; border-bottom-right-radius: 0; margin-bottom: 10px; text-align: center; font-size: 0.95rem; max-height: 46vh; }
+            .jodi-bubble::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 8px solid #FFF; filter: drop-shadow(0 2px 1px rgba(0,0,0,0.05)); }
+            .mobile-wb { display: none !important; }
+        }
+
+        /* Phones: size to the initial containing block and make the document unscrollable.
+           Deliberately NOT position:fixed on html/body — Safari stopped delivering taps to the
+           Message HQ button when that was tried. See docs/goodblock-integration-checklist.md. */
+        @media (max-width: 767px) {
+            html { height: 100%; overflow: hidden; }
+            body { height: 100%; min-height: 0 !important; overflow: hidden !important; }
+            .app-shell { height: 100%; }
+            .navbar-content { flex: 0 0 auto; min-height: 52px; padding-top: env(safe-area-inset-top); }
+            footer.footer-content { display: none !important; }
+            .content-column { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+            .jodi-wrapper { flex-wrap: wrap; }
+            #jodi-recall { flex-basis: 100%; order: 5; margin-top: 6px; padding: 8px 0; }
+            .sidebar-jodi { padding: 10px 10px 6px; }
+            .jodi-avatar.jodi-stage { width: 92px; height: 92px; margin-right: 12px; }
+            .jodi-bubble { max-height: 26vh; font-size: 0.82rem; padding: 12px 13px; }
+            .page { padding: 16px 14px 44px; }
+            .case-reset { padding: 10px 6px; font-size: 11px; }
+            .stack-mobile { flex-direction: column !important; }
+            .stack-mobile > * { width: 100% !important; }
+        }
+
+        .jodi-avatar img, .jodi-avatar svg { transition: opacity 0.18s ease; }
+        .jodi-avatar.mood-shift img, .jodi-avatar.mood-shift svg { opacity: 0.15; }
+        .jodi-avatar.jodi-stage { cursor: pointer; }
+        .jodi-avatar.jodi-stage:hover { filter: drop-shadow(2px 4px 10px rgba(155,59,90,0.35)); }
+
+        .card-shimmer { background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(249,250,251,1) 100%); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #E5E7EB; }
+        .case-reset { transition: transform .12s ease, background-color .15s ease; }
+        .case-reset:active { transform: scale(.97); }
+
+        .step-bar { border-left: 4px solid #9B3B5A; background: #FBEAF0; border-radius: 0 12px 12px 0; padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px; }
+        .step-bar .step-num { width: 22px; height: 22px; border-radius: 999px; background: #9B3B5A; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+        .step-bar .step-text { font-size: 13px; color: #4a1224; line-height: 1.45; }
+        .step-bar.done { border-left-color: #059669; background: #ECFDF5; }
+        .step-bar.done .step-num { background: #059669; }
+        .step-bar.done .step-text { color: #064e3b; }
+
+        .reframe-box { border-left: 3px solid #9B3B5A; background: #FBEAF0; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 12px; font-style: italic; color: #7A2B45; margin-top: 14px; display: none; }
+        .reframe-box.show { display: block; animation: fadeIn 0.4s ease-out; }
+
+        .small-btn { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 6px 10px; border-radius: 999px; border: 1px solid #d1d5db; background: #fff; color: #4b5563; transition: all .15s ease; white-space: nowrap; }
+        .small-btn:hover:not(:disabled) { border-color: #9B3B5A; color: #7A2B45; }
+        .small-btn:disabled { opacity: .4; cursor: not-allowed; }
+        .small-btn.primary { background: #9B3B5A; border-color: #9B3B5A; color: #fff; }
+        .small-btn.primary:hover:not(:disabled) { background: #7A2B45; color: #fff; }
+
+        .clock-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #b91c1c; display: inline-flex; align-items: center; gap: 6px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 999px; padding: 4px 10px; }
+
+        /* ---- Case 2: blind artefact comparison (registry #40) ----
+           ⚠️ NOT gated on being right. A wrong call reveals the answer and walks all six
+           tells anyway — the reveal is the teaching, not the score. Criterion 22. */
+        .paper { border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; overflow: hidden; }
+        .paper-bar { background: #F3F4F6; border-bottom: 1px solid #e5e7eb; padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #6b7280; display: flex; justify-content: space-between; align-items: center; }
+        .paper.revealed .paper-bar { background: #FBEAF0; color: #7A2B45; }
+        .paper-body { padding: 10px 12px; font-size: 11.5px; line-height: 1.6; color: #374151; }
+        .region { border-left: 3px solid #E5E7EB; border-radius: 0 8px 8px 0; background: #F9FAFB; padding: 7px 10px; margin-bottom: 6px; cursor: pointer; transition: border-color .15s ease, background-color .15s ease; text-align: left; width: 100%; }
+        .region:hover { border-left-color: #C98BA2; background: #fff; }
+        .region.opened { border-left-color: #9B3B5A; background: #fff; }
+        .region.tagged-help { border-left-color: #059669; }
+        .region.tagged-none { border-left-color: #b45309; }
+        .region.lit { animation: litUp .6s ease-out; border-left-color: #9B3B5A; background: #FBEAF0; }
+        @keyframes litUp { 0% { background: #FDE68A; transform: translateX(4px); } 100% { background: #FBEAF0; transform: translateX(0); } }
+        .region-quote { font-size: 11.5px; color: #1f2937; }
+        .region-note { font-size: 10.5px; color: #6b7280; margin-top: 5px; line-height: 1.5; display: none; }
+        .region.opened .region-note, .region.lit .region-note { display: block; }
+        .region-tags { display: none; gap: 6px; margin-top: 6px; }
+        .region.opened .region-tags { display: flex; }
+        .tag-pill { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; border-radius: 999px; padding: 3px 8px; border: 1px solid #d1d5db; background: #fff; color: #4b5563; }
+        .tag-pill.on { background: #9B3B5A; border-color: #9B3B5A; color: #fff; }
+        .called { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+
+        /* ---- Case 3: dependency-aware scheduling (registry #41) ----
+           ⚠️ A session whose dependency can no longer be met GREYS OUT IN THE TRAY with its
+           badge struck through. It does not vanish — the student has to see what was lost.
+           Criterion 23, and the all-late calendar still fits: criterion 24. */
+        .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+        .cal-head { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; text-align: center; padding-bottom: 2px; }
+        .day { border: 1px solid #e5e7eb; border-radius: 7px; background: #fff; min-height: 52px; padding: 3px; font-size: 8px; color: #9ca3af; text-align: left; transition: border-color .15s ease, background-color .15s ease; }
+        .day:hover { border-color: #C98BA2; }
+        .day.tuesday { background: #F5F3FF; border-color: #DDD6FE; }
+        .day.deadline { background: #FEF2F2; border-color: #FECACA; }
+        .day.armed { border-color: #9B3B5A; border-width: 2px; }
+        .day-num { font-weight: 700; color: #6b7280; }
+        .day-chip { display: block; font-size: 8px; font-weight: 700; background: #9B3B5A; color: #fff; border-radius: 4px; padding: 1px 3px; margin-top: 2px; line-height: 1.25; white-space: normal; }
+        .day-chip.cont { background: #C98BA2; }
+        .tray-card { border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; padding: 7px 9px; text-align: left; width: 100%; transition: border-color .15s ease, opacity .25s ease; }
+        .tray-card:hover { border-color: #C98BA2; }
+        .tray-card.armed { border-color: #9B3B5A; border-width: 2px; background: #FBEAF0; }
+        .tray-card.placed { opacity: .3; }
+        .tray-card.greyed { background: #F3F4F6; border-style: dashed; color: #9ca3af; }
+        .tray-card.greyed .tray-name { color: #9ca3af; }
+        .tray-name { font-size: 11.5px; font-weight: 700; color: #1f2937; }
+        .dep-badge { font-size: 9px; font-weight: 700; color: #6b7280; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 999px; padding: 1px 7px; display: inline-block; margin-top: 3px; }
+        .tray-card.greyed .dep-badge { text-decoration: line-through; text-decoration-thickness: 2px; color: #b91c1c; background: #FEF2F2; border-color: #FECACA; }
+        .dep-line { position: absolute; height: 2px; background: #9B3B5A; transform-origin: left center; opacity: 0; animation: drawDep .5s ease-out forwards; }
+        @keyframes drawDep { from { opacity: 0; } to { opacity: .75; } }
+        .cal-wrap { position: relative; }
+
+        /* ---- Case 4: query-the-journal (registry #42) ----
+           ⚠️ Entry 2 returns NOTHING for the first question and something real for the
+           second. The same entry is useless for one question and load-bearing for another —
+           do not simplify this into a two-bin sort. Criterion 26. */
+        .entry { border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; padding: 8px 10px; text-align: left; width: 100%; transition: border-color .15s ease; }
+        .entry:hover { border-color: #C98BA2; }
+        .entry.queried { border-color: #9B3B5A; }
+        .entry.useful { border-left: 4px solid #059669; }
+        .entry.empty-handed { border-left: 4px solid #d1d5db; }
+        .entry-date { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #9B3B5A; }
+        .entry-text { font-size: 11.5px; color: #374151; line-height: 1.55; margin-top: 2px; }
+        .answer-box { border: 2px solid #e5e7eb; border-radius: 12px; background: #F9FAFB; padding: 10px 12px; min-height: 74px; font-size: 11.5px; color: #6b7280; line-height: 1.6; }
+        .answer-box.filled { border-color: #059669; background: #ECFDF5; color: #064e3b; }
+        .answer-box.blank { border-style: dashed; }
+        .q-card { border: 1px solid #9B3B5A; border-radius: 12px; background: #FBEAF0; padding: 9px 12px; font-size: 12.5px; color: #4a1224; font-weight: 700; line-height: 1.5; }
+        .rewrite-btn { border: 1px solid #d1d5db; border-radius: 12px; background: #fff; padding: 9px 11px; text-align: left; width: 100%; transition: border-color .15s ease; }
+        .rewrite-btn:hover { border-color: #9B3B5A; }
+        .rewrite-btn.chosen { border-color: #9B3B5A; background: #FBEAF0; }
+
+        /* ---- Case 5: first-artefact selection (registry #43) ----
+           Exploration with a commitment shape. Every card is pressable in any order, as often
+           as the student likes, and re-tapping reprints. Three of the six leave the panel
+           empty and each prints its own line. Criterion 27. */
+        .action-card { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 10px 12px; text-align: left; width: 100%; transition: border-color .15s ease, transform .1s ease; }
+        .action-card:hover { border-color: #C98BA2; }
+        .action-card:active { transform: scale(.99); }
+        .action-card.used { border-color: #9B3B5A; }
+        .react-panel { border: 2px dashed #d1d5db; border-radius: 12px; background: #F9FAFB; padding: 10px 12px; min-height: 120px; }
+        .react-panel.has-something { border-style: solid; border-color: #059669; background: #ECFDF5; }
+        .react-panel.stamped { position: relative; }
+        .react-item { font-size: 11px; color: #064e3b; background: #fff; border: 1px solid #A7F3D0; border-radius: 8px; padding: 6px 9px; margin-bottom: 5px; line-height: 1.5; animation: fadeIn .3s ease-out; }
+        .day1-stamp { position: absolute; right: 8px; top: 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: #059669; border: 2px solid #059669; border-radius: 6px; padding: 3px 8px; transform: rotate(-6deg); animation: popIn .35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .panel-empty-note { font-size: 11px; color: #9ca3af; line-height: 1.55; }
+
+        /* Shared furniture used by more than one Case in this GoodBlock. */
+        .pick-btn { border: 2px solid #E5E7EB; border-radius: 14px; background: #fff; padding: 12px 14px; text-align: left; width: 100%; transition: border-color .18s ease, background-color .18s ease, transform .1s ease; }
+        .pick-btn:hover { border-color: #C98BA2; }
+        .pick-btn:active { transform: scale(.99); }
+        .pick-btn.chosen { border-color: #9B3B5A; background: #FBEAF0; }
+        .pick-btn .pick-label { font-size: 13px; font-weight: 700; color: #1f2937; }
+        .pick-row { display: grid; gap: 8px; }
+        @media (min-width: 640px) { .pick-row.cols-2 { grid-template-columns: 1fr 1fr; } .pick-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; } }
+        .verdict-strip { border-radius: 10px; padding: 8px 11px; font-size: 11.5px; line-height: 1.5; background: #F1F5F9; border: 1px solid #E2E8F0; color: #334155; animation: fadeIn .3s ease-out; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-allgood-dark font-body overflow-y-auto">
+
+    <div class="app-shell" id="screen">
+
+        <!-- STARTUP SCREEN — Lab-Pack identity as one set. Icon `calendar-clock`, verified against
+             the bundled /assets/js/lucide.min.js, and reused verbatim on the completion badge. -->
+        <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-[#1a0710] via-[#2d0f1c] to-[#0d0508]">
+            <div class="absolute inset-0 opacity-40" style="background: radial-gradient(circle at 50% 35%, rgba(155,59,90,0.45), transparent 60%);"></div>
+            <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
+                <div class="flex-grow flex flex-col items-center justify-center px-4">
+                    <div class="relative flex flex-col items-center">
+                        <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        <i data-lucide="calendar-clock" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(155,59,90,0.75)]"></i>
+                        <h2 class="text-xl md:text-2xl font-heading font-bold text-rose-200 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
+                        <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-rose-200 tracking-tighter relative z-10">Jodi's Schoolhouse</h1>
+                        <p class="mt-4 text-rose-300 font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: The Cost of Later</p>
+                        <p class="mt-2 text-white/50 text-[10px] tracking-[0.3em] uppercase font-bold relative z-10">Room to Think Lab Pack</p>
+                    </div>
+                    <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- HEADER -->
+        <header class="bg-allgood-secondary shadow-md navbar-content flex items-center shrink-0">
+            <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
+            <div class="w-full px-4 flex items-center justify-between h-full">
+                <div class="flex items-center overflow-hidden">
+                    <div class="flex shrink-0 items-center bg-allgood-primary rounded-full px-3 py-1 shadow-sm mr-2">
+                        <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">The Cost of Later</span>
+                    </div>
+                    <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
+                        <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
+                        <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 6</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-1 shrink-0 relative">
+                    <button id="home-toggle" title="Home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                    <button onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Comms">
+                        <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+                    </button>
+                    <button id="menu-toggle" title="Jump to a Case" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 min-h-0 relative split-layout">
+
+            <!-- MENTOR SIDEBAR -->
+            <div class="sidebar-jodi shrink-0">
+                <div class="jodi-wrapper">
+                    <div class="jodi-avatar jodi-stage rounded-2xl shadow-md relative overflow-hidden bg-[#F5E6D3]">
+                        <div id="jodi-img-neutral" class="absolute inset-0 w-full h-full" style="display:block;"><img src="/assets/jodi/jodi-neutral.svg" class="w-full h-full" alt="Jodi, neutral"></div>
+                        <div id="jodi-img-happy" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-happy.svg" class="w-full h-full" alt="Jodi, happy"></div>
+                        <div id="jodi-img-concerned" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-concerned.svg" class="w-full h-full" alt="Jodi, concerned"></div>
+                        <div id="jodi-img-thinking" class="absolute inset-0 w-full h-full" style="display:none;"><img src="/assets/jodi/jodi-thinking.svg" class="w-full h-full" alt="Jodi, thinking"></div>
+                    </div>
+                    <div id="jodi-bubble" class="jodi-bubble">Hey there. Pull up a chair.</div>
+                    <div id="jodi-whiteboard" class="hidden md:block w-full bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                        <strong id="whiteboard-title" class="text-rose-300 block text-sm font-heading"></strong>
+                        <p id="whiteboard-desc" class="text-slate-300 leading-relaxed"></p>
+                    </div>
+                    <button id="jodi-recall" onclick="window.recallJodi()" class="hidden w-full text-[10px] font-bold uppercase tracking-widest text-gb-accent hover:text-gb-accent-dark py-1 mb-2 items-center justify-center gap-1">
+                        <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span id="jodi-recall-label">Re-read what Jodi said</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="content-column" id="content-column">
+
+                <!-- ==================== CASE 1: COLD OPEN ====================
+                     The student is put inside the last moment rather than the first — the
+                     project already handed in, on time, marked, with two lines of comment on
+                     it and nothing wrong with it. Jodi speaks over it. Nothing here is
+                     interactive but Continue, which is the point: the decision that mattered
+                     was made three weeks ago. -->
+                <div class="page" id="page-1">
+                    <div class="page-inner">
+                    <div class="max-w-2xl mx-auto pt-8 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 1</span>
+                        <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1 mb-5">Handed In On Time</h2>
+
+                        <div class="paper mb-5">
+                            <div class="paper-bar">
+                                <span>Independent project &mdash; submitted</span>
+                                <span class="clock-pill"><i data-lucide="check" class="w-3 h-3"></i> On time</span>
+                            </div>
+                            <div class="paper-body">
+                                <p class="font-heading font-bold text-[15px] text-gray-900 mb-1">Does the bus route change affect who gets to school on time?</p>
+                                <p class="text-[10px] text-gray-400 mb-3">Adaeze O. &middot; Year 10 &middot; 1,420 words</p>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <span class="text-2xl font-heading font-bold text-gb-accent-dark">B</span>
+                                    <p class="text-[11px] text-gray-600 leading-relaxed italic">&ldquo;Clear and well organised. I'd have liked to see where you tested this against anything that disagreed with you.&rdquo;</p>
+                                </div>
+                                <p class="text-[10.5px] text-gray-400">Marked and returned. Nothing on the page says it was written in four days.</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-6 card-shimmer rounded-xl p-4 border flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gb-accent-light border border-gb-accent/30 flex items-center justify-center shrink-0">
+                                <i data-lucide="user" class="w-5 h-5 text-gb-accent-dark"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold text-gray-900">Adaeze</p>
+                                <p class="text-xs text-gray-500">Made the deadline. Works better under pressure, she reckons.</p>
+                            </div>
+                        </div>
+
+                        <div id="continue-1" class="continue-prompt ready items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(1)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CASE 2: TWO VERSIONS, NO LABELS ====================
+                     Registry #40 — blind artefact comparison with evidence tagging. The belief
+                     commit sits at the top: stored, quoted back in Case 6, never judged.
+                     ⚠️ Not gated on being right. A wrong final call reveals the answer and
+                     walks all six tells anyway. Criterion 22. -->
+                <div class="page" id="page-2">
+                    <div class="page-inner">
+                    <div class="max-w-4xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 2</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Two Versions, No Labels</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Same topic, same length. One of them had somebody else look at it first.</p>
+                        </div>
+
+                        <!-- The belief commit. Nothing on this page marks it either way. -->
+                        <div class="card-shimmer rounded-xl border p-4 mb-4">
+                            <p class="text-[13px] font-bold text-gray-900 mb-1">&ldquo;I work better under pressure.&rdquo;</p>
+                            <p class="text-[11px] text-gray-500 mb-3">No right answer here, and nothing on this page is marked. It comes back at the end exactly as you left it.</p>
+                            <div id="c2-belief" class="pick-row cols-2"></div>
+                        </div>
+
+                        <div id="step-2" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Open the spots where you can tell, and tag each one. Three tags and you can call it.</span></div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 stack-mobile">
+                            <div class="paper" id="c2-paper-a">
+                                <div class="paper-bar"><span id="c2-label-a">Page A</span><span id="c2-called-a" class="called"></span></div>
+                                <div class="paper-body" id="c2-regions-a"></div>
+                            </div>
+                            <div class="paper" id="c2-paper-b">
+                                <div class="paper-bar"><span id="c2-label-b">Page B</span><span id="c2-called-b" class="called"></span></div>
+                                <div class="paper-body" id="c2-regions-b"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <span id="c2-tag-count" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Nothing tagged yet</span>
+                            <div class="flex gap-2">
+                                <button id="c2-call-btn" class="small-btn primary hidden" onclick="window.openCall()">I'm ready to call it</button>
+                                <button onclick="window.resetCase2()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
+                                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Clear my tags</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="c2-call" class="hidden card-shimmer rounded-xl border p-4 mb-3">
+                            <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Which one had feedback before it went in?</p>
+                            <div class="pick-row cols-2">
+                                <button class="pick-btn" onclick="window.callPage('a')"><span class="pick-label">Page A</span></button>
+                                <button class="pick-btn" onclick="window.callPage('b')"><span class="pick-label">Page B</span></button>
+                            </div>
+                        </div>
+
+                        <div id="c2-reveal" class="hidden space-y-2 mb-3"></div>
+
+                        <div id="mobile-wb-2" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                            <strong class="mobile-wb-title text-rose-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-2" class="reframe-box mb-4">&ldquo;Nobody wrote &lsquo;rushed&rsquo; anywhere on that page.&rdquo;</div>
+
+                        <div id="continue-2" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(2)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CASE 3: PUT THE SESSIONS ON THE CALENDAR ====================
+                     Registry #41 — dependency-aware scheduling. ⚠️ A session whose dependency
+                     can no longer be met GREYS OUT IN THE TRAY with its badge struck through.
+                     It does not vanish (criterion 23). Placing everything as late as possible
+                     still fits and still greys three sessions out — that is the demonstration,
+                     not a failure state (criterion 24). Front-loading gets its own line and is
+                     not rewarded either (criterion 25). -->
+                <div class="page" id="page-3">
+                    <div class="page-inner">
+                    <div class="max-w-4xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 3</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Put the Sessions on the Calendar</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Three weeks. Seven things. Some of them need somebody else.</p>
+                        </div>
+
+                        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div id="step-3" class="step-bar flex-1 min-w-[200px] mr-3"><span class="step-num">1</span><span class="step-text">Tap a session, then tap a day. Tap a placed session to pick it up again.</span></div>
+                            <button onclick="window.resetCase3()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 shrink-0">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Clear the calendar</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_230px] gap-3 stack-mobile">
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Today on the left, deadline on the right</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-widest text-violet-500">Tuesdays: supervisor in</span>
+                                </div>
+                                <div class="cal-wrap"><div id="c3-cal" class="cal"></div></div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">The tray</p>
+                                <div id="c3-tray" class="space-y-1.5"></div>
+                            </div>
+                        </div>
+
+                        <div id="c3-why" class="verdict-strip mt-3 hidden"></div>
+
+                        <div id="mobile-wb-3" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3 mt-3">
+                            <strong class="mobile-wb-title text-rose-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-3" class="reframe-box mb-4">&ldquo;The late version had the same number of hours in it.&rdquo;</div>
+
+                        <div id="continue-3" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(3)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CASE 4: ASK YOUR OWN NOTEBOOK ====================
+                     Registry #42 — query-the-journal. ⚠️ Entry 2 returns NOTHING for the first
+                     question and something real for the second: feelings are data about
+                     process. The same entry is useless for one question and load-bearing for
+                     another. Criterion 26 — do not simplify this into a two-bin sort. -->
+                <div class="page" id="page-4">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Ask Your Own Notebook</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">Four entries. Two questions she has to answer from them.</p>
+                        </div>
+
+                        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div id="step-4" class="step-bar flex-1 min-w-[200px] mr-3"><span class="step-num">1</span><span class="step-text">Tap an entry to ask it the question. Ask as many as you like, as often as you like.</span></div>
+                            <button onclick="window.resetCase4()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 shrink-0">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Empty the answer box</span>
+                            </button>
+                        </div>
+
+                        <div id="c4-question" class="q-card mb-3"></div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 stack-mobile">
+                            <div>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">The notebook</p>
+                                <div id="c4-entries" class="space-y-2"></div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">What goes in the report</p>
+                                <div id="c4-result" class="verdict-strip mb-2 hidden"></div>
+                                <div id="c4-answer" class="answer-box blank">Nothing yet.</div>
+                                <div id="c4-progress" class="mt-2 text-[10px] font-bold uppercase tracking-widest text-gray-400"></div>
+                            </div>
+                        </div>
+
+                        <div id="c4-rewrite" class="hidden mb-3">
+                            <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Rewrite Day 3 so it answers <em>something</em></p>
+                            <div id="c4-rewrite-row" class="space-y-2"></div>
+                            <div id="c4-rewrite-note" class="verdict-strip mt-2 hidden"></div>
+                        </div>
+
+                        <div id="c4-reorder" class="hidden mb-3"></div>
+
+                        <div id="mobile-wb-4" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
+                            <strong class="mobile-wb-title text-rose-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-4" class="reframe-box mb-4">&ldquo;Write the decisions, not the hours.&rdquo;</div>
+
+                        <div id="continue-4" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(4)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CASE 5: THE FIRST TEN MINUTES ====================
+                     Registry #43 — first-artefact selection. Exploration with a commitment
+                     shape: every card is pressable in any order, as often as the student
+                     likes, and re-tapping reprints. Three of the six leave the right-hand
+                     panel empty and each prints its own line. The Case completes only when the
+                     panel is non-empty, and it says so plainly. Criterion 27. -->
+                <div class="page" id="page-5">
+                    <div class="page-inner">
+                    <div class="max-w-4xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
+                        <div class="mb-5">
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 5</span>
+                            <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The First Ten Minutes</h2>
+                            <p class="text-sm text-gray-600 mt-2 leading-relaxed">New project, day one, nothing done. Ten minutes is all there is today.</p>
+                        </div>
+
+                        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div id="step-5" class="step-bar flex-1 min-w-[200px] mr-3"><span class="step-num">1</span><span class="step-text">Pick one. Watch the panel on the right &mdash; that is the only part that matters tomorrow.</span></div>
+                            <button onclick="window.resetCase5()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5 shrink-0">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Start the day over</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 stack-mobile">
+                            <div>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Ten minutes</p>
+                                <div id="c5-actions" class="space-y-2"></div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">What somebody else could react to tomorrow</p>
+                                <div id="c5-panel" class="react-panel"></div>
+                                <div id="c5-note" class="verdict-strip mt-2 hidden"></div>
+                            </div>
+                        </div>
+
+                        <div id="mobile-wb-5" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3 mt-3">
+                            <strong class="mobile-wb-title text-rose-300 block text-sm font-heading"></strong>
+                            <p class="mobile-wb-desc text-slate-300 leading-relaxed"></p>
+                        </div>
+                        <div id="reframe-5" class="reframe-box mb-4">&ldquo;Start with the thing that can be wrong.&rdquo;</div>
+
+                        <div id="continue-5" class="continue-prompt items-center justify-center pt-2">
+                            <button onclick="window.advanceFromPage(5)" class="flex items-center gap-2 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-3 rounded-full shadow-lg text-xs uppercase tracking-wide transition-transform hover:scale-105">
+                                Continue <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CASE 6: RATING AND HANDOFF ==================== -->
+                <div class="page" id="page-6">
+                    <div class="page-inner">
+                    <div class="max-w-3xl mx-auto pt-10 px-4 sm:px-8 flex flex-col justify-center py-4 items-center text-center">
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent mb-3">Case 6</span>
+
+                        <!-- The Case 2 belief, handed straight back. No correction attached,
+                             nothing scored, and no control here to answer it with. -->
+                        <div id="case6-belief" class="paper w-full max-w-md mb-6 text-left">
+                            <div class="paper-bar"><span>&ldquo;I work better under pressure&rdquo;</span><span>Case 2</span></div>
+                            <div class="paper-body">
+                                <p id="case6-belief-line" class="text-sm text-gray-700 leading-relaxed"></p>
+                                <p class="mt-3 text-sm font-heading font-bold text-gb-accent-dark">Worth asking yourself again now.</p>
+                            </div>
+                        </div>
+
+                        <div id="case6-rating" class="mb-6 w-full max-w-md">
+                            <h2 class="text-2xl font-heading font-bold text-gray-900 mb-1">Before You Go</h2>
+                            <p class="text-sm text-gray-500 mb-4">How was this one?</p>
+                            <div class="flex justify-center gap-1 mb-4">
+                                <button onclick="window.selectCaseRating(1)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="1">★</button>
+                                <button onclick="window.selectCaseRating(2)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="2">★</button>
+                                <button onclick="window.selectCaseRating(3)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="3">★</button>
+                                <button onclick="window.selectCaseRating(4)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="4">★</button>
+                                <button onclick="window.selectCaseRating(5)" class="star-btn text-4xl text-gray-300 hover:text-amber-400 transition-colors leading-none" data-star="5">★</button>
+                            </div>
+                            <!-- 16px: anything smaller makes iOS zoom the page on focus. -->
+                            <textarea id="case6-feedback-text" placeholder="Anything you want to tell us? (optional)" class="w-full border border-gray-200 rounded-lg p-3 text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-gb-accent/40" style="font-size:16px;" rows="2"></textarea>
+                            <button id="case6-submit-btn" onclick="window.finalizeCaseRating()" class="hidden mt-3 bg-allgood-primary hover:bg-allgood-hover text-white font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wide shadow-md transition-transform hover:scale-105">
+                                Submit
+                            </button>
+                            <button id="case6-skip-btn" onclick="window.revealCompletion()" class="mt-3 block mx-auto text-xs text-gray-500 hover:text-allgood-dark font-bold uppercase tracking-wide underline decoration-dotted">Skip &mdash; show me the badge</button>
+                        </div>
+
+                        <div id="case6-reveal" class="w-full hidden">
+                            <div class="mb-6">
+                                <span class="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Calendar Lab Cleared</span>
+                                <h2 class="text-3xl sm:text-4xl font-heading font-bold text-gray-900 mt-4">You Started Before You Were Ready</h2>
+                                <p class="text-sm text-gray-600 max-w-md mx-auto mt-3 leading-relaxed">Two pages and six tells, a calendar that would only take the supervisor on a Tuesday, a notebook asked two questions, and ten minutes on day one.</p>
+                            </div>
+
+                            <div class="card-shimmer rounded-2xl p-8 shadow-md border border-gb-accent/30 mb-8 max-w-lg w-full relative overflow-hidden mx-auto">
+                                <div class="absolute -right-8 -bottom-8 w-32 h-32 bg-gb-accent/5 rounded-full pointer-events-none"></div>
+                                <!-- Same icon as the startup screen, deliberately. -->
+                                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-gb-accent-light to-rose-100 border-4 border-gb-accent/40 shadow-inner flex items-center justify-center">
+                                    <i data-lucide="calendar-clock" class="w-10 h-10 text-gb-accent-dark drop-shadow-sm"></i>
+                                </div>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-gb-accent block mb-1">MINTED IN DOSSIER</span>
+                                <h3 class="text-xl font-heading font-bold text-gray-900 mb-1">The Cost of Later Foundation</h3>
+                                <!-- 6 = 'starting_early' scenarios in the Room to Think Challenge
+                                     SCENARIO_DATA. Counted, not estimated — check-modules.js
+                                     re-counts it. This counts Challenge scenarios, NOT Cases. -->
+                                <p id="badge-count-line" class="text-lg font-heading font-bold text-gb-accent-dark mb-2">6 scenarios completed</p>
+                                <p class="text-xs text-gray-600 mb-6 leading-relaxed">Covers the principles behind <strong>6 scenarios</strong> in the 24-scenario Room to Think Challenge.</p>
+
+                                <button onclick="window.returnToLabPack()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2">
+                                    <span>Back to Room to Think</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="window.launchRoomToThinkChallenge()" class="w-full text-gray-400 hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
+                                    Or jump straight to the Room to Think Challenge
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="lock-overlay absolute inset-0 items-center justify-center bg-white/50 backdrop-blur-[1px] z-10">
+                        <div class="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wide bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+                            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Complete the case above to unlock
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <footer class="footer-content flex items-center justify-center px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
+            <p class="text-gray-400 text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
+        </footer>
+
+        <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+            <div class="bg-jodi-warmth rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gb-accent">
+                <div class="mb-4"><i data-lucide="home" class="w-10 h-10 mx-auto text-gb-accent"></i></div>
+                <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Where to, Agent?</h2>
+                <p class="text-sm text-gray-500 mb-6 font-body">You can pick this back up anytime.</p>
+                <div class="space-y-3">
+                    <button onclick="window.restartModule()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart Lab</button>
+                    <button onclick="window.returnToLabPack()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="layers" class="w-4 h-4 mr-2"></i> Room to Think Hub</button>
+                    <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm flex items-center justify-center"><i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Dashboard</button>
+                    <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="case-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+            <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-gb-accent">
+                <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Case</h2>
+                <p class="text-xs text-gray-500 mb-4 font-body">Only cases you've already cleared are open for review.</p>
+                <div id="case-menu-list" class="space-y-2"></div>
+                <button onclick="window.closeCaseMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const CASE_TITLES = ["Handed In On Time", "Two Versions, No Labels", "Put the Sessions on the Calendar", "Ask Your Own Notebook", "The First Ten Minutes", "Handoff"];
+        window.openCaseMenu = () => {
+            const list = document.getElementById('case-menu-list');
+            list.innerHTML = '';
+            for (let i = 0; i < TOTAL_PAGES; i++) {
+                const unlocked = i <= highestUnlocked;
+                const isCurrent = i === highestUnlocked;
+                const btn = document.createElement('button');
+                btn.disabled = !unlocked;
+                btn.className = `w-full text-left p-3 rounded-lg border flex items-center justify-between text-xs font-bold transition-colors ${
+                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                } ${isCurrent ? 'ring-2 ring-allgood-primary' : ''}`;
+                btn.innerHTML = `<span>Case ${i + 1}: ${CASE_TITLES[i]}</span>${unlocked ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : '<i data-lucide="lock" class="w-3.5 h-3.5"></i>'}`;
+                if (unlocked) btn.onclick = () => {
+                    clearPendingUI();
+                    window.closeCaseMenu();
+                    const pageEl = document.getElementById(`page-${i + 1}`);
+                    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                };
+                list.appendChild(btn);
+            }
+            document.getElementById('case-menu-modal').classList.remove('hidden-modal');
+            document.getElementById('case-menu-modal').classList.add('visible-modal');
+            if (window.lucide) window.lucide.createIcons();
+        };
+        window.closeCaseMenu = () => {
+            document.getElementById('case-menu-modal').classList.add('hidden-modal');
+            document.getElementById('case-menu-modal').classList.remove('visible-modal');
+        };
+    </script>
+
+    <script>
+        const TOTAL_PAGES = 6;
+        let highestUnlocked = 0;
+        let pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: true };
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+        function playTone(freq, type, duration, vol = 0.1) {
+            initAudio(); const now = audioCtx.currentTime; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, now); osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(vol, now + 0.01); gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            osc.start(now); osc.stop(now + duration);
+        }
+        window.sfx = {
+            powerOn: () => { initAudio(); playTone(220, 'triangle', 0.4, 0.2); },
+            tick: () => { initAudio(); playTone(800, 'sine', 0.05, 0.05); },
+            click: () => { initAudio(); playTone(520, 'sine', 0.05, 0.05); },
+            success: () => { playTone(400, 'sine', 0.1); setTimeout(() => playTone(600, 'sine', 0.2), 100); },
+            error: () => playTone(150, 'sawtooth', 0.3)
+        };
+
+        // ✅ BIBLE-PASSED. Checked against docs/jodi-character-bible.md by the Instructional
+        // Designer and entered here VERBATIM from the storyboard (§11). Do not re-interpret her
+        // from the bible at build time — that pass is done, and §6 records that a first attempt
+        // lifted the bible's sample lines word-for-word into places they did not belong. A line
+        // matching a bible sample verbatim is a defect, not compliance.
+        const jodiScript = [
+            { text: "Well hey there. Look at that — Adaeze's, handed in on time, and there is nothing wrong with it. Four moments today, and they all come back round to one thing near everybody believes: I work better under pressure. Now, I'm not going to argue with you about that. I'm going to show you what it costs and let you decide for yourself.", mood: 'neutral' },
+            { text: "One of these had somebody else look at it before it went in. One didn't. I'm not telling you which. Now — find me the places where you can tell.", mood: 'neutral' },
+            { text: "Three weeks, seven things. Some of them need somebody else, and somebody else is not available whenever you happen to feel like it.", mood: 'neutral' },
+            { text: "She's got to explain a decision she made eleven days ago. Let's see if her notebook can help her out.", mood: 'neutral' },
+            { text: "Ten minutes. That's all you've got today and honestly that's fine. Pick one — but keep an eye on that panel, because that's the only bit that matters tomorrow.", mood: 'neutral' },
+            { text: "Four moments — two pages and six tells, a calendar with three things gone grey on you, a notebook that could only answer one question out of four, and ten minutes. Starting late never costs you hours. You can always find hours. What it costs you is every single person who would've helped, because they've all got calendars too. Start badly, start early. Go on now.", mood: 'happy' }
+        ];
+
+        let currentIntro = null, lastMechanism = null, lastSaid = null, stashedReaction = null, jodiShowingIntro = true;
+
+        window.renderJodi = function(stateKey) {
+            const mood = ['neutral', 'happy', 'concerned', 'thinking'].includes(stateKey) ? stateKey : 'neutral';
+            const avatarEl = document.querySelector('.jodi-avatar');
+            if (avatarEl) avatarEl.classList.add('mood-shift');
+            setTimeout(() => {
+                ['neutral', 'happy', 'concerned', 'thinking'].forEach(m => {
+                    const el = document.getElementById(`jodi-img-${m}`);
+                    if (el) el.style.display = (m === mood) ? 'block' : 'none';
+                });
+                if (avatarEl) avatarEl.classList.remove('mood-shift');
+            }, 90);
+        }
+
+        window.renderLocks = function() {
+            for (let i = 0; i < TOTAL_PAGES; i++) {
+                const pageEl = document.getElementById(`page-${i + 1}`);
+                if (!pageEl) continue;
+                if (i <= highestUnlocked) pageEl.classList.remove('locked');
+                else pageEl.classList.add('locked');
+            }
+            document.getElementById('header-page-indicator').textContent = `${highestUnlocked + 1} / ${TOTAL_PAGES}`;
+            document.getElementById('flex-progress-fill').style.width = `${((highestUnlocked + 1) / TOTAL_PAGES) * 100}%`;
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        window.playPageIntro = function(pageIndex) {
+            const whiteboard = document.getElementById('jodi-whiteboard');
+            if (whiteboard) whiteboard.classList.remove('wb-populated');
+            const bubbleEl = document.getElementById('jodi-bubble');
+            if (bubbleEl) bubbleEl.classList.remove('tucked');
+
+            const script = jodiScript[pageIndex];
+            if (!script) return;
+            const bubble = document.getElementById('jodi-bubble');
+            bubble.classList.remove('visible');
+
+            let displayText = script.text;
+            if (typeof window.pageIntroText === 'function') {
+                displayText = window.pageIntroText(pageIndex, displayText) || displayText;
+            }
+
+            currentIntro = { text: displayText, mood: script.mood };
+            stashedReaction = null;
+            jodiShowingIntro = true;
+            window.updateRecallButton();
+
+            setTimeout(() => {
+                bubble.textContent = displayText;
+                bubble.classList.add('visible');
+                window.renderJodi(script.mood);
+            }, 300);
+        };
+
+        window.markReady = function(pageIndex) {
+            if (pageCompletion[pageIndex]) return;
+            pageCompletion[pageIndex] = true;
+            const prompt = document.getElementById(`continue-${pageIndex + 1}`);
+            if (prompt) prompt.classList.add('ready');
+            if (window.lucide) window.lucide.createIcons();
+            if (window.sfx) window.sfx.success();
+        };
+
+        function saveProgress() {
+            if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                window.AuthCore.saveModuleProgress('the-cost-of-later', { highestUnlocked, pageCompletion, pressureBelief });
+            }
+        }
+
+        window.advanceFromPage = function(pageNum) {
+            clearPendingUI();
+            if (pageNum > highestUnlocked) {
+                highestUnlocked = pageNum;
+                pageCompletion[pageNum - 1] = true;
+                window.renderLocks();
+                window.playPageIntro(pageNum);
+                if (window.Telemetry) window.Telemetry.step(pageNum + 1);
+                saveProgress();
+                // Completion is recorded HERE, on reaching the final Case, never inside
+                // finalizeCaseRating(). check-invariants [completion] fails if this moves.
+                if (pageNum === TOTAL_PAGES - 1 && window.logModuleCompletion) window.logModuleCompletion();
+            }
+            const nextPageEl = document.getElementById(`page-${pageNum + 1}`);
+            if (nextPageEl) nextPageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        window.restoreModuleProgress = function(data) {
+            if (!data) return;
+            if (typeof data.highestUnlocked === 'number' && data.highestUnlocked > highestUnlocked) highestUnlocked = data.highestUnlocked;
+            if (data.pageCompletion && typeof data.pageCompletion === 'object') pageCompletion = { ...pageCompletion, ...data.pageCompletion };
+            if (typeof data.pressureBelief === 'string') { pressureBelief = data.pressureBelief; window.pickBelief(pressureBelief); }
+
+            // This path never runs advanceFromPage(), so nothing else cancels timers for it —
+            // and it must not start any either. It only re-renders static state.
+            clearPendingUI();
+            window.renderLocks();
+            for (let i = 1; i < TOTAL_PAGES; i++) {
+                if (pageCompletion[i]) {
+                    const prompt = document.getElementById(`continue-${i + 1}`);
+                    if (prompt) prompt.classList.add('ready');
+                }
+            }
+            if (window.lucide) window.lucide.createIcons();
+            if (highestUnlocked > 0) {
+                window.playPageIntro(highestUnlocked);
+                setTimeout(() => {
+                    const pageEl = document.getElementById(`page-${highestUnlocked + 1}`);
+                    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 800);
+            }
+        };
+
+        window.updateWhiteboard = (title, desc, caseNum) => {
+            const wbTitle = document.getElementById('whiteboard-title');
+            const wbDesc = document.getElementById('whiteboard-desc');
+            if (wbTitle) wbTitle.textContent = title;
+            if (wbDesc) wbDesc.textContent = desc;
+            const whiteboard = document.getElementById('jodi-whiteboard');
+            if (whiteboard) whiteboard.classList.add('wb-populated');
+            const bubble = document.getElementById('jodi-bubble');
+            if (bubble) bubble.classList.add('tucked');
+            lastMechanism = { title, desc, caseNum };
+            if (caseNum) {
+                const box = document.getElementById(`mobile-wb-${caseNum}`);
+                if (box) {
+                    box.classList.remove('hidden');
+                    box.querySelector('.mobile-wb-title').textContent = title;
+                    box.querySelector('.mobile-wb-desc').textContent = desc;
+                }
+            }
+        };
+
+        function renderBubble(text, mood) {
+            const bubble = document.getElementById('jodi-bubble');
+            if (!bubble) return;
+            const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+            if (isDesktop) { bubble.textContent = text; window.renderJodi(mood); }
+            else {
+                bubble.classList.remove('visible');
+                setTimeout(() => { bubble.textContent = text; bubble.classList.add('visible'); window.renderJodi(mood); }, 150);
+            }
+        }
+
+        window.sayJodi = (text, mood) => { lastSaid = { text, mood }; jodiShowingIntro = false; window.updateRecallButton(); renderBubble(text, mood); };
+
+        window.recallJodi = () => {
+            if (jodiShowingIntro) {
+                if (!stashedReaction) { if (window.sfx) window.sfx.tick(); return; }
+                const s = stashedReaction;
+                if (s.mechanism) window.updateWhiteboard(s.mechanism.title, s.mechanism.desc, s.mechanism.caseNum);
+                window.sayJodi(s.text, s.mood);
+            } else {
+                if (!currentIntro) { if (window.sfx) window.sfx.tick(); return; }
+                stashedReaction = { text: lastSaid ? lastSaid.text : '', mood: lastSaid ? lastSaid.mood : 'neutral', mechanism: lastMechanism };
+                const wb = document.getElementById('jodi-whiteboard');
+                if (wb) wb.classList.remove('wb-populated');
+                const bubble = document.getElementById('jodi-bubble');
+                if (bubble) bubble.classList.remove('tucked');
+                jodiShowingIntro = true;
+                window.updateRecallButton();
+                renderBubble(currentIntro.text, currentIntro.mood);
+            }
+            if (window.sfx) window.sfx.click();
+        };
+
+        window.updateRecallButton = () => {
+            const btn = document.getElementById('jodi-recall');
+            const label = document.getElementById('jodi-recall-label');
+            if (!btn || !label) return;
+            const canToggle = jodiShowingIntro ? !!stashedReaction : !!currentIntro;
+            btn.classList.toggle('hidden', !canToggle);
+            btn.classList.toggle('flex', canToggle);
+            label.textContent = jodiShowingIntro ? 'Back to the board' : 'Re-read what Jodi said';
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        // Every delayed UI reaction goes through scheduleUI() so advanceFromPage(), the Case
+        // menu and each Case's own reset can cancel it. A stale timer firing on a Case the
+        // student has since left silently overwrites that Case's whiteboard.
+        let pendingTimers = [];
+        function scheduleUI(fn, ms) { const id = setTimeout(fn, ms); pendingTimers.push(id); return id; }
+        function clearPendingUI() { pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+        window._clearPendingUI = clearPendingUI;
+
+        window.teach = (caseNum, title, desc, mood) => { window.updateWhiteboard(title, desc, caseNum); window.sayJodi(desc, mood || 'neutral'); };
+        window.teachSplit = (caseNum, title, desc, said, mood) => { window.updateWhiteboard(title, desc, caseNum); window.sayJodi(said, mood || 'neutral'); };
+
+        window.setStep = (caseNum, num, html, done) => {
+            const bar = document.getElementById(`step-${caseNum}`);
+            if (!bar) return;
+            bar.querySelector('.step-num').innerHTML = done ? SVG_CHECK : String(num);
+            bar.querySelector('.step-text').innerHTML = html;
+            bar.classList.toggle('done', !!done);
+        };
+
+        function showReframe(caseNum) { const r = document.getElementById(`reframe-${caseNum}`); if (r) r.classList.add('show'); }
+
+        const SVG_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+        function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    </script>
+
+    <script>
+        /* ===================== CASE 2: TWO VERSIONS, NO LABELS =====================
+           Registry #40 — blind artefact comparison with evidence tagging.
+
+           ⚠️ This Case is NOT gated on being right. A wrong final call reveals the answer and
+           walks all six tells anyway — the reveal is the teaching, not the score. Criterion 22.
+
+           The belief commit at the top of the page is stored, quoted back in Case 6, and never
+           judged anywhere: nothing reads `pressureBelief` except the Case 6 header. */
+        const C2_BELIEFS = [
+            { id: 'true',  label: 'True for me',     phrase: 'works' },
+            { id: 'false', label: 'Not true for me', phrase: "doesn't work" }
+        ];
+        let pressureBelief = null;
+
+        // Page B is the one that had feedback. Six meaningful regions, three on each page —
+        // three things that are missing from A and three things that are only in B.
+        const C2_HELPED = 'b';
+        const C2_REGIONS = [
+            { id: 'a1', page: 'a', quote: 'Sources: Harding (2021), Ofsted (2019), Transport for the North (2022).',
+              tell: 'A source cited and never used',
+              note: "Harding is in the list and never turns up anywhere in the argument. Nobody asked what it was doing there." },
+            { id: 'a2', page: 'a', quote: 'Cost to families — "The 7:42 was the only service that reached the school before registration…"',
+              tell: 'A heading that does not match its own paragraph',
+              note: "The heading says cost. The paragraph is about timetables. Nobody read the two of them next to each other." },
+            { id: 'a3', page: 'a', quote: 'In conclusion, the route change should be reversed.',
+              tell: 'A conclusion answering a slightly different question',
+              note: "The introduction asked who is getting to school late. The conclusion answers whether the route should change. Close, but not the same question." },
+            { id: 'b1', page: 'b', quote: '[Fig. 1] Arrivals after 08:50, by service — note the gap in the middle column: that is the week the 61 was suspended.',
+              tell: 'A diagram with a caption that tells you what to look at',
+              note: "Somebody read this and asked what they were supposed to be looking at. This caption is the answer they got." },
+            { id: 'b2', page: 'b', quote: 'It could be argued the lateness is seasonal rather than route-related. The same weeks last year show no such gap, which is the reason this reading holds.',
+              tell: 'A counter-argument named and answered',
+              note: "Somebody pushed back before this went in, and the page answers them. You do not write your own objections at eleven at night." },
+            { id: 'b3', page: 'b', quote: 'Thirty-one students were affected. (Earlier draft: "It is possible to say that as many as thirty-one students may have been affected by this change.")',
+              tell: 'A sentence visibly rewritten shorter',
+              note: "Twenty-one words became four. That is a second pass, and a second pass needs a second day." }
+        ];
+
+        let c2Tags = {}, c2Opened = new Set(), c2Call = null, c2Revealed = false;
+
+        function initCase2() {
+            document.getElementById('c2-belief').innerHTML = C2_BELIEFS.map(b => `
+                <button class="pick-btn" data-belief="${b.id}" onclick="window.pickBelief('${b.id}')">
+                    <span class="pick-label">${b.label}</span>
+                </button>`).join('');
+            c2Render();
+        }
+
+        window.pickBelief = function(id) {
+            pressureBelief = id;
+            if (window.sfx) window.sfx.click();
+            document.querySelectorAll('#c2-belief .pick-btn').forEach(b => b.classList.toggle('chosen', b.dataset.belief === id));
+            saveProgress();
+        };
+
+        function c2Render() {
+            for (const page of ['a', 'b']) {
+                document.getElementById(`c2-regions-${page}`).innerHTML = C2_REGIONS.filter(r => r.page === page).map(r => {
+                    const tag = c2Tags[r.id];
+                    const cls = ['region'];
+                    if (c2Opened.has(r.id)) cls.push('opened');
+                    if (tag === 'help') cls.push('tagged-help');
+                    if (tag === 'none') cls.push('tagged-none');
+                    return `<div class="${cls.join(' ')}" data-region="${r.id}" onclick="window.openRegion('${r.id}')">
+                                <p class="region-quote">${r.quote}</p>
+                                <p class="region-note">${c2Revealed ? '<strong>' + r.tell + '.</strong> ' + r.note : r.note}</p>
+                                <div class="region-tags">
+                                    <button class="tag-pill ${tag === 'help' ? 'on' : ''}" data-tag="help" onclick="event.stopPropagation(); window.tagRegion('${r.id}','help')">Had help</button>
+                                    <button class="tag-pill ${tag === 'none' ? 'on' : ''}" data-tag="none" onclick="event.stopPropagation(); window.tagRegion('${r.id}','none')">Didn't</button>
+                                </div>
+                            </div>`;
+                }).join('');
+            }
+            const n = Object.keys(c2Tags).length;
+            document.getElementById('c2-tag-count').textContent = n === 0 ? 'Nothing tagged yet' : `${n} tagged`;
+            // The call control appears at three tags, and no correctness feedback exists
+            // before it: tagging never tells the student whether a tag was right.
+            document.getElementById('c2-call-btn').classList.toggle('hidden', n < 3 || c2Revealed);
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        // Re-tapping a tagged region must re-open it with the tag still changeable.
+        window.openRegion = function(id) {
+            c2Opened.add(id);
+            if (window.sfx) window.sfx.tick();
+            c2Render();
+        };
+
+        window.tagRegion = function(id, tag) {
+            if (c2Revealed) return;
+            c2Tags[id] = tag;
+            if (window.sfx) window.sfx.click();
+            c2Render();
+        };
+
+        window.openCall = function() {
+            document.getElementById('c2-call').classList.remove('hidden');
+            if (window.sfx) window.sfx.click();
+        };
+
+        window.callPage = function(page) {
+            if (c2Revealed) return;
+            c2Call = page;
+            c2Revealed = true;
+            if (window.sfx) window.sfx.success();
+
+            // The pages label themselves, whichever way the call went.
+            document.getElementById('c2-label-a').textContent = C2_HELPED === 'a' ? 'Page A — had feedback' : 'Page A — nobody read it';
+            document.getElementById('c2-label-b').textContent = C2_HELPED === 'b' ? 'Page B — had feedback' : 'Page B — nobody read it';
+            document.getElementById('c2-paper-a').classList.toggle('revealed', C2_HELPED === 'a');
+            document.getElementById('c2-paper-b').classList.toggle('revealed', C2_HELPED === 'b');
+            document.getElementById(`c2-called-${page}`).textContent = 'your call';
+            document.getElementById('c2-call').classList.add('hidden');
+
+            C2_REGIONS.forEach(r => c2Opened.add(r.id));
+            c2Render();
+
+            // All six tells light in sequence with one line each — the same six, in the same
+            // order, whether the call was right or not.
+            const reveal = document.getElementById('c2-reveal');
+            reveal.classList.remove('hidden');
+            reveal.innerHTML = '';
+            C2_REGIONS.forEach((r, i) => {
+                scheduleUI(() => {
+                    const el = document.querySelector(`[data-region="${r.id}"]`);
+                    if (el) { el.classList.add('lit'); scheduleUI(() => el.classList.remove('lit'), 900); }
+                    const row = document.createElement('div');
+                    row.className = 'verdict-strip';
+                    row.innerHTML = `<strong>Tell ${i + 1} of ${C2_REGIONS.length} &mdash; ${r.tell}.</strong> ${r.note}`;
+                    reveal.appendChild(row);
+                }, 250 + i * 550);
+            });
+
+            scheduleUI(() => {
+                window.teachSplit(2, 'You could see it', "Nobody wrote 'rushed' anywhere on that page.",
+                    "You found it in what wasn't there. The caption nobody asked for. The counter-argument nobody raised. That's what the extra days buy — not more words. Somebody else's eyes.", 'thinking');
+                showReframe(2);
+                window.setStep(2, 1, `Called it, and every one of the six is on the table either way.`, true);
+                window.markReady(1);
+                saveProgress();
+            }, 250 + C2_REGIONS.length * 550);
+        };
+
+        // Clears the tags. Keeps which regions have been opened — the student has read them.
+        window.resetCase2 = function() {
+            clearPendingUI();
+            c2Tags = {}; c2Call = null; c2Revealed = false;
+            document.getElementById('c2-call').classList.add('hidden');
+            document.getElementById('c2-reveal').classList.add('hidden');
+            document.getElementById('c2-reveal').innerHTML = '';
+            document.getElementById('c2-label-a').textContent = 'Page A';
+            document.getElementById('c2-label-b').textContent = 'Page B';
+            document.getElementById('c2-called-a').textContent = '';
+            document.getElementById('c2-called-b').textContent = '';
+            document.getElementById('c2-paper-a').classList.remove('revealed');
+            document.getElementById('c2-paper-b').classList.remove('revealed');
+            document.getElementById('reframe-2').classList.remove('show');
+            window.setStep(2, 1, 'Open the spots where you can tell, and tag each one. Three tags and you can call it.', false);
+            c2Render();
+        };
+    </script>
+
+    <script>
+        /* ===================== CASE 3: PUT THE SESSIONS ON THE CALENDAR =====================
+           Registry #41 — dependency-aware scheduling.
+
+           Twenty-one days, today on the left, the deadline on the right. Seven sessions; two
+           of them run over two consecutive days, marked ×2. SEVEN is the number in all copy
+           and in the gate — the nine day-slots those seven occupy is never said aloud.
+
+           ⚠️ A session whose dependency can no longer be met GREYS OUT IN THE TRAY with its
+           badge struck through. It does not vanish: the student has to see what was lost, and
+           tapping it prints exactly why, generated from where the sessions actually are.
+           Criterion 23.
+
+           ⚠️ Placing everything as late as possible still FITS and still greys three sessions
+           out. That is the demonstration, not a failure state. Criterion 24. Front-loading is
+           not rewarded either and gets its own line. Criterion 25. */
+        const C3_DAYS = 21;
+        const C3_DEADLINE = 21;
+        const C3_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const c3IsTuesday = d => (d - 1) % 7 === 1;          // day 1 is a Monday → 2, 9, 16
+        const C3_TUESDAYS = Array.from({ length: C3_DAYS }, (_, i) => i + 1).filter(c3IsTuesday);
+        const C3_FEEDBACK_LEAD = 2;                           // draft in two days early
+
+        const C3_SESSIONS = [
+            { id: 'topic',    name: 'Pick the topic',          span: 1, badge: 'Nobody else needed' },
+            { id: 'sources',  name: 'Gather sources',          span: 2, badge: 'Nobody else needed' },
+            { id: 'draft',    name: 'First rough draft',       span: 2, badge: 'Nobody else needed' },
+            { id: 'feedback', name: 'Get supervisor feedback', span: 1, badge: 'Tuesdays only, draft in two days early' },
+            { id: 'rewrite',  name: 'Rewrite after feedback',  span: 1, badge: 'After the feedback comes back' },
+            { id: 'reader',   name: 'Get a second reader',     span: 1, badge: 'Day after the rewrite at the earliest' },
+            { id: 'final',    name: 'Final check and submit',  span: 1, badge: 'Nobody else needed' }
+        ];
+        const C3_BY_ID = id => C3_SESSIONS.find(s => s.id === id);
+
+        let c3Placed = {}, c3Armed = null, c3Done = false, c3Warned = false;
+
+        const c3End = id => c3Placed[id] === undefined ? null : c3Placed[id] + C3_BY_ID(id).span - 1;
+
+        // Can this session sit on this day, given everything else currently placed?
+        function c3CanPlace(id, day) {
+            const s = C3_BY_ID(id);
+            if (day < 1 || day + s.span - 1 > C3_DEADLINE) return false;
+            if (id === 'feedback') {
+                if (!c3IsTuesday(day)) return false;
+                if (c3Placed.draft === undefined) return false;
+                return c3End('draft') + C3_FEEDBACK_LEAD <= day;
+            }
+            if (id === 'rewrite') {
+                if (c3Placed.feedback === undefined) return false;
+                return day > c3Placed.feedback;
+            }
+            if (id === 'reader') {
+                if (c3Placed.rewrite === undefined) return false;
+                return day >= c3Placed.rewrite + 1;
+            }
+            return true;
+        }
+
+        // Is there ANY day left where this session could go? Greying is driven by where the
+        // other sessions sit, not by time passing — nothing on this calendar expires.
+        function c3Reachable(id) {
+            for (let d = 1; d <= C3_DEADLINE; d++) if (c3CanPlace(id, d)) return true;
+            if (id === 'feedback' && c3Placed.draft === undefined) return true;
+            if (id === 'rewrite' && c3Placed.feedback === undefined) return c3Reachable('feedback');
+            if (id === 'reader' && c3Placed.rewrite === undefined) return c3Reachable('rewrite');
+            return false;
+        }
+
+        function c3WhyStuck(id) {
+            if (id === 'feedback') {
+                const lastTue = C3_TUESDAYS[C3_TUESDAYS.length - 1];
+                const needBy = c3End('draft') + C3_FEEDBACK_LEAD;
+                return `The supervisor's last Tuesday is day ${lastTue}. Your draft won't exist until day ${c3End('draft')}, and they need it two days before that meeting — so the earliest they could look at it is day ${needBy}.`;
+            }
+            if (id === 'rewrite') return "There is no feedback to rewrite after. That one went first, and this one went with it.";
+            if (id === 'reader') return "There is no rewritten draft for anybody to read. That went when the rewrite did.";
+            return 'This one has nowhere left to go.';
+        }
+
+        function initCase3() { c3Render(); }
+
+        function c3Render() {
+            // Any placed session whose dependency no longer holds goes back in the tray. A
+            // move that breaks something downstream must show the damage, not hide it.
+            let bumped = [];
+            for (const id of ['feedback', 'rewrite', 'reader']) {
+                if (c3Placed[id] !== undefined && !c3CanPlace(id, c3Placed[id])) { delete c3Placed[id]; bumped.push(C3_BY_ID(id).name); }
+            }
+
+            const cal = document.getElementById('c3-cal');
+            let html = C3_WEEKDAYS.map(w => `<div class="cal-head">${w}</div>`).join('');
+            for (let d = 1; d <= C3_DAYS; d++) {
+                const cls = ['day'];
+                if (c3IsTuesday(d)) cls.push('tuesday');
+                if (d === C3_DEADLINE) cls.push('deadline');
+                if (c3Armed && c3CanPlace(c3Armed, d)) cls.push('armed');
+                const chips = C3_SESSIONS.filter(s => c3Placed[s.id] !== undefined && d >= c3Placed[s.id] && d <= c3End(s.id))
+                    .map(s => `<span class="day-chip${d > c3Placed[s.id] ? ' cont' : ''}" onclick="window.chipTapped(event, '${s.id}', ${d})">${d > c3Placed[s.id] ? '&hellip;' : s.name}</span>`).join('');
+                html += `<div class="${cls.join(' ')}" data-day="${d}" onclick="window.dropOnDay(${d})">
+                            <span class="day-num">${d}${d === C3_DEADLINE ? ' &middot; due' : ''}</span>${chips}
+                         </div>`;
+            }
+            cal.innerHTML = html;
+
+            const tray = document.getElementById('c3-tray');
+            tray.innerHTML = C3_SESSIONS.map(s => {
+                const placed = c3Placed[s.id] !== undefined;
+                const greyed = !placed && !c3Reachable(s.id);
+                const cls = ['tray-card'];
+                if (placed) cls.push('placed');
+                if (greyed) cls.push('greyed');
+                if (c3Armed === s.id) cls.push('armed');
+                return `<button class="${cls.join(' ')}" data-session="${s.id}" data-greyed="${greyed}" onclick="window.armSession('${s.id}')">
+                            <span class="tray-name">${s.name}${s.span > 1 ? ' <span class="text-[9px] text-gb-accent-dark">&times;2</span>' : ''}</span>
+                            <span class="dep-badge">${s.badge}</span>
+                            ${placed ? `<span class="block text-[9px] text-gray-400 mt-1">on day ${c3Placed[s.id]}</span>` : ''}
+                        </button>`;
+            }).join('');
+
+            const placedCount = Object.keys(c3Placed).length;
+            const greyedNames = C3_SESSIONS.filter(s => c3Placed[s.id] === undefined && !c3Reachable(s.id)).map(s => s.name);
+            if (!c3Done) {
+                window.setStep(3, 1, placedCount === 0
+                    ? 'Tap a session, then tap a day. Tap a placed session to pick it up again.'
+                    : `${placedCount} of ${C3_SESSIONS.length} placed${greyedNames.length ? `, ${greyedNames.length} gone grey in the tray` : ''}.`, false);
+            }
+            if (bumped.length) c3Why(`${bumped.join(' and ')} went back in the tray &mdash; what they depend on moved.`);
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        function c3Why(html) {
+            const w = document.getElementById('c3-why');
+            w.innerHTML = html;
+            w.classList.remove('hidden');
+        }
+
+        window.armSession = function(id) {
+            if (c3Done) return;
+            // A greyed card is still tappable — that is the whole point of it not vanishing.
+            if (c3Placed[id] === undefined && !c3Reachable(id)) {
+                if (window.sfx) window.sfx.error();
+                c3Why(`<strong>${C3_BY_ID(id).name}.</strong> ${c3WhyStuck(id)}`);
+                return;
+            }
+            if (c3Placed[id] !== undefined) { window.pickUpSession(id); return; }
+            c3Armed = c3Armed === id ? null : id;
+            if (window.sfx) window.sfx.tick();
+            c3Render();
+        };
+
+        // A chip sits on top of a day cell. If something is already armed the student is
+        // aiming at the DAY, so let the drop through; otherwise the chip means "pick this one
+        // back up". Without this, arming a session and tapping an occupied day silently
+        // swapped which session was in hand.
+        window.chipTapped = function(ev, id, day) {
+            if (c3Armed) { ev.stopPropagation(); window.dropOnDay(day); return; }
+            ev.stopPropagation();
+            window.pickUpSession(id);
+        };
+
+        window.pickUpSession = function(id) {
+            if (c3Done) return;
+            delete c3Placed[id];
+            c3Armed = id;
+            if (window.sfx) window.sfx.tick();
+            c3Render();
+            c3Check();
+        };
+
+        window.dropOnDay = function(day) {
+            if (c3Done || !c3Armed) return;
+            if (!c3CanPlace(c3Armed, day)) {
+                if (window.sfx) window.sfx.error();
+                const s = C3_BY_ID(c3Armed);
+                let why = `Day ${day} does not work for <strong>${s.name}</strong>.`;
+                if (c3Armed === 'feedback') {
+                    why += c3IsTuesday(day)
+                        ? (c3Placed.draft === undefined ? ' There is no draft yet for them to read.' : ` The draft runs to day ${c3End('draft')}, and they need it two days before you sit down.`)
+                        : ` The supervisor is only in on Tuesdays &mdash; days ${C3_TUESDAYS.join(', ')}.`;
+                } else if (c3Armed === 'rewrite') {
+                    why += c3Placed.feedback === undefined ? ' There is no feedback to rewrite after yet.' : ` The feedback is on day ${c3Placed.feedback}. This has to come after it.`;
+                } else if (c3Armed === 'reader') {
+                    why += c3Placed.rewrite === undefined ? ' There is no rewritten draft for them to read yet.' : ` The rewrite is on day ${c3Placed.rewrite}, and a second reader needs a day to turn it round.`;
+                } else if (day + s.span - 1 > C3_DEADLINE) {
+                    why += ' It runs past the deadline.';
+                }
+                c3Why(why);
+                return;
+            }
+            c3Placed[c3Armed] = day;
+            c3Armed = null;
+            if (window.sfx) window.sfx.click();
+            document.getElementById('c3-why').classList.add('hidden');
+            c3Render();
+            c3Check();
+        };
+
+        function c3Check() {
+            if (c3Done) return;
+            const placed = Object.keys(c3Placed);
+            const greyed = C3_SESSIONS.filter(s => c3Placed[s.id] === undefined && !c3Reachable(s.id));
+
+            // The all-late calendar: everything that needs nobody else is down, the three that
+            // need somebody else have gone grey, and it all still fits inside the deadline.
+            if (!c3Warned && greyed.length === 3 && placed.length === C3_SESSIONS.length - 3) {
+                c3Warned = true;
+                window.sayJodi("Well, it all fits. Now look at what went grey anyway.", 'thinking');
+                c3Why(`It fits. <strong>${greyed.map(s => s.name).join(', ')}</strong> went grey in the tray, struck through, and they are the three that needed somebody else.`);
+                return;
+            }
+
+            if (placed.length !== C3_SESSIONS.length) return;
+            c3Done = true;
+            const lastDay = Math.max(...C3_SESSIONS.map(s => c3End(s.id)));
+            window.setStep(3, 1, `All ${C3_SESSIONS.length} placed, nothing greyed, and the supervisor got a Tuesday.`, true);
+            c3DrawDependencies();
+            document.getElementById('c3-why').classList.add('hidden');
+
+            // Front-loading is not rewarded either. The idle-day count is computed off the
+            // calendar rather than typed, so it can never contradict what is on screen.
+            const idle = C3_DEADLINE - lastDay;
+            const frontLoaded = lastDay <= 11;
+            const finish = () => {
+                window.teachSplit(3, "You didn't run out of time", 'The late version had the same number of hours in it.',
+                    "What it didn't have was a Tuesday with a supervisor sat on it, ready and willing. That's the cost, sugar — not hours. Somebody wanted to help and never got asked.", 'happy');
+                showReframe(3);
+                window.markReady(2);
+                saveProgress();
+            };
+            if (frontLoaded) {
+                window.sayJodi(`That works. You've also left ${idle} days doing nothing, and you'll fill them rewriting the same page. Spacing isn't the same as hurrying.`, 'thinking');
+                scheduleUI(finish, 2800);
+            } else finish();
+        }
+
+        // The completion confirmation: the calendar draws the dependency lines between the
+        // placed sessions, so the student sees the shape as a structure rather than a list.
+        function c3DrawDependencies() {
+            const wrap = document.querySelector('.cal-wrap');
+            const cal = document.getElementById('c3-cal');
+            if (!wrap || !cal) return;
+            wrap.querySelectorAll('svg.dep-svg').forEach(s => s.remove());
+            const box = cal.getBoundingClientRect();
+            const centre = (id) => {
+                const el = cal.querySelector(`[data-day="${c3Placed[id]}"]`);
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 };
+            };
+            const chain = [['draft', 'feedback'], ['feedback', 'rewrite'], ['rewrite', 'reader']];
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'dep-svg');
+            svg.setAttribute('style', `position:absolute;left:0;top:0;width:${box.width}px;height:${box.height}px;pointer-events:none;`);
+            chain.forEach(([from, to], i) => {
+                const a = centre(from), b = centre(to);
+                if (!a || !b) return;
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+                line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+                line.setAttribute('stroke', '#9B3B5A');
+                line.setAttribute('stroke-width', '2');
+                line.setAttribute('stroke-dasharray', '4 3');
+                line.setAttribute('opacity', '0');
+                svg.appendChild(line);
+                scheduleUI(() => line.setAttribute('opacity', '0.8'), 200 + i * 260);
+            });
+            wrap.appendChild(svg);
+        }
+
+        window.resetCase3 = function() {
+            clearPendingUI();
+            c3Placed = {}; c3Armed = null; c3Done = false; c3Warned = false;
+            const wrap = document.querySelector('.cal-wrap');
+            if (wrap) wrap.querySelectorAll('svg.dep-svg').forEach(s => s.remove());
+            document.getElementById('c3-why').classList.add('hidden');
+            document.getElementById('reframe-3').classList.remove('show');
+            c3Render();
+        };
+    </script>
+
+    <script>
+        /* ===================== CASE 4: ASK YOUR OWN NOTEBOOK =====================
+           Registry #42 — query-the-journal.
+
+           ⚠️ Entry 2 returns NOTHING for the first question and something real for the second.
+           In a process journal an affective entry IS evidence — it earns its place the moment
+           the question changes. The same entry being useless for one question and load-bearing
+           for another is the whole Case. Criterion 26: do not simplify this into a two-bin
+           sort, and do not make entry 2 useless. */
+        const C4_QUESTIONS = [
+            { id: 'q1', text: 'Why did you drop the survey and use interviews instead?',
+              blank: 'Nothing in here about why.' },
+            { id: 'q2', text: 'What would you do differently next time?',
+              blank: "Nothing in here about what you'd change." }
+        ];
+        const C4_ENTRIES = [
+            { n: 1, day: 'Day 3', text: 'Worked on the project for two hours. Made good progress.', answers: {} },
+            { n: 2, day: 'Day 4', text: 'Really struggling with this. Feeling behind.',
+              answers: { q2: "Day 4 was where it started to go wrong and I didn't tell anybody. Next time I would say it out loud on Day 4 instead of waiting until Day 9, when the only option left was to change method." } },
+            { n: 3, day: 'Day 5', text: "Dropped the survey. Only 6 replies in four days and I'd need about 40 for it to mean anything. Switching to 3 interviews — slower per person but I'll actually get them.",
+              answers: {
+                q1: "Because 6 replies in four days was never going to reach the 40 it needed to mean anything, so I switched to 3 interviews — slower per person, but I would actually get them.",
+                q2: "I would check whether a survey could reach 40 people before spending four days waiting to find out that it couldn't."
+              } },
+            { n: 4, day: 'Day 9', text: 'Interviews done. Two useful, one not.', answers: {} }
+        ];
+        const C4_REWRITES = [
+            { id: 'w1', strong: false, text: 'Day 3 — Worked really hard on the project for two hours. Made excellent progress.',
+              note: "That is the same entry with better adjectives on it. Ask it either question and it still has nothing to say." },
+            { id: 'w2', strong: true,  text: 'Day 3 — Picked the bus-route question over the canteen one, because I can actually get the timetable data for it.',
+              note: "That one names a decision and why it went that way. In six weeks it can still answer a question." },
+            { id: 'w3', strong: false, text: 'Day 3 — A productive two hours. Solid progress made on the project overall.',
+              note: "Tidier, and still no decision in it. Nothing in there for a question to get hold of." }
+        ];
+
+        let c4Qi = 0, c4Answers = {}, c4Rewrite = null, c4Queried = {}, c4Locked = false;
+
+        function initCase4() { c4Render(); }
+
+        function c4Render() {
+            const q = C4_QUESTIONS[c4Qi];
+            document.getElementById('c4-question').innerHTML =
+                `<span class="text-[9px] uppercase tracking-widest text-gb-accent block mb-1">Day 16, writing it up &mdash; question ${c4Qi + 1} of ${C4_QUESTIONS.length}</span>${q.text}`;
+
+            document.getElementById('c4-entries').innerHTML = C4_ENTRIES.map(e => {
+                const state = c4Queried[`${q.id}:${e.n}`];
+                const cls = ['entry'];
+                if (state) cls.push('queried', state === 'hit' ? 'useful' : 'empty-handed');
+                return `<button class="${cls.join(' ')}" data-entry="${e.n}" onclick="window.queryEntry(${e.n})">
+                            <span class="entry-date">${e.day}</span>
+                            <span class="entry-text block">${e.text}</span>
+                            ${state ? `<span class="block text-[9.5px] font-bold uppercase tracking-widest mt-1.5 ${state === 'hit' ? 'text-emerald-600' : 'text-gray-400'}">${state === 'hit' ? 'answered it' : 'nothing about this'}</span>` : ''}
+                        </button>`;
+            }).join('');
+
+            const box = document.getElementById('c4-answer');
+            const ans = c4Answers[q.id];
+            if (ans) { box.textContent = ans; box.className = 'answer-box filled'; }
+            else { box.textContent = 'Nothing yet. Ask an entry.'; box.className = 'answer-box blank'; }
+
+            const done = C4_QUESTIONS.filter(x => c4Answers[x.id]).length;
+            document.getElementById('c4-progress').textContent = `${done} of ${C4_QUESTIONS.length} questions answered from the notebook`;
+            document.getElementById('c4-rewrite').classList.toggle('hidden', done < C4_QUESTIONS.length);
+            document.getElementById('c4-rewrite-row').innerHTML = C4_REWRITES.map(r => `
+                <button class="rewrite-btn ${c4Rewrite === r.id ? 'chosen' : ''}" data-rewrite="${r.id}" onclick="window.chooseRewrite('${r.id}')">
+                    <span class="block text-[11.5px] text-gray-900 leading-snug">${r.text}</span>
+                </button>`).join('');
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        // Querying an entry is never one-shot. Ask it again and it says the same thing again.
+        window.queryEntry = function(n) {
+            const q = C4_QUESTIONS[c4Qi];
+            const e = C4_ENTRIES.find(x => x.n === n);
+            const hit = e.answers[q.id];
+            c4Queried[`${q.id}:${n}`] = hit ? 'hit' : 'miss';
+            const result = document.getElementById('c4-result');
+            result.textContent = hit ? `${e.day} answered it.` : q.blank;
+            result.className = `verdict-strip mb-2${hit ? '' : ' text-gray-400'}`;
+            if (window.sfx) hit ? window.sfx.success() : window.sfx.tick();
+            if (hit) {
+                c4Answers[q.id] = hit;
+                c4Render();
+                const nextUnanswered = C4_QUESTIONS.findIndex(x => !c4Answers[x.id]);
+                if (nextUnanswered >= 0) {
+                    scheduleUI(() => { c4Qi = nextUnanswered; document.getElementById('c4-result').classList.add('hidden'); c4Render(); }, 1400);
+                    window.setStep(4, 1, `${e.day} answered it. Next question loading &mdash; ask them all again, the answers change.`, false);
+                } else {
+                    window.setStep(4, 1, 'Both questions answered out of the notebook. Now rewrite Day 3.', false);
+                }
+            } else {
+                c4Render();
+                window.setStep(4, 1, `${e.day} has nothing in it about this one. Ask another.`, false);
+            }
+        };
+
+        window.chooseRewrite = function(id) {
+            const r = C4_REWRITES.find(x => x.id === id);
+            const note = document.getElementById('c4-rewrite-note');
+            note.textContent = r.note;
+            note.classList.remove('hidden');
+            if (window.sfx) r.strong ? window.sfx.success() : window.sfx.tick();
+            if (!r.strong) {
+                // Says why it changes nothing, and leaves the choice open. Not a rebuke.
+                document.querySelectorAll('#c4-rewrite-row .rewrite-btn').forEach(b => b.classList.remove('chosen'));
+                return;
+            }
+            c4Rewrite = id;
+            c4Render();
+            c4Complete(r);
+        };
+
+        function c4Complete(r) {
+            if (c4Locked) return;
+            c4Locked = true;
+            // The four entries re-order by usefulness, with the rewritten Day 3 in the useful
+            // half — the answer count is read off what actually happened, not assumed.
+            const usefulness = e => C4_QUESTIONS.filter(q => (e.n === 1 ? { q1: null, q2: null } : e.answers)[q.id]).length;
+            const rows = C4_ENTRIES.map(e => ({
+                day: e.day,
+                text: e.n === 1 ? r.text.replace(/^Day 3 — /, '') : e.text,
+                score: e.n === 1 ? 1 : usefulness(e)
+            })).sort((a, b) => b.score - a.score);
+            document.getElementById('c4-reorder').classList.remove('hidden');
+            document.getElementById('c4-reorder').innerHTML =
+                `<p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">The notebook, in order of what it can answer</p>` +
+                rows.map(x => `<div class="entry ${x.score > 0 ? 'useful' : 'empty-handed'} mb-1.5">
+                        <span class="entry-date">${x.day}</span>
+                        <span class="entry-text block">${x.text}</span>
+                        <span class="block text-[9.5px] font-bold uppercase tracking-widest mt-1 ${x.score > 0 ? 'text-emerald-600' : 'text-gray-400'}">${x.score > 0 ? 'can answer a question' : 'can answer nothing'}</span>
+                     </div>`).join('');
+            window.setStep(4, 1, 'Both questions answered, and Day 3 rewritten into something that can answer one.', true);
+            window.teachSplit(4, 'A journal that records effort is a diary', "'Two hours, good progress' can't answer a single question you'll be asked later.",
+                "Now — notice I didn't throw out 'feeling behind.' That one earned its place the second the question changed. Write the decisions, not the hours.", 'happy');
+            showReframe(4);
+            window.markReady(3);
+            saveProgress();
+        }
+
+        // Empties the answer box. Keeps the entries — they are what they are.
+        window.resetCase4 = function() {
+            clearPendingUI();
+            c4Qi = 0; c4Answers = {}; c4Rewrite = null; c4Queried = {}; c4Locked = false;
+            document.getElementById('c4-result').classList.add('hidden');
+            document.getElementById('c4-rewrite-note').classList.add('hidden');
+            document.getElementById('c4-reorder').classList.add('hidden');
+            document.getElementById('reframe-4').classList.remove('show');
+            window.setStep(4, 1, 'Tap an entry to ask it the question. Ask as many as you like, as often as you like.', false);
+            c4Render();
+        };
+    </script>
+
+    <script>
+        /* ===================== CASE 5: THE FIRST TEN MINUTES =====================
+           Registry #43 — first-artefact selection.
+
+           Exploration with a commitment shape. Every card is pressable in any order, as often
+           as the student likes, and re-tapping reprints. Three of the six leave the right-hand
+           panel empty and each prints its OWN line — they are not one line three times. The
+           Case completes only when the panel has something in it, and it says so plainly
+           rather than leaving the student guessing. Criterion 27. */
+        const C5_ACTIONS = [
+            { id: 'plan',    label: 'Make a plan for the whole project',        fills: false,
+              line: "A plan's about you. Nothing there for anybody else to look at yet." },
+            { id: 'format',  label: 'Set up the document and format the headings', fills: false,
+              line: "That's tidying. It feels like work because it is work — just work nobody can answer." },
+            { id: 'read',    label: 'Read around the topic for ten minutes',    fills: false,
+              line: "You know more than you did. Nobody else can tell." },
+            { id: 'para',    label: 'Write the worst possible first paragraph',  fills: true,
+              artefact: 'One bad paragraph, written down, that says the bus change made people late.',
+              line: "That's terrible. It's also the first thing in this whole project somebody could disagree with." },
+            { id: 'questions', label: "Write down the three questions you can't answer", fills: true,
+              artefact: "Three questions she can't answer yet, written where somebody can see them.",
+              line: "Now your supervisor's got something to be useful about." },
+            { id: 'ask',     label: 'Message the supervisor asking for a meeting', fills: true,
+              artefact: 'A message sent, and a meeting that now has to be answered.',
+              line: "Ten minutes, and the slowest-moving thing in the project is now moving." }
+        ];
+
+        let c5Panel = [], c5Used = new Set(), c5Locked = false;
+
+        function initCase5() { c5Render(); }
+
+        function c5Render() {
+            document.getElementById('c5-actions').innerHTML = C5_ACTIONS.map(a => `
+                <button class="action-card ${c5Used.has(a.id) ? 'used' : ''}" data-action="${a.id}" onclick="window.spendTenMinutes('${a.id}')">
+                    <span class="block text-[12.5px] font-bold text-gray-900 leading-snug">${a.label}</span>
+                    ${c5Used.has(a.id) ? '<span class="block text-[9.5px] font-bold uppercase tracking-widest text-gb-accent mt-1">tried it</span>' : ''}
+                </button>`).join('');
+
+            const panel = document.getElementById('c5-panel');
+            panel.classList.toggle('has-something', c5Panel.length > 0);
+            panel.classList.toggle('stamped', c5Locked);
+            panel.innerHTML = (c5Locked ? '<div class="day1-stamp">Day 1</div>' : '')
+                + (c5Panel.length
+                    ? c5Panel.map(id => `<div class="react-item">${C5_ACTIONS.find(a => a.id === id).artefact}</div>`).join('')
+                    : '<p class="panel-empty-note">Empty. Nothing here yet that somebody else could look at and answer.</p>');
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        window.spendTenMinutes = function(id) {
+            const a = C5_ACTIONS.find(x => x.id === id);
+            c5Used.add(id);
+            if (a.fills && !c5Panel.includes(id)) c5Panel.push(id);
+            if (window.sfx) a.fills ? window.sfx.success() : window.sfx.tick();
+
+            // Re-tapping reprints. Nothing here is a dead card.
+            const note = document.getElementById('c5-note');
+            note.textContent = a.line;
+            note.classList.remove('hidden');
+            c5Render();
+
+            if (!c5Panel.length) {
+                // Said plainly, not left for the student to work out.
+                window.setStep(5, 1, `Try another one. We need something on the right &mdash; ${c5Used.size} of ${C5_ACTIONS.length} tried so far.`, false);
+                return;
+            }
+            c5Complete();
+        };
+
+        function c5Complete() {
+            if (c5Locked) return;
+            c5Locked = true;
+            c5Render();
+            window.setStep(5, 1, 'There is something on the right. Tomorrow has something in it.', true);
+            window.teachSplit(5, 'Start with the thing that can be wrong', 'Three of those felt more responsible than the other three, and all three left you exactly where you started.',
+                "A bad paragraph on Monday beats a perfect plan, every time — because on Tuesday somebody can argue with it.", 'happy');
+            showReframe(5);
+            window.markReady(4);
+            saveProgress();
+        }
+
+        window.resetCase5 = function() {
+            clearPendingUI();
+            c5Panel = []; c5Used = new Set(); c5Locked = false;
+            document.getElementById('c5-note').classList.add('hidden');
+            document.getElementById('reframe-5').classList.remove('show');
+            window.setStep(5, 1, 'Pick one. Watch the panel on the right &mdash; that is the only part that matters tomorrow.', false);
+            c5Render();
+        };
+
+        /* The belief from Case 2, handed straight back on Case 6 with no correction attached
+           and nothing to answer it with. */
+        window.renderPressureBelief = function() {
+            const line = document.getElementById('case6-belief-line');
+            if (!line) return;
+            if (pressureBelief) {
+                const b = C2_BELIEFS.find(x => x.id === pressureBelief);
+                line.textContent = `You said pressure ${b.phrase} for you.`;
+            } else {
+                line.textContent = 'You did not say either way about pressure.';
+            }
+        };
+    </script>
+
+    <script>
+        /* Case 6's header is filled whichever way the student arrives at it — Continue, the
+           Case menu, or a restored session. playPageIntro() is where all three paths meet, so
+           the module hooks it and hands the text straight back: Jodi's copy is never touched. */
+        window.pageIntroText = function(pageIndex, defaultText) {
+            if (pageIndex === 5) window.renderPressureBelief();
+            return defaultText;
+        };
+    </script>
+    <script>
+        /* ===================== CASE 6: RATING + HANDOFF ===================== */
+        let selectedStars = 0;
+        window.selectCaseRating = (stars) => {
+            selectedStars = stars;
+            document.querySelectorAll('.star-btn').forEach(btn => {
+                const val = parseInt(btn.dataset.star);
+                btn.classList.toggle('text-amber-400', val <= stars);
+                btn.classList.toggle('text-gray-300', val > stars);
+            });
+            if (window.sfx) window.sfx.tick();
+            document.getElementById('case6-submit-btn').classList.remove('hidden');
+        };
+
+        // Shown when the student reaches it, whether or not they rated. Idempotent: Submit
+        // and Skip both funnel through here. This does NOT couple completion to the rating —
+        // logModuleCompletion() fires from advanceFromPage() on reaching Case 6, untouched.
+        let _agRated = false;
+        window.revealCompletion = () => {
+            const rating = document.getElementById('case6-rating');
+            const reveal = document.getElementById('case6-reveal');
+            if (!reveal || !reveal.classList.contains('hidden')) return;
+            if (rating) rating.classList.add('hidden');
+            reveal.classList.remove('hidden');
+            if (window.lucide) window.lucide.createIcons();
+            try { reveal.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* ignore */ }
+            if (window.AuthCore && window.AuthCore.saveModuleProgress) {
+                window.AuthCore.saveModuleProgress('the-cost-of-later', { rated: _agRated });
+            }
+            if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+                window._agSaveOffered = true;
+                setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
+            }
+        };
+
+        window.finalizeCaseRating = () => {
+            if (!selectedStars) { if (window.sfx) window.sfx.tick(); return; }
+            const feedbackText = document.getElementById('case6-feedback-text')?.value || '';
+            if (window.AuthCore && window.AuthCore.submitCourseFeedback) {
+                window.AuthCore.submitCourseFeedback({ gameName: 'The Cost of Later', rating: selectedStars, feedback: feedbackText });
+            }
+            if (window.sfx) window.sfx.success();
+            _agRated = true;
+            setTimeout(() => { window.revealCompletion(); }, 400);
+        };
+
+        window.launchRoomToThinkChallenge = () => { window.location.href = '/educational-games/room-to-think/'; };
+        window.returnToLabPack = () => { window.location.href = '/jsh/room-to-think-lab/'; };
+        // Relative on purpose: an absolute production URL would throw a student off a
+        // preview channel and onto the live site.
+        window.handleSystemExit = () => { window.location.href = '/dashboard/'; };
+        window.closeSystemMenu = () => {
+            document.getElementById('system-menu-modal').classList.add('hidden-modal');
+            document.getElementById('system-menu-modal').classList.remove('visible-modal');
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) window.lucide.createIcons();
+            // Retry ladder — a missing icon fails silently, so this stays even though the
+            // library is served locally.
+            [100, 400, 1000, 2000].forEach(delay => { setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay); });
+            window.addEventListener('load', () => { if (window.lucide) window.lucide.createIcons(); });
+
+            const startup = document.getElementById('startup-screen');
+            if (startup) {
+                let startupTriggered = false;
+                const handleStartup = async () => {
+                    if (startupTriggered) return;
+                    startupTriggered = true;
+                    if (window.sfx) window.sfx.powerOn();
+                    startup.style.opacity = '0';
+                    setTimeout(() => { startup.style.display = 'none'; }, 700);
+                    // Guest-first: nobody signs in to start anything.
+                    await window.AuthGate.startGuestSession();
+                };
+                startup.addEventListener('click', handleStartup);
+
+                // NOT `const unsub = ...` — a synchronous callback would hit the TDZ before
+                // unsub exists. See docs/goodblock-integration-checklist.md.
+                if (window.AuthCore && window.AuthCore.skipPowerUp) {
+                    let unsub;
+                    unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => { unsub(); handleStartup(); });
+                }
+            }
+
+            document.getElementById('home-toggle').addEventListener('click', () => {
+                document.getElementById('system-menu-modal').classList.remove('hidden-modal');
+                document.getElementById('system-menu-modal').classList.add('visible-modal');
+            });
+            document.getElementById('menu-toggle').addEventListener('click', () => window.openCaseMenu());
+
+            const feedbackBox = document.getElementById('case6-feedback-text');
+            if (feedbackBox) {
+                feedbackBox.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.finalizeCaseRating(); }
+                });
+            }
+
+            const avatarEl = document.querySelector('.jodi-avatar');
+            if (avatarEl) {
+                avatarEl.setAttribute('title', "Tap Jodi to re-read what she said");
+                avatarEl.addEventListener('click', () => window.recallJodi());
+            }
+
+            initCase2();
+            initCase3();
+            initCase4();
+            initCase5();
+            window.renderPressureBelief();
+
+            window.renderLocks();
+            window.playPageIntro(0);
+        });
+
+        window.restartModule = () => {
+            highestUnlocked = 0;
+            pageCompletion = { 0: true, 1: false, 2: false, 3: false, 4: false, 5: true };
+
+            // Each Case's own reset restores its own DOM, including the Case 2 belief — a
+            // restart is the student walking in again, so what they walked in believing goes
+            // back to being unrecorded rather than carried over as a prior answer.
+            window.resetCase2();
+            window.resetCase3();
+            window.resetCase4();
+            window.resetCase5();
+
+            currentIntro = null; lastMechanism = null; lastSaid = null;
+            stashedReaction = null; jodiShowingIntro = true;
+            window.updateRecallButton();
+            document.querySelectorAll('.mobile-wb').forEach(b => b.classList.add('hidden'));
+            document.querySelectorAll('.reframe-box').forEach(r => r.classList.remove('show'));
+            document.getElementById('jodi-whiteboard').classList.remove('wb-populated');
+            document.getElementById('jodi-bubble').classList.remove('tucked');
+            for (let i = 2; i <= TOTAL_PAGES; i++) {
+                const prompt = document.getElementById(`continue-${i}`);
+                if (prompt) prompt.classList.remove('ready');
+            }
+
+            selectedStars = 0;
+            document.querySelectorAll('.star-btn').forEach(btn => { btn.classList.remove('text-amber-400'); btn.classList.add('text-gray-300'); });
+            document.getElementById('case6-submit-btn').classList.add('hidden');
+            document.getElementById('case6-feedback-text').value = '';
+            document.getElementById('case6-rating').classList.remove('hidden');
+            document.getElementById('case6-reveal').classList.add('hidden');
+
+            window.closeSystemMenu();
+            window.renderLocks();
+            window.playPageIntro(0);
+            document.getElementById('content-column').scrollTop = 0;
+            if (window.lucide) window.lucide.createIcons();
+            saveProgress();
+        };
+    </script>
+</body>
+</html>
