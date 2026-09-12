@@ -2949,6 +2949,12 @@
                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openAboutModal()">
                                 <i data-lucide="info" class="w-4 h-4 mr-3 text-slate-500"></i>About Us
                             </button>
+                            <!-- The navbar Home icon now steps back to the dashboard from
+                                 Profile/Admin instead of leaving the app, so this is the exit
+                                 to the public site — the capability Home used to carry alone. -->
+                            <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.location.href='/?home=1'">
+                                <i data-lucide="external-link" class="w-4 h-4 mr-3 text-slate-500"></i>Visit Homepage
+                            </button>
                             <div class="border-t border-slate-100 my-2"></div>
                              <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 text-red-600 font-bold flex items-center transition-colors uppercase" onclick="window.handleLogout()">
                                 <i data-lucide="log-out" class="w-4 h-4 mr-3"></i>Log Out
@@ -3390,8 +3396,6 @@
 
                 </div>
 
-            </div>
-
             <!-- 6. PROFILE PAGE (Dossier + Identity Editor + My Progress / Assigned to Me / Service Record) -->
             <div class="page" id="page-profile" style="display:none;">
 
@@ -3525,6 +3529,9 @@
                 </div>
             </div>
 
+            </div>
+
+
             <!-- ABOUT US MODAL -->
             <div id="about-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="closeAboutModal()">
                 <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
@@ -3652,11 +3659,13 @@
             // Home is a single tap now — no hidden hold-to-logout gesture. Logging out
             // stays reachable from the profile menu.
             //
-            // This is the one place in the app where the home icon means the PUBLIC
-            // homepage rather than the dashboard: the student is already on their
-            // dashboard, so "home" can only mean allgoodacademy.com. Everywhere else —
-            // both Lab Pack hubs, all seven GoodBlocks, both Challenges — the same icon
-            // brings them back HERE.
+            // The rule is the same one every other page in the app already follows —
+            // Home returns you one level toward the dashboard, and only exits to the
+            // public site once you're already there — it just didn't account for the
+            // dashboard itself gaining a second screen (Profile) when that shipped.
+            // On page-admin or page-profile, Home steps back to page-dashboard, same
+            // as their own "Back"/"Return to OS" controls. Only once page-dashboard is
+            // the one actually showing does Home mean allgoodacademy.com.
             //
             // ?home=1 is required, not decoration. public/index.html sends an account
             // holder (ag_account + ag_signed_in) straight back to /dashboard/, so a bare
@@ -3668,7 +3677,15 @@
             if(homeBtn) {
                 homeBtn.addEventListener('click', () => {
                     sfx.tick();
-                    window.location.href = '/?home=1';
+                    const adminPage = document.getElementById('page-admin');
+                    const profilePage = document.getElementById('page-profile');
+                    if (adminPage && adminPage.classList.contains('active')) {
+                        window.closeTeacherDashboard();
+                    } else if (profilePage && profilePage.classList.contains('active')) {
+                        window.closeProfileModal();
+                    } else {
+                        window.location.href = '/?home=1';
+                    }
                 });
             }
 
