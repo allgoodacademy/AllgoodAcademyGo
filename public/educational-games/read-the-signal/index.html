@@ -17,6 +17,14 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* Required by /js/identity-gate.js's injected #ag-modal, which shows/hides itself
+     purely by toggling these two class names (see open()/resolveAndClose() there) —
+     every other page loading the gate defines them itself; this page didn't, so the
+     modal had no defined hidden state at all. Copied verbatim from dashboard/index.html. */
+  .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+  .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+  .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
   :root {
     --teal: #357889;
     --orange: #D34716;
@@ -1734,7 +1742,11 @@ function showEnd(outcome) {
   // reveal above, and declining hides nothing.
   if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
     window._agSaveOffered = true;
-    setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
+    setTimeout(() => {
+      window.AuthGate.offerSave().catch((e) => console.error('[ReadTheSignal] offerSave failed', e));
+    }, 1200);
+  } else if (!window.AuthGate) {
+    console.warn('[ReadTheSignal] window.AuthGate not available — identity-gate.js may have failed to load.');
   }
 }
 
