@@ -24,10 +24,19 @@
    merely absent: this page only redirects when ag_signed_in is present, and that is
    exactly the condition under which /dashboard/ does not redirect back.
 
+   ?home=1 is the one exception, and it is the mirror of the ?signin=1 exception on
+   /dashboard/'s own guard: it means a student pressed Home ON their dashboard and is
+   deliberately asking for the marketing site. Without it that button is dead for an
+   account holder — they would be bounced straight back to the page they just left.
+   The param stays in the URL on purpose, so a reload keeps them here rather than
+   yanking them to the dashboard a beat later. It only ever suppresses a redirect;
+   it grants nothing and gates nothing.
+
    Worst case the flags are stale, someone lands on the wrong page, and one click fixes
    it. No real content is gated on either. */
 (function(){
   try{
+    if(/[?&]home=1/.test(location.search))return; // student asked for this page from their dashboard
     if(localStorage.getItem('ag_account')==='1'&&localStorage.getItem('ag_signed_in')==='1'){window.__agRedirectingToDashboard=true;location.replace('/dashboard/');}
   }catch(e){/* storage blocked - just show the page */}
 })();
@@ -47,7 +56,12 @@
      location.replace() above does not stop the parser, so an account holder on their
      way to /dashboard/ would still fetch gtag.js and send a pageview for a page they
      never see. The flag skips both. A signed-out visitor — everyone this tag is
-     actually for — always takes the branch below. Same shape as the gated loader in
+     actually for — always takes the branch below. So does an account holder who
+     arrived via ?home=1, and that is correct: they asked for this page and are staying
+     on it, exactly like a visit to /about/ or /for-teachers/, which carry this same
+     public tag with no guard at all. Nothing about what is collected changes — this
+     page still loads no auth, no identity gate and no telemetry.js, so a hit here
+     cannot carry a learner identity. Same shape as the gated loader in
      dashboard/index.html; /about/ and /for-teachers/ need no guard and carry the
      stock snippet. */
   if (!window.__agRedirectingToDashboard) {
