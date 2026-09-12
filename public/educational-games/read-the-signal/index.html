@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Read the Signal — Allgood Academy</title>
+<!-- Shared identity module — see /js/auth-core.js. Loaded only for db/appId/auth
+     access so a signed-in visitor's Recruit Code can be attached to telemetry.
+     Deliberately NOT loading /js/identity-gate.js: this game has no login wall. -->
+<script type="module" src="/js/auth-core.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal: #357889;
+    --orange: #D34716;
+    --cream: #FBF6EE;
+    --dark: #0F1923;
+    --muted: #7A909F;
+    --safe: #2E7D52;
+    --safe-bg: #E8F5EE;
+    --sketchy: #B85C00;
+    --sketchy-bg: #FFF3E0;
+    --danger: #C0392B;
+    --danger-bg: #FDEAEA;
+  }
+
+  body {
+    font-family: Verdana, sans-serif;
+    background: var(--dark);
+    color: var(--cream);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  /* INTRO SCREEN */
+  #intro {
+    text-align: center;
+    max-width: 420px;
+  }
+
+  #intro h1 {
+    font-family: Georgia, serif;
+    font-size: clamp(2rem, 8vw, 3rem);
+    font-weight: 700;
+    color: var(--cream);
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  #intro h1 span { color: var(--orange); }
+
+  #intro p {
+    font-size: 0.95rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+
+  .start-btn {
+    background: var(--orange);
+    color: white;
+    border: none;
+    padding: 16px 40px;
+    font-family: Verdana, sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 50px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: transform 0.1s, opacity 0.1s;
+  }
+
+  .start-btn:hover { opacity: 0.9; transform: scale(1.02); }
+
+  .pill-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+  }
+
+  .pill-safe { background: var(--safe-bg); color: var(--safe); }
+  .pill-sketchy { background: var(--sketchy-bg); color: var(--sketchy); }
+  .pill-danger { background: var(--danger-bg); color: var(--danger); }
+
+  /* GAME SCREEN */
+  #game { display: none; width: 100%; max-width: 480px; }
+
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .score-display {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .score-display span {
+    color: var(--cream);
+    font-size: 1.1rem;
+  }
+
+  .lives {
+    display: flex;
+    gap: 6px;
+  }
+
+  .life {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--orange);
+    transition: opacity 0.3s;
+  }
+
+  .life.lost { opacity: 0.2; }
+
+  .progress-bar {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--teal);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  /* SIGNAL CARD */
+  .signal-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .signal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .signal-meta { flex: 1; min-width: 0; }
+
+  .signal-sender {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0F1923;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .signal-context {
+    font-size: 0.72rem;
+    color: #7A909F;
+    margin-top: 1px;
+  }
+
+  .signal-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+  }
+
+  .badge-dm { background: #E3F2FD; color: #1565C0; }
+  .badge-notif { background: #F3E5F5; color: #6A1B9A; }
+  .badge-app { background: #E8F5E9; color: #2E7D32; }
+  .badge-post { background: #FFF3E0; color: #E65100; }
+  .badge-email { background: #FCE4EC; color: #AD1457; }
+
+  .signal-body {
+    padding: 16px;
+    color: #1a1a1a;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .signal-body strong { color: #0F1923; }
+
+  .signal-detail {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #f8f8f8;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    color: #555;
+    line-height: 1.5;
+  }
+
+  /* CHOICE BUTTONS */
+  .choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .choice-btn {
+    padding: 18px 8px;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: Verdana, sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    transition: transform 0.1s, opacity 0.1s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  .choice-btn:hover { transform: scale(1.03); }
+
+  .choice-btn .icon { font-size: 1.4rem; }
+
+  .btn-safe {
+    background: var(--safe-bg);
+    color: var(--safe);
+    border-color: #c8e6c9;
+  }
+
+  .btn-danger {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: #ef9a9a;
+  }
+
+  .hint {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+
+  /* FEEDBACK */
+  .feedback-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,25,35,0.92);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .feedback-overlay.show { display: flex; }
+
+  .feedback-card {
+    background: var(--cream);
+    border-radius: 20px;
+    padding: 28px 24px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    animation: popIn 0.25s ease;
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .feedback-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .feedback-result {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--dark);
+  }
+
+  .feedback-result.correct { color: var(--safe); }
+  .feedback-result.wrong { color: var(--danger); }
+
+  .feedback-signal {
+    font-family: Georgia, serif;
+    font-size: 0.9rem;
+    color: #444;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    font-style: italic;
+  }
+
+  .next-btn {
+    background: var(--teal);
+    color: white;
+    border: none;
+    padding: 13px 32px;
+    border-radius: 50px;
+    font-family: Verdana, sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+  }
+
+  /* END SCREEN */
+  #end {
+    display: none;
+    text-align: center;
+    max-width: 420px;
+    width: 100%;
+  }
+
+  .end-score {
+    font-family: Georgia, serif;
+    font-size: clamp(3rem, 15vw, 5rem);
+    font-weight: 700;
+    color: var(--orange);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .end-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    margin-bottom: 24px;
+  }
+
+  .end-breakdown {
+    background: rgba(255,255,255,0.05);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.85rem;
+  }
+
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-label { color: var(--muted); }
+  .breakdown-val { font-weight: 700; color: var(--cream); }
+
+  .jodi-moment {
+    background: var(--teal);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .jodi-moment-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .jodi-moment-text {
+    font-family: Georgia, serif;
+    font-size: 0.95rem;
+    color: white;
+    line-height: 1.6;
+    font-style: italic;
+  }
+
+  .end-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .play-again-btn {
+    background: var(--orange);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 50px;
+    font-family: Verdana, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .lab-btn {
+    background: transparent;
+    color: var(--cream);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 14px;
+    border-radius: 50px;
+    font-family: Verdana, sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .wordmark {
+    font-family: Georgia, serif;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.2);
+    margin-top: 28px;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+
+<!-- INTRO -->
+<div id="intro">
+  <div class="pill-row">
+    <span class="pill pill-safe">SAFE</span>
+    <span class="pill pill-danger">NOT SAFE</span>
+  </div>
+  <h1>Read the <span>Signal.</span></h1>
+  <p>15 real scenarios. No reading required. Can you spot what's really going on?</p>
+  <button class="start-btn" onclick="startGame()">Start</button>
+  <p class="wordmark" style="margin-top:24px">Allgood Academy</p>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div class="hud">
+    <div class="score-display">Score <span id="scoreDisplay">0</span></div>
+    <div class="lives" id="livesDisplay"></div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+  </div>
+  <div class="signal-card" id="signalCard"></div>
+  <div class="choices">
+    <button class="choice-btn btn-safe" onclick="choose('safe')">
+      <span class="icon">✅</span>Safe
+    </button>
+    <button class="choice-btn btn-danger" onclick="choose('notsafe')">
+      <span class="icon">🚨</span>Not Safe
+    </button>
+  </div>
+  <div class="hint" id="hintText">What signal does this send?</div>
+</div>
+
+<!-- FEEDBACK -->
+<div class="feedback-overlay" id="feedbackOverlay">
+  <div class="feedback-card">
+    <span class="feedback-icon" id="feedbackIcon"></span>
+    <div class="feedback-result" id="feedbackResult"></div>
+    <div class="feedback-signal" id="feedbackSignal"></div>
+    <button class="next-btn" onclick="nextScenario()">Next signal →</button>
+  </div>
+</div>
+
+<!-- END -->
+<div id="end">
+  <div class="end-score" id="finalScore"></div>
+  <div class="end-label" id="endOutOf">OUT OF 10</div>
+  <div class="end-breakdown">
+    <div class="breakdown-row">
+      <span class="breakdown-label">Correct reads</span>
+      <span class="breakdown-val" id="endCorrect"></span>
+    </div>
+    <div class="breakdown-row">
+      <span class="breakdown-label">Strongest area</span>
+      <span class="breakdown-val" id="endStrongest"></span>
+    </div>
+    <div class="breakdown-row">
+      <span class="breakdown-label">Most missed type</span>
+      <span class="breakdown-val" id="endMissed"></span>
+    </div>
+  </div>
+  <div class="jodi-moment">
+    <div class="jodi-moment-label">HEY Y'ALL 💛 FROM JODI</div>
+    <div class="jodi-moment-text" id="jodiMoment"></div>
+  </div>
+  <div class="end-actions">
+    <button class="play-again-btn" onclick="restartGame()">Play again</button>
+    <button class="lab-btn" onclick="window.location.href='/jsh/digital-decisions-lab/'">Try the full Digital Decisions Lab →</button>
+  </div>
+  <div class="wordmark">Allgood Academy · Free for all learners, always.</div>
+</div>
+
+<script>
+// answer: 'safe' | 'not-safe' — binary, matching the two on-screen choices.
+// category: privacy | phishing | permissions | social | safe — used for the
+// end-screen breakdown and the Firestore telemetry categories map.
+const scenarios = [
+  {
+    id: "school-rewards-phishing",
+    sender: "SchoolRewards_Official",
+    avatar: "🎁",
+    avatarBg: "#FFF3E0",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Instagram · 2 minutes ago",
+    body: "Congrats! You've been selected for a <strong>$50 Amazon gift card</strong> as part of our Student Appreciation Program. Click the link below to claim before it expires in 24 hours.",
+    detail: "Link: amaz0n-student-rewards.co/claim?id=9182",
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Misspelled domain (amaz0n not amazon), unsolicited prize, 24-hour urgency — classic phishing signals."
+  },
+  {
+    id: "maya-netflix-login",
+    sender: "Maya Chen",
+    avatar: "M",
+    avatarBg: "#E3F2FD",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "iMessage · Just now",
+    body: "hey can I borrow your Netflix login? my sister's account got suspended and I just need to decompress",
+    detail: null,
+    answer: "not-safe",
+    category: "privacy",
+    feedback: "Sharing account credentials violates terms and means someone else has your password — even with a friend."
+  },
+  {
+    id: "spotify-permissions",
+    sender: "Spotify",
+    avatar: "🎵",
+    avatarBg: "#E8F5E9",
+    badge: "APP",
+    badgeClass: "badge-app",
+    context: "Permission request · Spotify app",
+    body: "<strong>Spotify would like access to:</strong>",
+    detail: "📍 Precise location (always)\n📷 Camera\n📂 All files on your device\n📬 Read your messages",
+    answer: "not-safe",
+    category: "permissions",
+    feedback: "A music app needs none of these. Location maybe — camera, files, and messages are a red flag."
+  },
+  {
+    id: "jordan-group-chat-screenshot",
+    sender: "Jordan T.",
+    avatar: "J",
+    avatarBg: "#F3E5F5",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "Group chat: Bio Project · 8:47 PM",
+    body: "wait did anyone see what Ms. Rivera said about Aaliyah today?? someone screenshot it before she deletes",
+    detail: null,
+    answer: "not-safe",
+    category: "social",
+    feedback: "Screenshotting and spreading extends someone's embarrassment beyond its original audience."
+  },
+  {
+    id: "it-support-phishing",
+    sender: "IT Support — Lincoln High",
+    avatar: "🔒",
+    avatarBg: "#FCE4EC",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "School email · Received 11:23 PM",
+    body: "Your account will be <strong>deactivated in 2 hours</strong>. Verify your identity.",
+    detail: "Reply with: Full name · Student ID · Current password",
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Real IT never asks for your password. 2-hour threat is a pressure tactic. Phishing."
+  },
+  {
+    id: "free-vpn-permissions",
+    sender: "Free_VPN_Secure",
+    avatar: "🛡",
+    avatarBg: "#E8EAF6",
+    badge: "APP",
+    badgeClass: "badge-app",
+    context: "App Store · Free · 4.1★ (12 reviews)",
+    body: "<strong>SecureVPN Free.</strong> No logs. Military-grade encryption.",
+    detail: "Permissions: Route all internet traffic through our servers",
+    answer: "not-safe",
+    category: "permissions",
+    feedback: "A free VPN routes your traffic through someone else's servers — they can see everything you do. Often sells your data."
+  },
+  {
+    id: "tyler-venmo-request",
+    sender: "Tyler Osei",
+    avatar: "T",
+    avatarBg: "#E0F2F1",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Snapchat · Opened · 3:14 PM",
+    body: "yo can you Venmo me $20? my mom's card got declined at lunch I'll pay you back Friday",
+    detail: null,
+    answer: "not-safe",
+    category: "privacy",
+    feedback: "Could be real — or someone who got into Tyler's account. Verify through a different channel before sending money."
+  },
+  {
+    id: "quizbowl-notification",
+    sender: "QuizBowl_Official",
+    avatar: "🏆",
+    avatarBg: "#FFFDE7",
+    badge: "NOTIF",
+    badgeClass: "badge-notif",
+    context: "Push notification · QuizBowl app",
+    body: "Your score from last week has been <strong>updated</strong>. Tap to review.",
+    detail: null,
+    answer: "safe",
+    category: "safe",
+    feedback: "Notification from an app you use, about something you did, no request for credentials. This is what safe looks like."
+  },
+  {
+    id: "coach-personal-number",
+    sender: "Unknown Number",
+    avatar: "?",
+    avatarBg: "#ECEFF1",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "iMessage · Not in contacts",
+    body: "Hi this is Coach Davis texting from my personal phone. We need everyone at practice 30 min early. Don't reply to the school email.",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Could be real — but asking to bypass the school email is the tell. Legitimate coaches don't need you to avoid official channels."
+  },
+  {
+    id: "tiktok-contacts-permission",
+    sender: "TikTok",
+    avatar: "🎵",
+    avatarBg: "#FCE4EC",
+    badge: "NOTIF",
+    badgeClass: "badge-notif",
+    context: "TikTok · Permission request",
+    body: "<strong>TikTok would like to access your contacts</strong> to help you find friends on TikTok.",
+    detail: "This will share your entire contact list with TikTok's servers.",
+    answer: "not-safe",
+    category: "privacy",
+    feedback: "Uploading your contacts shares your friends' data without their consent."
+  },
+  {
+    id: "priya-bereal-location",
+    sender: "Priya Nair",
+    avatar: "P",
+    avatarBg: "#F8BBD0",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "BeReal · 14 minutes ago",
+    body: "Finally done with AP Physics 🙃",
+    detail: "📍 Location tagged: Lincoln High School, Room 204",
+    answer: "not-safe",
+    category: "privacy",
+    feedback: "The tagged room number means anyone who finds her profile knows exactly where she is during the school day."
+  },
+  {
+    id: "canvas-lms-assignment",
+    sender: "Canvas LMS",
+    avatar: "📚",
+    avatarBg: "#E8F5E9",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: canvas@instructure.com",
+    body: "A new assignment has been posted in <strong>AP Language</strong>. Log in to Canvas to view details.",
+    detail: null,
+    answer: "safe",
+    category: "safe",
+    feedback: "Official domain, no request for credentials, no urgency. This is what a legitimate notification looks like."
+  },
+  {
+    id: "instacash-money-flip",
+    sender: "InstaCash_Fast",
+    avatar: "💸",
+    avatarBg: "#F9FBE7",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Instagram · New follower · Just messaged you",
+    body: "Hey! I'm running a money flip promotion. Send $10 via Cash App and I'll send back $50 in 2 hours. Limited spots ⏰",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Money flip scams are one of the most common ways teenagers lose money online. There is no promotion."
+  },
+  {
+    id: "dominic-old-screenshots",
+    sender: "Dominic Walsh",
+    avatar: "D",
+    avatarBg: "#E8EAF6",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "Group chat: Senior Trip Planning · 6:02 PM",
+    body: "lmaooo okay so I found the funniest thing — pulled receipts from 3 years ago 😭",
+    detail: "📎 [Attachment: Screenshot_2023.jpg]",
+    answer: "not-safe",
+    category: "social",
+    feedback: "Old screenshots being resurfaced rarely end well for whoever's in them. Ask what the intent is before you react."
+  },
+  {
+    id: "apple-id-phishing",
+    sender: "Apple ID",
+    avatar: "🍎",
+    avatarBg: "#ECEFF1",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: noreply@apple-id-security.net",
+    body: "Your Apple ID was used to sign in on a new device in <strong>Lagos, Nigeria</strong>. Click here immediately.",
+    detail: "apple-id-security.net (not apple.com)",
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "apple-id-security.net is not Apple. Apple uses apple.com. Classic phishing."
+  }
+];
+
+const jodiMoments = [
+  "The signal is almost always in the domain or the ask. Legitimate services don't redirect you to .co or .net versions of themselves — and they never need your password to help you.",
+  "Urgency is a design choice. When something needs you to act in the next 2 hours or lose everything — that's not a coincidence. That's the mechanic.",
+  "A permission is a contract. Every time you tap Allow, you're agreeing to something. Reading what you're agreeing to isn't paranoia — it's the move.",
+  "The signals you catch get faster to spot. The ones that get through are the ones that look exactly like the real thing. That's worth sitting with.",
+  "Being kind to your friends doesn't mean handing them your credentials. Those are different things."
+];
+
+const ROUND_SIZE = 10;
+const CATEGORY_LABELS = { privacy: 'Privacy', phishing: 'Phishing', permissions: 'Permissions', social: 'Social', safe: 'Safe reads' };
+
+let currentIndex = 0;
+let score = 0;
+let lives = 3;
+let round = [];
+let categoryStats = {};
+let scenarioLog = [];
+let correctCount = 0;
+
+// --- Telemetry (Ticket 3): one game_sessions document per completed session,
+// keyed to a per-tab sessionStorage UUID so replays in the same tab don't
+// collide and a closed tab starts fresh.
+function getSessionId() {
+  let id = sessionStorage.getItem('rts_session_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem('rts_session_id', id);
+  }
+  return id;
+}
+
+async function recordSession(outcome) {
+  try {
+    const AuthCore = window.AuthCore;
+    if (!AuthCore) return; // Firebase module failed to load — never block the game on telemetry.
+
+    const { getFirestore, collection, addDoc, serverTimestamp, Timestamp } =
+      await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+
+    // Firestore rules require an authenticated request (anonymous auth counts) —
+    // sign in silently, same as every other module on the site, so a first-time
+    // visitor who never touched the login gate still gets a session recorded.
+    let user = AuthCore.auth.currentUser;
+    if (!user) {
+      try { await AuthCore.silentSignIn(); } catch (e) { /* telemetry is best-effort */ }
+      user = AuthCore.auth.currentUser;
+    }
+
+    let recruitCode = null;
+    let studentId = null;
+    if (user && !user.isAnonymous) {
+      studentId = user.uid;
+    }
+    if (user) {
+      try {
+        const account = await AuthCore.getAccount(user.uid);
+        if (account && account.recruitCode) recruitCode = account.recruitCode;
+      } catch (e) { /* telemetry is best-effort */ }
+    }
+
+    const playedAt = new Date();
+    const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+    await addDoc(collection(AuthCore.db, 'game_sessions'), {
+      game: 'read-the-signal',
+      sessionId: getSessionId(),
+      recruitCode,
+      studentId,
+      playedAt: serverTimestamp(),
+      ttl: Timestamp.fromDate(ttl),
+      outcome,
+      scenariosPlayed: scenarioLog.length,
+      correct: correctCount,
+      wrong: scenarioLog.length - correctCount,
+      livesLost: 3 - lives,
+      categories: categoryStats,
+      scenarios: scenarioLog
+    });
+  } catch (e) {
+    // Never let a telemetry failure interrupt the game.
+    console.warn('Read the Signal telemetry write failed', e);
+  }
+}
+
+function startGame() {
+  round = [...scenarios].sort(() => Math.random() - 0.5).slice(0, ROUND_SIZE);
+  currentIndex = 0;
+  score = 0;
+  lives = 3;
+  correctCount = 0;
+  categoryStats = {};
+  scenarioLog = [];
+
+  document.getElementById('intro').style.display = 'none';
+  document.getElementById('end').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+  document.getElementById('endOutOf').textContent = 'OUT OF ' + ROUND_SIZE;
+  renderLives();
+  showScenario();
+}
+
+function renderLives() {
+  const el = document.getElementById('livesDisplay');
+  el.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const d = document.createElement('div');
+    d.className = 'life' + (i >= lives ? ' lost' : '');
+    el.appendChild(d);
+  }
+}
+
+function showScenario() {
+  const s = round[currentIndex];
+  document.getElementById('progressFill').style.width = (currentIndex / ROUND_SIZE * 100) + '%';
+  document.getElementById('scoreDisplay').textContent = score;
+
+  const card = document.getElementById('signalCard');
+  card.innerHTML = `
+    <div class="signal-header">
+      <div class="avatar" style="background:${s.avatarBg}">${s.avatar}</div>
+      <div class="signal-meta">
+        <div class="signal-sender">${s.sender}</div>
+        <div class="signal-context">${s.context}</div>
+      </div>
+      <span class="signal-badge ${s.badgeClass}">${s.badge}</span>
+    </div>
+    <div class="signal-body">
+      ${s.body}
+      ${s.detail ? `<div class="signal-detail">${s.detail.replace(/\n/g, '<br>')}</div>` : ''}
+    </div>
+  `;
+}
+
+function choose(pick) {
+  const s = round[currentIndex];
+  const pickAnswer = pick === 'safe' ? 'safe' : 'not-safe';
+  const correct = pickAnswer === s.answer;
+
+  if (!categoryStats[s.category]) categoryStats[s.category] = { played: 0, correct: 0 };
+  categoryStats[s.category].played++;
+  if (correct) categoryStats[s.category].correct++;
+
+  scenarioLog.push({ id: s.id, answer: s.answer, correct, category: s.category });
+
+  if (correct) {
+    score += 10;
+    correctCount++;
+  } else {
+    lives--;
+    renderLives();
+  }
+
+  showFeedback(correct, s.feedback);
+
+  if (lives <= 0) {
+    setTimeout(() => {
+      document.getElementById('feedbackOverlay').classList.remove('show');
+      showEnd('lives-lost');
+    }, 2000);
+    return;
+  }
+}
+
+function showFeedback(correct, feedbackText) {
+  document.getElementById('feedbackIcon').textContent = correct ? '✅' : '❌';
+  const result = document.getElementById('feedbackResult');
+  result.textContent = correct ? 'Good read.' : 'Missed the signal.';
+  result.className = 'feedback-result ' + (correct ? 'correct' : 'wrong');
+  document.getElementById('feedbackSignal').textContent = feedbackText;
+  document.getElementById('feedbackOverlay').classList.add('show');
+}
+
+function nextScenario() {
+  document.getElementById('feedbackOverlay').classList.remove('show');
+  currentIndex++;
+  if (currentIndex >= ROUND_SIZE) {
+    showEnd('completed');
+    return;
+  }
+  showScenario();
+}
+
+function showEnd(outcome) {
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('feedbackOverlay').classList.remove('show');
+  document.getElementById('end').style.display = 'block';
+
+  document.getElementById('finalScore').textContent = correctCount;
+  document.getElementById('endCorrect').textContent = correctCount + ' / ' + ROUND_SIZE;
+
+  const withAccuracy = Object.entries(categoryStats).map(([cat, s]) => [cat, s.correct / s.played, s]);
+  if (withAccuracy.length) {
+    const best = withAccuracy.slice().sort((a, b) => b[1] - a[1])[0];
+    const worst = withAccuracy.slice().filter(([, , s]) => s.played - s.correct > 0).sort((a, b) => a[1] - b[1])[0];
+    document.getElementById('endStrongest').textContent = CATEGORY_LABELS[best[0]] || best[0];
+    document.getElementById('endMissed').textContent = worst ? (CATEGORY_LABELS[worst[0]] || worst[0]) : 'None — clean read!';
+  } else {
+    document.getElementById('endStrongest').textContent = '—';
+    document.getElementById('endMissed').textContent = '—';
+  }
+
+  const jodi = jodiMoments[Math.floor(Math.random() * jodiMoments.length)];
+  document.getElementById('jodiMoment').textContent = '"' + jodi + '"';
+
+  recordSession(outcome);
+}
+
+function restartGame() {
+  document.getElementById('end').style.display = 'none';
+  startGame();
+}
+</script>
+</body>
+</html>

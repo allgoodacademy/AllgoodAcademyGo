@@ -271,6 +271,22 @@ service cloud.firestore {
       allow read, delete: if isAllowlistedAdmin();
     }
 
+    // NEW — Read the Signal telemetry (append-only, one doc per completed game
+    // session; see PROMPT-claude-code.md Ticket 3). Anonymous auth counts as
+    // authenticated, so a student who never touched the login gate can still
+    // have a session recorded. TTL purge on the `ttl` field is configured in
+    // Firebase console, not here.
+    match /game_sessions/{sessionDocId} {
+      allow create: if request.auth != null
+        && request.resource.data.game == 'read-the-signal'
+        && request.resource.data.keys().hasOnly([
+             'game', 'sessionId', 'recruitCode', 'studentId', 'playedAt', 'ttl',
+             'outcome', 'scenariosPlayed', 'correct', 'wrong', 'livesLost',
+             'categories', 'scenarios'
+           ]);
+      allow read, update, delete: if isAllowlistedAdmin();
+    }
+
     // 12. NEW — Collection-group reads for Insider. Rule #2 already lets the admin
     //     allowlist read any one user's subcollections, but a collectionGroup() query
     //     (every user's launches / game_scores / ... in ONE read, instead of one round

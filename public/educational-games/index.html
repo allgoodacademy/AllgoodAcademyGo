@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Games & Challenges — Allgood Academy</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#0F1923;
+  --dark-card:#1C2E3A;
+  --teal:#357889;
+  --teal-light:#4a9aad;
+  --orange:#D34716;
+  --cream:#FBF6EE;
+  --cream-dim:#e8e0d4;
+  --muted:#7A909F;
+  --safe:#2E7D52;
+  --safe-bg:#E8F5EE;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:Verdana,Geneva,sans-serif;
+  background:var(--cream);
+  color:var(--dark);
+  min-height:100vh;
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+
+/* ── NAV ── */
+nav{
+  position:sticky;top:0;z-index:100;
+  background:var(--dark);
+  padding:0 24px;
+  height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.nav-logo{
+  font-family:Georgia,serif;font-size:15px;font-weight:700;
+  color:white;letter-spacing:0.02em;text-decoration:none;
+}
+.nav-logo span{color:var(--teal)}
+.nav-links{display:flex;gap:4px;align-items:center}
+.nav-link{
+  font-size:12px;color:rgba(255,255,255,0.55);
+  text-decoration:none;padding:6px 12px;border-radius:6px;
+  transition:color 0.15s,background 0.15s;
+}
+.nav-link:hover{color:white;background:rgba(255,255,255,0.08)}
+.nav-link.active{color:white;background:rgba(255,255,255,0.1)}
+.nav-cta{
+  font-size:12px;font-weight:700;color:var(--dark);
+  background:var(--cream);border:none;padding:7px 16px;
+  border-radius:20px;cursor:pointer;text-decoration:none;
+  transition:opacity 0.15s;
+}
+.nav-cta:hover{opacity:0.85}
+
+/* ── HERO ── */
+.hero{
+  background:var(--dark);
+  padding:72px 24px 64px;
+  position:relative;overflow:hidden;
+}
+.hero-inner{max-width:960px;margin:0 auto;position:relative;z-index:2}
+
+/* radar pulse — the one motion */
+.radar{
+  position:absolute;right:5%;top:50%;
+  transform:translateY(-50%);
+  width:360px;height:360px;
+  opacity:0.06;
+  pointer-events:none;
+}
+.radar-ring{
+  position:absolute;inset:0;
+  border-radius:50%;
+  border:1.5px solid var(--teal);
+  animation:pulse 3s ease-out infinite;
+}
+.radar-ring:nth-child(2){animation-delay:1s}
+.radar-ring:nth-child(3){animation-delay:2s}
+.radar-dot{
+  position:absolute;top:50%;left:50%;
+  width:8px;height:8px;
+  border-radius:50%;background:var(--teal);
+  transform:translate(-50%,-50%);
+  opacity:0.8;
+}
+@keyframes pulse{
+  0%{transform:scale(0.3);opacity:0.8}
+  100%{transform:scale(1.5);opacity:0}
+}
+
+.hero-eyebrow{
+  font-size:11px;font-weight:700;
+  color:var(--teal);letter-spacing:0.1em;
+  margin-bottom:20px;
+  display:flex;align-items:center;gap:8px;
+}
+.hero-eyebrow::before{
+  content:'';display:block;
+  width:24px;height:1.5px;background:var(--teal);
+}
+.hero-h1{
+  font-family:Georgia,serif;
+  font-size:clamp(2.4rem,6vw,4rem);
+  font-weight:700;line-height:1.05;
+  color:white;margin-bottom:20px;
+}
+.hero-h1 em{color:var(--orange);font-style:normal}
+.hero-sub{
+  font-size:15px;color:rgba(255,255,255,0.5);
+  line-height:1.65;max-width:480px;margin-bottom:36px;
+}
+.hero-pills{display:flex;flex-wrap:wrap;gap:8px}
+.hero-pill{
+  font-size:11px;font-weight:700;
+  padding:5px 12px;border-radius:20px;
+  border:1px solid rgba(255,255,255,0.12);
+  color:rgba(255,255,255,0.45);
+  letter-spacing:0.04em;
+}
+
+/* ── MAIN LAYOUT ── */
+.page{max-width:960px;margin:0 auto;padding:0 24px 80px}
+
+/* ── SECTION HEADER ── */
+.sec-head{
+  display:flex;align-items:baseline;gap:12px;
+  padding:48px 0 20px;
+}
+.sec-title{
+  font-family:Georgia,serif;
+  font-size:1.4rem;font-weight:700;color:var(--dark);
+}
+.sec-count{
+  font-size:11px;font-weight:700;
+  color:var(--muted);letter-spacing:0.06em;
+}
+
+/* ── GAME CARD (hero card) ── */
+.game-card-hero{
+  background:var(--dark);
+  border-radius:20px;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:0;
+  margin-bottom:12px;
+  transition:transform 0.2s;
+}
+.game-card-hero:hover{transform:translateY(-2px)}
+.game-card-hero-body{padding:36px 36px 36px}
+.game-card-hero-visual{
+  width:200px;
+  background:var(--dark-card);
+  display:flex;align-items:center;justify-content:center;
+  font-size:72px;
+  position:relative;overflow:hidden;
+}
+.game-card-hero-visual::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at center,rgba(53,120,137,0.2) 0%,transparent 70%);
+}
+.game-tag{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:700;letter-spacing:0.06em;
+  padding:4px 10px;border-radius:20px;margin-bottom:14px;
+}
+.tag-game{background:rgba(211,71,22,0.2);color:#f08060}
+.tag-challenge{background:rgba(53,120,137,0.2);color:var(--teal-light)}
+.tag-new{background:rgba(211,71,22,0.9);color:white}
+.game-card-hero-title{
+  font-family:Georgia,serif;
+  font-size:1.8rem;font-weight:700;
+  color:white;line-height:1.1;margin-bottom:10px;
+}
+.game-card-hero-desc{
+  font-size:13px;color:rgba(255,255,255,0.5);
+  line-height:1.65;margin-bottom:24px;max-width:380px;
+}
+.game-meta{display:flex;gap:16px;margin-bottom:28px}
+.game-meta-item{
+  font-size:11px;color:rgba(255,255,255,0.35);
+  display:flex;align-items:center;gap:4px;
+}
+.game-meta-item svg{width:13px;height:13px;opacity:0.6}
+.play-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--orange);color:white;
+  border:none;padding:13px 28px;border-radius:50px;
+  font-family:Verdana,sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;text-decoration:none;
+  transition:opacity 0.15s,transform 0.1s;
+  letter-spacing:0.01em;
+}
+.play-btn:hover{opacity:0.9;transform:scale(1.02)}
+.play-btn svg{width:14px;height:14px}
+
+/* ── COMING SOON CARD ── */
+.coming-soon-card{
+  border:1.5px dashed rgba(53,120,137,0.25);
+  border-radius:16px;padding:24px 28px;
+  display:flex;align-items:center;gap:16px;
+  margin-bottom:12px;
+}
+.cs-icon{
+  width:48px;height:48px;border-radius:12px;
+  background:rgba(53,120,137,0.08);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;
+}
+.cs-info{}
+.cs-name{
+  font-family:Georgia,serif;font-size:1rem;font-weight:700;
+  color:rgba(15,25,35,0.4);margin-bottom:3px;
+}
+.cs-desc{font-size:12px;color:var(--muted)}
+.cs-badge{
+  margin-left:auto;
+  font-size:10px;font-weight:700;
+  padding:4px 10px;border-radius:20px;
+  background:rgba(53,120,137,0.08);
+  color:var(--teal);letter-spacing:0.05em;
+  flex-shrink:0;
+}
+
+/* ── CHALLENGE CARDS ── */
+.challenge-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:12px;
+}
+.challenge-card{
+  background:white;border-radius:16px;
+  padding:24px;
+  border:1.5px solid #e8e0d4;
+  text-decoration:none;color:inherit;
+  display:flex;flex-direction:column;
+  transition:border-color 0.2s,transform 0.15s;
+  position:relative;overflow:hidden;
+}
+.challenge-card::before{
+  content:'';position:absolute;
+  left:0;top:0;bottom:0;width:3px;
+  background:var(--orange);border-radius:3px 0 0 3px;
+}
+.challenge-card:hover{
+  border-color:#c8bfb3;transform:translateY(-2px);
+}
+.challenge-card-icon{
+  font-size:28px;margin-bottom:14px;
+}
+.challenge-card-name{
+  font-family:Georgia,serif;
+  font-size:1.05rem;font-weight:700;
+  color:var(--dark);margin-bottom:6px;
+}
+.challenge-card-desc{
+  font-size:12px;color:var(--muted);
+  line-height:1.6;flex:1;margin-bottom:18px;
+}
+.challenge-card-footer{
+  display:flex;align-items:center;
+  justify-content:space-between;
+}
+.challenge-card-meta{font-size:11px;color:var(--muted)}
+.challenge-cta{
+  font-size:11px;font-weight:700;
+  color:var(--teal);
+  display:flex;align-items:center;gap:4px;
+}
+.challenge-cta svg{width:12px;height:12px;transition:transform 0.15s}
+.challenge-card:hover .challenge-cta svg{transform:translateX(3px)}
+
+/* ── EDUCATOR STRIP ── */
+.edu-strip{
+  margin-top:56px;
+  background:var(--dark);
+  border-radius:20px;
+  padding:36px 40px;
+  display:flex;align-items:center;
+  justify-content:space-between;gap:24px;
+  flex-wrap:wrap;
+}
+.edu-strip-text{}
+.edu-strip-eyebrow{
+  font-size:11px;font-weight:700;color:var(--teal);
+  letter-spacing:0.08em;margin-bottom:8px;
+}
+.edu-strip-title{
+  font-family:Georgia,serif;font-size:1.3rem;font-weight:700;
+  color:white;margin-bottom:8px;
+}
+.edu-strip-desc{font-size:13px;color:rgba(255,255,255,0.45);line-height:1.6;max-width:480px}
+.edu-strip-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.08);
+  color:white;border:1px solid rgba(255,255,255,0.15);
+  padding:12px 24px;border-radius:50px;
+  font-family:Verdana,sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;text-decoration:none;white-space:nowrap;
+  transition:background 0.15s;
+}
+.edu-strip-btn:hover{background:rgba(255,255,255,0.14)}
+
+/* ── FOOTER ── */
+footer{
+  background:var(--dark);
+  padding:28px 24px;
+  text-align:center;
+}
+.footer-inner{max-width:960px;margin:0 auto}
+.footer-logo{
+  font-family:Georgia,serif;font-size:14px;font-weight:700;
+  color:rgba(255,255,255,0.3);margin-bottom:6px;
+}
+.footer-tagline{font-size:11px;color:rgba(255,255,255,0.2)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:680px){
+  .game-card-hero{grid-template-columns:1fr}
+  .game-card-hero-visual{display:none}
+  .game-card-hero-body{padding:28px 24px}
+  .hero{padding:48px 20px 40px}
+  .hero-h1{font-size:2rem}
+  .radar{display:none}
+  .edu-strip{padding:28px 24px}
+  .page{padding:0 16px 60px}
+  nav{padding:0 16px}
+  .nav-links .nav-link{display:none}
+}
+@media(max-width:480px){
+  .challenge-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Allgood<span>Academy</span></a>
+  <div class="nav-links">
+    <a href="/educational-games/" class="nav-link active">Games</a>
+    <a href="/for-teachers/" class="nav-link">For teachers</a>
+  </div>
+  <a href="/" class="nav-cta">Sign in</a>
+</nav>
+
+<section class="hero">
+  <div class="radar" aria-hidden="true">
+    <div class="radar-ring"></div>
+    <div class="radar-ring"></div>
+    <div class="radar-ring"></div>
+    <div class="radar-dot"></div>
+  </div>
+  <div class="hero-inner">
+    <h1 class="hero-h1">Play. <em>Practice.</em><br>Actually get better.</h1>
+    <p class="hero-sub">Games that teach by doing, not by telling. Free for every student — no account required to start.</p>
+    <div class="hero-pills">
+      <span class="hero-pill">No login required</span>
+      <span class="hero-pill">Any device</span>
+      <span class="hero-pill">Free for every learner</span>
+    </div>
+  </div>
+</section>
+
+<main class="page">
+
+  <!-- GAMES -->
+  <div class="sec-head">
+    <h2 class="sec-title">Games</h2>
+    <span class="sec-count">1 live · more coming</span>
+  </div>
+
+  <!-- Read the Signal — hero game card -->
+  <article class="game-card-hero">
+    <div class="game-card-hero-body">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <span class="game-tag tag-game">Game</span>
+        <span class="game-tag tag-new">New</span>
+      </div>
+      <h3 class="game-card-hero-title">Read the Signal</h3>
+      <p class="game-card-hero-desc">Safe or not safe? Real DMs, app permissions, emails, and group chats — no reading required. Just your instinct and a two-second call.</p>
+      <div class="game-meta">
+        <span class="game-meta-item">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+          2–5 minutes
+        </span>
+        <span class="game-meta-item">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l1.5 4.5H14l-3.7 2.7 1.4 4.3L8 11l-3.7 2.5 1.4-4.3L2 6.5h4.5z"/></svg>
+          Replayable
+        </span>
+        <span class="game-meta-item">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="12" height="8" rx="2"/><path d="M5 5V4a3 3 0 016 0v1"/></svg>
+          No account needed
+        </span>
+      </div>
+      <a href="/educational-games/read-the-signal/" class="play-btn">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 3l10 5-10 5V3z"/></svg>
+        Play now
+      </a>
+    </div>
+    <div class="game-card-hero-visual" aria-hidden="true">📡</div>
+  </article>
+
+  <!-- Coming soon -->
+  <div class="coming-soon-card">
+    <div class="cs-icon">🌀</div>
+    <div class="cs-info">
+      <div class="cs-name">The Rumor Mill</div>
+      <div class="cs-desc">Watch information spread. Decide what to share, what to stop, and what to verify first.</div>
+    </div>
+    <span class="cs-badge">Coming soon</span>
+  </div>
+
+  <!-- CHALLENGES -->
+  <div class="sec-head">
+    <h2 class="sec-title">Challenges</h2>
+    <span class="sec-count">2 live</span>
+  </div>
+
+  <div class="challenge-grid">
+    <a href="/educational-games/digital-decisions/" class="challenge-card">
+      <div class="challenge-card-icon">⚖️</div>
+      <div class="challenge-card-name">Digital Decisions Challenge</div>
+      <p class="challenge-card-desc">30 scenarios across all four Digital Decisions labs — social intelligence, privacy, digital citizenship, and professional brand. The capstone.</p>
+      <div class="challenge-card-footer">
+        <span class="challenge-card-meta">30 scenarios · ~25 min · Scored</span>
+        <span class="challenge-cta">
+          Start
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6h8M6 2l4 4-4 4"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a href="/educational-games/real-world-ready/" class="challenge-card">
+      <div class="challenge-card-icon">🌍</div>
+      <div class="challenge-card-name">Real World Ready Challenge</div>
+      <p class="challenge-card-desc">30 real-world situations covering conflict resolution, money as a skill, and reading the room socially. No right answers — just better ones.</p>
+      <div class="challenge-card-footer">
+        <span class="challenge-card-meta">30 scenarios · ~25 min · Scored</span>
+        <span class="challenge-cta">
+          Start
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6h8M6 2l4 4-4 4"/></svg>
+        </span>
+      </div>
+    </a>
+  </div>
+
+  <!-- EDUCATOR STRIP -->
+  <div class="edu-strip">
+    <div class="edu-strip-text">
+      <div class="edu-strip-eyebrow">For educators</div>
+      <div class="edu-strip-title">Assign it in 60 seconds.</div>
+      <p class="edu-strip-desc">Free teacher account gives you a live class roster, completion data, and scores across every game and challenge. Share one link. Students start immediately.</p>
+    </div>
+    <a href="/for-teachers/" class="edu-strip-btn">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 7h12M7 1l6 6-6 6"/></svg>
+      See how it works
+    </a>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">Allgood Academy</div>
+    <div class="footer-tagline">Free for all learners, always.</div>
+  </div>
+</footer>
+
+</body>
+</html>
