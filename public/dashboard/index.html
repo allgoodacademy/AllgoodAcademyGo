@@ -170,13 +170,19 @@
             { id: 'rwr-challenge', name: 'Real World Ready Challenge', category: 'challenge', pack: 'real-world-ready', url: '/educational-games/real-world-ready/',
               gameNames: ['Real World Ready Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
               badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
-            // Room to Think — the third Lab Pack. One GoodBlock live, three storyboarded and
-            // honestly coming soon on the hub. `topic` and `blurb` sit AFTER gameNames because
+            // Room to Think — the third Lab Pack, and complete: all four GoodBlocks are live
+            // and the hub has no coming-soon card left. `topic` and `blurb` sit AFTER gameNames because
             // scripts/check-modules.js parses id/name/category/pack/url/gameNames positionally
             // and stops matching if anything is inserted between them.
             { id: 'ten-voices-one-source', name: 'Ten Voices, One Source', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/ten-voices-one-source/',
               gameNames: ['Ten Voices, One Source'], topic: 'Checking a claim', blurb: 'Nine people said it. Two of them found out.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
+            { id: 'the-question-decides-the-answer', name: 'The Question Decides the Answer', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/the-question-decides-the-answer/',
+              gameNames: ['The Question Decides the Answer'], topic: 'How you ask', blurb: 'Ask it the other way and see what comes back.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             // 64 of 72 again — the same bar as the Real World Ready Challenge, both 88.9%.
+            { id: 'where-you-say-it', name: 'Where You Say It', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/where-you-say-it/',
+              gameNames: ['Where You Say It'], topic: 'Saying the hard thing', blurb: 'The same sentence lands four different ways.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
+            { id: 'the-cost-of-later', name: 'The Cost of Later', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/the-cost-of-later/',
+              gameNames: ['The Cost of Later'], topic: 'Starting early', blurb: 'The options run out before the deadline does.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'rtt-challenge', name: 'Room to Think Challenge', category: 'challenge', pack: 'room-to-think', url: '/educational-games/room-to-think/',
               gameNames: ['Room to Think Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
               badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
@@ -212,8 +218,8 @@
         // Every lab the Real World Ready Lab Pack holds (hub: public/jsh/real-world-ready-lab/).
         const RWR_PACK_PLANNED = ['Money as a Skill', 'Conflict Has a Winner', 'Reading the Room'];
         // Every lab the Room to Think Lab Pack will hold (hub: public/jsh/room-to-think-lab/).
-        // All four are storyboarded; one is built. The card's "4 labs planned • 1 live • 3
-        // coming soon" counter is derived from this array against the registry — never typed.
+        // All four are built. The card's "4 labs planned • 4 live" counter is derived from
+        // this array against the registry — never typed.
         const RTT_PACK_PLANNED = ['Ten Voices, One Source', 'The Question Decides the Answer', 'Where You Say It', 'The Cost of Later'];
         // One entry per Lab Pack card on this dashboard. A registry entry's `pack` ties it to
         // one of these; the card's counter, duration and status pill are all derived from the
@@ -2719,7 +2725,7 @@
                         <div onclick="window.launchCourse('Room to Think Challenge', '/educational-games/room-to-think/', this)"
                              class="mission-file status-active p-5 flex items-start gap-4 group">
                             <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center border border-rose-100 flex-shrink-0 group-hover:bg-rose-100 transition-colors shadow-sm">
-                                <span class="text-3xl emoji-badge">🔀</span>
+                                <span class="text-3xl emoji-badge">🧠</span>
                             </div>
                             <div class="flex-grow">
                                 <div class="flex justify-between items-start">
@@ -2740,7 +2746,7 @@
                              one-accent-four-icons rule Real World Ready follows. Counter / duration
                              / pill are all derived from MODULE_REGISTRY entries with
                              pack: 'room-to-think' — renderLabPackStatus() writes the counter, so
-                             the "4 planned • 1 live • 3 coming soon" text is never hardcoded. -->
+                             the "4 labs planned • 4 live" text is never hardcoded. -->
                         <div onclick="window.launchCourse('Room to Think Lab Pack', '/jsh/room-to-think-lab/', this)"
                              class="mission-file status-active p-5 flex items-start gap-4 group">
                             <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center border border-rose-100 flex-shrink-0 group-hover:bg-rose-100 transition-colors shadow-sm">

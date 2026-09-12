@@ -2,13 +2,14 @@
 
 **Status:** Awaiting sign-off — Instructional Designer / Curriculum & Learning Science. Reviewed by Veteran Teacher (IB MYP).
 **Authored:** 2026-09-12, against the live repo.
-**Build state:** 🟢 **AS BUILT (partial)** — reconciled 2026-09-12 against the staging build on
-`claude/new-session-f6ve19`. The hub, **Ten Voices, One Source** and the **full 24-scenario
-Challenge** are built. **The Question Decides the Answer**, **Where You Say It** and **The Cost
-of Later** are storyboarded in full below and are **not built** — they show as coming-soon on
-the hub and do not navigate. Everything in §9, §10 and §11 is therefore specification, not
-description. **This copy supersedes the one shipped with the first build**: it carries the three
-corrected counts and R9 (§13). See §15 for what changed between spec and build, and why.
+**Build state:** 🟢 **AS BUILT** — reconciled 2026-09-12 against the staging build on
+`claude/rtt-remaining-goodblocks`. The hub, **all four GoodBlocks** and the **full 24-scenario
+Challenge** are built. The hub carries four live cards and no coming-soon state; the dashboard
+counter derives to *4 labs planned • 4 live*. §§8–11 now describe what is on staging rather than
+what is planned. **Sections 5–13 of this copy were replaced wholesale with the bible-passed
+spec** shipped for the remaining-three sprint, so the dialogue quoted below is the dialogue in
+the build — with the exceptions named in §15. See §15 for every place the build and the spec
+differ, and why.
 **Authority:** This document is the single source both the Room to Think Challenge and all four GoodBlocks draw from. Per the GoodBlock Builder skill (Phase 1, item 0), when a Challenge and its labs are designed together the mapping is *authored* rather than discovered, and whichever is written first is authoritative. **The Challenge scenario map below is authoritative. GoodBlocks conform to it.**
 
 ---
@@ -205,7 +206,9 @@ Challenge entry carries `badgeThreshold: 64, maxScore: 72` and the `isComplete` 
 
 ## 6. Jodi — voice notes taken from the shipped modules
 
-There is still no bundled character bible. **The zip does not contain one** — `find . -iname "*bible*"` returns nothing and the only hits for "character bible" are three code comments. `/mnt/project/jodi-character-bible.md` remains the canonical file and the 🔴 backlog item *CI 6 — Bundle Jodi character bible into goodblock-builder skill* is still open at 💡 Idea.
+**The character bible is in this package** as `jodi-character-bible.md`, recovered by the founder on 2026-09-12. It had been missing from the skill, from the repo and from `/mnt/project`. **Commit it to `docs/jodi-character-bible.md` as part of this build** — it currently exists in one place and is not under version control, which is how it went missing the first time.
+
+Every Jodi line below has been checked against it.
 
 What this document *does* have is all seven shipped scripts. Every line below was written against them. What the evidence actually shows:
 
@@ -217,7 +220,18 @@ What this document *does* have is all seven shipped scripts. Every line below wa
 - **Case N sends the student off.** *"Go on now. Go be somebody's good day."* · *"Go make some good calls out there."* · *"Keep doing that."*
 - **Mood distribution runs far more `neutral` than the skill's target suggests.** Conflict Has a Winner is neutral on six of seven intros. Moods below follow the shipped pattern, not the reference doc's percentages; count at build and raise it with the Instructional Designer if it drifts.
 
-**These lines are still drafts.** They are now drafted against the product rather than against a description of it, which is a real improvement and not the same as a bible pass.
+### What the bible added that the shipped scripts alone did not
+
+Four things the seven scripts do not make obvious, and all four changed copy in this document:
+
+- **She is warm on contact.** Trust is the starting condition, not something a student earns. Openers aim warmth at *the student* rather than only narrating the scene.
+- **She never says wrong.** Every wrong-path line in this document was originally written as a correction and has been rewritten as a reframe — curiosity about the choice first, then a look at what else was on the table. Never shame, never a grade.
+- **She dishes it back.** Teasing is respect, not meanness. One volley per GoodBlock where the student earns it — §9 Case 3's is the strongest, because the tease *is* the lesson.
+
+> **⚠️ Write from the bible. Do not paste from it.** The sample lines in the bible exist to establish rhythm, and the first attempt at this pass lifted them verbatim into places they did not belong — a "come here a second" meant for pulling a kid aside after a wrong answer, dropped into a lesson opener; a "hotshot" that was a sample, not a word she has ever actually said in the product. That reads worse than not having the bible at all. Every line in this document is now written in her rhythm using its own words. **If a line here matches a bible sample word for word, it is a defect.**
+- **What actually bothers her is a wasted chance to do good** — someone who could have made it better for somebody else and didn't. That is her one line in the sand, and it is the beat every scenario is quietly testing. It now lands once per GoodBlock: the girl nobody thought to ask, the two people left guessing for a week, the supervisor who was willing and never got asked.
+
+**Not in this document, but real:** the bible calls callbacks load-bearing and asks for a continuity bank — a running record per student so later lessons can reference earlier ones. This pack uses in-GoodBlock callbacks only (`beliefThreshold`, `priorPosition`, `pressureBelief`). Cross-lesson continuity is a product capability nobody has scoped. Worth a backlog item.
 
 ### ⚠️ Resolved — the Case 1 problem
 
@@ -260,7 +274,7 @@ The RWR coverage map records an open objection: *the intro page is a syllabus �
 
 Screen: Yara's phone, mid-scroll, one post visible accusing a Year 9 student of taking money from the trip fund. Nothing interactive except Continue.
 
-> **Jodi (neutral):** "Well hey there. That's Yara, and that post has been in front of her for about nine seconds. Four moments today, and every one of them runs on the same little lie: if enough people are saying it, that's a lot of evidence. Let's go find out how much evidence there actually is."
+> **Jodi (neutral):** "Well hey there. That's Yara, and that post has been sitting in front of her about nine seconds now. Four moments today, and every one of them turns on the same little lie — that if enough people are saying a thing, it must add up to a lot of evidence. It doesn't. Let's go find out what it does add up to."
 
 Continue ↓ is available immediately. **No bullet list of what's coming.**
 
@@ -301,7 +315,7 @@ Continue ↓ is available immediately. **No bullet list of what's coming.**
 | Action | Result |
 |---|---|
 | Tap two cards sharing an origin | They stack into one, counter drops, line prints: *"Ruben told both of them. That's one person, twice."* |
-| Merge a pair that doesn't share an origin | Cards spring back, counter unchanged, line names why: *"Different origins. One saw it herself, one got it from Ruben. Keep them apart."* Jodi `thinking` |
+| Merge a pair that doesn't share an origin | Cards spring back, counter unchanged, line names why: *"Mm — hold those two apart a second. One of them saw it herself. One got it from Ruben. Different people finding out is not the same as one person repeating."* Jodi `thinking` |
 | Tap one card, tap it again | Deselects, with a visible state change |
 | Tap a stack | Expands to show members; second tap collapses. **Re-inspection is part of the task and must work** |
 | Reset ("Unstack them all") | Board returns to nine, counter to 9. **The repost counter in the corner keeps climbing through the reset** — do not rewind it |
@@ -311,7 +325,7 @@ Continue ↓ is available immediately. **No bullet list of what's coming.**
 **Completion confirmation.** The eight-stack dims, the single card lifts and brightens.
 
 > **Whiteboard — "Nine voices, two sources":** "Eight of those are Ruben wearing eight different names. The ninth is the only person who went and looked, and she's the one saying it didn't happen."
-> **Jodi (concerned → thinking):** "That's the bit that gets me, sugar. The one who checked is the quietest one on there."
+> **Jodi (concerned → thinking):** "That's the bit that gets me, sugar. The one person who actually went and looked is the quietest voice on that whole board — and not one of those nine thought to go ask the girl it's about."
 
 `concerned` here is at the situation, never at the student.
 
@@ -327,7 +341,7 @@ Same mechanic, different data. **Deliberate re-use inside the GoodBlock, because
 
 | Action | Result |
 |---|---|
-| Over-merging below 4 | Pair springs apart: *"The driver didn't read the notice. He got told at work. That's a second person finding out, not a second person repeating."* |
+| Over-merging below 4 | Pair springs apart: *"Now hold on, that one's different. The driver never read the notice — somebody told him at work. That's a second person finding out, and that counts."* |
 | Under-merging the three reposts | *"All three of these are the same notice with a different caption on top."* |
 | Deselect / re-inspect / reset | As Case 3 |
 
@@ -364,7 +378,7 @@ All five are available. Used cards stay visible in a used state and **re-tapping
 
 ### Case 6 — Rating and handoff
 
-> **Jodi (happy):** "So that's four moments. Nine voices and two sources, seven voices and four, and one question that was worth all the scrolling put together. Repeating is cheap and finding out costs something — that's why most of what you see is the cheap kind. Go on now. Go count something."
+> **Jodi (happy):** "So that's four moments — nine voices and two sources, six voices and four, and one little question worth more than all that scrolling put together. Here's the whole thing: repeating costs nothing and finding out costs something, which is exactly why most of what lands in front of you is the cheap kind. That's enough out of me today. Go on now — go count something."
 
 Star rating 1–5, selecting only selects, optional text field ≥16px, Submit appears on any star, Enter submits, Shift+Enter breaks. Visible **"Skip — show me the badge."**
 
@@ -383,7 +397,7 @@ Badge: `git-merge`, wine accent, **"6 scenarios completed."** Primary exit: the 
 
 Screen: a document titled *Should our school keep the uniform?*, due Friday, cursor blinking on an empty page.
 
-> **Jodi (neutral):** "Hey there. That's Tomás, that's due Friday, and he already knows what he thinks. So do you, probably — that's not the problem. Four moments today, and all four of them are about one thing: the internet is very good at agreeing with you."
+> **Jodi (neutral):** "Well hey there. That's Tomás, and that essay's due Friday — and I'll tell you right now, he already knows what he's going to say. Most folks do. We're not going to argue him out of it. We're just going to watch what happens when he goes looking, because the internet is *very* good at agreeing with you."
 
 ### Case 2 — What you already think
 
@@ -424,7 +438,7 @@ Screen: a document titled *Should our school keep the uniform?*, due Friday, cur
 **Completion confirmation.** A scorecard prints the three predictions side by side.
 
 > **Whiteboard — "You got better at guessing":** "By the third one you could see it coming."
-> **Jodi (thinking):** "Now — if you can call the answer before you've read a single word of it, what exactly did the searching add?"
+> **Jodi (thinking):** "Oh, look at you. Three for three. You're getting good at this — and I hate to tell you, that is not the compliment it sounds like. If you can call the answer before you've read a single word of it, what exactly did the searching do for you?"
 
 > **Design note:** the teaching is in the student's *improving accuracy*, which is why the predictions must appear as a set at the end and never as a running score. Adding a live score converts a realisation into a quiz. Do not add one.
 
@@ -442,7 +456,7 @@ Below it, a live results panel currently showing four one-sided cards, and a bal
 |---|---|
 | Tap a load-bearing word (*Why · should · finally · get rid of · pointless*) | Strikes through, question re-renders, **results panel recomposes live**, balance readout moves |
 | Strike all five | Leaves *"our school the uniform rule."* Panel flags **too broken to search**: *"Now it isn't a question. Put something back."* |
-| Over-strike a neutral word (*school*, *uniform*) | *"That one wasn't arguing. That's just what you're asking about."* The word un-strikes itself with a visible animation so it doesn't read as a bug |
+| Over-strike a neutral word (*school*, *uniform*) | *"Mm, I don't think that one's doing the arguing. That's just what you're asking about — put it back and try another."* The word un-strikes itself with a visible animation so it doesn't read as a bug |
 | Tap a struck word | Restores it, panel recomposes back. **Both directions must work** |
 | Rebuild row (appears once the five are struck) | Three endings, each showing what it returns. *"How do students feel about the uniform rule?"* is **deliberately still narrow** — returns only opinion, and the panel says so |
 | Reset ("Put the question back") | Original wording, original one-sided panel |
@@ -467,8 +481,8 @@ Covers Q6 — the same mechanism in a question you *write* rather than type.
 | Action | Result |
 |---|---|
 | Place a card | Slot fills, readout updates: *"5 of 5 from one question"* / *"3 from one, 2 from another"* / *"Spread across all three."* |
-| All five from one framing | Plain statement, not a rebuke: *"Every one of those was found by asking the same way. That's not five pieces of evidence — that's one search, five times."* **Does not pass** |
-| All five from the opposing framing | *"You've swung the other way and done exactly the same thing."* **Does not pass.** Over-correction is a different mistake and is not quietly rewarded |
+| All five from one framing | Plain statement, not a rebuke: *"Have a look at what you've got there. Every one of those turned up by asking the same way. That's not five pieces of evidence, sugar — that's one search, five times over."* **Does not pass** |
+| All five from the opposing framing | *"Oh, now you've swung the whole way round and done the exact same thing. Same trap, other side of it."* **Does not pass.** Over-correction is a different mistake and is not quietly rewarded |
 | Remove a card | Returns to pool, readout updates. Must respond |
 | Slot one of the two weak sources — an unsourced blog post from Run 1, a 14-person survey from one class in Run 2 | Names the weakness, then: *"You can use it. Just know what it is."* **They do not block completion. This is deliberate — do not turn it into a gate** |
 | Reset ("Clear the sheet") | Empties all five |
@@ -482,7 +496,7 @@ Covers Q6 — the same mechanism in a question you *write* rather than type.
 
 ### Case 6 — Rating and handoff
 
-> **Jodi (happy):** "Four moments. One guess you got too good at, five words, a sheet of sources and one question you'd already answered before you started. Here's the keeper: if you can guess what your search will say before you run it, you're collecting, not researching."
+> **Jodi (happy):** "Four moments — one guess you got a little too good at, five words, a sheet of sources, and one question you'd already answered before you started. Keep this one: if you can guess what your search is going to say before you run it, you're not researching, you're shopping. Go on now."
 
 Header shows `priorPosition` beside one question — *"Still your position?"* — with **no answer required and nothing scored.** Just the question, left open.
 
@@ -502,7 +516,7 @@ Rating, completion-write rule and exits as §8 Case 6. Badge: `scan-search`, **"
 
 Screen: a group chat, three days on the clock, one unanswered message from Inés — *"slides?"* — sent yesterday, no reply.
 
-> **Jodi (neutral):** "Alright. That's Inés, that's three days, and that message has been sitting there since yesterday afternoon. Four moments today. Every one of them she already knows what she wants to say — what she's choosing is where to say it, and it turns out that's the whole thing."
+> **Jodi (neutral):** "Hey there. That's Inés, that's three days on the clock, and that message has been sitting there since yesterday afternoon with no answer. Four moments today, and here's what I want you watching — she knows exactly what she wants to say every single time. All she's picking is where to say it, and that turns out to be the whole thing."
 
 ### Case 2 — The same words, three rooms
 
@@ -542,7 +556,7 @@ Three turns, three replies each. **Idris's response *is* the feedback. No meter,
 
 | Turn | Options | What happens |
 |---|---|---|
-| 1 | *"Where are the slides?"* / *"You said yesterday and we've got nothing — what happened?"* / *"It's fine, don't stress, whenever you can."* | Accusation → he defends, gives a reason, no commitment. **Question → he gives the real reason: he can't open the file format.** This branch unlocks everything downstream. Too-soft → thanks, nothing changes. Jodi `thinking`: *"Kind. Now nobody's got slides *and* nobody's asked for any."* |
+| 1 | *"Where are the slides?"* / *"You said yesterday and we've got nothing — what happened?"* / *"It's fine, don't stress, whenever you can."* | Accusation → he defends, gives a reason, no commitment. **Question → he gives the real reason: he can't open the file format.** This branch unlocks everything downstream. Too-soft → thanks, nothing changes. Jodi `thinking`: *"That was kind, and I mean that. It also means nobody's got slides *and* nobody's asked for any."* |
 | 2 | What to do with whatever he said | Strongest: an offer plus a time — *"I've got the file, I'll send you a PDF tonight — can you do the rest by tomorrow?"* |
 | 3 | Making it stick | Close with nothing / close with a time / close with a time **and** who tells the others |
 
@@ -578,8 +592,8 @@ Covers A2, A4.
 | Action | Result |
 |---|---|
 | Place a card | Result line prints immediately, for right and wrong alike |
-| Card 2 → *Nobody* | *"They're building around a deadline that just changed. That's not protecting him, that's leaving two people working blind."* |
-| Card 4 → *The group* | *"That's a verdict, not news. Three days isn't long enough to know that about somebody."* |
+| Card 2 → *Nobody* | *"Now, I don't think that's unkind — I think it's aimed at the wrong person. Those two are building around a deadline that just moved, and you've left them working blind."* |
+| Card 4 → *The group* | *"Mm. That's a verdict, not news. Three days is nowhere near long enough to decide that about somebody."* |
 | Move a placed card | Allowed, re-prints. **Not one-shot** |
 | Any card → **The teacher** | *"Not yet. Nothing here has failed yet."* Jodi `neutral`. **Correct for none of the four — deliberate.** The teacher becomes correct in Case 5 and the contrast is the teaching. **Do not add a fifth card to "balance the bins."** |
 | Reset | Clears all four |
@@ -588,7 +602,7 @@ Covers A2, A4.
 **Completion confirmation.** The group chat lights up with the two messages Inés actually sent, composed from cards 2 and 3.
 
 > **Whiteboard — "Private about the person, open about the work":** "Handling it quietly keeps the criticism between two people. It doesn't mean the other two find out on Friday."
-> **Jodi (happy):** "That's the line, and most folks never find it."
+> **Jodi (happy):** "That's the line, and most folks never find it. Two people could've been saved a whole week of guessing, and it cost her one message."
 
 Covers A6.
 
@@ -622,7 +636,7 @@ Covers A5.
 
 ### Case 6 — Rating and handoff
 
-> **Jodi (happy):** "Four moments. Three rooms and the same fourteen words, three messages, four things somebody needed to know, and one email. Here's the keeper: before you say the hard thing, ask who's going to be watching the other person hear it. If the answer's 'lots of folks,' you've just made it about them instead of about the thing. Go on now."
+> **Jodi (happy):** "Four moments — three rooms and the same fourteen words, three messages, four things somebody needed to know, and one email. Keep this one: before you say the hard thing, ask yourself who's going to be watching the other person hear it. If the answer's 'a whole lot of folks,' you've just made it about them instead of about the thing. That's enough out of me. Go on now — go be somebody's good day."
 
 Rating, completion-write rule and exits as §8 Case 6. Badge: `megaphone`, **"6 scenarios completed."**
 
@@ -639,7 +653,7 @@ Rating, completion-write rule and exits as §8 Case 6. Badge: `megaphone`, **"6 
 
 Screen: a finished project page, handed in, with a mark and two lines of comment on it. Nothing interactive but Continue.
 
-> **Jodi (neutral):** "That's Adaeze's, handed in on time, and there's nothing wrong with it. Four moments today, and they all come back to one thing near everybody believes: *I work better under pressure.* I'm not going to argue with you about it. I'm going to show you what it actually costs, and then you can decide."
+> **Jodi (neutral):** "Well hey there. Look at that — Adaeze's, handed in on time, and there is nothing wrong with it. Four moments today, and they all come back round to one thing near everybody believes: *I work better under pressure.* Now, I'm not going to argue with you about that. I'm going to show you what it costs and let you decide for yourself."
 
 ### Case 2 — Two versions, no labels
 
@@ -698,7 +712,7 @@ Screen: a finished project page, handed in, with a mark and two lines of comment
 **Completion confirmation.** The calendar draws the dependency lines between the placed sessions — the first time the student sees the shape as a structure rather than a list.
 
 > **Whiteboard — "You didn't run out of time":** "The late version had the same number of hours in it."
-> **Jodi (happy):** "What it didn't have was a Tuesday with a supervisor on it. That's the cost, sugar. Not hours. Options."
+> **Jodi (happy):** "What it didn't have was a Tuesday with a supervisor sat on it, ready and willing. That's the cost, sugar — not hours. Somebody wanted to help and never got asked."
 
 Covers L1, L2, L3, L5, L6.
 
@@ -763,7 +777,7 @@ Covers L4.
 
 ### Case 6 — Rating and handoff
 
-> **Jodi (happy):** "Four moments. Two pages and six tells, a calendar with three things gone grey, a notebook that could only answer one question out of four, and ten minutes. Starting late doesn't cost you hours — you can always find hours. It costs you the folks who could've helped, because they've all got calendars too. Start badly, start early. Go on now."
+> **Jodi (happy):** "Four moments — two pages and six tells, a calendar with three things gone grey on you, a notebook that could only answer one question out of four, and ten minutes. Starting late never costs you hours. You can always find hours. What it costs you is every single person who would've helped, because they've all got calendars too. Start badly, start early. Go on now."
 
 `pressureBelief` prints back with **no correction attached** — *"You said pressure [works / doesn't work] for you. Worth asking yourself again now."*
 
@@ -801,7 +815,7 @@ To be added to `references/storyboard-checklist.md` as **entries 29–43**, cont
 
 ## ⚠️ Open — must close before Phase 3
 
-**⚠️ F1 — The character bible.** Still not bundled, and **not in the uploaded zip.** Every Jodi line here is drafted against the seven shipped scripts, which is close but is not the same as a bible pass. The 🔴 backlog item *CI 6* is still open. **This is the only flag that blocks writing final copy.**
+**✅ F1 — CLOSED.** The character bible was recovered on 2026-09-12 and every Jodi line in this document has been checked against it. What it changed is recorded in §6. **One thing remains: commit it to `docs/jodi-character-bible.md` in this build.** It exists in exactly one place and is not in version control.
 
 **⚠️ F2 — Two icon names.** `scan-search` and `megaphone` must be checked against the live Lucide library before use. Guessing has failed silently twice in this codebase.
 
@@ -830,7 +844,7 @@ To be added to `references/storyboard-checklist.md` as **entries 29–43**, cont
 - [x] Character names verified clear across the library
 - [x] Every numeral in student copy traces to the coverage map
 - [ ] **Icons verified** — F2 open
-- [ ] **Jodi copy checked against the character bible** — F1 open
+- [x] **Jodi copy checked against the character bible** — done 2026-09-12
 - [ ] **Instructional Designer** — sign
 - [ ] **Curriculum & Learning Science** — sign
 
@@ -1103,14 +1117,16 @@ built as written.
 
 | Piece | Path | State |
 |---|---|---|
-| Lab Pack hub | `/jsh/room-to-think-lab/` | ✅ Built — five cards, one live, three coming-soon, ungated Challenge |
-| Ten Voices, One Source | `/jsh/room-to-think-lab/ten-voices-one-source/` | ✅ Built — 6 Cases, `TOTAL_PAGES = 6` |
+| Lab Pack hub | `/jsh/room-to-think-lab/` | ✅ Built — five cards, all live, no coming-soon state, ungated Challenge |
+| Ten Voices, One Source | `/jsh/room-to-think-lab/ten-voices-one-source/` | ✅ Built — 6 Cases, `TOTAL_PAGES = 6`, registry #29–31 |
+| The Question Decides the Answer | `/jsh/room-to-think-lab/the-question-decides-the-answer/` | ✅ Built — 6 Cases, registry #32–35 |
+| Where You Say It | `/jsh/room-to-think-lab/where-you-say-it/` | ✅ Built — 6 Cases, registry #36–39 |
+| The Cost of Later | `/jsh/room-to-think-lab/the-cost-of-later/` | ✅ Built — 6 Cases, registry #40–43 |
 | Room to Think Challenge | `/educational-games/room-to-think/` | ✅ Built — all 24 scenarios, 72 / 64 |
 | Tailwind bundle | `tailwind/room-to-think.config.js` → `public/assets/css/tailwind.room-to-think.min.css` | ✅ Built |
-| Dashboard wiring | `public/dashboard/index.html` | ✅ Built — Room to Think section, both cards |
-| The Question Decides the Answer | — | ⬜ Storyboarded (§9), deliberately not built |
-| Where You Say It | — | ⬜ Storyboarded (§10), deliberately not built |
-| The Cost of Later | — | ⬜ Storyboarded (§11), deliberately not built |
+| Dashboard wiring | `public/dashboard/index.html` | ✅ Built — Room to Think section, five registry entries |
+| Jodi character bible | `docs/jodi-character-bible.md` | ✅ Committed — it existed in exactly one place and was not under version control, which is how it went missing the first time |
+| Cross-lesson continuity bank | — | ⬜ **Not built, and out of scope.** §6 records that the bible asks for a running per-student record so later lessons can reference earlier ones. This pack uses in-GoodBlock callbacks only (`beliefThreshold`, `priorPosition`/`priorConfidence`, `pressureBelief`). Cross-lesson continuity is a product capability nobody has scoped; it is a backlog item, not a gap in this build |
 
 ## Deviations from the storyboard
 
@@ -1161,10 +1177,82 @@ were only borrowing the next card's. Each card now stands on its own.
 window: a second "Coming Soon" in the menu falls just inside the window of the live lab's own
 menu row, and the checker then reports Ten Voices, One Source as both live and coming soon.
 
+**D5 and D6 are both retired for this pack**, since there is no coming-soon card or closed menu
+row left on the hub. Kept on the record because the 400-character window is a property of
+`check-modules.js`, not of this pack, and the next hub that ships incomplete will hit it.
+The reasoning is repeated in the hub source next to the menu it used to apply to.
+
 **D7 — `playPageIntro` gained a general `window.pageIntroText(pageIndex, defaultText)` hook.**
 The chassis has `handoffPrefix()`, which only fires on the final Case. Case 5 has to quote the
 Case 2 number back by name and branch entirely when it was never set, so the hook was
 generalised rather than special-cased. One code path, used by Case 5 today.
+
+**D8 — §9 Case 3's tease carries the count the scorecard actually shows.** Her line is written
+*"Oh, look at you. Three for three…"*, which is only true when all three predictions landed. The
+scorecard prints directly above it, so a hard-coded numeral that contradicts the board is a
+defect under the bible's numerals rule. The count now tracks the board and **nothing else in the
+sentence moves**: three hits gets "Three for three", two gets "Two for three". Below two the
+tease has nothing to stand on, so she skips to the closing question, verbatim and unaltered.
+Marked in the source. Worth one ID decision if the founder would rather she said it regardless.
+
+**D9 — §9 Case 4's rebuild row also appears when the panel is already mixed.** The storyboard
+says the row appears "once the five are struck", and separately that the gate is *"the panel is
+no longer single-sided"* and that **any combination that neutralises it passes**. Those two
+cannot both hold: a student who neutralises the question on four strikes would have no way to
+reach the documented completion trigger, which needs a rebuild chosen. The row therefore appears
+on *either* condition. Nothing else about the gate changed.
+
+**D10 — §9 Case 4's other two rebuild endings are build-authored.** The storyboard gives three
+endings and writes only one of them out — *"How do students feel about the uniform rule?"*, the
+deliberately narrow one. The other two (*"What effect does the uniform rule have on students?"*
+and *"What does the research say about the uniform rule?"*) are authored to the pattern the
+section describes, each with a line saying what it returns. The narrow one passes, as specified,
+with the panel naming what it is: every source in it reports how somebody feels and none of them
+measured anything.
+
+**D11 — §9 Case 5's weakness sentences are build-authored; Jodi's waive-through is verbatim.**
+The storyboard says the weak sources "name the weakness, then: *'You can use it. Just know what
+it is.'*" The second half is hers, word for word. The first half — *"No author on it, no date,
+and six numbers that never say where they came from"* and *"Fourteen people, all in one class,
+all asked by their own classmate"* — is written here, because the section delegates it.
+
+**D12 — §10 Case 2's outside classmate says "y'all", at the founder's instruction.** The line
+in the class channel was *"what are you lot even presenting"* and is now *"what are y'all even
+presenting"*. Noted rather than silently applied because the pack is set in a British school and
+the register is slightly off for a Year 10 in one; it is also a **student's** line, not Jodi's,
+so the bible's never-write-out-a-drawl rule does not reach it. Founder's call, applied as given.
+
+**D13 — §11's calendar is twenty-one numbered days, and the greyed-session reason says "day N".**
+The storyboard's example reason reads *"The supervisor's last Tuesday is the 14th. Your draft
+won't exist until the 16th."* The build numbers the three weeks day 1 to day 21 with day 1 a
+Monday, so the three supervisor Tuesdays are days 2, 9 and 16 and the reason is generated from
+where the sessions actually sit — *"The supervisor's last Tuesday is day 16. Your draft won't
+exist until day 19…"*. Same sentence shape, real numbers, no calendar dates invented.
+
+**D14 — §11 Case 3's front-loading line computes its own idle-day count.** Her line is written
+*"You've also left ten days doing nothing"*. Ten is exactly right for the tightest front-load —
+the last session lands on day 11 of 21 — but a student can front-load loosely, and a hard-coded
+"ten" against a calendar showing something else is the same defect as D8. The count is read off
+the calendar. The canonical front-load still says ten, and the browser pass asserts that.
+
+**D15 — §11 Case 4's weak rewrites do not complete the Case.** The section's gate reads "both
+questions answered from a correct entry plus a rewrite chosen", and separately says the two weak
+options "add adjectives to the same non-content, and the panel says why that changes nothing".
+Completing on a weak rewrite would reward exactly what the Case is about, and the completion
+confirmation — *"the four entries re-order by usefulness, with the rewritten entry 1 now in the
+useful half"* — only makes sense for the strong one. A weak option prints its line and leaves the
+choice open. It is never marked wrong.
+
+**D16 — §11 Case 4 has two panels where the storyboard has one.** The section describes both an
+"empty result panel" for the query just made and an "answer box" that entry 3 "fills completely".
+Built as one box, an entry that returned nothing either wiped an answer already found or silently
+showed the stale one. They are two surfaces now: a result strip for what the last query returned,
+and the answer box holding what goes in the report.
+
+**D17 — §11 Case 3 allows more than one session on a day.** The section does not say either way.
+Front-loading has to be reachable and the seven sessions occupy nine day-slots, so days are not
+capacity-limited. A chip sitting on a day is tappable to pick that session back up — unless
+something is already in hand, in which case the tap is a placement (see F-11).
 
 ## Defects found during verification, and fixed
 
@@ -1196,10 +1284,64 @@ the six-card correction in both the spoken line and the badge blurb. Both now re
 and four", and the bible checker asserts every count Jodi says against the real on-screen card
 counts so this cannot drift silently again.
 
+**F-7 (hub, browser pass) — Where You Say It shipped live but filed under "Still to come".**
+The card was complete, marked Ready and navigated correctly; it was sitting inside the
+*Still to come* section on the hub, under that heading. Introduced when the live cards were split
+away from the unbuilt ones to keep each coming-soon pill clear of its neighbours (D5). Caught by
+a new assertion that reads the section a card is in, not just the card. Both the live grid and
+the "Still to come" section are now checked for membership, and the section is gone entirely now
+that the pack is complete.
+
+**F-8 (§9 Case 3, browser pass) — a new search closed every result card the student had open.**
+Each search re-rendered all three runs, so expanding a Run 1 result and then running Run 3 shut
+it again. The section is explicit that re-opening an earlier result must work at any time,
+because re-reading to compare *is* the task. Expanded state now lives outside the render, keyed
+by source rather than by Case, so a source opened in Case 3 is open in Case 4 as well.
+
+**F-9 (§11 Case 3, browser pass) — arming a session and tapping an occupied day picked up the
+wrong one.** A placed session's chip sits on top of its day cell and its tap meant "pick this
+back up". With another session already in hand, tapping that day swapped which session was held
+and silently discarded the arming. A chip tap is now a placement when something is armed, and a
+pick-up only when nothing is.
+
+**F-10 (§11 Case 4, browser pass) — an empty result was overwritten by its own re-render.**
+`queryEntry` set the box to *"Nothing in here about why."* and then called the render, which put
+*"Nothing yet. Ask an entry."* straight back over it: an entry that answered nothing looked
+exactly like an entry nobody had asked. Fixed by D16's two-panel split.
+
+**F-11 (verification harness) — four checks were passing by not looking.** Each was corrected,
+not relaxed, and each correction was run against deliberately-broken copies of the build to prove
+it still fails:
+  - the static layer's structural pass ran over the **first** GoodBlock only, so the second, third
+    and fourth shipped with nothing checking their page count, badge, icon pairing or completion
+    write. It loops over every live GoodBlock now;
+  - the same layer asserted "advanceFromPage clears pending timers" by grepping for a **comment**
+    that only the first GoodBlock carries. It reads the function body;
+  - `bible-check`'s line extractor matched only single-quoted `sayJodi` arguments and one
+    one-line `teachSplit` shape. The two GoodBlocks written after it quote her in double quotes
+    and template literals across several lines, so most of their spoken copy was never checked —
+    it reported six lines for a module with sixteen. Arguments are parsed quote- and paren-aware
+    now, and the pass covers 16 lines in §9 and 12 in §11;
+  - `bible-check`'s load-bearing-callback rule was hardcoded to Ten Voices' two variable names,
+    so every other GoodBlock warned whatever it did.
+
+**F-12 (verification harness) — three checks were hardcoded to a moment in the sprint.** The
+dashboard counter check expected "1 live • 3 coming soon"; its prove-it-is-derived probe added a
+lab, which stops meaning anything once four of four planned are live; the hub browser pass
+expected the unbuilt labs to refuse navigation by name. All three derive from the arrays and the
+hub now. A checker that has to be edited every time a lab ships is not checking anything.
+
+Three checker findings were investigated and the **copy was kept**, because the check was wrong
+rather than the line: a token-level `wrong` match on Jodi's *"Nothing wrong with that number"*
+(her explicitly refusing to judge), the same on *"here's where folks get it wrong"* (a
+generalisation about people, not a verdict on the student), and a `right answer` match on §9
+Case 2's *"There is no right answer here"* — the most on-spec sentence on that page. Each check
+was narrowed to the shape of the violation rather than loosened away from it.
+
 ## Do-not-undo, carried forward
 
-These four look like bugs to a fresh reader and are load-bearing. All four are verified in the
-build and asserted by the verification suite.
+These look like bugs to a fresh reader and are load-bearing. Every one is verified in the build
+and asserted by the verification suite.
 
 1. **GB1 Case 3's repost counter keeps climbing through the reset.** Reset unstacks the board;
    it does not rewind the ticker. Rewinding it removes the only pressure the Case has. Asserted
@@ -1211,8 +1353,37 @@ build and asserted by the verification suite.
 3. **GB1 Case 4's honest answer is four, not one.** The Case exists so that over-merging is
    scoreable as wrong. Asserted in the simulated pass (4 is reachable only by fully merging the
    notice group).
-4. **The three unbuilt GoodBlock cards do not navigate.** Not a missing link. Asserted in the
-   browser pass by clicking each one and checking the URL did not change.
+4. **~~The three unbuilt GoodBlock cards do not navigate.~~** Retired: all four GoodBlocks are
+   live and the hub has no coming-soon card left. The assertion survives in a derived form — any
+   card marked coming-soon must not navigate, and any card marked live must — so it will hold
+   again the next time a pack ships incomplete.
+5. **§9 Case 3 has no live scoreboard, and must not get one.** No running tally, no hit count, no
+   meter. The three predictions appear together once, at the end. The storyboard's design note is
+   explicit that a live score converts a realisation into a quiz. Asserted in the simulated pass
+   (every reference to a hit count must sit inside the completion function) and in the browser
+   pass (nothing on screen may read like a score while runs remain).
+6. **§9 Case 4's neutral words un-strike themselves, with an animation.** Not a dead tap and not
+   a rejected input: the word strikes, springs back and says which one put itself back. Asserted
+   in the browser pass by reading the class on and off the element either side of the animation.
+7. **§9 Case 5's two weak sources pass.** They name what is thin about them and go on the sheet.
+   Turning them into a gate would teach source-quality triage, which is a different lesson and
+   not this one. Asserted in all three layers, including that a *passing* sheet can hold both.
+8. **§10 Case 4's teacher bin is correct for nothing**, and **§10 Case 5's class channel keeps
+   ticking through a reset.** Both unchanged from the previous reconciliation.
+9. **§11 Case 2 reveals all six tells on a wrong call.** The reveal is the teaching, not the
+   score, and the call is never marked right or wrong. Asserted by calling it wrong on purpose in
+   both the simulated and the browser pass and counting six lines.
+10. **§11 Case 3's all-late calendar still fits, and greys three sessions out.** That is the
+    demonstration, not a failure state, and the three that grey are exactly the three that needed
+    somebody else. They stay in the tray with their badges struck through — a vanished card
+    teaches nothing. Asserted in all three layers, including the computed `text-decoration` on
+    the badge as rendered.
+11. **§11 Case 4's "feeling behind" entry is evidence.** Useless for the first question,
+    load-bearing for the second. Asserted as a 2×4 grid in the simulated pass so it cannot
+    collapse back into a two-bin sort.
+12. **§11 Case 5's three preparation-shaped cards leave the panel empty on purpose**, each with
+    its own line, and the Case says plainly that it needs something on the right. Asserted in
+    both the simulated and the browser pass.
 
 Plus one introduced by the shuffle and fixed before ship:
 
@@ -1250,11 +1421,17 @@ notice and the honest number is three.
 
 ## Still open
 
-- **F1 — the Jodi character bible. CLOSED.** The bible is not on disk and `/mnt/project` is
-  still not mounted, but it exists in Notion as **"Jodi — Character Bible"** (under *Jodi Avatar
-  System — SVG States & Usage*) and was read from there. **Ten Voices, One Source has now had a
-  real bible pass**, checked line by line against what the bible actually states rather than
-  against a memory of her voice:
+- **F1 — the Jodi character bible. CLOSED, and now under version control.** It was missing from
+  the skill, from the repo and from `/mnt/project`; it was recovered from Notion ("Jodi —
+  Character Bible", under *Jodi Avatar System — SVG States & Usage*) and then supplied in the
+  remaining-three sprint package. **It is committed at `docs/jodi-character-bible.md` as part of
+  this build**, because existing in exactly one un-versioned place is how it went missing.
+
+  **All four GoodBlocks have now had a real bible pass** — 15 lines in §8, 16 in §9, 19 in §10,
+  12 in §11 — checked line by line against what the bible actually states rather than against a
+  memory of her voice. The dialogue in §§8–11 was entered **verbatim** from the bible-passed
+  spec; it was not re-interpreted from the bible at build time, which §6 records going wrong the
+  first time. The rules, and the result for every module:
 
   | Bible rule | Result |
   |---|---|
@@ -1263,7 +1440,9 @@ notice and the honest number is three.
   | Never *"anything that talks down"* | ✅ clean |
   | *"Warm on contact… she doesn't build up to liking you"* | ✅ opens "Well hey there", the bible's own sample opener |
   | Closing cadence — *"Go on now — go be somebody's good day"* | ✅ Case 6 closes "Go on now. Go count something." |
-  | *"Callbacks are load-bearing, not decorative"* | ✅ Case 5 quotes the student's own Case 2 number back by name, and branches when they never set one |
+  | *"Callbacks are load-bearing, not decorative"* | ✅ in §8 (Case 5 quotes the student's own Case 2 number back and branches when they never set one), §9 (`priorPosition` / `priorConfidence`), §11 (`pressureBelief`). ⚠️ **§10 has none** — its callbacks are narrative recaps, not the student's own stored answer handed back. Flagged, not papered over: the pass reports it as a warning against that module |
+  | Every numeral she says matches what the student saw | ✅ asserted against the real on-screen counts, which is what caught F-6 and drove D8 and D14 |
+  | *"If a line here matches a bible sample word for word, it is a defect"* (§6) | ✅ checked against all six sample lines in the bible; no verbatim paste, with the "Go on now" closing cadence exempted because the bible establishes it as a recurring signature rather than a sample |
 
   One line was examined closely and **kept**: *"Nothing wrong with that number."* A token-level
   reading flags it; the bible's actual rule is that she never tells a student their choice was
@@ -1280,5 +1459,21 @@ notice and the honest number is three.
   now render on `/dashboard/` and a full-page screenshot was captured for the side-by-side, but
   **this is a human judgement and has not been made.** If they read as a pair, take the wine
   darker; PB is shipped and does not move.
+- **Registry entries 29–43 are specified in §12 but not filed.** They belong in
+  `references/storyboard-checklist.md` per §12, and that file is part of the GoodBlock Builder
+  skill rather than this repository — there is no `references/` directory here. All fifteen are
+  written out in §12 with the two honest adjacency notes (#37 against #28, #40 against #27), so
+  they can be filed at the next skill repackage without re-deriving them.
+- **Cross-lesson callbacks and the per-student continuity bank — not built, deliberately.**
+  §6 records that the bible asks for a running record so later lessons can reference earlier
+  ones. Nobody has scoped it: it needs a storage shape, a privacy answer and a decision about
+  what happens to a student who plays the packs out of order. Every callback in this pack is
+  in-GoodBlock only. **Backlog item, raised rather than improvised.**
+- **F3 carried over: the six-card Case 4 provenance question above is now settled.** The founder
+  confirmed the merge logic as built — the reposts merge with each other, the gate stays at 4 —
+  so the build stands and no change was made. The wording question in the section above is still
+  worth an ID look, but it is not blocking.
 - **Instructional Designer** and **Curriculum & Learning Science** sign-off — unchanged, and not
-  closable in code.
+  closable in code. `scripts/check-invariants.js` reports `[standards] awaiting sign-off` on
+  every run for the two other packs' coverage maps; that violation is pre-existing, byte-identical
+  on `origin/main`, and not this build's.
