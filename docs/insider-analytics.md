@@ -36,7 +36,7 @@ the moments that matter. Steps per module:
 
 | Module | Step unit | Total |
 |---|---|---|
-| Digital Decisions Challenge | scenarios answered | 30 |
+| Digital Decisions Challenge | scenarios answered | 28 |
 | Jolene's Lemonade Challenge | pages reached | 19 |
 | Social Intelligence | cases reached | 7 |
 | Privacy & Security | cases reached | 6 |

@@ -44,7 +44,6 @@ const CHALLENGES = [
 // build job — but a NEW scenario added to either still has to pass, so they are checked and
 // their existing failures are listed as known debt instead of being hidden.
 const PRE_STANDARD = new Set([
-    'public/educational-games/digital-decisions/index.html',
     'public/educational-games/real-world-ready/index.html',
 ]);
 

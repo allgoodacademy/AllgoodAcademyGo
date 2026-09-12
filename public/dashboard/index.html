@@ -149,9 +149,12 @@
         // URLs are site-relative on purpose: an absolute production URL would throw a
         // student off a preview channel and onto the live site.
         const MODULE_REGISTRY = [
+            // v2: a score document without challengeVersion === 'dd-v2' is a v1 attempt — it
+            // still shows in ddcAttempts history (below) so a v1 badge is never hidden or
+            // deleted, but it no longer counts as a CURRENT completion/badge.
             { id: 'ddc', name: 'Digital Decisions', category: 'challenge', pack: 'digital-decisions', url: '/educational-games/digital-decisions/',
-              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 80,
-              badgeThreshold: 80, maxScore: 90, durationMinutes: 25 },
+              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 68 && d.challengeVersion === 'dd-v2',
+              badgeThreshold: 68, maxScore: 84, durationMinutes: 25 },
             { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/social-intelligence/',
               gameNames: ['Social Intelligence'], topic: 'Reading people', blurb: 'How a group read lands, and what it costs to get it wrong.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
             { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/privacy-security/',

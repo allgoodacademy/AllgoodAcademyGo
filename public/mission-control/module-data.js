@@ -16,635 +16,593 @@ export const MODULE_DATA = {
     ],
     "kind": "challenge",
     "indexBase": 1,
-    "stepsTotal": 30,
+    "stepsTotal": 28,
     "steps": [
       {
-        "title": "Your classmate posts a picture of your group project online without getting your permission. Question: What do you do?",
+        "title": "Jalen posted a photo of your group's finished project. Your name isn't on it and he didn't ask anybody first. Two people have already said it looks great.",
         "category": "social_intelligence",
         "choices": [
           {
-            "text": "Say nothing and ignore the post, hoping it will go away.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Post a mean comment on their picture telling them to take it down immediately.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Politely message them to ask them to take it down, explaining why you're uncomfortable.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          }
-        ]
-      },
-      {
-        "title": "You get into a heated debate with a stranger in the comments section of a social media post. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Use an 'I' statement to express your point of view calmly and then disengage from the conversation.",
+            "text": "Message Jalen and ask him to add everyone's names to the caption.",
             "score": 3,
             "effectiveness": "most-effective"
           },
           {
-            "text": "Use personal attacks to try and win the argument.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Say nothing and leave the conversation.",
+            "text": "Post your own photo of the project with all four names on it.",
             "score": 1,
             "effectiveness": "less-effective"
+          },
+          {
+            "text": "Comment under his post that he forgot to credit the group.",
+            "score": 0,
+            "effectiveness": "least-effective"
           }
         ]
       },
       {
-        "title": "You are applying for a job, and the company asks for your social media handles. Question: What do you do?",
+        "title": "You're three replies deep with a stranger under a post about your team. They've started bringing up things that have nothing to do with the post. You've got a good reply typed out.",
+        "category": "social_intelligence",
+        "choices": [
+          {
+            "text": "Close the app without sending it.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Send one calm reply making your point, then leave the thread.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Send it. You've been reasonable this whole time and they haven't.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "Someone in your grade posted a joke about a student in your class. The replies have gone well past jokes. There's about thirty of them.",
+        "category": "social_intelligence",
+        "choices": [
+          {
+            "text": "Report the post, then message the student it's about.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Reply telling everybody to stop.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Screenshot it and send it to your group chat so people know what he's like.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A classmate posted an answer on the class discussion board with a date that's clearly off. Six people have replied agreeing with him. The test is Friday.",
+        "category": "social_intelligence",
+        "choices": [
+          {
+            "text": "Reply on the board with the correction and where you found it.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Message him so the class doesn't watch him get corrected.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Reply on the board asking whether he actually read the chapter.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A friend has posted a picture of herself with the caption \"don't talk to me today.\" It's been up an hour. Nobody's replied.",
+        "category": "social_intelligence",
+        "choices": [
+          {
+            "text": "Send her one short message saying you saw it and you're around.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Do what the caption asks and leave her be.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Comment under the post asking what happened.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "Somebody's made an account using Rosa's name and her photos. It's posting insults about people at your school. Three of them are about people in your class.",
+        "category": "social_intelligence",
+        "choices": [
+          {
+            "text": "Tell Rosa, then tell a teacher or the counselor.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Report the account to the app and tell Rosa to report it too.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Post from your own account warning everybody the profile is fake.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "Two people in your project group chat are arguing about who was supposed to do the research. It's been twenty minutes. Nothing's been decided and the chat is where the work lives.",
+        "category": "social_intelligence",
+        "choices": [
+          {
+            "text": "Post a split of the remaining work in the chat and ask if that works.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Message each of them on the side to calm them down.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Back the one who's actually right so it ends.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A new app wants your full name, your birthdate and the town you live in before it'll let you in. None of it's marked optional. Everybody in your class already has it.",
+        "category": "privacy_security",
+        "choices": [
+          {
+            "text": "Don't make the account.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Fill it in properly, since it won't let you in otherwise.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Put in a fake name and birthdate so you can use it without giving up anything real.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A pop-up covers the page you were reading. It says your phone's infected and you have to install an app right now to fix it. There's a timer counting down in the corner.",
+        "category": "privacy_security",
+        "choices": [
+          {
+            "text": "Close the tab. Don't tap anything on the pop-up.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Show it to an adult before you touch it.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Tap it and follow the steps so the phone gets fixed.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A text from a number you don't know: \"Sorry, I think I've got the wrong number — but you seem cool. What's your name?\"",
+        "category": "privacy_security",
+        "choices": [
+          {
+            "text": "Block the number. Don't reply.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Reply and let them know they've got the wrong number.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Reply and ask who they are.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "You're making an account and the box wants a capital letter, a number and a symbol. You just want to get into the app.",
+        "category": "privacy_security",
+        "choices": [
+          {
+            "text": "String four unrelated words together, then add the capital and symbol to satisfy the box.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Build a short complicated one that ticks every rule.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Take the password you already use and add a number and a symbol to the end.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "Somebody you've never heard of has sent you a friend request. No mutual friends. The profile's got four photos and looks ordinary enough.",
+        "category": "privacy_security",
+        "choices": [
+          {
+            "text": "Leave the request sitting there, and while you're in settings check who can see your posts.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Leave the request and don't think about it again.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Accept, then message and ask how they know you.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A survey's promising a gift card for a brand you like. Halfway through it starts asking for your parents' names, their phone numbers, and roughly what they earn.",
+        "category": "privacy_security",
+        "choices": [
+          {
+            "text": "Close it, and tell a parent what it was asking for.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Close it and don't fill in another thing.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Finish it with made-up answers so nothing real goes in.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "You finish up on a library Chromebook and the bell rings. Your school account's still signed in and your files are open. The next class is already coming through the door.",
+        "category": "privacy_security",
+        "choices": [
+          {
+            "text": "Sign out before you go, even though it makes you late.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Shut the lid — it locks when it closes.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Leave it. It's a school device and everybody's account ends up on there anyway.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "Your teacher gave the class a website for the topic. You've found another one with far more on it. You've never heard of it and there's no author listed anywhere.",
+        "category": "digital_citizenship",
+        "choices": [
+          {
+            "text": "Search the site's name in a new tab and see what other sources say about it.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Stick to the site your teacher gave you.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Use the new one. More detail makes for a better project.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "You need a photo for your presentation. The best one came up in an ordinary image search. There's nothing on it saying whether you're allowed to use it.",
+        "category": "digital_citizenship",
+        "choices": [
+          {
+            "text": "Switch the search to images licensed for reuse and take one of those, with credit.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Track down the photographer and email them for permission.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Use it and credit it to the search engine you found it on.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "You want to post a drawing you found. It's signed with a username you don't recognize, and the account you found it on didn't make it either.",
+        "category": "digital_citizenship",
+        "choices": [
+          {
+            "text": "Reverse image search it, find the artist, and tag them.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Post it with \"credit to the artist\" in the caption.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Crop the signature out so the post looks cleaner.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "You need three facts for a science project. An AI chatbot gives you three, each with a source named underneath. The sources sound right.",
+        "category": "digital_citizenship",
+        "choices": [
+          {
+            "text": "Look up each source yourself before any of them goes in.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Check one of them as a spot check and use the others.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Use them. It named sources, which means it checked.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A friend's shared a fundraiser for a charity you've never heard of. Photos, a total raised, a link. Two people you know have already given.",
+        "category": "digital_citizenship",
+        "choices": [
+          {
+            "text": "Look the charity up before you donate or share.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Don't donate, don't share, and leave it be.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Share it. Your friend checked, and sharing costs nothing.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "Somebody in your game is using slurs in the voice chat. Two other players are answering back. The match has ten minutes left on it.",
+        "category": "digital_citizenship",
+        "choices": [
+          {
+            "text": "Mute and report them, then keep playing.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Leave the match.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Answer back so he doesn't get a free pass.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "A friend's posted a screenshot of a news headline you're fairly sure isn't real. It's been shared about forty times. The replies are angry.",
+        "category": "digital_citizenship",
+        "choices": [
+          {
+            "text": "Check whether the headline exists on the outlet's own site, then send your friend what you found.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Reply under the post saying it's fake.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Share it with \"is this real?\" so other people can check.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "You're applying for a summer program and the form asks for your social accounts. You've got one you made two years ago and haven't opened since.",
         "category": "professional_brand",
         "choices": [
           {
-            "text": "You curate your social media to reflect your professional goals and then share it.",
+            "text": "Read back through the old account yourself before you decide what goes on the form.",
             "score": 3,
             "effectiveness": "most-effective"
           },
           {
-            "text": "You delete all your social media accounts before giving them your handles.",
+            "text": "Delete the old account and put down only the current one.",
             "score": 1,
             "effectiveness": "less-effective"
           },
           {
-            "text": "You give them all your social media handles without reviewing them.",
+            "text": "Put down only the current one and leave the old one up.",
             "score": 0,
             "effectiveness": "least-effective"
           }
         ]
       },
       {
-        "title": "Your friend sends you a link to a 'free gift card' survey. It asks for your personal information, including your full name and address. Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Fill out the survey with your real information to get the reward.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Delete the message and warn your friend that it might be a scam.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Ask your friend if they have used it successfully and if it's safe.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You want to use a picture you found on Google for your school presentation. The picture is not labeled for reuse. Question: What do you do?",
-        "category": "digital_citizenship",
-        "choices": [
-          {
-            "text": "Search for the original creator and ask for permission.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Use the image anyway since it's on the internet and easy to find.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Use the image anyway and give credit to 'Google Images.'",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You see a post from your classmate making fun of another student. The comments are full of hateful remarks. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Report the post and privately message the person being bullied to offer support.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Like the post to fit in with your friends.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Comment on the post, telling everyone to stop being so mean.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You're taking an online class and your classmate posts something with a clear mistake. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Privately message your classmate with constructive feedback and offer to help.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Post a public comment correcting their mistake so everyone can learn.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Say nothing and ignore the mistake.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          }
-        ]
-      },
-      {
-        "title": "You receive a friend request on social media from a person you don't know. Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Ignore the request and review your privacy settings to make sure your profile is private.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Accept the request and then immediately send them a message asking who they are.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Accept the request; the more friends you have, the more popular you seem.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You're scrolling through social media, and a pop-up appears, claiming your phone has a virus and you need to download a special app to fix it. Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Show it to your parents or a trusted adult to get their opinion.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Close the pop-up and run a scan with your phone's built-in security software.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Immediately tap the pop-up and follow the instructions to get rid of the virus.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          }
-        ]
-      },
-      {
-        "title": "Your teacher has asked you to use a specific website for research, but you've found a different website that seems to have more information. You have never heard of this new website before. Question: What do you do?",
-        "category": "digital_citizenship",
-        "choices": [
-          {
-            "text": "Use both websites and check to see if the information is the same.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Use the new website because it has more information.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Stick to the website your teacher has provided because it is a reliable source.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          }
-        ]
-      },
-      {
-        "title": "You are creating a new account and are asked to create a new password. You're eager to start using the app. Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Use the same password you use for everything else because it's easy to remember.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Create a complex password with a mix of letters, numbers, and symbols that is unique to this account.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Use your birthdate or a simple name because it is easy to remember.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          }
-        ]
-      },
-      {
-        "title": "You notice your friend is constantly online and seems to be neglecting their schoolwork and other responsibilities. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Make a public post about how your friend needs to get off their phone.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Use an 'I' statement to express your concern to your friend privately.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Do nothing because it's their life and their choices.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You want to share a funny meme online. You found the meme on a popular page, but you don't know who created it. Question: What do you do?",
-        "category": "digital_citizenship",
-        "choices": [
-          {
-            "text": "Share the meme without a second thought.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Try to find the original creator and tag them in your post.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Add 'Credit to the creator' to your post.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You see a post online with a picture of a friend looking sad and a caption that says, 'Don't talk to me today.' Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Privately message them to ask if they're okay and offer to listen.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Do nothing. You don't want to bother them since they asked not to be talked to.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Leave a public comment asking if they're okay and what's wrong.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          }
-        ]
-      },
-      {
-        "title": "Two of your classmates in a group chat for a project start arguing about who should do what part of the project. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Try to mediate the conflict by suggesting a compromise or a new way of dividing the work.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Say nothing and let them work it out on their own.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Take a side and start arguing with one of them to help your friend win.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          }
-        ]
-      },
-      {
-        "title": "You're doing research for a history project and find a blog post with great information, but the author isn't a historian. Question: What do you do?",
-        "category": "digital_citizenship",
-        "choices": [
-          {
-            "text": "Use the information anyway because it's a good source.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Use the information but cite it as a blog post.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Cross-reference the information with at least two other, more reliable sources (like a university website or a verified encyclopedia).",
-            "score": 3,
-            "effectiveness": "most-effective"
-          }
-        ]
-      },
-      {
-        "title": "You are asked to review a new learning app for school and find a minor bug. Question: What do you do?",
+        "title": "An app your class uses just lost twenty minutes of your work. You've written a review that says exactly how that felt and you're one tap from posting it.",
         "category": "professional_brand",
         "choices": [
           {
-            "text": "Privately message the developers with a detailed, constructive report of the bug.",
+            "text": "Send the same information to the developers as a bug report.",
             "score": 3,
             "effectiveness": "most-effective"
           },
           {
-            "text": "Say nothing and hope the developers find the bug themselves.",
+            "text": "Post it. It's accurate and other people should know.",
             "score": 1,
             "effectiveness": "less-effective"
           },
           {
-            "text": "Leave a scathing review online, detailing all the bugs you found and how terrible the app is.",
+            "text": "Post it and tag the school account so they see it too.",
             "score": 0,
             "effectiveness": "least-effective"
           }
         ]
       },
       {
-        "title": "You see a post from your classmate that makes a joke about a sensitive topic, and some people in the comments are hurt by it. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Privately message your classmate, explaining why the post was hurtful and suggesting they take it down.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Do nothing because it's not your problem.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Leave a comment to tell the person who made the post that they should apologize.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          }
-        ]
-      },
-      {
-        "title": "You are creating a profile for a new app. It asks for your real name, birthdate, and where you live. Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Provide all the requested information because it's required to create an account.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Close the app and don't create an account.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Create an account with a fake name and birthdate to protect your privacy.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          }
-        ]
-      },
-      {
-        "title": "You are working on a group project with a classmate. You notice they are not doing their part and are just copying and pasting from Wikipedia. Question: What do you do?",
+        "title": "Your project partner's section is straight off Wikipedia, brackets still sitting in it. It's due in two days and your name's on it too.",
         "category": "professional_brand",
         "choices": [
           {
-            "text": "Privately message your classmate with a constructive message to tell them that you are worried about their work and offer to help.",
+            "text": "Tell him you're not handing it in like that, and offer to rewrite it with him.",
             "score": 3,
             "effectiveness": "most-effective"
           },
           {
-            "text": "Call them out in the group chat for being lazy and not doing their part.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Just do their work for them so you get a good grade.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You are asked to create a new password for a new social media account. You are asked to create a strong password, but you just want to get to the app. Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Use a simple password that is easy to remember, like 'password123'.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Use your school email address as your password.",
+            "text": "Hand it in and tell the teacher afterward which part wasn't yours.",
             "score": 1,
             "effectiveness": "less-effective"
           },
           {
-            "text": "Create a password that is complex and unique to this account.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          }
-        ]
-      },
-      {
-        "title": "You're in a group chat for a class project, and one of your classmates posts a private message that you sent them to the group chat. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Take a screenshot of the message and post it to social media to call out your classmate.",
+            "text": "Rewrite his section yourself so it's done.",
             "score": 0,
             "effectiveness": "least-effective"
-          },
-          {
-            "text": "Ask the person to delete the message and explain to them why it was wrong.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Tell the teacher and ask them to remove the classmate from the group.",
-            "score": 1,
-            "effectiveness": "less-effective"
           }
         ]
       },
       {
-        "title": "You are scrolling through social media, and you see a post from a friend that is promoting a fake charity. Question: What do you do?",
-        "category": "digital_citizenship",
-        "choices": [
-          {
-            "text": "Leave a comment on the post saying that the charity is fake.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Do nothing and ignore the post, so you don't hurt your friend's feelings.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Privately message your friend and explain to them why the charity is fake and why they should take the post down.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          }
-        ]
-      },
-      {
-        "title": "You are completing an online survey for a product you like. It asks for your parents' names, phone numbers, and income. Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Fill out the survey with your real information to get the reward.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Close the survey immediately and do not provide the information.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Fill out the survey with fake information.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You're playing a multiplayer video game and another player is being very aggressive and using offensive language in the chat. Question: What do you do?",
-        "category": "digital_citizenship",
-        "choices": [
-          {
-            "text": "Report the player's behavior to the platform's moderators and mute/block them.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Argue back with them and use your own insults to defend yourself.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Say nothing and leave the game immediately.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "A friend posts a picture of you online that you think is unflattering. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Politely message your friend and ask them to remove the picture, explaining how you feel.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Post a mean comment on their picture, telling them to take it down.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Ignore it and do nothing. You don't want to make things awkward.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You receive a message from an unknown number. It says, 'Hey, I think I have the wrong number, but you seem cool. What's your name?' Question: What do you do?",
-        "category": "privacy_security",
-        "choices": [
-          {
-            "text": "Block the number and don't respond.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          },
-          {
-            "text": "Reply and give them your name and a brief description of yourself.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Reply and say, 'I think you have the wrong number.'",
-            "score": 1,
-            "effectiveness": "less-effective"
-          }
-        ]
-      },
-      {
-        "title": "You're in a video meeting for an online class, and you see a classmate live-tweeting the lecture, making fun of the professor. Question: What do you do?",
+        "title": "During a live class, Cade's posting jokes about the teacher in a side chat he thinks six people can see. The screen share has been on the whole time.",
         "category": "professional_brand",
         "choices": [
           {
-            "text": "Do nothing; it's not your business.",
-            "score": 0,
-            "effectiveness": "least-effective"
-          },
-          {
-            "text": "Screenshot the tweets and send them to the professor to get your classmate in trouble.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Privately message your classmate and explain why what they are doing could be disrespectful and have serious consequences.",
-            "score": 3,
-            "effectiveness": "most-effective"
-          }
-        ]
-      },
-      {
-        "title": "You discover someone has created a fake social media profile using a friend's name and photos to post mean things about other students. Question: What do you do?",
-        "category": "social_intelligence",
-        "choices": [
-          {
-            "text": "Report the fake account to the social media platform and then block it.",
-            "score": 1,
-            "effectiveness": "less-effective"
-          },
-          {
-            "text": "Privately message your friend and offer to help them report the account and alert others.",
+            "text": "Message Cade right now and tell him the share is on.",
             "score": 3,
             "effectiveness": "most-effective"
           },
           {
-            "text": "Create a public post to warn everyone about the fake account and call out the person who created it.",
+            "text": "Screenshot it and send it to the teacher.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Do nothing. He'll find out.",
             "score": 0,
             "effectiveness": "least-effective"
           }
         ]
       },
       {
-        "title": "You see a post from a friend that is promoting a charity. The post looks legitimate, but you have never heard of the charity before. Question: What do you do?",
-        "category": "digital_citizenship",
+        "title": "A friend's tagged you in a video from a party. You're not doing a thing wrong in it. It's the first thing that comes up when somebody searches your name.",
+        "category": "professional_brand",
         "choices": [
           {
-            "text": "Donate to the charity and share the post, assuming it's a good cause.",
-            "score": 0,
-            "effectiveness": "least-effective"
+            "text": "Untag yourself, and check what else your name's attached to while you're in there.",
+            "score": 3,
+            "effectiveness": "most-effective"
           },
           {
-            "text": "Do nothing and ignore the post.",
+            "text": "Ask your friend to take the video down.",
             "score": 1,
             "effectiveness": "less-effective"
           },
           {
-            "text": "Research the charity to see if it's legitimate before donating or sharing the post.",
+            "text": "Leave it and post better things so it drops down the results.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "Somebody sends you a screenshot of something you posted last year and says people are passing it around. Reading it back, you don't think that any more.",
+        "category": "professional_brand",
+        "choices": [
+          {
+            "text": "Say so yourself, once, in your own words, and then let it sit.",
             "score": 3,
             "effectiveness": "most-effective"
+          },
+          {
+            "text": "Delete the original post and say nothing.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Explain in the replies to everybody who brings it up that they've misread it.",
+            "score": 0,
+            "effectiveness": "least-effective"
+          }
+        ]
+      },
+      {
+        "title": "The teacher writing your recommendation just followed you. You post the way you always have. A friend says you should lock everything down until the letter's written.",
+        "category": "professional_brand",
+        "choices": [
+          {
+            "text": "Keep the account as it is, and decide before each post whether you'd be fine with it being seen.",
+            "score": 3,
+            "effectiveness": "most-effective"
+          },
+          {
+            "text": "Make the account private and leave it private.",
+            "score": 1,
+            "effectiveness": "less-effective"
+          },
+          {
+            "text": "Lock it down until the letter's written, then switch back.",
+            "score": 0,
+            "effectiveness": "least-effective"
           }
         ]
       }

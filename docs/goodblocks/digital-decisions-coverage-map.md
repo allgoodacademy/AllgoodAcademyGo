@@ -1,12 +1,14 @@
-# Digital Decisions — Standards Coverage Map v1
+# Digital Decisions — Standards Coverage Map v2
 
 **Status:** Awaiting sign-off — Instructional Designer / Curriculum & Learning Science
-**Authored:** 2026-09-11
+**Authored:** 2026-09-11 (v1) · **Updated:** 2026-09-12 (v2, Digital Decisions Challenge v2 rebuild)
 **Covers:** Social Intelligence, Privacy & Security, Digital Citizenship, Professional Brand
+
+**What changed in v2.** The Digital Decisions Challenge scenario bank was rebuilt (28 scenarios, 7 per category, replacing the old 30-scenario bank at 11/8/7/4) and the HUD gained a fourth independent bar — Empathy, Critical Thinking, Integrity, Foresight, one per category, no merging. **Finding 2 below (the blended Integrity number) closes as a result** — see the Finding for detail. The Case-level evidence for each GoodBlock (the four tables below) is about the Lab GoodBlocks, not the Challenge bank, and is unchanged by this rebuild; only the Challenge category counts and the HUD/trait-confirmation sections needed updating.
 
 **Frameworks referenced:**
 - **CASEL** — the five core competencies of the CASEL 5 (Self-Awareness, Self-Management, Social Awareness, Relationship Skills, Responsible Decision-Making).
-- **ISTE Standards for Students (2016)**, Standard 2 — *Digital Citizen*, sub-standards 2a–2d. The edition matters: ISTE renumbered in later revisions, and the For Teachers page says "ISTE Standard 2," so this document states which Standard 2 it means.
+- **ISTE Standards for Students (2016)**, Standards 2 and 3 — *Digital Citizen* (2a–2d) and *Knowledge Constructor* (3b, evaluating accuracy, perspective, credibility and relevance of information). The For Teachers page now says "maps to ISTE Standards 2 and 3": four Digital Citizenship items (DC-1, DC-4, DC-5, DC-7 in the v2 Challenge bank) are 3b work, not 2-series work, and the claim has to cover them. The edition matters: ISTE renumbered in later revisions, so this document states which edition it means.
 
 ---
 
@@ -28,7 +30,7 @@ Where that method produced something other than a clean confirmation, it is stat
 |---|---|
 | **Builds (live table)** | Empathy |
 | **CASEL claimed (live table)** | Social Awareness · Relationship Skills |
-| **Challenge category** | `social_intelligence` — 11 of 30 DDC scenarios |
+| **Challenge category** | `social_intelligence` — 7 of 28 DDC scenarios (v2) |
 | **Structure** | 7 Cases (1 overview, 2–6 interactive, 7 handoff) |
 
 ### Case-level evidence
@@ -47,7 +49,7 @@ Where that method produced something other than a clean confirmation, it is stat
 
 ### Trait confirmation
 
-The DDC HUD renders **Empathy** from `catPoints.social_intelligence` (`public/educational-games/digital-decisions/index.html:727`). Matches the Builds column. ✅
+The DDC HUD renders **Empathy** from its own independent bar (`updateHUDDisplay()`, keyed on `CATEGORIES.social_intelligence.metricId`, `public/educational-games/digital-decisions/index.html`). Matches the Builds column. ✅
 
 ### Note — coverage beyond the claim
 
@@ -61,7 +63,7 @@ Case 6 exercises **Self-Management**, which the live table does not claim for th
 |---|---|
 | **Builds (live table)** | Critical Thinking |
 | **CASEL claimed (live table)** | Responsible Decision-Making |
-| **Challenge category** | `privacy_security` — 8 of 30 DDC scenarios |
+| **Challenge category** | `privacy_security` — 7 of 28 DDC scenarios (v2) |
 | **Structure** | 6 Cases (1 overview, 2–5 interactive, 6 handoff) |
 
 ### Case-level evidence
@@ -80,7 +82,7 @@ Case 6 exercises **Self-Management**, which the live table does not claim for th
 
 ### Trait confirmation
 
-The DDC HUD renders **Critical Thinking** from `catPoints.privacy_security` (`:726`). Matches the Builds column. ✅
+The DDC HUD renders **Critical Thinking** from its own independent bar (`CATEGORIES.privacy_security.metricId`). Matches the Builds column. ✅
 
 ---
 
@@ -90,7 +92,7 @@ The DDC HUD renders **Critical Thinking** from `catPoints.privacy_security` (`:7
 |---|---|
 | **Builds (live table)** | Integrity |
 | **CASEL claimed (live table)** | Responsible Decision-Making · Social Awareness |
-| **Challenge category** | `digital_citizenship` — 7 of 30 DDC scenarios |
+| **Challenge category** | `digital_citizenship` — 7 of 28 DDC scenarios (v2) |
 | **Structure** | 7 Cases (1 overview, 2–6 interactive, 7 handoff) |
 
 ### Case-level evidence
@@ -103,14 +105,15 @@ The DDC HUD renders **Critical Thinking** from `catPoints.privacy_security` (`:7
 | **5 — The One You Know Is Fake** | Della is sharing a fundraising scam the student already knows is fake, and it is climbing — 41 shares. Build the response in order; each action shows what it costs. | **Social Awareness** and **Responsible Decision-Making** together. The overview frames it as *"saying nothing is a choice too, and somebody else pays for it"* — the cost is carried by Della and by the people who donate, not by the student. |
 | **6 — The Toxic Lobby** | A player in a match will not let up. The reply box works. So do Report, Mute and Block, which most people never touch. | **Responsible Decision-Making** (choosing among available tools rather than the nearest one) with **Social Awareness** of what each does to the other player and to the lobby. Also **ISTE 2b**. |
 
-### ISTE Standard 2
+### ISTE Standards 2 and 3
 
 - **2c — understanding of and respect for the rights and obligations of using and sharing intellectual property.** Case 3, squarely and as the Case's entire subject.
 - **2b — positive, safe, legal and ethical behavior online.** Case 5 (declining to amplify a known scam and acting on it) and Case 6 (using moderation tools instead of the reply box).
+- **3b — evaluate the accuracy, perspective, credibility and relevance of information and media (Knowledge Constructor).** This is new to the v2 mapping: four of the seven v2 Challenge scenarios in this category (DC-1, DC-4, DC-5, DC-7) are 3b work — judging a source, an AI-cited fact, a fundraiser and a screenshot — not 2-series work. This is the reason the For Teachers claim widened from "ISTE Standard 2" to "ISTE Standards 2 and 3."
 
 ### Trait confirmation
 
-The DDC HUD renders **Integrity** — but from `professional_brand` **+** `digital_citizenship` merged into a single bar (`:728`). The trait *name* matches the Builds column. ✅ The *number* is not per-GoodBlock. See **Finding 2**.
+The DDC HUD renders **Integrity** from its own independent bar (`CATEGORIES.digital_citizenship.metricId`) — no longer merged with Professional Brand. The trait *name* matches the Builds column. ✅ The *number* is now per-GoodBlock too. **Finding 2 (below) closes as of v2.**
 
 ### Note on relative strength
 
@@ -122,9 +125,9 @@ Responsible Decision-Making is carried by four of the five interactive Cases. So
 
 | | |
 |---|---|
-| **Builds (live table)** | Integrity |
-| **CASEL claimed (live table)** | Self-Awareness |
-| **Challenge category** | `professional_brand` — 4 of 30 DDC scenarios |
+| **Builds (live table)** | Foresight (v2 — was Integrity) |
+| **CASEL claimed (live table)** | Self-Awareness · Responsible Decision-Making (v2 — was Self-Awareness alone) |
+| **Challenge category** | `professional_brand` — 7 of 28 DDC scenarios (v2) |
 | **Structure** | 7 Cases (1 overview, 2–6 interactive, 7 handoff) |
 
 ### Case-level evidence
@@ -145,15 +148,11 @@ Responsible Decision-Making is carried by four of the five interactive Cases. So
 
 ### Trait confirmation
 
-The DDC HUD renders **Integrity** from `professional_brand` **+** `digital_citizenship` merged (`:728`). The trait *name* matches the Builds column. ✅ See **Finding 2**.
+The DDC HUD renders **Foresight** from its own independent bar (`CATEGORIES.professional_brand.metricId`) — no longer merged with Digital Citizenship. The trait *name* matches the Builds column, and the CASEL cell now names two competencies against two independently-attested Case clusters. ✅ **Finding 2 (below) closes as of v2** — see that finding for the merge history.
 
-### ⚠️ Note — the claim holds, but it is narrower than the content
+### Note — the widened CASEL claim (resolved in v2)
 
-**Self-Awareness is genuinely exercised**, in Cases 2, 3 and 6, and in Case 2 it is exercised well. **No `CLAIM NOT SUPPORTED` block is raised for this GoodBlock**, because the trigger for one is a claimed competency the content does not exercise, and this content does exercise it.
-
-What is worth a reviewer's attention is the weighting. Cases 4 and 5 are not Self-Awareness by any honest reading — Case 4 is consequence-evaluation about somebody else's plagiarism, Case 5 is a judgment call about intervening for somebody else's sake. Both are **Responsible Decision-Making**, with **Social Awareness** in Case 5. The live table names one competency for this GoodBlock where the content exercises three.
-
-The consequence is small but real, and it is a founder/board decision rather than one to fix here: a department head who reads this map after reading the table will find two of five Cases mapping to competencies the table does not mention. The options are to leave the table as the headline competency only, or to widen the Professional Brand row to `Self-Awareness · Responsible Decision-Making`. Nothing needs to be removed either way.
+v1 of this document flagged that Self-Awareness is genuinely exercised (Cases 2, 3, 6) but Cases 4 and 5 are **Responsible Decision-Making** (with **Social Awareness** in Case 5), and the live table named only Self-Awareness. That was recorded as a founder/board decision, not a defect to fix in code. **The sprint that shipped Challenge v2 widened the Professional Brand CASEL cell to `Self-Awareness · Responsible Decision-Making`**, which now covers Cases 2, 3, 4, 5 and 6 — closing the gap this note originally raised. Case 5's secondary Social Awareness thread is still narrower than the two-competency claim, which is expected: a two-competency claim does not have to name every competency a Case touches, only the ones that are genuinely, repeatedly there — and both now are.
 
 ---
 
@@ -163,36 +162,38 @@ The consequence is small but real, and it is a founder/board decision rather tha
 
 All four Digital Decisions rows of the For Teachers table are backed by named Cases above. No `⚠️ CLAIM NOT SUPPORTED` block is raised in this document. That is a result, not an absence of scrutiny: the one row that came closest, Professional Brand, is written up in full above with the narrowness stated rather than smoothed.
 
-### Finding 2 — "reports these traits back by name" is true; the Integrity number is blended
+### Finding 2 — CLOSED in v2. "Reports these traits back by name" is now exact for all four traits
 
-The For Teachers page says: *"Each Challenge scores and reports these traits back to the student by name, so what a GoodBlock is built to develop is the same thing it reports on."*
+**v1 finding (for the record):** the For Teachers page says *"Each Challenge scores and reports these traits back to the student by name, so what a GoodBlock is built to develop is the same thing it reports on."* For three of the four v1 DDC traits this was exact and 1:1. For **Integrity** it was not — the v1 HUD had three bars and the pack has four categories, so `professional_brand` and `digital_citizenship` were summed into one Integrity bar. A student strong on Digital Citizenship and weak on Professional Brand saw one blended figure, at an uneven weighting (7 scenarios against 4).
 
-For three of the four DDC traits this is exact and 1:1. For **Integrity** it is not. The DDC HUD has three bars and the pack has four categories, so `professional_brand` and `digital_citizenship` are summed into one Integrity bar:
+**v2 resolution:** the Challenge v2 rebuild added a fourth, independent HUD bar — **Foresight**, mapped 1:1 to `professional_brand` — so `updateHUDDisplay()` now computes four separate percentages with no merge:
 
 ```js
-const inPct = getPct(catPoints.professional_brand.s + catPoints.digital_citizenship.s,
-                     catPoints.professional_brand.max + catPoints.digital_citizenship.max);
+CATEGORY_KEYS.forEach(key => {
+    const pct = getPct(catPoints[key].earned, catPoints[key].max);
+    // one bar per category — social_intelligence, privacy_security,
+    // digital_citizenship, professional_brand — no summing
+});
 ```
-`public/educational-games/digital-decisions/index.html:728`
+`public/educational-games/digital-decisions/index.html`, `updateHUDDisplay()`
 
-The sentence on the live page survives this, because both rows claim Integrity and Integrity is what gets reported by name. But a student strong on Digital Citizenship and weak on Professional Brand sees one blended figure, and the weighting is uneven — 7 scenarios against 4. The Real World Ready map records the same merge as *"a compromise forced by the count, not a design principle."* It is recorded here so that nobody reading the table later assumes a per-GoodBlock score exists when it does not.
+Digital Citizenship's bar is now **Integrity** alone (7 scenarios, 21 points) and Professional Brand's is **Foresight** alone (7 scenarios, 21 points). The blend this finding originally raised no longer exists. **This finding is closed, not superseded** — the fourth bar was the fix the v1 text already anticipated when it called the merge "a compromise forced by the count, not a design principle."
 
-**Not a marketing correction.** No copy needs to change. It is a limitation of the reporting, and the honest place for it is this document.
+### Finding 3 — scenario counts verified (v2)
 
-### Finding 3 — scenario counts verified
-
-Counted from the live `SCENARIO_DATA`, not inferred: `social_intelligence` 11, `privacy_security` 8, `digital_citizenship` 7, `professional_brand` 4 — totalling the declared 30. Each GoodBlock's completion badge was checked against its own category count and each is correct.
+Counted from the live `SCENARIO_DATA`, not inferred: `social_intelligence` 7, `privacy_security` 7, `digital_citizenship` 7, `professional_brand` 7 — totalling the declared 28, evenly. (v1 counted 11/8/7/4 of 30 — the uneven split that made Finding 2's blend uneven too.) Each GoodBlock's completion badge copy was checked against its own category count and updated to match.
 
 ---
 
 ## Sign-off
 
 - [x] All four Digital Decisions GoodBlocks mapped from Case content upward
-- [x] CASEL competency named exactly as the live For Teachers table claims it
-- [x] ISTE Standard 2 sub-standards identified per GoodBlock with Case-level evidence
+- [x] CASEL competency named exactly as the live For Teachers table claims it (v2: Professional Brand now two competencies)
+- [x] ISTE Standards 2 and 3 sub-standards identified per GoodBlock with Case-level evidence (v2 adds 3b for the four Digital Citizenship Challenge items that are Knowledge Constructor work)
 - [x] Trait names verified against Challenge source, not against the coverage map
+- [x] **Founder/board decision resolved:** the Professional Brand row is widened to `Self-Awareness · Responsible Decision-Making` (v2) — see the note under Professional Brand
+- [x] **Finding 2 (blended Integrity number) closed** — the fourth HUD bar (Foresight) removes the merge; see Finding 2
 - [ ] **Instructional Designer** — read against the live modules and sign
 - [ ] **Curriculum & Learning Science** — read against the live modules and sign
-- [ ] **Founder/board decision outstanding:** the Professional Brand row — leave as `Self-Awareness`, or widen it (see the note under Professional Brand)
 
-**Until both signatures are present this document is not a standards alignment.** It is an evidenced draft of one.
+**Until both signatures are present this document is not a standards alignment.** It is an evidenced draft of one. This is why the For Teachers page's draft-mapping disclaimer ("Do you have standards documentation for my department?") stays in place for now — both sign-offs are still open, unrelated to the content changes above.
