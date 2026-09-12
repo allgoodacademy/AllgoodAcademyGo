@@ -6,10 +6,14 @@
 <title>Read the Signal — Allgood Academy</title>
 <link rel="stylesheet" href="/assets/css/tailwind.min.css">
 <script src="/assets/js/lucide.min.js"></script>
-<!-- Shared identity module — see /js/auth-core.js. Loaded only for db/appId/auth
-     access so a signed-in visitor's Recruit Code can be attached to telemetry.
-     Deliberately NOT loading /js/identity-gate.js: this game has no login wall. -->
+<!-- Shared identity module — see /js/auth-core.js. -->
 <script type="module" src="/js/auth-core.js"></script>
+<!-- Shared identify gate (age question / Sign In / Recruit Code) — see /js/identity-gate.js.
+     Loading this does NOT put a login wall on the game: the gate only ever opens when
+     something explicitly calls window.AuthGate.offerSave()/ensureIdentified(), same as
+     every GoodBlock. Here that's the end-screen save offer, so a finished run has
+     somewhere to go instead of vanishing when the tab closes. -->
+<script type="module" src="/js/identity-gate.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -635,6 +639,7 @@
               <button onclick="window.location.href='/'">Return to dashboard</button>
               <button onclick="handleRestartFromPopover()">Restart game</button>
               <button onclick="window.location.href='/educational-games/'">Browse games</button>
+              <button onclick="window.location.href='/dashboard/?signin=1'">Already have an account? Sign in</button>
             </div>
           </div>
           <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.location.href='/educational-games/'">
@@ -1722,6 +1727,15 @@ function showEnd(outcome) {
   document.getElementById('jodiMoment').textContent = '"' + jodi + '"';
 
   recordSession(outcome);
+
+  // Same shape as the GoodBlocks' end-of-module offer: hangs off the completion
+  // screen being on screen, once per page load, regardless of win/loss outcome —
+  // a finished round is a real run worth keeping either way. Never blocks the
+  // reveal above, and declining hides nothing.
+  if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+    window._agSaveOffered = true;
+    setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
+  }
 }
 
 function restartGame() {
