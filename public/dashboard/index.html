@@ -2615,7 +2615,14 @@
         /* Updated Navbar for Executive Glass Look */
         .navbar-content { flex: 0 0 60px; z-index: 30; background: rgba(53, 120, 137, 0.85); backdrop-filter: blur(5px); border-bottom: 1px solid rgba(255,255,255,0.1); color: white; transition: opacity 0.3s; position: relative; }
         .footer-content { flex: 0 0 50px; z-index: 20; background: white; border-top: 1px solid #e2e8f0; }
-        .page { flex: 1 1 auto; overflow-y: auto; padding: 24px; position: relative; display: none; width: 100%; background: transparent; }
+        /* min-height:0 overrides the flex default of min-height:auto, which otherwise
+           refuses to let this shrink below its own content's height — so overflow-y:auto
+           never actually gets anything to scroll, and .screen-container's overflow:hidden
+           just clips it instead. Invisible on desktop, where .tablet-frame's 88vh usually
+           has enough headroom that content never overflows in the first place; real on
+           mobile, where .tablet-frame is a full 100vh and a content-heavy page (Profile's
+           My Progress tab, in particular) genuinely exceeds it. */
+        .page { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px; position: relative; display: none; width: 100%; background: transparent; }
         .page.active { display: block; }
         
         .modal-content-base { background: white; }
