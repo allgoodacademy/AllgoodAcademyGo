@@ -1615,6 +1615,11 @@ async function recordSession(outcome) {
 }
 
 function startGame() {
+  // Unlike a Challenge (finish-once, retake-rarely), Play Again is this game's core
+  // loop — so unlike the Challenges' one-shot guard, each fresh round gets its own
+  // chance to offer a save. offerSave() itself still no-ops quietly once a session
+  // is actually saved/identified, so this never re-nags someone who already said yes.
+  window._agSaveOffered = false;
   round = buildSession(scenarios);
   currentIndex = 0;
   score = 0;
