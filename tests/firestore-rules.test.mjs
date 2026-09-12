@@ -42,6 +42,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   // than being indistinguishable from a denied one.
   await setDoc(doc(db, 'artifacts', APP, 'messages', 'm1'), { senderUid: 'student_1', timestamp: 1 });
   await setDoc(doc(db, 'artifacts', APP, 'course_feedback', 'f1'), { uid: 'student_1', timestamp: 1, rating: 5 });
+  await setDoc(doc(db, 'artifacts', APP, 'topic_selections', 't1'), { uid: 'student_1', timestamp: 1, category: 'Money', ageTier: 'under13' });
   await setDoc(doc(db, 'artifacts', APP, 'recruit_codes', 'arctic-fox-trot'), { uid: 'student_1' });
   await setDoc(doc(db, 'artifacts', APP, 'sessions', 's1'), { uid: 'student_1', module: 'social-intelligence', startedAt: 1 });
   await setDoc(doc(db, 'artifacts', APP, 'events', 'e1'), { uid: 'student_1', event: 'module_open', ts: 1 });
@@ -192,11 +193,41 @@ await it('teacher CAN read a classroom student\'s scenario_attempts (the drill-d
 // fix split rule #2, because the admin's list grant had been riding on that rule's
 // zero-segment {document=**} match. So assert every source, not just the interesting ones.
 console.log('\nINSIDER — the admin allowlist can read every source loadEverything() asks for');
+// TOPIC SELECTIONS (Comms pass one). Same shape as course_feedback: a student may file a
+// selection for THEMSELVES and read none of them back. Not student-readable is the point,
+// not an oversight — a list of what a child says they are bad at is a behavioural record
+// about a minor, and nothing in the product reads it back to them.
+console.log('\nTOPIC SELECTIONS — create for yourself, read by nobody but an admin');
+const TOPICS = (db) => collection(db, 'artifacts', APP, 'topic_selections');
+await it('a student CAN file a topic selection under their own uid', async () => {
+  await assertSucceeds(setDoc(doc(TOPICS(student), 'mine'), { uid: 'student_1', category: 'Money', ageTier: 'under13', timestamp: 2 }));
+});
+await it('a student CANNOT file one under someone ELSE uid', async () => {
+  await assertFails(setDoc(doc(TOPICS(student), 'forged'), { uid: 'teacher_1', category: 'Money', ageTier: null, timestamp: 2 }));
+});
+await it('a guest CANNOT file one under another uid either', async () => {
+  await assertFails(setDoc(doc(TOPICS(guest), 'forged2'), { uid: 'student_1', category: 'Money', ageTier: null, timestamp: 2 }));
+});
+await it('a student CANNOT read back their OWN topic selection', async () => {
+  await assertFails(getDoc(doc(TOPICS(student), 't1')));
+});
+await it('a student CANNOT enumerate topic selections', async () => {
+  await assertFails(getDocs(TOPICS(student)));
+});
+await it('a TEACHER cannot read topic selections, even for their own student', async () => {
+  await assertFails(getDocs(TOPICS(teacher)));
+  await assertFails(getDoc(doc(TOPICS(teacher), 't1')));
+});
+await it('an admin CAN read a topic selection', async () => {
+  await assertSucceeds(getDoc(doc(TOPICS(admin), 't1')));
+});
+
 const INSIDER_SOURCES = {
   users: db => getDocs(collection(db, 'artifacts', APP, 'users')),
   classrooms: db => getDocs(collection(db, 'artifacts', APP, 'classrooms')),
   messages: db => getDocs(query(collection(db, 'artifacts', APP, 'messages'), orderBy('timestamp', 'desc'), limit(300))),
   course_feedback: db => getDocs(query(collection(db, 'artifacts', APP, 'course_feedback'), orderBy('timestamp', 'desc'), limit(1000))),
+  topic_selections: db => getDocs(query(collection(db, 'artifacts', APP, 'topic_selections'), orderBy('timestamp', 'desc'), limit(1000))),
   launches: db => getDocs(collectionGroup(db, 'launches')),
   game_scores: db => getDocs(collectionGroup(db, 'game_scores')),
   scenario_attempts: db => getDocs(collectionGroup(db, 'scenario_attempts')),
