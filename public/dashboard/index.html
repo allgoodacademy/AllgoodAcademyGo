@@ -229,6 +229,57 @@
         }
         renderLabPackStatus();
 
+        // --- LAB PACK SECTIONS ---
+        // One section per Lab Pack, each holding that pack's Lab Pack card followed by its
+        // Challenge card. Membership is derived from MODULE_REGISTRY's `pack` field and never
+        // hardcoded: the Lab Pack card is found through LAB_PACKS[pack].pillId and each
+        // Challenge card through CHALLENGE_CARDS' badgeId, both of which are themselves
+        // derived from the registry. Section order follows first appearance in the registry.
+        // Adding a pack to the registry (plus the LAB_PACKS row its pill/counter/duration
+        // already need) gives that pack a section here with no edit to this function.
+        //
+        // Cards are MOVED, not rebuilt: every element id, launchCourse() string and listener
+        // target survives, so startModuleStatusListener() / renderLabPackStatus() /
+        // renderModuleDurations() keep populating exactly the fields they populated before.
+        //
+        // A Challenge is NOT gated behind its pack's labs. A student who has completed zero
+        // labs can open either Challenge, and nothing here marks one as locked - no disabled
+        // state, no "complete N labs to unlock". That is a deliberate product decision.
+        function packLabel(pack) {
+            return pack.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+        function renderPackSections() {
+            const host = document.getElementById('pack-sections');
+            if (!host) return;
+            const cardFor = (elId) => {
+                const el = document.getElementById(elId);
+                return el ? el.closest('.mission-file') : null;
+            };
+            [...new Set(MODULE_REGISTRY.map(m => m.pack))].forEach((pack) => {
+                const ids = [];
+                if (LAB_PACKS[pack]) ids.push(LAB_PACKS[pack].pillId);           // Lab Pack card first
+                CHALLENGE_CARDS.forEach(c => {                                    // Challenge card(s) last
+                    const mod = getModuleById(c.id);
+                    if (mod && mod.pack === pack) ids.push(c.badgeId);
+                });
+                const cards = ids.map(cardFor).filter(Boolean);
+                if (!cards.length) return;
+                const section = document.createElement('section');
+                section.setAttribute('aria-labelledby', `pack-heading-${pack}`);
+                const heading = document.createElement('h2');
+                heading.id = `pack-heading-${pack}`;
+                heading.className = 'font-heading font-bold text-slate-700 text-lg uppercase tracking-wide mb-3';
+                heading.textContent = packLabel(pack);
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 gap-4';
+                cards.forEach(card => grid.appendChild(card));
+                section.appendChild(heading);
+                section.appendChild(grid);
+                host.appendChild(section);
+            });
+        }
+        renderPackSections();
+
         // Aggregate Not Started / Started / Completed across the whole pack, from the two
         // independent listeners in startModuleStatusListener/startLaunchListener's sibling
         // (module_progress) — see their _labPackCompletedGameNames/_labPackStartedModuleIds
@@ -2118,22 +2169,15 @@
         .status-ready { border-left-color: #357889; } /* Deep Cyan */
         .status-locked { border-left-color: #757575; opacity: 0.7; cursor: not-allowed; }
         
-        /* COMMAND RAIL TABS (UPDATED) */
-        .tab-btn {
-            color: #64748b; /* Text Secondary */
-            border: none;
-        }
-        .tab-btn:hover {
-            background-color: rgba(255,255,255,0.5);
-            color: #357889; /* Brand Secondary */
-        }
-        .active-tab {
-            background-color: #D34716 !important; /* Brand Primary */
-            color: white !important;
-            box-shadow: 0 4px 6px -1px rgba(211, 71, 22, 0.3), 0 2px 4px -1px rgba(211, 71, 22, 0.1);
-            transform: translateY(-1px);
-        }
-
+        /* --- LAB PACK SECTIONS --- */
+        /* Spacing lives here rather than in Tailwind utilities: assets/css/tailwind.min.css
+           is a pruned build that has no gap-8 or space-y-8, so reaching for one of those
+           silently renders as no gap at all. #pack-sections holds the cards directly until
+           renderPackSections() moves them into <section>s, so both shapes get spaced: 1rem
+           between cards, 2rem between packs. */
+        #pack-sections > * + * { margin-top: 1rem; }
+        #pack-sections > section + section { margin-top: 2rem; }
+        
         /* Custom image container for headshot */
         .headshot-container {
             width: 64px;
@@ -2574,22 +2618,18 @@
                         </div>
                     </div>
 
-                    <!-- TAB NAVIGATION: COMMAND RAIL (Mobile Optimized) -->
-                    <div class="bg-white/40 backdrop-blur-md p-1.5 rounded-xl border border-white/60 shadow-sm flex space-x-2 mb-6 mx-auto max-w-3xl">
-                        <button id="tab-btn-challenges" onclick="switchTab('challenges')"
-                            class="tab-btn inactive-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
-                            <i data-lucide="target" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i>
-                            <span class="hidden sm:inline">Challenges</span>
-                        </button>
-                        <button id="tab-btn-courses" onclick="switchTab('courses')"
-                            class="tab-btn active-tab flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-xs sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 ease-out">
-                            <i data-lucide="graduation-cap" class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2"></i>
-                            <span class="hidden sm:inline">Jodi's Schoolhouse</span>
-                        </button>
-                    </div>
-
-                    <!-- TAB 1: CHALLENGES -->
-                    <div id="tab-challenges" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+                    <!-- LAB PACK SECTIONS
+                         The dashboard groups by Lab Pack now, not by format: the Challenges /
+                         Jodi's Schoolhouse tab rail is gone and all four cards are visible on
+                         arrival, no click required. The cards below are unchanged - at load
+                         renderPackSections() reads each module's `pack` field out of
+                         MODULE_REGISTRY and moves every card under a heading for its pack, the
+                         Lab Pack card first and the Challenge card last. Source order in here is
+                         therefore irrelevant; give a new card's module a `pack` and it lands in
+                         the right section on its own. They start as direct children of
+                         #pack-sections on purpose, so a student still sees all four - and can
+                         still launch them - if that script never runs. -->
+                    <div id="pack-sections">
                         <div onclick="window.launchCourse('Digital Decisions', '/educational-games/digital-decisions/', this)"
                              class="mission-file status-active p-5 flex items-start gap-4 group">
                              <!-- CHANGED: Rounded-full, shadow-sm, Emoji -->
@@ -2635,13 +2675,10 @@
                                 <p id="rwr-challenge-best-score" class="text-[10px] text-slate-400 uppercase tracking-wide mb-2"></p>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- TAB 2: JODI'S SCHOOLHOUSE — Rage Revenue and Finding Yourself have been
-                         archived (see archive/jsh/); they're replaced by the Digital Decisions Lab
-                         Pack, a set of short labs with Jodi. This tab opens onto the real Lab Pack
-                         hub, which shows each lab as live or "coming soon" per MODULE_REGISTRY. -->
-                    <div id="tab-courses" class="tab-content grid grid-cols-1 gap-4">
+                        <!-- Rage Revenue and Finding Yourself have been archived (see
+                             archive/jsh/); they're replaced by the Digital Decisions Lab Pack, a
+                             set of short labs with Jodi. This card opens onto the real Lab Pack
+                             hub, which shows each lab as live or "coming soon" per MODULE_REGISTRY. -->
                         <div onclick="window.launchCourse('Digital Decisions Lab Pack', '/jsh/digital-decisions-lab/', this)"
                              class="mission-file status-active p-5 flex items-start gap-4 group">
                             <div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center border border-indigo-100 flex-shrink-0 group-hover:bg-indigo-100 transition-colors shadow-sm">
@@ -3152,22 +3189,6 @@
 
         window.sfx = sfx;
         window.initAudio = initAudio;
-
-        window.switchTab = (tabName) => {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            const target = document.getElementById('tab-' + tabName);
-            if(target) target.classList.remove('hidden');
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active-tab');
-                btn.classList.add('inactive-tab');
-            });
-            const activeBtn = document.getElementById('tab-btn-' + tabName);
-            if(activeBtn) {
-                activeBtn.classList.remove('inactive-tab');
-                activeBtn.classList.add('active-tab');
-            }
-            sfx.nav(); 
-        };
 
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
