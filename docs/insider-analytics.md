@@ -46,9 +46,11 @@ the moments that matter. Steps per module:
 | Conflict Has a Winner | cases reached | 7 |
 | Reading the Room | cases reached | 7 |
 | Real World Ready Challenge | scenarios answered | 24 |
+| Ten Voices, One Source | cases reached | 6 |
+| Room to Think Challenge | scenarios answered | 24 |
 
 Modules belong to a Lab Pack. The dashboard's `MODULE_REGISTRY` (`public/dashboard/index.html`) carries a
-`pack` field on every entry — `'digital-decisions'` or `'real-world-ready'` — and each pack has
+`pack` field on every entry — `'digital-decisions'`, `'real-world-ready'` or `'room-to-think'` — and each pack has
 one dashboard card whose counter, duration and status pill are derived from the entries with
 that pack. Insider's `COURSES` does not carry `pack` today; group by the `category` label or
 by the module ids listed above if you need a per-pack view.

@@ -36,6 +36,7 @@ const GOODBLOCKS = [
   'public/jsh/real-world-ready-lab/money-as-a-skill/index.html',
   'public/jsh/real-world-ready-lab/conflict-has-a-winner/index.html',
   'public/jsh/real-world-ready-lab/reading-the-room/index.html',
+  'public/jsh/room-to-think-lab/ten-voices-one-source/index.html',
 ];
 
 // Pages an anonymous / under-13 session can reach. GA4 must never load unconditionally here.
@@ -45,6 +46,8 @@ const LEARNER_SURFACES = [
   'public/jsh/real-world-ready-lab/index.html',
   'public/educational-games/digital-decisions/index.html',
   'public/educational-games/real-world-ready/index.html',
+  'public/educational-games/room-to-think/index.html',
+  'public/jsh/room-to-think-lab/index.html',
   'public/mission-control/index.html',
 ];
 

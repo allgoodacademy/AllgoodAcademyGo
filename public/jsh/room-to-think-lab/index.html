@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Allgood Academy | Room to Think Lab Pack</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+
+    <link rel="stylesheet" href="/assets/css/tailwind.min.css">
+    <script src="/assets/js/lucide.min.js"></script>
+
+    <!-- Shared identity/login module + identify gate — see /js/auth-core.js and
+         /js/identity-gate.js. Needed here only for the Comms icon, which requires a real
+         signed-in session to write; launching a lab from one of the cards below hands off
+         to that lab's own gate, same as every other module. -->
+    <script type="module" src="/js/auth-core.js"></script>
+    <script type="module" src="/js/identity-gate.js"></script>
+    <script src="/js/message-hq.js" data-message-source="Room to Think Hub"></script>
+
+    <style>
+        body { font-family: Verdana, sans-serif; background-color: #FBF6EE; margin: 0; min-height: 100vh; min-height: 100dvh; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+        .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .lab-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .lab-card.live:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.15); }
+        /* A coming-soon card is not a link and must not pretend to be one: no pointer
+           cursor, no hover lift, no navigation. See the acceptance criteria — three of the
+           four GoodBlock cards here are honestly unbuilt, not missing hrefs. */
+        .lab-card.soon { cursor: default; }
+    </style>
+</head>
+<body class="text-allgood-dark font-body">
+
+    <!-- HEADER — same Home / Message / Menu pattern as the other two Lab Pack hubs.
+         Home goes to /dashboard/, not to /: the marketing site took the site root and both
+         other hubs were fixed for exactly this in PR #19. -->
+    <header class="bg-allgood-secondary shadow-md flex items-center h-[60px] sticky top-0 z-30">
+        <div class="w-full px-4 flex items-center justify-between h-full">
+            <div class="flex items-center overflow-hidden">
+                <div class="flex shrink-0 items-center bg-allgood-primary rounded-full px-3 py-1 shadow-sm">
+                    <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[220px]">Room to Think Lab Pack</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-1 shrink-0">
+                <a href="/dashboard/" title="Dashboard" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 inline-flex"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></a>
+                <button onclick="window.openMessageModal()" title="Comms" class="text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                <button onclick="window.openLabMenu()" title="Jump to a Lab" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+
+        <!-- HERO. The pack's own mark is `compass`; the four GoodBlock icons sit beside it so
+             the row reads as "a pack of four", not one promoted module. -->
+        <section class="text-center mb-12">
+            <span class="text-xs font-bold uppercase tracking-widest text-allgood-secondary">Jodi's Schoolhouse</span>
+            <h1 class="text-3xl sm:text-5xl font-heading font-bold text-allgood-dark mt-2 mb-4">Room to <span class="text-rtt-accent">Think</span></h1>
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-full bg-rtt-accent-light border border-rtt-accent/30 flex items-center justify-center shadow-sm"><i data-lucide="git-merge" class="w-6 h-6 text-rtt-accent-dark"></i></div>
+                <div class="w-12 h-12 rounded-full bg-rtt-accent-light border border-rtt-accent/30 flex items-center justify-center shadow-sm"><i data-lucide="scan-search" class="w-6 h-6 text-rtt-accent-dark"></i></div>
+                <div class="w-12 h-12 rounded-full bg-rtt-accent-light border border-rtt-accent/30 flex items-center justify-center shadow-sm"><i data-lucide="megaphone" class="w-6 h-6 text-rtt-accent-dark"></i></div>
+                <div class="w-12 h-12 rounded-full bg-rtt-accent-light border border-rtt-accent/30 flex items-center justify-center shadow-sm"><i data-lucide="calendar-clock" class="w-6 h-6 text-rtt-accent-dark"></i></div>
+            </div>
+            <p class="text-sm sm:text-base text-gray-600 max-w-xl mx-auto leading-relaxed">
+                Four situations where doing more made it worse. And what to do instead. Then the
+                <strong class="text-allgood-dark">Room to Think Challenge</strong> to see where you actually land. Take them in any order.
+            </p>
+        </section>
+
+        <!-- FOUR GOODBLOCKS + THE CHALLENGE. One is live; three are honestly coming soon and
+             do not navigate. The Challenge is not gated behind any of them. -->
+        <section id="labs" class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+
+            <!-- TEN VOICES, ONE SOURCE — live. git-merge / wine #9B3B5A, matching the
+                 GoodBlock's own startup screen and completion badge. -->
+            <div onclick="window.launchLab('Ten Voices, One Source', '/jsh/room-to-think-lab/ten-voices-one-source/')"
+                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FBEAF0; border:1px solid #EBC6D3;">
+                        <i data-lucide="git-merge" class="w-7 h-7" style="color:#9B3B5A;"></i>
+                    </div>
+                    <span id="lab-status-ten-voices-one-source" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Ten Voices, One Source</h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Nine people said it. Two of them found out.</p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+
+            <!-- THE QUESTION DECIDES THE ANSWER — Coming Soon. Storyboarded in full, not built.
+                 Deliberately has no onclick: tapping it must do nothing at all. -->
+            <div class="lab-card soon bg-white/60 rounded-2xl border border-dashed border-jodi-border shadow-none p-6 flex flex-col select-none">
+                <div class="flex items-start mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center bg-slate-100 border border-slate-200">
+                        <i data-lucide="scan-search" class="w-7 h-7 text-slate-400"></i>
+                    </div>
+                </div>
+                <h3 class="font-bold text-slate-500 text-lg mb-2 uppercase">The Question Decides the Answer</h3>
+                <span class="self-start bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide mb-2">Coming Soon</span>
+                <p class="text-xs text-slate-400 leading-relaxed flex-grow">Ask it the other way and see what comes back.</p>
+                <span class="mt-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Storyboarded &mdash; not built yet</span>
+            </div>
+
+            <!-- WHERE YOU SAY IT — Coming Soon. No onclick, on purpose. -->
+            <div class="lab-card soon bg-white/60 rounded-2xl border border-dashed border-jodi-border shadow-none p-6 flex flex-col select-none">
+                <div class="flex items-start mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center bg-slate-100 border border-slate-200">
+                        <i data-lucide="megaphone" class="w-7 h-7 text-slate-400"></i>
+                    </div>
+                </div>
+                <h3 class="font-bold text-slate-500 text-lg mb-2 uppercase">Where You Say It</h3>
+                <span class="self-start bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide mb-2">Coming Soon</span>
+                <p class="text-xs text-slate-400 leading-relaxed flex-grow">The same sentence lands four different ways.</p>
+                <span class="mt-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Storyboarded &mdash; not built yet</span>
+            </div>
+
+            <!-- THE COST OF LATER — Coming Soon. No onclick, on purpose. -->
+            <div class="lab-card soon bg-white/60 rounded-2xl border border-dashed border-jodi-border shadow-none p-6 flex flex-col select-none">
+                <div class="flex items-start mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center bg-slate-100 border border-slate-200">
+                        <i data-lucide="calendar-clock" class="w-7 h-7 text-slate-400"></i>
+                    </div>
+                </div>
+                <h3 class="font-bold text-slate-500 text-lg mb-2 uppercase">The Cost of Later</h3>
+                <span class="self-start bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide mb-2">Coming Soon</span>
+                <p class="text-xs text-slate-400 leading-relaxed flex-grow">The options run out before the deadline does.</p>
+                <span class="mt-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Storyboarded &mdash; not built yet</span>
+            </div>
+
+            <!-- ROOM TO THINK CHALLENGE — live, and NOT gated. No lock, no completion
+                 requirement: a student who has finished nothing can start here. Consistent
+                 with the 2026-09-11 dashboard decision on both existing Challenges. -->
+            <div onclick="window.launchLab('Room to Think Challenge', '/educational-games/room-to-think/')"
+                 class="lab-card live cursor-pointer bg-slate-900 rounded-2xl border border-slate-800 shadow-sm p-6 flex flex-col text-white relative overflow-hidden sm:col-span-2">
+                <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/5 rounded-full pointer-events-none"></div>
+                <div class="flex items-start justify-between mb-4 relative z-10">
+                    <div class="w-14 h-14 rounded-full bg-rtt-accent/25 border border-rtt-accent/40 flex items-center justify-center shadow-sm">
+                        <i data-lucide="shuffle" class="w-7 h-7 text-rose-200"></i>
+                    </div>
+                    <span id="lab-status-rtt-challenge" class="bg-white/10 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-white/10">Challenge</span>
+                </div>
+                <h3 class="font-bold text-white text-lg mb-1 uppercase relative z-10">Room to Think Challenge</h3>
+                <p class="text-xs text-slate-300 leading-relaxed flex-grow relative z-10">24 situations, scored. Start here if you want — nothing is locked.</p>
+                <span class="mt-4 text-[11px] font-bold text-white uppercase tracking-wide flex items-center gap-1 relative z-10">Jump In <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+        </section>
+
+        <!-- TEACHER STRIP — collapsed by default, below the fold. This is the ONLY surface in
+             the product carrying IB / MYP vocabulary; no student-facing copy anywhere in this
+             pack uses the words IB, MYP or ATL. -->
+        <section class="mt-10">
+            <details class="bg-white/70 rounded-2xl border border-jodi-border">
+                <summary class="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-3">
+                    <span class="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                        <i data-lucide="graduation-cap" class="w-4 h-4"></i> For teachers &mdash; curriculum framing
+                    </span>
+                    <span class="text-[10px] text-slate-400 uppercase tracking-wide">Tap to open</span>
+                </summary>
+                <div class="px-5 pb-5 pt-1 border-t border-jodi-border/70 space-y-3">
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        <strong class="text-slate-800">Key concept:</strong> Perspective &nbsp;&middot;&nbsp;
+                        <strong class="text-slate-800">Related concepts:</strong> Credibility, Choice, Causality, Bias &nbsp;&middot;&nbsp;
+                        <strong class="text-slate-800">Global context:</strong> Identities and relationships &nbsp;&middot;&nbsp;
+                        <strong class="text-slate-800">Year group:</strong> MYP 2&ndash;4
+                    </p>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        <strong class="text-slate-800">Statement of inquiry:</strong> <em>Urgency, audience and repetition narrow the choices
+                        available to us; recognising these forces helps us make more deliberate decisions about what we believe and how we act.</em>
+                    </p>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        <strong class="text-slate-800">The through-line:</strong> four misconceptions, one mechanism underneath all of them &mdash;
+                        the student mistakes intensity for effectiveness. More voices, more certainty, more audience, more pressure. In every case
+                        the thing that feels like it is making them stronger is the thing removing their options.
+                    </p>
+                    <p class="text-[11px] text-slate-500 leading-relaxed border-t border-jodi-border/70 pt-3">
+                        <strong class="text-slate-700">Not affiliated with the IB.</strong> Allgood Academy is an independent publisher.
+                        This mapping is offered to help teachers place the material in an existing planner; it is not authorised, endorsed by,
+                        or produced in association with the International Baccalaureate Organization, and no IB registration or approval is implied.
+                    </p>
+                </div>
+            </details>
+        </section>
+
+        <div class="mt-12 mb-4 text-center">
+            <p class="text-[10px] text-slate-400 font-mono tracking-widest uppercase opacity-80">
+                ALLGOOD OS <span class="mx-2">•</span> GOODBLOCK™
+            </p>
+        </div>
+    </main>
+
+    <!-- LAB MENU: jump to the live lab or the Challenge. A second, separate list with its own
+         hardcoded onclicks (see the integration checklist). The three unbuilt GoodBlocks are
+         listed here too, as disabled rows — visible, honest, and not navigable.
+
+         These rows read "Not open yet", not "Coming Soon", on purpose. The cards above are
+         where each unbuilt lab carries its Coming Soon placeholder, and check-modules.js
+         looks for that placeholder within 400 characters of a lab's NAME — a second "Coming
+         Soon" here sits just inside that window of the live lab's menu row and makes the
+         checker report Ten Voices, One Source as both live and coming soon. Each unbuilt
+         card above carries its own pill directly under its own title, so no card depends on
+         its neighbour to look correctly marked. -->
+    <div id="lab-menu-modal" class="hidden-modal fixed inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
+        <div class="bg-jodi-warmth rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-rtt-accent">
+            <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Lab</h2>
+            <p class="text-xs text-gray-500 mb-4 font-body">Any order works.</p>
+            <div class="space-y-2">
+                <button onclick="window.closeLabMenu(); window.launchLab('Ten Voices, One Source', '/jsh/room-to-think-lab/ten-voices-one-source/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rtt-accent text-xs font-bold flex items-center justify-between">
+                    <span>Ten Voices, One Source</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <button disabled class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
+                    <span>The Question Decides the Answer</span><span class="text-[9px] uppercase tracking-wide">Not open yet</span>
+                </button>
+                <button disabled class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
+                    <span>Where You Say It</span><span class="text-[9px] uppercase tracking-wide">Not open yet</span>
+                </button>
+                <button disabled class="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-between cursor-not-allowed">
+                    <span>The Cost of Later</span><span class="text-[9px] uppercase tracking-wide">Not open yet</span>
+                </button>
+                <button onclick="window.closeLabMenu(); window.launchLab('Room to Think Challenge', '/educational-games/room-to-think/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rtt-accent text-xs font-bold flex items-center justify-between">
+                    <span>Room to Think Challenge</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <button onclick="window.closeLabMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+        </div>
+    </div>
+
+    <!-- MESSAGE MODAL: standardized in /js/message-hq.js, injected at runtime -->
+
+    <script>
+        window.openLabMenu = () => {
+            document.getElementById('lab-menu-modal').classList.remove('hidden-modal');
+            document.getElementById('lab-menu-modal').classList.add('visible-modal');
+            if (window.lucide) window.lucide.createIcons();
+        };
+        window.closeLabMenu = () => {
+            document.getElementById('lab-menu-modal').classList.add('hidden-modal');
+            document.getElementById('lab-menu-modal').classList.remove('visible-modal');
+        };
+
+        // GUEST-FIRST ENTRY (founder decision, 2026-09-09): clicking a card opens the
+        // GoodBlock, full stop — no age question in front of it. This must NOT call
+        // ensureIdentified(); both other hubs were fixed for exactly that in PR #13.
+        // Establishing the guest session here rather than only in the lab means this hub's
+        // own progress badges have a session to read from; the lab calls startGuestSession()
+        // again at its power-up moment and passes straight through on an established session.
+        window.launchLab = async (name, url) => {
+            try { await window.AuthGate.startGuestSession(); } catch (e) { console.error('[Hub] guest session failed', e); }
+            if (typeof gtag === 'function') gtag('event', 'launch_module', { module_name: name });
+            window.location.href = url;
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) window.lucide.createIcons();
+            [100, 400, 1000, 2000].forEach((delay) => setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay));
+        });
+    </script>
+
+    <!-- Real per-module progress for a signed-in student — "Ready" is a marketing label for
+         an unauthenticated visitor only. Reads the same game_scores / module_progress paths
+         the dashboard's MODULE_REGISTRY uses; the predicates here mirror those entries. -->
+    <script type="module">
+        import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // 64 = the Room to Think Challenge's certification threshold (of 72). Same bar as the
+        // Real World Ready Challenge, NOT the Digital Decisions Challenge's 80 (of 90) —
+        // copying 80 across would make the badge unreachable, since a perfect score is 72.
+        const LAB_STATUS_REGISTRY = [
+            { id: 'ten-voices-one-source', gameName: 'Ten Voices, One Source', badgeId: 'lab-status-ten-voices-one-source', isComplete: (d) => d.completed === true },
+            { id: 'rtt-challenge', gameName: 'Room to Think Challenge', badgeId: 'lab-status-rtt-challenge', isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64, dark: true },
+        ];
+
+        function setLabBadge(lab, status) {
+            const el = document.getElementById(lab.badgeId);
+            if (!el) return;
+            if (status === 'completed') {
+                el.textContent = 'Completed';
+                el.className = 'bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else if (status === 'started') {
+                el.textContent = 'Started';
+                el.className = lab.dark ? 'bg-blue-500/20 text-blue-200 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-blue-400/30' : 'bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            } else {
+                el.textContent = 'Not Started';
+                el.className = lab.dark ? 'bg-white/10 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-white/10' : 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
+            }
+        }
+
+        // startedModuleIds is the set of module_progress doc ids for this student — the
+        // only "started" signal a lab has. Labs write to game_scores only on completion.
+        function applyRealLabStatuses(scoreDocs, startedModuleIds) {
+            LAB_STATUS_REGISTRY.forEach(lab => {
+                let sawAttempt = startedModuleIds.has(lab.id);
+                let completed = false;
+                for (const data of scoreDocs) {
+                    if (data.gameName !== lab.gameName) continue;
+                    sawAttempt = true;
+                    if (lab.isComplete(data)) { completed = true; break; }
+                }
+                setLabBadge(lab, completed ? 'completed' : (sawAttempt ? 'started' : 'not_started'));
+            });
+        }
+
+        // Wait for auth-core.js's module script (loaded in <head>, executes first) to have
+        // set window.AuthCore before touching it.
+        function whenAuthCoreReady(cb) {
+            if (window.AuthCore) { cb(); return; }
+            const check = setInterval(() => { if (window.AuthCore) { clearInterval(check); cb(); } }, 50);
+        }
+
+        whenAuthCoreReady(() => {
+            window.AuthCore.onAuthStateChanged(window.AuthCore.auth, async (user) => {
+                if (!user) return;
+                try {
+                    const [scoresSnap, progressSnap] = await Promise.all([
+                        getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'game_scores')),
+                        getDocs(collection(window.AuthCore.db, 'artifacts', window.AuthCore.appId, 'users', user.uid, 'module_progress')),
+                    ]);
+                    const startedModuleIds = new Set(progressSnap.docs.map(d => d.id));
+                    applyRealLabStatuses(scoresSnap.docs.map(d => d.data()), startedModuleIds);
+                } catch (e) {
+                    console.error('[Room to Think Hub] Couldn\'t read progress — leaving cards as Ready', e);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -26,6 +26,12 @@ module.exports = {
         'rwr-accent': '#C97D1A',
         'rwr-accent-light': '#FEF3DC',
         'rwr-accent-dark': '#A8620E',
+        // Room to Think Lab Pack. Same structure and same reasoning as the Real World
+        // Ready triplet above: one Lab-Pack accent, four Lucide icons, so this is shared
+        // theme rather than a per-GoodBlock gb-accent-*.
+        'rtt-accent': '#9B3B5A',
+        'rtt-accent-light': '#FBEAF0',
+        'rtt-accent-dark': '#7A2B45',
     },
     fontFamily: {
         heading: ['Georgia', 'serif'],
