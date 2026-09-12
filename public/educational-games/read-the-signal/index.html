@@ -37,6 +37,7 @@
     font-family: Verdana, sans-serif;
     background-color: #0f172a;
     min-height: 100vh;
+    min-height: 100dvh;
     position: relative;
     margin: 0;
     padding: 0;
@@ -107,7 +108,13 @@
     }
     .tablet-frame {
         width: 100vw !important;
+        /* 100vh is the LARGE viewport on mobile — it includes the space the
+           browser's own address/tab bar can occupy, so content sized to it
+           sits partly behind that bar. 100dvh tracks the bar's real, current
+           height instead. Keep 100vh first as a fallback for browsers that
+           don't support dvh (last rule wins when both are supported). */
         height: 100vh !important;
+        height: 100dvh !important;
         max-width: none !important;
         max-height: none !important;
         border-radius: 0 !important;
