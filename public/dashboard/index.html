@@ -170,6 +170,16 @@
             { id: 'rwr-challenge', name: 'Real World Ready Challenge', category: 'challenge', pack: 'real-world-ready', url: '/educational-games/real-world-ready/',
               gameNames: ['Real World Ready Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
               badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
+            // Room to Think — the third Lab Pack. One GoodBlock live, three storyboarded and
+            // honestly coming soon on the hub. `topic` and `blurb` sit AFTER gameNames because
+            // scripts/check-modules.js parses id/name/category/pack/url/gameNames positionally
+            // and stops matching if anything is inserted between them.
+            { id: 'ten-voices-one-source', name: 'Ten Voices, One Source', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/ten-voices-one-source/',
+              gameNames: ['Ten Voices, One Source'], topic: 'Checking a claim', blurb: 'Nine people said it. Two of them found out.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
+            // 64 of 72 again — the same bar as the Real World Ready Challenge, both 88.9%.
+            { id: 'rtt-challenge', name: 'Room to Think Challenge', category: 'challenge', pack: 'room-to-think', url: '/educational-games/room-to-think/',
+              gameNames: ['Room to Think Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
+              badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
         ];
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
         // Comms (/js/message-hq.js) derives its topic chips and the lab it suggests from
@@ -201,12 +211,17 @@
         const LAB_PACK_PLANNED = ['Social Intelligence', 'Privacy & Security', 'Digital Citizenship', 'Professional Brand'];
         // Every lab the Real World Ready Lab Pack holds (hub: public/jsh/real-world-ready-lab/).
         const RWR_PACK_PLANNED = ['Money as a Skill', 'Conflict Has a Winner', 'Reading the Room'];
+        // Every lab the Room to Think Lab Pack will hold (hub: public/jsh/room-to-think-lab/).
+        // All four are storyboarded; one is built. The card's "4 labs planned • 1 live • 3
+        // coming soon" counter is derived from this array against the registry — never typed.
+        const RTT_PACK_PLANNED = ['Ten Voices, One Source', 'The Question Decides the Answer', 'Where You Say It', 'The Cost of Later'];
         // One entry per Lab Pack card on this dashboard. A registry entry's `pack` ties it to
         // one of these; the card's counter, duration and status pill are all derived from the
         // registry filtered by that pack, so nothing here is hand-counted.
         const LAB_PACKS = {
             'digital-decisions': { planned: LAB_PACK_PLANNED, pillId: 'labpack-status-pill', counterId: 'labpack-counter', durationId: 'labpack-duration' },
             'real-world-ready':  { planned: RWR_PACK_PLANNED,  pillId: 'rwr-status-pill',     counterId: 'rwr-counter',     durationId: 'rwr-duration' },
+            'room-to-think':     { planned: RTT_PACK_PLANNED,  pillId: 'rtt-status-pill',     counterId: 'rtt-counter',     durationId: 'rtt-duration' },
         };
         function renderLabPackStatus() {
             Object.entries(LAB_PACKS).forEach(([pack, cfg]) => {
@@ -2693,6 +2708,56 @@
                                     <p id="labpack-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">&nbsp;</p>
                                     <!-- Pack total duration, summed from durationMinutes across live labs — see renderLabPackStatus() -->
                                     <span id="labpack-duration" class="text-[10px] text-slate-400 uppercase tracking-wide whitespace-nowrap">&nbsp;</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ROOM TO THINK CHALLENGE — a standalone card, independent of the Room to
+                             Think Lab Pack hub which also links to it. NOT gated behind the pack's
+                             labs: a student who has completed nothing can open it. Status badge,
+                             duration and best score are all driven from MODULE_REGISTRY. -->
+                        <div onclick="window.launchCourse('Room to Think Challenge', '/educational-games/room-to-think/', this)"
+                             class="mission-file status-active p-5 flex items-start gap-4 group">
+                            <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center border border-rose-100 flex-shrink-0 group-hover:bg-rose-100 transition-colors shadow-sm">
+                                <span class="text-3xl emoji-badge">🔀</span>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Room to Think Challenge</h3>
+                                    <!-- Not a fabricated status: starts empty, same em-dash pattern as
+                                         the other Challenge cards. startModuleStatusListener sets the
+                                         real state once Firestore has actually loaded. -->
+                                    <span id="rtt-challenge-status-badge" class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">—</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Decide your way through 24 situations where doing more made it worse.</p>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2" data-duration-for="rtt-challenge">&nbsp;</p>
+                                <p id="rtt-challenge-best-score" class="text-[10px] text-slate-400 uppercase tracking-wide mb-2"></p>
+                            </div>
+                        </div>
+
+                        <!-- ROOM TO THINK LAB PACK — the third Lab Pack under /jsh/. Wine is the
+                             Lab-Pack-level accent shared by all four of its GoodBlocks, the same
+                             one-accent-four-icons rule Real World Ready follows. Counter / duration
+                             / pill are all derived from MODULE_REGISTRY entries with
+                             pack: 'room-to-think' — renderLabPackStatus() writes the counter, so
+                             the "4 planned • 1 live • 3 coming soon" text is never hardcoded. -->
+                        <div onclick="window.launchCourse('Room to Think Lab Pack', '/jsh/room-to-think-lab/', this)"
+                             class="mission-file status-active p-5 flex items-start gap-4 group">
+                            <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center border border-rose-100 flex-shrink-0 group-hover:bg-rose-100 transition-colors shadow-sm">
+                                <span class="text-3xl emoji-badge">🧠</span>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Room to Think Lab Pack</h3>
+                                    <!-- Real state only: updateLabPackStatusPill() sets Not Started/Started/Completed once
+                                         Firestore has actually loaded — never a fabricated default. -->
+                                    <span id="rtt-status-pill" class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">—</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-1 leading-relaxed"><strong>Action:</strong> Four situations where doing more made it worse — and what to do instead — then the Room to Think Challenge.</p>
+                                <!-- Intentionally count-free — renderLabPackStatus() populates these at runtime. Do not hardcode counts here. -->
+                                <div class="flex items-center justify-between gap-2">
+                                    <p id="rtt-counter" class="text-[10px] text-slate-400 uppercase tracking-wide">&nbsp;</p>
+                                    <span id="rtt-duration" class="text-[10px] text-slate-400 uppercase tracking-wide whitespace-nowrap">&nbsp;</span>
                                 </div>
                             </div>
                         </div>

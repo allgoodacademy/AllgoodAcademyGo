@@ -1,6 +1,10 @@
 # Fails the build when the hand-maintained module lists disagree: dashboard MODULE_REGISTRY,
 # Insider COURSES, Lab Pack hub cards, each module's Telemetry.init and the docs table.
 # See "Publishing a module" in docs/goodblock-integration-checklist.md.
+#
+# Also runs the Challenge copy validator, which enforces the authored Voice Standard on
+# every Challenge's SCENARIO_DATA (setup under 45 words and 3 sentences, options readable
+# on their own). Structural checks say nothing about whether the question can be read.
 name: Module registry check
 
 on:
@@ -16,3 +20,4 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/check-modules.js
+      - run: node scripts/check-challenge-copy.js

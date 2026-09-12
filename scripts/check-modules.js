@@ -36,6 +36,14 @@ const PACKS = {
     challengePage: 'public/educational-games/real-world-ready/index.html',
     badgeCategory: { 'money-as-a-skill': 'money', 'conflict-has-a-winner': 'conflict', 'reading-the-room': 'reading_room' },
   },
+  'room-to-think': {
+    plannedConst: 'RTT_PACK_PLANNED',
+    hub: 'public/jsh/room-to-think-lab/index.html',
+    hubPrefix: '/jsh/room-to-think-lab/',
+    challengeId: 'rtt-challenge',
+    challengePage: 'public/educational-games/room-to-think/index.html',
+    badgeCategory: { 'ten-voices-one-source': 'source_counting' },
+  },
 };
 
 // --- dashboard

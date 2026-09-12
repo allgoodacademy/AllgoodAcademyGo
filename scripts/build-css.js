@@ -45,6 +45,7 @@ const BUNDLES = [
         ['privacy-security', 'Privacy & Security'],
         ['professional-brand', 'Professional Brand'],
         ['rwr-amber', 'Real World Ready (shared Lab Pack amber)'],
+        ['room-to-think', 'Room to Think (shared Lab Pack wine)'],
     ].map(([slug, label]) => ({
         config: `${slug}.config.js`,
         out: `tailwind.${slug}.min.css`,

@@ -222,6 +222,25 @@
                 scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
                 progressStep: p => Object.keys(p.answeredScenarioScores || {}).length,
             },
+            {
+                id: 'ten-voices-one-source', name: 'Ten Voices, One Source', category: "Jodi's Schoolhouse lab",
+                gameNames: ['Ten Voices, One Source'], launchNames: [],
+                // 6 cases, not 6 scenarios — the completion badge's "6 scenarios" counts
+                // Challenge items and is a different number that happens to match here.
+                stepsTotal: 6, stepLabel: 'cases reached', stepBucket: 1, scored: false,
+                isComplete: d => d.completed === true,
+                scoreOf: () => null,
+                progressStep: p => (typeof p.highestUnlocked === 'number' ? p.highestUnlocked + 1 : 0),
+            },
+            {
+                id: 'rtt-challenge', name: 'Room to Think Challenge', category: 'Challenge',
+                gameNames: ['Room to Think Challenge'], launchNames: ['Room to Think Challenge'],
+                stepsTotal: 24, stepLabel: 'scenarios answered', stepBucket: 4, scored: true,
+                // 64 of 72 — the same bar as the Real World Ready Challenge, both 88.9%.
+                isComplete: d => typeof d.finalScore === 'number' && d.finalScore >= 64,
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: p => Object.keys(p.answeredScenarioScores || {}).length,
+            },
         ];
         const courseByGameName = {};
         const courseByLaunchName = {};
