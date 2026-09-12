@@ -175,6 +175,27 @@ service cloud.firestore {
       allow delete: if isAllowlistedAdmin();
     }
 
+    // 8b. NEW — Topic selections: what a student answered to "what do you want to get
+    //     better at?" in Comms (/js/message-hq.js). Deliberately the SAME shape as
+    //     course_feedback directly above, and for the same reasons: flat, top-level,
+    //     create-for-yourself, admin-read.
+    //
+    //     NOT student-readable, and that is the point rather than an oversight. A list of
+    //     what a child has repeatedly said they are bad at is a behavioural record about a
+    //     minor; nothing in the product reads it back to them, so nothing should be able
+    //     to. `create` is pinned to the requester's own uid so one student cannot file a
+    //     selection under another's name, exactly as the feedback rule does.
+    //
+    //     Every document carries ageTier (stamped in auth-core.js recordTopicSelection),
+    //     so an under-13 row can be found for a parental deletion request without joining
+    //     back to the user document — the same property that made course_feedback
+    //     answerable. It is listed in scripts/prune-telemetry.js for the same reason.
+    match /artifacts/{appId}/topic_selections/{selectionId} {
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read: if isAllowlistedAdmin();
+      allow delete: if isAllowlistedAdmin();
+    }
+
     // 9. NEW — Recruit Codes: a Learner Recruit's memorable passphrase (e.g.
     //    "arctic-fox-trot"), doubling as the portable copy of their identity + progress
     //    used to reclaim their account on a different device (Firebase's anonymous auth
