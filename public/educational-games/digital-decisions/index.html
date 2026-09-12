@@ -1650,9 +1650,12 @@
             // so scrolling ahead never spoils answers and never has to render 30 scenarios' worth of DOM upfront.
             function renderScenarioBlockHTML(scenarioIndex, state) {
                 if (state === 'locked') {
+                    const lockedQueuePos = categoryQueue.indexOf(scenarioIndex);
+                    const lockedDisplayNumber = lockedQueuePos !== -1 ? lockedQueuePos + 1 : scenarioIndex;
+                    const lockedDisplayTotal = lockedQueuePos !== -1 ? categoryQueue.length : SCENARIO_DATA.length;
                     return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" data-locked="true" class="scenario-block mb-10 max-w-xl mx-auto bg-white/60 rounded-2xl border border-dashed border-gray-300 p-8 text-center select-none">
                         <i data-lucide="lock" class="w-5 h-5 text-gray-300 mx-auto mb-2"></i>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Scenario ${scenarioIndex}</p>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Scenario ${lockedDisplayNumber} of ${lockedDisplayTotal}</p>
                         <p class="text-[11px] text-gray-400 mt-1">Answer the scenario above to continue</p>
                     </div>`;
                 }
@@ -1712,9 +1715,13 @@
 
                 const visualHtml = getScenarioTemplate(scene, data.title, choicesHtml, feedbackHtml);
 
+                const queuePos = categoryQueue.indexOf(scenarioIndex);
+                const displayNumber = queuePos !== -1 ? queuePos + 1 : scenarioIndex;
+                const displayTotal = queuePos !== -1 ? categoryQueue.length : SCENARIO_DATA.length;
+
                 return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" class="scenario-block mb-10 scroll-mt-4">
                     <section class="mb-4 border-b border-gray-200 pb-2 flex justify-between items-end max-w-xl mx-auto lg:max-w-none lg:px-2">
-                        <h2 class="text-xl font-heading font-bold text-allgood-dark">Scenario ${scenarioIndex}</h2>
+                        <h2 class="text-xl font-heading font-bold text-allgood-dark">Scenario ${displayNumber} of ${displayTotal}</h2>
                         <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">${isAnswered ? 'Reviewed' : 'Decide'}</span>
                     </section>
                     ${visualHtml}
