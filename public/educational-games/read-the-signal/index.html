@@ -636,7 +636,7 @@
     <span class="pill pill-danger">NOT SAFE</span>
   </div>
   <h1>Read the <span>Signal.</span></h1>
-  <p>15 real scenarios. No reading required. Can you spot what's really going on?</p>
+  <p>45 real scenarios, 10 a round. No reading required. Can you spot what's really going on?</p>
   <button class="start-btn" onclick="startGame()">Start</button>
   <p class="wordmark" style="margin-top:24px">Allgood Academy</p>
 </div>
@@ -920,6 +920,426 @@ const scenarios = [
     answer: "not-safe",
     category: "phishing",
     feedback: "apple-id-security.net is not Apple. Apple uses apple.com. Classic phishing."
+  },
+  {
+    id: "mia-ambassador-program",
+    sender: "Mia Rodriguez",
+    avatar: "M",
+    avatarBg: "#F8BBD0",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Instagram · Followed you 2 minutes ago",
+    body: "Hey! I saw your profile and I think you'd be <strong>PERFECT</strong> for our paid ambassador program. We send you free products, you post once a week. DM me your email and phone number to apply.",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Legitimate brand deals don't start with a cold DM from a stranger asking for your phone number. This is a data harvesting attempt."
+  },
+  {
+    id: "google-security-phishing",
+    sender: "Google",
+    avatar: "G",
+    avatarBg: "#E3F2FD",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: security-alert@google-accounts-verify.com",
+    body: "Your Google account has been accessed from an unfamiliar location. To prevent your account from being locked, verify your identity within 12 hours.",
+    detail: "Link: accounts.google-accounts-verify.com/verify",
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Google's domain is google.com. google-accounts-verify.com is a different domain entirely. The urgency and fake domain are the two tells."
+  },
+  {
+    id: "class-groupchat-lab-answers",
+    sender: "Class GroupChat",
+    avatar: "🧪",
+    avatarBg: "#E8F5E9",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "AP Bio group · 47 members · 11:34 PM",
+    body: "does anyone have the answers to tomorrow's lab worksheet? asking for a friend lol",
+    detail: null,
+    answer: "not-safe",
+    category: "social",
+    feedback: "Sharing answers to an assignment is academic dishonesty — even in a group chat, even as a joke. The record of you sending it exists."
+  },
+  {
+    id: "paypal-dispute-email",
+    sender: "PayPal",
+    avatar: "P",
+    avatarBg: "#E3F2FD",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: service@paypal.com",
+    body: "You sent $287.00 to GameStore_LLC. If you didn't authorize this transaction, click here to dispute it immediately.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "This is from PayPal's real domain. If you didn't make this purchase, disputing it through the official email is the right move — just verify by logging into PayPal directly rather than clicking the link."
+  },
+  {
+    id: "bereal-permissions",
+    sender: "BeReal",
+    avatar: "📸",
+    avatarBg: "#ECEFF1",
+    badge: "APP",
+    badgeClass: "badge-app",
+    context: "BeReal would like access to:",
+    body: "<strong>BeReal would like access to:</strong>",
+    detail: "📷 Camera (front and back) — to capture your authentic moment\n🎤 Microphone — to record audio with your BeReal\n📍 Location (while using app) — to show where your BeReal was taken",
+    answer: "safe",
+    category: "permissions",
+    feedback: "A photo-sharing app that needs your camera, microphone, and location while in use is asking for what it actually needs to work. These permissions make sense for this app."
+  },
+  {
+    id: "usps-smishing",
+    sender: "Unknown",
+    avatar: "?",
+    avatarBg: "#ECEFF1",
+    badge: "TEXT",
+    badgeClass: "badge-dm",
+    context: "SMS · Unknown number · 3:47 AM",
+    body: "Your package could not be delivered. Please confirm your address and pay the $2.99 redelivery fee here: usps-redelivery.net/confirm",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "USPS uses usps.com — not usps-redelivery.net. Smishing (SMS phishing) about package delivery is one of the most common scams. The 3:47 AM timing and fake domain are both red flags."
+  },
+  {
+    id: "jasmine-rumor-forward",
+    sender: "Jasmine K.",
+    avatar: "J",
+    avatarBg: "#FFFDE7",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Snapchat · Best Friends · Opened",
+    body: "ok don't tell anyone but I heard from someone that heard from someone that [student name] cheated on the last test. apparently the teacher already knows",
+    detail: null,
+    answer: "not-safe",
+    category: "social",
+    feedback: "Forwarding unverified rumors — even to one person — makes you part of the spread. \"Someone who heard from someone\" isn't a source. This could seriously damage someone who did nothing wrong."
+  },
+  {
+    id: "coinbase-unauthorized-link",
+    sender: "Coinbase",
+    avatar: "C",
+    avatarBg: "#E0F2F1",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: noreply@coinbase.com",
+    body: "You've successfully linked your bank account ending in 4521. Your first purchase of $50 in Bitcoin will process in 24 hours.",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Even though this appears to be from Coinbase's real domain, if you didn't do this — someone has access to your account. Don't click anything in the email. Go directly to coinbase.com and change your password immediately."
+  },
+  {
+    id: "free-music-downloader-permissions",
+    sender: "Free Music Downloader Pro",
+    avatar: "🎧",
+    avatarBg: "#FFF3E0",
+    badge: "APP",
+    badgeClass: "badge-app",
+    context: "App Store · Free · 2.1★ (6 reviews)",
+    body: "Download any song for free! No streaming required. Works offline.",
+    detail: "Permissions: Full network access · Read/write all files · Run at startup · Prevent device from sleeping",
+    answer: "not-safe",
+    category: "permissions",
+    feedback: "An app that \"downloads any song for free\" is almost certainly pirating copyrighted music. The permissions — especially writing all files and running at startup — are excessive and suspicious. Low star rating with few reviews is an additional warning."
+  },
+  {
+    id: "ms-thompson-draft-reminder",
+    sender: "Ms. Thompson",
+    avatar: "T",
+    avatarBg: "#F3E5F5",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: mthompson@lincolnhigh.edu · Sent 2:14 PM",
+    body: "Hi — just a reminder that your research paper draft is due Thursday at 11:59 PM via Turnitin. Let me know if you have any questions.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "School email domain, specific assignment details, no request for credentials or money, sent during school hours. This is what a legitimate teacher email looks like."
+  },
+  {
+    id: "roblox-free-robux-phishing",
+    sender: "Roblox Support",
+    avatar: "R",
+    avatarBg: "#FCE4EC",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Roblox · Direct Message",
+    body: "Congratulations! Your account has been selected for 10,000 free Robux. To claim your reward, we need to verify your account. Please share your username and password with this support agent.",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "No legitimate platform ever asks for your password — not even their own support team. Free currency giveaways on gaming platforms are almost always scams. This one is asking for the keys to your account."
+  },
+  {
+    id: "linkedin-connection-notification",
+    sender: "LinkedIn",
+    avatar: "L",
+    avatarBg: "#E3F2FD",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: jobs-noreply@linkedin.com",
+    body: "You have 3 new connection requests and 1 message waiting. Log in to see who wants to connect.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "LinkedIn's legitimate notification email domain, standard activity notification, no urgency, no request for credentials. This is normal platform email behavior."
+  },
+  {
+    id: "aiden-ai-essay-tool",
+    sender: "Aiden W.",
+    avatar: "A",
+    avatarBg: "#E8EAF6",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "Server: Study Group · #general · 8:23 PM",
+    body: "bro just use this AI tool to write your entire essay, I used it for the last three assignments and got A's on all of them, here's the link",
+    detail: null,
+    answer: "not-safe",
+    category: "social",
+    feedback: "Submitting AI-generated work as your own is academic dishonesty at most schools. The fact that it worked before doesn't make it safe — and clicking unknown links from server members carries its own risks."
+  },
+  {
+    id: "venmo-payment-received",
+    sender: "Venmo",
+    avatar: "💸",
+    avatarBg: "#E0F2F1",
+    badge: "NOTIF",
+    badgeClass: "badge-notif",
+    context: "Venmo app · Push notification",
+    body: "Payment received: Jordan T. paid you $25.00 for 'dinner last week' 🍕",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "A payment received from a contact you know, for something that matches your memory, through an app you use. No link, no request, no urgency. This is what a normal Venmo notification looks like."
+  },
+  {
+    id: "techrewards-survey-scam",
+    sender: "TechRewards Survey",
+    avatar: "$",
+    avatarBg: "#F9FBE7",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: rewards@techrewards-survey.net · Subject: You've been selected!",
+    body: "Complete a 2-minute survey and receive a $100 Amazon gift card! Limited to the first 500 respondents. Your email was selected from a verified list.",
+    detail: "Survey link: techrewards-survey.net/claim-now",
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Gift cards for surveys from unsolicited emails are a classic phishing pattern. The domain isn't Amazon. \"Selected from a verified list\" is meaningless. The $100 reward for 2 minutes of work doesn't exist."
+  },
+  {
+    id: "facebook-new-device-login",
+    sender: "Facebook",
+    avatar: "f",
+    avatarBg: "#E3F2FD",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: security@facebookmail.com",
+    body: "We noticed a login to your account from a new device in Austin, TX. If this was you, no action needed. If not, secure your account now.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "facebookmail.com is Facebook's legitimate email domain for notifications. No credential request, no fake urgency, clear instruction to ignore if it was you. This is what a real security notification looks like."
+  },
+  {
+    id: "dev-tools-pro-job-scam",
+    sender: "Dev_Tools_Pro",
+    avatar: "D",
+    avatarBg: "#ECEFF1",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Discord · DM · Account created 3 days ago",
+    body: "Hey, I noticed you're into coding. I have a paid internship opportunity — $800/week remote. Just need to verify you're serious by sending $50 via CashApp first as a deposit. Get it back on your first paycheck.",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Legitimate internships never ask for money upfront. \"Pay to prove you're serious\" is a job scam. The 3-day-old account and the CashApp request are both red flags."
+  },
+  {
+    id: "student-portal-permissions",
+    sender: "Your School",
+    avatar: "🎓",
+    avatarBg: "#E8F5E9",
+    badge: "APP",
+    badgeClass: "badge-app",
+    context: "Student Portal app · Permission request",
+    body: "<strong>Student Portal would like access to:</strong>",
+    detail: "📚 Your class schedule\n📋 Your assignments and grades\n🔔 Send you notifications about deadlines",
+    answer: "safe",
+    category: "permissions",
+    feedback: "A school app that needs your class schedule, grades, and deadline notifications is asking for exactly what it needs to do its job. These permissions match the app's purpose."
+  },
+  {
+    id: "crypto-millionaire-scam",
+    sender: "Crypto_Millionaire_2026",
+    avatar: "💰",
+    avatarBg: "#FFF3E0",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Instagram · 847 followers · DM",
+    body: "I turned $200 into $14,000 in 3 weeks using this method. I'm only sharing with 10 people. Send me $200 in Bitcoin and I'll show you exactly how. Proof in my stories.",
+    detail: null,
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Investment \"opportunities\" that require you to send cryptocurrency first are scams. Every time. The \"only 10 people\" urgency, the Instagram DM, and the Bitcoin request are all textbook signals."
+  },
+  {
+    id: "sofia-license-home-address",
+    sender: "Sofia M.",
+    avatar: "S",
+    avatarBg: "#F8BBD0",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "BeReal · Public · 4:12 PM",
+    body: "finally got my license!! 🚗",
+    detail: "📍 Location: 2847 Maple Street (home address visible)",
+    answer: "not-safe",
+    category: "social",
+    feedback: "Posting your home address publicly — even accidentally through a location tag — makes that information permanently available to anyone who sees the post. Worth a heads-up to Sofia before more people see it."
+  },
+  {
+    id: "spotify-receipt-email",
+    sender: "Spotify",
+    avatar: "🎵",
+    avatarBg: "#E8F5E9",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: no-reply@spotify.com · Subject: Your receipt",
+    body: "Thanks for your purchase! Spotify Premium Family Plan — $15.99/month. Your next billing date is October 12.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "Spotify's real domain, a standard billing receipt with specific details, no link asking you to do anything. If you recognize this purchase, it's legitimate. If not, go directly to spotify.com to check your account."
+  },
+  {
+    id: "anonymous-ngl-bullying",
+    sender: "Anonymous",
+    avatar: "?",
+    avatarBg: "#ECEFF1",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "Snapchat · NGL link in your story replies",
+    body: "you think you're so much better than everyone but you're actually really annoying and nobody actually likes you. just saying",
+    detail: null,
+    answer: "not-safe",
+    category: "social",
+    feedback: "Sending anonymous negative messages about someone — even through a third-party app — is a form of cyberbullying. The anonymity doesn't make it less harmful or less traceable."
+  },
+  {
+    id: "marcus-suspicious-link",
+    sender: "Marcus B.",
+    avatar: "M",
+    avatarBg: "#E0F2F1",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "iMessage · Contact · 6:41 PM",
+    body: "hey can you look at this link? someone posted something weird about you",
+    detail: "Link: tinyurl.com/xk9p2mw",
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "\"Someone posted something about you\" is one of the most common social engineering hooks — it triggers an emotional response that makes you click without thinking. Shortened URLs hide the destination. Verify with Marcus through a different channel before clicking anything."
+  },
+  {
+    id: "google-photos-storage",
+    sender: "Google Photos",
+    avatar: "📷",
+    avatarBg: "#FFFDE7",
+    badge: "NOTIF",
+    badgeClass: "badge-notif",
+    context: "Google Photos · Push notification",
+    body: "Your storage is almost full (14.8 GB of 15 GB used). Upgrade to Google One to get more storage.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "A notification from an app you use, about a real account limit, with no request for credentials or unusual links. Storage warnings from cloud services are normal. Check your actual storage in the app if you're unsure."
+  },
+  {
+    id: "flashlight-plus-permissions",
+    sender: "iPhone Setup",
+    avatar: "🔦",
+    avatarBg: "#ECEFF1",
+    badge: "APP",
+    badgeClass: "badge-app",
+    context: "New app installation · Flashlight+",
+    body: "<strong>Flashlight+ would like access to:</strong>",
+    detail: "📷 Camera\n🎤 Microphone\n📍 Location (always)\n📬 Read your contacts\n📂 All files on your device",
+    answer: "not-safe",
+    category: "permissions",
+    feedback: "A flashlight app only needs camera access to use the flash. Microphone, location, contacts, and all files have nothing to do with a flashlight. This is spyware behavior."
+  },
+  {
+    id: "principal-adams-fire-drill",
+    sender: "Principal Adams",
+    avatar: "P",
+    avatarBg: "#F3E5F5",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: padams@lincolnhigh.edu · 9:03 AM",
+    body: "Please share this with all students: We will be conducting a mandatory fire drill this Friday at 1:30 PM. All students should proceed to the designated assembly areas.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "School domain, appropriate sender, routine school communication, no requests for information or money. This is normal administrative email."
+  },
+  {
+    id: "steam-skin-giveaway-scam",
+    sender: "Steam",
+    avatar: "S",
+    avatarBg: "#E3F2FD",
+    badge: "DM",
+    badgeClass: "badge-dm",
+    context: "Steam · Friend request + message · Account created 1 week ago",
+    body: "Hey, I'm doing a giveaway for CS:GO skins worth $500. Just vote for my team on this site and you'll get a free skin added to your account. You'll need to log in with your Steam account.",
+    detail: "Link: steamcommunity-items.net/vote",
+    answer: "not-safe",
+    category: "phishing",
+    feedback: "Steam skin giveaways through third-party sites that require your login are account-stealing scams. steamcommunity-items.net is not Steam's domain (store.steampowered.com is). New account + too-good offer + fake domain = scam."
+  },
+  {
+    id: "fedex-delivery-notification",
+    sender: "Delivery Notification",
+    avatar: "📦",
+    avatarBg: "#FFF3E0",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: tracking@fedex.com · Subject: Your package is out for delivery",
+    body: "Your package (tracking #794683920471) is out for delivery today. Estimated arrival: between 2:00 PM – 6:00 PM. No signature required.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "FedEx's real domain, a specific tracking number, realistic delivery window, no request for action or credentials. If you're expecting a package, this is what a legitimate delivery notification looks like."
+  },
+  {
+    id: "kalani-coach-cuts-rumor",
+    sender: "Kalani T.",
+    avatar: "K",
+    avatarBg: "#E8EAF6",
+    badge: "POST",
+    badgeClass: "badge-post",
+    context: "Soccer team group chat · 23 members · 10:47 PM",
+    body: "guys I just found out Coach is planning to cut 3 people this week. heard it from someone on JV. don't tell anyone",
+    detail: null,
+    answer: "not-safe",
+    category: "social",
+    feedback: "Forwarding unverified information about someone's job or position — especially with \"don't tell anyone\" attached — spreads anxiety and could be completely wrong. If you're worried, talk to Coach directly."
+  },
+  {
+    id: "app-store-instagram-download",
+    sender: "App Store",
+    avatar: "🍎",
+    avatarBg: "#ECEFF1",
+    badge: "EMAIL",
+    badgeClass: "badge-email",
+    context: "From: no-reply@email.apple.com",
+    body: "Your Apple ID was used to download Instagram. If you made this purchase, you can disregard this email. If you did not make this purchase, click here to cancel and get a refund.",
+    detail: null,
+    answer: "safe",
+    category: "phishing",
+    feedback: "email.apple.com is Apple's legitimate email domain. A download confirmation with a clear \"ignore if this was you\" instruction is standard. The refund option is legitimate — go to reportaproblem.apple.com if needed, rather than clicking the email link."
   }
 ];
 
@@ -930,6 +1350,15 @@ const jodiMoments = [
   "The signals you catch get faster to spot. The ones that get through are the ones that look exactly like the real thing. That's worth sitting with.",
   "Being kind to your friends doesn't mean handing them your credentials. Those are different things."
 ];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const ROUND_SIZE = 10;
 const CATEGORY_LABELS = { privacy: 'Privacy', phishing: 'Phishing', permissions: 'Permissions', social: 'Social', safe: 'Safe reads' };
@@ -1008,7 +1437,7 @@ async function recordSession(outcome) {
 }
 
 function startGame() {
-  round = [...scenarios].sort(() => Math.random() - 0.5).slice(0, ROUND_SIZE);
+  round = shuffle(scenarios).slice(0, ROUND_SIZE);
   currentIndex = 0;
   score = 0;
   lives = 3;
