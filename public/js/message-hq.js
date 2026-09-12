@@ -16,11 +16,31 @@
     var scriptEl = document.currentScript;
     var source = (scriptEl && scriptEl.dataset.messageSource) || document.title || 'Unknown portal';
 
+    // The properties that decide whether this modal is SEEN AT ALL are set inline, not
+    // left to Tailwind classes — the same remedy identity-gate.js already carries, for
+    // the same reason: this markup is injected into pages that each ship their own
+    // purged CSS build, and it must not depend on what any of them happened to compile.
+    //
+    // The bundles were built by scanning .html only, so a utility used nowhere but here
+    // never got compiled. z-[9999] appears in no markup at all, so it was missing from
+    // EVERY bundle: the modal computed to `z-index:auto` and painted UNDERNEATH the
+    // dashboard's .screen-container (z-index:1, overflow:hidden). Tapping the message
+    // icon hazed the screen — backdrop-blur-sm did compile, because the dashboard's own
+    // markup uses it — and showed nothing else. bg-allgood-dark/90 survived only in the
+    // site-wide bundle, where three .html files happen to use it; on the four scoped
+    // GoodBlock bundles the scrim was missing too.
+    //
+    // The build now scans public/js/**/*.js as well, but these inline styles are what
+    // actually guarantee it: a stale or hand-edited bundle must never hide this again.
+    var MODAL_STYLE = 'position:fixed;inset:0;z-index:2147483000;' +
+        'background-color:rgba(76,76,76,0.9);' +   // allgood-dark @ 90%
+        'display:flex;align-items:center;justify-content:center;';
+
     function injectModal() {
         if (document.getElementById('message-modal')) return;
         var wrapper = document.createElement('div');
         wrapper.innerHTML =
-            '<div id="message-modal" class="hidden-modal fixed inset-0 z-[9999] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeMessageModal()">' +
+            '<div id="message-modal" style="' + MODAL_STYLE + '" class="hidden-modal fixed inset-0 z-[9999] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeMessageModal()">' +
                 '<div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">' +
                     '<button onclick="window.closeMessageModal()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>' +
                     '<div class="mb-4">' +
