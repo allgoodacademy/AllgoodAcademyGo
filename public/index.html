@@ -270,6 +270,37 @@ footer{background:var(--surface);padding:0 0 44px}
     </nav>
   </div>
 </div>
+<script>
+/* One control, two states. A visitor who already has a session should never be told to
+   sign in — they press Home on their dashboard, land here, and the top-right still said
+   "Sign in", which reads as "your session is gone".
+
+   Deliberately synchronous and deliberately HERE, immediately after the button rather
+   than with the click handler at the end of the body: this runs during parse, before
+   first paint, so a slow Chromebook never shows a beat of the wrong label.
+
+   Keyed on ag_signed_in (any session, guests included) and NOT ag_account, because a
+   guest mid-way through a Lab Pack is exactly who needs the way back. This replaces the
+   separately injected "Your dashboard" nav-link that used to sit beside the button: that
+   link was a .nav-link, which is display:none below 960px, so it never existed on a
+   phone at all. The button is not hidden, so relabelling it fixes phones too.
+
+   The flag only ever changes a WORD. It grants no access and reveals nothing — the
+   dashboard enforces its own entry either way — so reading the looser of the two flags
+   is safe here in a way it would not be for a gate.
+
+   Known, accepted: on a shared Chromebook a stale flag can offer "Your dashboard" to the
+   next student, pointing at someone else's progress. It costs one tap and self-corrects;
+   it is not a disclosure, since nothing is shown until /dashboard/ resolves a real
+   session. Do not "fix" this by naming the student here. */
+(function(){
+  try{
+    if(localStorage.getItem('ag_signed_in')!=='1')return;
+    var b=document.querySelector('.nav-signin');
+    if(b)b.textContent='Your dashboard';
+  }catch(e){/* storage blocked - button stays "Sign in", which is the safe default */}
+})();
+</script>
 
 <section class="hero">
   <div class="wrap">
@@ -483,21 +514,14 @@ swap.addEventListener('click',function(){answer(swap.dataset.next)});
 (function(){
   var btn=document.querySelector('.nav-signin');
   if(!btn)return;
-  btn.addEventListener('click',function(){location.href='/dashboard/?signin=1';});
-
-  /* A guest who has already started something is no longer bounced here (see the head
-     guard), so give them the way back rather than making them remember the URL. Only
-     for a session that exists but is not an account — an account holder never sees this
-     page, and a first-time visitor has nothing to go back to. Reuses the existing
-     .nav-link style and sits before Sign in, so the nav is unchanged for everyone else. */
-  try{
-    if(localStorage.getItem('ag_signed_in')!=='1'||localStorage.getItem('ag_account')==='1')return;
-    var a=document.createElement('a');
-    a.className='nav-link';
-    a.href='/dashboard/';
-    a.textContent='Your dashboard';
-    btn.parentNode.insertBefore(a,btn);
-  }catch(e){/* storage blocked - nav stays as it is */}
+  btn.addEventListener('click',function(){
+    /* Same flag the relabel above reads, so the label and the destination can never
+       disagree. A visitor with a session goes straight in; everyone else opens the
+       identity gate, which lives on the dashboard with the styles it was built against. */
+    var signedIn=false;
+    try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
+    location.href = signedIn ? '/dashboard/' : '/dashboard/?signin=1';
+  });
 })();
 </script>
 </body>
