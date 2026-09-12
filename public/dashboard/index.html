@@ -3198,12 +3198,25 @@
             localStorage.removeItem('aa_jlc_complete');
 
             // Home is a single tap now — no hidden hold-to-logout gesture. Logging out
-            // stays reachable from the profile menu; this button just scrolls home.
+            // stays reachable from the profile menu.
+            //
+            // This is the one place in the app where the home icon means the PUBLIC
+            // homepage rather than the dashboard: the student is already on their
+            // dashboard, so "home" can only mean allgoodacademy.com. Everywhere else —
+            // both Lab Pack hubs, all seven GoodBlocks, both Challenges — the same icon
+            // brings them back HERE.
+            //
+            // ?home=1 is required, not decoration. public/index.html sends an account
+            // holder (ag_account + ag_signed_in) straight back to /dashboard/, so a bare
+            // '/' would bounce them to the page they just left and the button would look
+            // broken. The param is that page's opt-out, the mirror of this page's own
+            // ?signin=1, and is deliberately left in the URL so a reload keeps them on
+            // the homepage instead of yanking them back.
             const homeBtn = document.getElementById('btn-home');
             if(homeBtn) {
                 homeBtn.addEventListener('click', () => {
                     sfx.tick();
-                    document.getElementById('page-dashboard').scrollTop = 0;
+                    window.location.href = '/?home=1';
                 });
             }
 
