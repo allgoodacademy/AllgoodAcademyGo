@@ -1,16 +1,21 @@
 #!/usr/bin/env node
-// Deletes every guest/passphrase account (Firebase Anonymous Auth user) and everything
-// keyed to it. Written for the Sep 2026 cleanup: the recruit-code passphrase flow shipped
-// and no real student had signed in yet, so every anonymous account on file was internal
-// testing, not product data.
+// Deletes every passphrase/recruit-code account and everything keyed to it. Written for
+// the Sep 2026 cleanup: the recruit-code flow shipped Sep 3rd and no real student has used
+// it since, so every account carrying a recruitCode is internal testing, not product data.
 //
-// This is NOT a general-purpose "delete guests" switch — it deletes ALL anonymous accounts
-// unconditionally. Do not run this again once real students are using recruit codes; by
-// then "anonymous" will mean "real student who hasn't gone 13+" and this script would wipe
-// them. It exists for this one historical cleanup and should be treated as unsafe to reuse
-// without adding a real is-test marker first (see docs/insider-analytics.md).
+// IMPORTANT: this targets accounts with a recruitCode on file, NOT every anonymous Auth
+// user. Anonymous ("Continue as Guest") logins existed before Sep 3rd too, and some of
+// those pre-date the passphrase flow entirely — they may be real students who used the
+// site before recruit codes existed, so they are deliberately left alone. Only an account
+// whose artifacts/{appId}/users/{uid} doc has a non-empty `recruitCode` field is targeted.
 //
-// For each anonymous Auth user this deletes:
+// This is NOT a general-purpose "delete guests" switch. Do not run this again once real
+// students are using recruit codes; by then a recruitCode would mean "real student who
+// hasn't gone 13+" and this script would wipe them. It exists for this one historical
+// cleanup and should be treated as unsafe to reuse without adding a real is-test marker
+// first (see docs/insider-analytics.md).
+//
+// For each targeted account this deletes:
 //   - artifacts/{appId}/users/{uid}                        (and its recruitCode field)
 //   - artifacts/{appId}/users/{uid}/module_progress/*
 //   - artifacts/{appId}/users/{uid}/continuity_bank/*
@@ -60,17 +65,27 @@ function parseArgs(argv) {
   return args;
 }
 
-async function listAllAnonymousUsers(auth) {
-  const anonymous = [];
-  let pageToken;
-  do {
-    const page = await auth.listUsers(1000, pageToken);
-    for (const user of page.users) {
-      if (user.providerData.length === 0) anonymous.push(user);
-    }
-    pageToken = page.pageToken;
-  } while (pageToken);
-  return anonymous;
+// The only reliable "this is a passphrase account" signal is a recruitCode on file — NOT
+// anonymous-provider Auth users, since plain "Continue as Guest" logins predate Sep 3rd
+// and may be real students. Union two sources in case one side is ever out of sync:
+//   - users/{uid} docs that carry a non-empty recruitCode field
+//   - recruit_codes/{code} docs, each of which carries the owning uid
+async function findRecruitCodeUids(db, appId) {
+  const uids = new Map(); // uid -> recruitCode, for logging
+
+  const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
+  for (const doc of usersSnap.docs) {
+    const code = doc.get('recruitCode');
+    if (code) uids.set(doc.id, code);
+  }
+
+  const codesSnap = await db.collection('artifacts').doc(appId).collection('recruit_codes').get();
+  for (const doc of codesSnap.docs) {
+    const uid = doc.get('uid');
+    if (uid) uids.set(uid, uids.get(uid) || doc.id);
+  }
+
+  return uids;
 }
 
 async function deleteDocsInBatches(db, refs, { live, label }) {
@@ -130,22 +145,22 @@ async function main() {
     (args.keepUids.size ? ` keeping=${[...args.keepUids].join(',')}` : '')
   );
 
-  const anonymousUsers = await listAllAnonymousUsers(auth);
-  const targets = anonymousUsers.filter((u) => !args.keepUids.has(u.uid));
+  const recruitCodeUids = await findRecruitCodeUids(db, args.appId);
+  const targetUids = [...recruitCodeUids.keys()].filter((uid) => !args.keepUids.has(uid));
 
   console.log(
-    `[delete-guest-accounts] found ${anonymousUsers.length} anonymous auth user(s), ` +
-    `${targets.length} targeted for deletion (${anonymousUsers.length - targets.length} kept)`
+    `[delete-guest-accounts] found ${recruitCodeUids.size} account(s) with a recruitCode on file, ` +
+    `${targetUids.length} targeted for deletion (${recruitCodeUids.size - targetUids.length} kept)`
   );
 
-  for (const user of targets) {
-    console.log(`[delete-guest-accounts] ${args.live ? 'deleting' : 'would delete'} uid=${user.uid} created=${user.metadata.creationTime}`);
-    await deleteAccount(db, { appId: args.appId, uid: user.uid, live: args.live });
+  for (const uid of targetUids) {
+    console.log(`[delete-guest-accounts] ${args.live ? 'deleting' : 'would delete'} uid=${uid} recruitCode=${recruitCodeUids.get(uid)}`);
+    await deleteAccount(db, { appId: args.appId, uid, live: args.live });
   }
 
-  if (args.live && targets.length > 0) {
-    for (let i = 0; i < targets.length; i += 1000) {
-      const chunk = targets.slice(i, i + 1000).map((u) => u.uid);
+  if (args.live && targetUids.length > 0) {
+    for (let i = 0; i < targetUids.length; i += 1000) {
+      const chunk = targetUids.slice(i, i + 1000);
       const result = await auth.deleteUsers(chunk);
       console.log(`[delete-guest-accounts] auth deleteUsers: success=${result.successCount} failure=${result.failureCount}`);
       for (const err of result.errors) {
@@ -155,7 +170,7 @@ async function main() {
   }
 
   console.log(
-    `[delete-guest-accounts] done. ${args.live ? 'deleted' : 'would delete'} ${targets.length} account(s).` +
+    `[delete-guest-accounts] done. ${args.live ? 'deleted' : 'would delete'} ${targetUids.length} account(s).` +
     (args.live ? '' : ' Re-run with --live to actually delete.')
   );
 }
@@ -167,4 +182,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, listAllAnonymousUsers };
+module.exports = { parseArgs, findRecruitCodeUids };
