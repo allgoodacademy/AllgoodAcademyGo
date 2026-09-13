@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Rumor Mill — Allgood Academy</title>
+<link rel="stylesheet" href="/assets/css/tailwind.min.css">
+<script src="/assets/js/lucide.min.js"></script>
+<!-- Shared identity module — see /js/auth-core.js. -->
+<script type="module" src="/js/auth-core.js"></script>
+<!-- Shared identity gate (age question / Sign In / Recruit Code) — see /js/identity-gate.js.
+     Loading this does NOT put a login wall on the game: the gate only ever opens when
+     something explicitly calls window.AuthGate.offerSave()/ensureIdentified(), same as
+     every GoodBlock, Read the Signal, and Before You Send. Here that's the end-screen
+     save offer. -->
+<script type="module" src="/js/identity-gate.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Required by /js/identity-gate.js's injected #ag-modal — copied verbatim from
+     read-the-signal/index.html and before-you-send/index.html. */
+  .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+  .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+  .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+  /* Mobile hardening for #ag-modal — same fix as the other two games (a backdrop-filter
+     over a busy background is a known cause of an invisible, fully-blocking overlay on
+     mobile Safari/Android WebViews). */
+  #ag-modal { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  #ag-modal > div { max-height: 90dvh; max-height: 90vh; overflow-y: auto; }
+
+  :root {
+    --teal: #357889;
+    --orange: #D34716;
+    --cream: #FBF6EE;
+    --dark: #0F1923;
+    --dark-card: #1C2E3A;
+    --muted: #7A909F;
+    --warm-white: #F8F4EE;
+    --true-color: #2E7D52;
+    --false-color: #C0392B;
+  }
+
+  /* =============================================
+     DASHBOARD CHASSIS — copied verbatim from before-you-send/index.html, which itself
+     is copied verbatim from public/dashboard/index.html. Do not hand-tune these values
+     here — change the dashboard, then re-copy to all three games.
+     ============================================= */
+  body {
+    font-family: Verdana, sans-serif;
+    background-color: #0f172a;
+    min-height: 100vh;
+    min-height: 100dvh;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #bg-video-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: -50;
+    overflow: hidden;
+  }
+
+  #bg-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 1.0;
+  }
+
+  .tablet-frame {
+    height: 88vh;
+    width: auto;
+    aspect-ratio: 16/10;
+    max-width: min(1700px, 94vw);
+    max-height: 96vh;
+    min-height: 0;
+    min-width: 0;
+    background-image:
+        radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+        radial-gradient(circle at 100% 100%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+        linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow:
+        inset 1px 1px 2px rgba(255,255,255, 0.6),
+        inset -1px -1px 2px rgba(0,0,0, 0.8),
+        0 30px 60px -12px rgba(0, 0, 0, 0.8),
+        0 0 0 1px #111;
+    border: 1px solid #333;
+    position: relative;
+    margin: 20px auto;
+    transition: width 0.3s, height 0.3s, padding 0.3s;
+  }
+
+  .tablet-frame::before {
+    content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border-radius: 6px; background: #111; z-index: 0;
+  }
+
+  .screen-container {
+    width: 100%; height: 100%;
+    background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    position: relative; z-index: 1; overflow: hidden;
+    display: flex; flex-direction: column;
+    border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+  }
+
+  .navbar-content { flex: 0 0 60px; z-index: 30; background: rgba(15, 25, 35, 0.92); backdrop-filter: blur(5px); border-bottom: 1px solid rgba(255,255,255,0.1); color: white; position: relative; }
+
+  @media (max-width: 640px) {
+    body {
+        padding: 0;
+        align-items: flex-start;
+        background-image: none;
+        background-color: #f8fafc;
+    }
+    .tablet-frame {
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background-image: none !important;
+        aspect-ratio: auto !important;
+    }
+    .tablet-frame::before { display: none; }
+    .screen-container {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    main { padding: 0 !important; }
+  }
+
+  /* Home popover — copied verbatim from the other two games */
+  .home-popover-wrap { position: relative; }
+  .home-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    padding: 6px;
+    min-width: 190px;
+    z-index: 50;
+  }
+  .home-popover.show { display: block; }
+  .home-popover button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: Verdana, sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0F1923;
+    cursor: pointer;
+  }
+  .home-popover button:hover { background: #f0f0f0; }
+
+  /* --- Game screen: content area inside the chassis --- */
+  .trm-page {
+    flex: 1 1 auto;
+    position: relative;
+    overflow-y: auto;
+    background: var(--dark);
+    color: var(--cream);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 28px 24px;
+  }
+
+  /* ── INTRO ── */
+  #intro { text-align: center; max-width: 440px; margin: auto 0; }
+  #intro h1 { font-family: Georgia, serif; font-size: clamp(2rem,6vw,2.8rem); font-weight: 700; color: var(--cream); line-height: 1.1; margin-bottom: 12px; }
+  #intro h1 em { color: var(--orange); font-style: normal; }
+  #intro p { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 28px; }
+  .start-btn {
+    background: var(--orange); color: white; border: none;
+    padding: 14px 40px; border-radius: 50px;
+    font-family: Verdana, sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+  }
+  .start-btn:hover { opacity: 0.9; transform: scale(1.02); }
+  .wordmark { font-family: Georgia, serif; font-size: 0.8rem; color: rgba(255,255,255,0.2); margin-top: 16px; letter-spacing: 0.04em; }
+
+  /* ── GAME ── */
+  #game { display: none; width: 100%; max-width: 560px; margin: auto 0; flex-direction: column; align-items: center; }
+
+  /* Network visualization */
+  .network { width: 100%; height: 110px; position: relative; margin-bottom: 14px; flex-shrink: 0; }
+  .network svg { width: 100%; height: 100%; }
+  .node-circle { fill: rgba(255,255,255,0.08); stroke: rgba(255,255,255,0.15); stroke-width: 1.5; transition: all 0.4s; }
+  .node-circle.you { fill: rgba(53,120,137,0.3); stroke: var(--teal); stroke-width: 2; }
+  .node-circle.lit-true { fill: rgba(46,125,82,0.4); stroke: var(--true-color); stroke-width: 2; }
+  .node-circle.lit-false { fill: rgba(192,57,43,0.4); stroke: var(--false-color); stroke-width: 2; }
+  .node-circle.lit-stopped { fill: rgba(255,255,255,0.15); stroke: rgba(255,255,255,0.4); stroke-width: 2; }
+  .node-label { fill: rgba(255,255,255,0.4); font-size: 9px; font-family: Verdana,sans-serif; text-anchor: middle; }
+  .node-label.you-label { fill: var(--teal); font-weight: 700; }
+  .edge { stroke: rgba(255,255,255,0.08); stroke-width: 1; transition: stroke 0.4s; }
+  .edge.active-true { stroke: var(--true-color); stroke-width: 1.5; opacity: 0.6; }
+  .edge.active-false { stroke: var(--false-color); stroke-width: 1.5; opacity: 0.6; }
+  .edge.active-stopped { stroke: rgba(255,255,255,0.35); stroke-width: 1.5; opacity: 0.6; }
+
+  .hud { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .hud-score { font-size: 13px; color: var(--muted); font-weight: 700; }
+  .hud-score span { color: var(--cream); font-size: 18px; }
+  .hud-progress { display: flex; gap: 5px; }
+  .hud-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: background 0.3s; }
+  .hud-dot.done { background: var(--teal); }
+  .hud-dot.current { background: var(--orange); }
+
+  .countdown-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-bottom: 14px; overflow: hidden; }
+  .countdown-fill { height: 100%; border-radius: 2px; background: var(--teal); transition: width 1s linear, background 0.5s; }
+  .countdown-fill.urgent { background: #e74c3c; }
+
+  .msg-card { background: var(--warm-white); border-radius: 20px; width: 100%; overflow: hidden; margin-bottom: 14px; animation: cardIn 0.3s ease; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .msg-header { padding: 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.06); display: flex; align-items: center; gap: 10px; }
+  .msg-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; color: white; }
+  .msg-meta { flex: 1; min-width: 0; }
+  .msg-sender { font-size: 13px; font-weight: 700; color: #0F1923; }
+  .msg-sub { font-size: 10px; color: #8a9fac; }
+  .forward-count { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; flex-shrink: 0; white-space: nowrap; }
+  .fc-low { background: #f0f4f6; color: #7A909F; }
+  .fc-mid { background: #FFF3E0; color: #E65100; }
+  .fc-high { background: #FDEAEA; color: #C0392B; }
+  .msg-body { padding: 14px 16px; font-size: 14px; color: #1a1a1a; line-height: 1.6; }
+  .msg-claim { font-weight: 700; color: #0F1923; margin-bottom: 6px; }
+  .msg-detail { font-size: 11px; color: #555; margin-top: 8px; padding: 8px 10px; background: #f0ece6; border-radius: 6px; font-style: italic; }
+  .msg-source { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 10px; color: #8a9fac; }
+
+  .verify-panel { display: none; background: var(--dark-card); border-radius: 14px; width: 100%; padding: 16px; margin-bottom: 14px; animation: cardIn 0.25s ease; }
+  .verify-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.06em; margin-bottom: 8px; }
+  .verify-result { font-size: 13px; color: var(--cream); line-height: 1.6; }
+  .verify-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .verify-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: vdot 1s ease-in-out infinite; }
+  .verify-dot:nth-child(2) { animation-delay: 0.2s; }
+  .verify-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes vdot { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; width: 100%; }
+  .action-btn { padding: 16px 8px; border: none; border-radius: 14px; font-family: Verdana, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.1s, opacity 0.1s; display: flex; flex-direction: column; align-items: center; gap: 7px; letter-spacing: 0.02em; }
+  .action-btn:hover { transform: scale(1.03); }
+  .action-btn svg { width: 20px; height: 20px; }
+  .btn-forward { background: #fff3f0; color: var(--orange); }
+  .btn-verify { background: #EEF6F9; color: var(--teal); }
+  .btn-verify.verifying { opacity: 0.6; cursor: not-allowed; }
+  .btn-verify.done { background: #e8f5ee; color: var(--true-color); }
+  .btn-stop { background: #f0f4f6; color: #555; }
+
+  /* ── CONSEQUENCE ── */
+  #consequence { display: none; width: 100%; max-width: 560px; margin: auto 0; flex-direction: column; align-items: center; }
+  .consequence { width: 100%; animation: cardIn 0.4s ease; text-align: center; }
+  .consequence-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 12px; }
+  .consequence-scene { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.75; margin-bottom: 16px; text-align: left; font-family: Georgia, serif; }
+  .consequence-mechanism { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 20px; padding: 14px 16px; background: rgba(255,255,255,0.04); border-radius: 12px; text-align: left; }
+  .next-btn { background: var(--teal); color: white; border: none; padding: 14px 36px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; transition: opacity 0.15s; }
+  .next-btn:hover { opacity: 0.9; }
+
+  /* ── END ── */
+  #end { display: none; text-align: center; max-width: 440px; margin: auto 0; }
+  .end-score { font-family: Georgia, serif; font-size: clamp(3.5rem,12vw,5rem); font-weight: 700; color: var(--orange); line-height: 1; }
+  .end-label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; font-weight: 700; margin-bottom: 20px; }
+  .end-breakdown { width: 100%; background: rgba(255,255,255,0.04); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
+  .end-row { display: flex; justify-content: space-between; font-size: 12px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .end-row:last-child { border: none; }
+  .end-row-label { color: var(--muted); }
+  .end-row-val { font-weight: 700; color: var(--cream); }
+  .jodi-moment { width: 100%; background: var(--teal); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
+  .jodi-moment-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; margin-bottom: 6px; }
+  .jodi-moment-text { font-family: Georgia, serif; font-size: 13px; color: white; line-height: 1.65; font-style: italic; }
+  .deeper-card { width: 100%; background: rgba(53,120,137,0.14); border: 1px solid rgba(53,120,137,0.35); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
+  .deeper-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.08em; margin-bottom: 8px; }
+  .deeper-msg { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.65; margin-bottom: 14px; }
+  .deeper-btn { background: var(--teal); color: white; border: none; padding: 12px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; width: 100%; }
+  .play-again-btn { background: var(--orange); color: white; border: none; padding: 14px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 8px; }
+  .hub-btn { background: transparent; color: var(--cream); border: 1px solid rgba(255,255,255,0.15); padding: 12px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 12px; cursor: pointer; width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- ORBITAL LINK: Static Feed Injection — same space background as the dashboard -->
+<div id="bg-video-container">
+  <img id="bg-image" src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Orbital View">
+</div>
+
+<main class="flex-grow flex items-center justify-center py-8">
+  <div class="tablet-frame">
+    <div class="screen-container" id="screen">
+
+      <header class="navbar-content flex items-center justify-between px-6 shadow-md relative z-30">
+        <div class="flex items-center overflow-hidden">
+          <div class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate select-none uppercase">
+            ALLGOOD ACADEMY <span class="opacity-60 text-sm font-normal">| Games</span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-1 shrink-0 relative">
+          <div class="home-popover-wrap">
+            <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home" onclick="toggleHomePopover(event)">
+              <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+            </button>
+            <div class="home-popover" id="home-popover">
+              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/'; })">Return to dashboard</button>
+              <button onclick="window.AuthGate.guardedLeave(handleRestartFromPopover)">Restart game</button>
+              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse games</button>
+              <button onclick="window.location.href='/dashboard/?signin=1'">Already have an account? Sign in</button>
+            </div>
+          </div>
+          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">
+            <i data-lucide="gamepad-2" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="trm-page">
+
+<!-- INTRO -->
+<div id="intro">
+  <div style="font-size:48px;margin-bottom:16px">🌀</div>
+  <h1>The Rumor <em>Mill.</em></h1>
+  <p>10 messages. Forward it, verify it, or stop it here.<br>Everything you forward spreads — truth and damage alike.</p>
+  <button class="start-btn" onclick="startGame()">Start</button>
+  <div class="wordmark">Allgood Academy · Free for all learners</div>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div class="network" id="network"></div>
+  <div class="hud">
+    <div class="hud-score">Score <span id="scoreVal">0</span></div>
+    <div class="hud-progress" id="progressDots"></div>
+  </div>
+  <div class="countdown-bar"><div class="countdown-fill" id="timerFill" style="width:100%"></div></div>
+  <div class="msg-card" id="msgCard"></div>
+  <div class="verify-panel" id="verifyPanel"></div>
+  <div class="actions">
+    <button class="action-btn btn-forward" onclick="choose('forward')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+      Forward
+    </button>
+    <button class="action-btn btn-verify" id="verifyBtn" onclick="doVerify()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      Verify
+    </button>
+    <button class="action-btn btn-stop" onclick="choose('stop')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      Stop it
+    </button>
+  </div>
+</div>
+
+<!-- CONSEQUENCE -->
+<div id="consequence"></div>
+
+<!-- END -->
+<div id="end"></div>
+
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// truth: whether the claim is real. category: misinformation | accuracy | reputation —
+// used for Firestore telemetry only (no on-screen breakdown, same scope as Before You Send).
+const scenarios = [
+  { id:"unknown-breaking-lincoln-high-is-cancelling", sender:"Unknown", avatarColor:"#8a9fac", avatarText:"?",
+    sub:`Forwarded 47 times · Unknown source`, forwardCount:47,
+    claim:`BREAKING: Lincoln High is cancelling finals this semester due to a 'grading system error.' Admin confirmed it this morning.`, detail:`No link. No screenshot. Just a claim.`, source:`Anonymous · 0 followers`,
+    truth:false,
+    verifyResult:`The Lincoln High website shows no announcement. The district's official Twitter posted this morning about a normal exam schedule.`,
+    forward:{ scene:`The message reaches 847 people by afternoon. Students skip studying. Finals happen as scheduled. Three people fail who would have passed.`, mechanism:`Virality isn't verification. The message spread because it was exciting, not because it was true.` },
+    stop:{ scene:`You don't forward it. Two people who got it from other sources ask you about it. You say you're not sure it's real. They check. It isn't.`, mechanism:`Stopping a message at your node isn't doing nothing. It's doing the right thing.` },
+    category:"misinformation"
+  },
+  { id:"maya-chen-psa-there-s-a-guy-following", sender:"Maya Chen", avatarColor:"#357889", avatarText:"M",
+    sub:`Forwarded 3 times · Friend`, forwardCount:3,
+    claim:`PSA: There's a guy following students home from the bus stop on Oak Street. Two people reported it to the school already. Stay safe.`, detail:`Sent from a friend you trust.`, source:`Maya Chen · 312 followers`,
+    truth:true,
+    verifyResult:`The school sent an alert two hours later confirming the report and advising students to walk in groups.`,
+    forward:{ scene:`More students see it. Several change their routes. The person is identified and reported to police the next day.`, mechanism:`Some information spreads because it should. This was safety-relevant and accurate.` },
+    stop:{ scene:`You stop it. Students who use that bus stop don't know. Two more incidents happen that week.`, mechanism:`Stopping accurate safety information causes real harm. Verify before you stop — this one was worth forwarding.` },
+    category:"accuracy"
+  },
+  { id:"sports-insider-22-your-school-s-football-coach-jus", sender:"Sports_Insider_22", avatarColor:"#D34716", avatarText:"SI",
+    sub:`Forwarded 124 times · Account you don't follow`, forwardCount:124,
+    claim:`Your school's football coach just got fired for stealing from the booster fund. My cousin works there and confirmed it.`, detail:`No news source. No school statement.`, source:`Sports_Insider_22 · Account created 3 weeks ago`,
+    truth:false,
+    verifyResult:`The coach's official bio is still on the school website. No local news has covered this. The account that sent it was created three weeks ago.`,
+    forward:{ scene:`The coach's kids see it. His wife calls the school in tears. He hasn't been fired. The rumor follows him for months.`, mechanism:`Accusations spread faster than corrections. Forwarding an unverified claim about a real person causes real damage — even when you're not the source.` },
+    stop:{ scene:`You don't forward it. The rumor dies faster because fewer people see it.`, mechanism:`You didn't start it, but you decided where it ended. That's the power of stopping something at your node.` },
+    category:"reputation"
+  },
+  { id:"health-facts-now-new-study-drinking-cold-water", sender:"Health_Facts_Now", avatarColor:"#6c5ce7", avatarText:"H",
+    sub:`Forwarded 892 times · Account you don't follow`, forwardCount:892,
+    claim:`New study: Drinking cold water after eating causes your blood to clot. Doctors are hiding this. Share before it gets deleted.`, detail:`'Share before it gets deleted' is the tell.`, source:`Health_Facts_Now · No website linked`,
+    truth:false,
+    verifyResult:`This claim has been debunked by the American Heart Association and appears on multiple misinformation databases. Cold water does not cause blood clots.`,
+    forward:{ scene:`Your grandmother sees it and stops drinking water with meals. She tells her friends. None of them change real health risks — just a harmless habit.`, mechanism:`Health misinformation is especially dangerous because people act on it. The 'share before it gets deleted' line is always a manipulation signal.` },
+    stop:{ scene:`You stop it. One less person spreading it. The chain breaks at your node.`, mechanism:`Skepticism about dramatic health claims is almost always warranted. 'Doctors are hiding this' is a red flag, not a credential.` },
+    category:"misinformation"
+  },
+  { id:"principal-s-office-reminder-school-picture-day-is", sender:"Principal's Office", avatarColor:"#2e7d52", avatarText:"P",
+    sub:`Forwarded 2 times · Official account`, forwardCount:2,
+    claim:`Reminder: School picture day is rescheduled to Thursday, October 3rd. Please wear your ID badge.`, detail:`Sent from the official school account.`, source:`Lincoln High School Official · Verified account`,
+    truth:true,
+    verifyResult:`The school calendar on the official website shows October 3rd as picture day. Same date.`,
+    forward:{ scene:`Students who missed the announcement know to show up Thursday. Three people who would have missed it say thanks.`, mechanism:`Official, verifiable, specific, actionable. This is exactly the kind of information that's worth forwarding.` },
+    stop:{ scene:`You don't forward it. Several students miss picture day.`, mechanism:`Stopping accurate, useful information from verified sources has real costs. This one was safe to forward.` },
+    category:"accuracy"
+  },
+  { id:"anonymous-someone-in-our-grade-tested", sender:"Anonymous", avatarColor:"#8a9fac", avatarText:"?",
+    sub:`Forwarded 56 times · Anonymous`, forwardCount:56,
+    claim:`Someone in our grade tested positive for mono and has been at school all week. Admin is covering it up.`, detail:`No name. No date. No source.`, source:`Anonymous tip · Cannot be verified`,
+    truth:false,
+    verifyResult:`The school nurse's office confirmed there are no current communicable disease alerts. No student has reported mono this semester.`,
+    forward:{ scene:`Three students call out sick out of fear. Parents call the school. The nurse spends her afternoon answering calls instead of helping students.`, mechanism:`Health rumors cause panic disproportionate to any real risk — especially when they're anonymous and unverifiable.` },
+    stop:{ scene:`You stop it. The panic doesn't spread to your contacts.`, mechanism:`Anonymous claims with no source and no verifiable detail are almost never worth forwarding. The standard for health information should be higher, not lower.` },
+    category:"misinformation"
+  },
+  { id:"local-news-alert-road-closure-alert-main-street", sender:"Local News Alert", avatarColor:"#D34716", avatarText:"LN",
+    sub:`Forwarded 8 times · Local news account`, forwardCount:8,
+    claim:`Road closure alert: Main Street between 4th and 7th Ave will be closed Saturday 8AM–4PM for the annual 5K race.`, detail:`From the local news Twitter account.`, source:`@LocalNews · Verified media account`,
+    truth:true,
+    verifyResult:`The city's website lists this closure on the events calendar. The race is registered.`,
+    forward:{ scene:`Your neighbor sees it and changes her Saturday plans. She avoids a 45-minute detour.`, mechanism:`Local, specific, verifiable, from a credible source. This is what good information sharing looks like.` },
+    stop:{ scene:`You stop it. People get stuck in traffic Saturday morning.`, mechanism:`Useful, verified, local information from a real source is worth sharing. This one didn't need to stop at you.` },
+    category:"accuracy"
+  },
+  { id:"truthseeker-99-the-school-board-voted-last", sender:"TruthSeeker_99", avatarColor:"#e74c3c", avatarText:"T",
+    sub:`Forwarded 2,341 times · Unknown account`, forwardCount:2341,
+    claim:`The school board voted last night to eliminate art and music programs starting next year. Parents are furious. SHARE THIS.`, detail:`2,341 forwards. No article. No meeting minutes.`, source:`TruthSeeker_99 · Account created last month`,
+    truth:false,
+    verifyResult:`The school board meeting minutes are public. Last night's agenda covered budget line items — no mention of art or music elimination. The superintendent posted a statement calling the claim false.`,
+    forward:{ scene:`Art teachers see it. Several update their resumes that night. The district spends a week issuing corrections. Community trust in the school board drops.`, mechanism:`The more times something has been forwarded, the more suspicious you should be — not less. Virality is not verification.` },
+    stop:{ scene:`You stop it at your node. Fewer people in your network panic.`, mechanism:`High forward counts are a manipulation signal, not a credibility signal. You did the right thing.` },
+    category:"misinformation"
+  },
+  { id:"jordan-t-my-friend-at-westside-said", sender:"Jordan T.", avatarColor:"#357889", avatarText:"J",
+    sub:`Forwarded 1 time · Friend`, forwardCount:1,
+    claim:`My friend at Westside said their school is closing early today because of a gas leak. Could affect buses.`, detail:`One forward. From a friend. About a specific, verifiable event.`, source:`Jordan T. · Trusted contact`,
+    truth:true,
+    verifyResult:`Local news confirms Westside Middle School closed at 1PM due to a gas leak reported at 11AM. Bus routes from that area are delayed.`,
+    forward:{ scene:`Three people in your group who take connecting buses change their pickup plans. Nobody gets stranded.`, mechanism:`Specific, local, time-sensitive, from a trusted source — and verifiable. This was worth forwarding quickly.` },
+    stop:{ scene:`You stop it. Two people miss their bus connection because they weren't warned.`, mechanism:`Not all unverified claims should stop. This was specific, time-sensitive, and from a trusted source. Verify fast when it matters.` },
+    category:"accuracy"
+  },
+  { id:"social-justice-now-a-student-at-jefferson-high", sender:"Social_Justice_Now", avatarColor:"#8e44ad", avatarText:"SJ",
+    sub:`Forwarded 445 times · Account you don't follow`, forwardCount:445,
+    claim:`A student at Jefferson High was expelled for wearing a hijab to school. The school is trying to cover it up. SHARE NOW.`, detail:`No student name. No date. No news coverage.`, source:`Social_Justice_Now · No location · 2 weeks old`,
+    truth:false,
+    verifyResult:`Jefferson High's administration issued a public statement. No student has been expelled. No dress code violation related to religious clothing has occurred. Local ACLU has no record of this case.`,
+    forward:{ scene:`The story gets picked up by a national account. Jefferson High receives hundreds of angry messages. Teachers are harassed. The student who supposedly was expelled doesn't exist.`, mechanism:`Even causes you care about can be hijacked by misinformation. Sharing something false in the name of justice still spreads damage.` },
+    stop:{ scene:`You pause. You check. You don't forward it. The story loses momentum at your node.`, mechanism:`Emotional urgency — especially around injustice — is designed to bypass your verification instinct. That's exactly when you need it most.` },
+    category:"reputation"
+  },
+  { id:"city-emergency-alert-flash-flood-warning-in-effect", sender:"City Emergency Alert", avatarColor:"#357889", avatarText:"CE",
+    sub:`Forwarded 4 times · Official city account`, forwardCount:4,
+    claim:`Flash flood warning in effect for the downtown area until 8PM. Avoid underpasses and low-lying roads.`, detail:null, source:`Official city account`,
+    truth:true,
+    verifyResult:`The National Weather Service confirms an active flash flood warning for the county until 8PM.`,
+    forward:{ scene:`Two people in your group change their after-school routes and avoid flooded underpasses.`, mechanism:`Time-sensitive, official, verifiable. This is exactly what emergency alerts are for.` },
+    stop:{ scene:`A friend drives through a flooded underpass anyway. Her car stalls.`, mechanism:`Safety information from verified official sources should spread. Speed matters here.` },
+    category:"accuracy"
+  },
+  { id:"school-library-the-library-will-be-closed", sender:"School Library", avatarColor:"#D34716", avatarText:"SL",
+    sub:`Forwarded 2 times · Official school account`, forwardCount:2,
+    claim:`The library will be closed Thursday and Friday this week for inventory. The computer lab in Room 114 is available as an alternative.`, detail:null, source:`Official school account`,
+    truth:true,
+    verifyResult:`The school website calendar lists the library closure for Thursday-Friday with Room 114 as the alternative.`,
+    forward:{ scene:`Three students who needed the library Thursday make alternative plans. Nobody wastes a trip.`, mechanism:`Official, specific, verifiable, and useful. Low-stakes but worth sharing.` },
+    stop:{ scene:`You stop it. Several students show up to a locked library.`, mechanism:`Not every piece of information needs verification — this one came from a verified account about a mundane closure.` },
+    category:"accuracy"
+  },
+  { id:"coach-williams-practice-moved-to-4-30-today", sender:"Coach Williams", avatarColor:"#6c5ce7", avatarText:"CW",
+    sub:`Forwarded 1 times · Verified school coach account`, forwardCount:1,
+    claim:`Practice moved to 4:30 today — field maintenance. Same location. Don't be late.`, detail:null, source:`Verified school coach account`,
+    truth:true,
+    verifyResult:`The athletic department's page confirms a maintenance window for the main field from 3-4:30 today.`,
+    forward:{ scene:`Three teammates show up at 4:30 instead of 3:30. Practice runs smoothly.`, mechanism:`Time-sensitive, from a verified source, about something that directly affects people you know. Forward fast.` },
+    stop:{ scene:`Half the team shows up at 3:30 and waits an hour in the wrong place.`, mechanism:`You had the information and kept it. Your teammates paid the cost.` },
+    category:"accuracy"
+  },
+  { id:"student-council-spirit-week-starts-monday-theme", sender:"Student Council", avatarColor:"#2e7d52", avatarText:"SC",
+    sub:`Forwarded 5 times · Official student council account`, forwardCount:5,
+    claim:`Spirit week starts Monday! Theme days: Monday=Pajamas, Tuesday=Decades, Wednesday=Sports, Thursday=Twin Day, Friday=School Colors.`, detail:null, source:`Official student council account`,
+    truth:true,
+    verifyResult:`The school's Instagram confirms the same schedule posted two days ago.`,
+    forward:{ scene:`More students participate because they knew what to wear.`, mechanism:`Fun, harmless, verified, community-building. Exactly the kind of thing worth spreading.` },
+    stop:{ scene:`You stop it. Several friends show up Monday in regular clothes and feel left out.`, mechanism:`Not everything worth stopping is dangerous. But not everything worth forwarding is serious either.` },
+    category:"accuracy"
+  },
+  { id:"local-fire-department-structure-fire-at-4th-and", sender:"Local Fire Department", avatarColor:"#8a9fac", avatarText:"LF",
+    sub:`Forwarded 11 times · Official verified account`, forwardCount:11,
+    claim:`Structure fire at 4th and Main — area closed to traffic. Emergency vehicles need access. Please use alternate routes.`, detail:null, source:`Official verified account`,
+    truth:true,
+    verifyResult:`Local news is live-streaming the fire. Road closure confirmed by three local outlets.`,
+    forward:{ scene:`Drivers in your contact list avoid the area. One avoids a 40-minute detour.`, mechanism:`Real-time, verifiable, safety-adjacent. This is the kind of information that spreads because it should.` },
+    stop:{ scene:`You stop it. Your dad drives into the closure and sits for 45 minutes.`, mechanism:`Fast-moving situations need fast information. Stopping this caused a real inconvenience.` },
+    category:"accuracy"
+  },
+  { id:"lunch-lady-lisa-pizza-friday-is-back-starting", sender:"Lunch Lady Lisa", avatarColor:"#e74c3c", avatarText:"LL",
+    sub:`Forwarded 3 times · School cafeteria staff account`, forwardCount:3,
+    claim:`Pizza Friday is BACK starting this week! The new supplier is in. Line forms in the main cafeteria only.`, detail:null, source:`School cafeteria staff account`,
+    truth:true,
+    verifyResult:`The cafeteria menu on the school website lists pizza for this Friday.`,
+    forward:{ scene:`Students who loved pizza Friday plan accordingly. Cafeteria has a good turnout.`, mechanism:`Trivial but true. Not everything worth sharing has high stakes.` },
+    stop:{ scene:`Your friends bring lunch from home unnecessarily.`, mechanism:`The cost of stopping a true message isn't always dramatic — but it's still a cost.` },
+    category:"accuracy"
+  },
+  { id:"national-weather-service-tornado-watch-in-effect-u", sender:"National Weather Service", avatarColor:"#8e44ad", avatarText:"NW",
+    sub:`Forwarded 7 times · Official government account`, forwardCount:7,
+    claim:`Tornado watch in effect until 9PM for [county]. This is a WATCH not a WARNING — conditions are favorable for tornadoes but none confirmed yet.`, detail:null, source:`Official government account`,
+    truth:true,
+    verifyResult:`weather.gov confirms the active tornado watch for the county.`,
+    forward:{ scene:`Families check the weather. Two households move to interior rooms when the watch becomes a warning an hour later.`, mechanism:`Official government weather alert, verifiable in seconds. This one wasn't close.` },
+    stop:{ scene:`You stop it. Neighbors don't know. One family is outside when the warning is issued.`, mechanism:`Emergency preparedness information from official sources should spread immediately.` },
+    category:"accuracy"
+  },
+  { id:"maya-chen-the-new-thai-place-on", sender:"Maya Chen", avatarColor:"#2460a7", avatarText:"MC",
+    sub:`Forwarded 2 times · Friend`, forwardCount:2,
+    claim:`The new Thai place on 5th Street does a student discount — 15% off with school ID. My sister works there.`, detail:null, source:`Friend`,
+    truth:true,
+    verifyResult:`The restaurant's Instagram confirms the student discount in their bio.`,
+    forward:{ scene:`Three friends use the discount that week.`, mechanism:`Useful, low-stakes, verifiable, from a trusted source. Share it.` },
+    stop:{ scene:`Nobody knows. Everybody keeps paying full price.`, mechanism:`The cost of caution here was just money. Not everything requires deep skepticism.` },
+    category:"accuracy"
+  },
+  { id:"nurse-johnson-reminder-students-who-need-medicatio", sender:"Nurse Johnson", avatarColor:"#e1306c", avatarText:"NJ",
+    sub:`Forwarded 1 times · School nurse account`, forwardCount:1,
+    claim:`Reminder: Students who need medication during school hours must have a medical authorization form on file. Forms available in the main office.`, detail:null, source:`School nurse account`,
+    truth:true,
+    verifyResult:`The school health policy page lists this requirement with a link to the form.`,
+    forward:{ scene:`Two students who needed medication get their forms signed before needing their medication.`, mechanism:`Policy reminders from official school health staff are worth sharing.` },
+    stop:{ scene:`A student has an allergic reaction and the nurse can't administer the EpiPen without authorization on file.`, mechanism:`This one had a real consequence. Health policy information from verified school staff should spread.` },
+    category:"accuracy"
+  },
+  { id:"transit-authority-route-22-buses-are-running", sender:"Transit Authority", avatarColor:"#00897b", avatarText:"TA",
+    sub:`Forwarded 6 times · Official transit account`, forwardCount:6,
+    claim:`Route 22 buses are running 15-20 minutes behind schedule today due to road construction on Central Ave. Plan accordingly.`, detail:null, source:`Official transit account`,
+    truth:true,
+    verifyResult:`The transit authority app shows the same delay on Route 22.`,
+    forward:{ scene:`Friends who take Route 22 leave earlier or make other arrangements.`, mechanism:`Real-time service information from an official source. Forward it.` },
+    stop:{ scene:`Three people miss their buses waiting at the wrong time.`, mechanism:`Transit delays are time-sensitive. Stopping useful information has real costs.` },
+    category:"accuracy"
+  },
+  { id:"ap-biology-teacher-the-ap-bio-exam-date", sender:"AP Biology Teacher", avatarColor:"#357889", avatarText:"AB",
+    sub:`Forwarded 3 times · Teacher email forwarded as screenshot`, forwardCount:3,
+    claim:`The AP Bio exam date has been moved to May 7th (from May 5th). This is confirmed by the College Board calendar update.`, detail:null, source:`Teacher email forwarded as screenshot`,
+    truth:true,
+    verifyResult:`The College Board website shows May 7th for AP Biology this year.`,
+    forward:{ scene:`Students adjust their study schedules. Nobody shows up on the wrong day.`, mechanism:`Verifiable, important, from a credible source. Exam date changes are worth sharing.` },
+    stop:{ scene:`Two students prepare for the wrong date and are underprepared on May 7th.`, mechanism:`Academic information that's verifiable and high-stakes should spread.` },
+    category:"accuracy"
+  },
+  { id:"jordan-t-the-park-behind-school-is", sender:"Jordan T.", avatarColor:"#D34716", avatarText:"JT",
+    sub:`Forwarded 2 times · Friend`, forwardCount:2,
+    claim:`The park behind school is closed this weekend for a private event. Gate will be locked. Don't plan to hang out there Saturday.`, detail:null, source:`Friend`,
+    truth:true,
+    verifyResult:`The parks department website lists a private rental for that park Saturday 8AM-8PM.`,
+    forward:{ scene:`Your friend group plans somewhere else. Nobody makes a wasted trip.`, mechanism:`Useful, verifiable, from someone who checked. Worth sharing.` },
+    stop:{ scene:`Four people bike to the park Saturday and find it locked.`, mechanism:`Low stakes but still a wasted trip. True information from trusted sources is usually worth forwarding.` },
+    category:"accuracy"
+  },
+  { id:"breaking-news-teen-scientists-confirm-phones-cause", sender:"Breaking_News_Teen", avatarColor:"#6c5ce7", avatarText:"BN",
+    sub:`Forwarded 1,247 times · Account created 2 days ago`, forwardCount:1247,
+    claim:`Scientists confirm: Phones cause brain tumors in teenagers at 3x the rate of adults. Big tech is suppressing the study.`, detail:null, source:`Account created 2 days ago`,
+    truth:false,
+    verifyResult:`The WHO's website has no such study. Major medical journals show no peer-reviewed research supporting this claim. The 'suppression' narrative is a common misinformation pattern.`,
+    forward:{ scene:`Parents panic. Several students have their phones confiscated. No study exists.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. One less person spreads it.`, mechanism:`'Big tech is suppressing' is a manipulation signal. Peer-reviewed health claims should come from peer-reviewed sources.` },
+    category:"misinformation"
+  },
+  { id:"edu-watch-22-your-school-s-test-scores-just", sender:"Edu_Watch_22", avatarColor:"#2e7d52", avatarText:"EW",
+    sub:`Forwarded 89 times · Unknown advocacy account`, forwardCount:89,
+    claim:`Your school's test scores just ranked LAST in the district. The report was buried on the district website. Teachers are furious.`, detail:null, source:`Unknown advocacy account`,
+    truth:false,
+    verifyResult:`The district's public data portal shows your school ranked 4th out of 12 — above average. No buried report exists.`,
+    forward:{ scene:`Teachers see it. Several parents call the principal. A week of damage control follows.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. The false ranking doesn't spread in your network.`, mechanism:`'Buried' documents that nobody can find are almost always fictional. Check the actual source first.` },
+    category:"reputation"
+  },
+  { id:"health-hack-daily-eating-ice-cream-within-30", sender:"Health_Hack_Daily", avatarColor:"#8a9fac", avatarText:"HH",
+    sub:`Forwarded 3,421 times · Wellness influencer account`, forwardCount:3421,
+    claim:`Eating ice cream within 30 minutes of exercise causes dangerous lactic acid buildup. Doctor confirmed. DO NOT do this.`, detail:null, source:`Wellness influencer account`,
+    truth:false,
+    verifyResult:`No medical basis for this claim. Lactic acid doesn't accumulate from food timing. This appears on multiple health misinformation lists.`,
+    forward:{ scene:`Your teammate avoids her post-practice treat for three months based on something that isn't real.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Nobody changes a harmless habit based on false information.`, mechanism:`Health claims that are this specific and this dramatic are usually wrong. 'Doctor confirmed' without naming a doctor is meaningless.` },
+    category:"misinformation"
+  },
+  { id:"anonymous-a-substitute-teacher-at-our", sender:"Anonymous", avatarColor:"#e74c3c", avatarText:"A",
+    sub:`Forwarded 234 times · Anonymous`, forwardCount:234,
+    claim:`A substitute teacher at our school was caught copying student IDs. Admin knows but hasn't done anything. WARN YOUR FRIENDS.`, detail:null, source:`Anonymous`,
+    truth:false,
+    verifyResult:`The district's HR office has no record of this. No student or parent has filed a report. The school principal released a statement saying this did not happen.`,
+    forward:{ scene:`The substitute gets threatening messages. She resigns. She didn't do anything wrong.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. An innocent person keeps her job.`, mechanism:`Anonymous claims about named individuals — even unnamed ones in a specific role — can destroy real lives. Verify before you harm someone.` },
+    category:"reputation"
+  },
+  { id:"science-truther-new-research-students-who-use", sender:"Science_Truther", avatarColor:"#8e44ad", avatarText:"ST",
+    sub:`Forwarded 5,601 times · Anonymous science account`, forwardCount:5601,
+    claim:`New research: Students who use phones before bed sleep 6x worse than those who don't. The sleep study is being hidden by device makers.`, detail:null, source:`Anonymous science account`,
+    truth:false,
+    verifyResult:`There IS research linking phone use to worse sleep — but not at 6x. The actual research shows modest effects. The '6x' figure appears nowhere in peer-reviewed literature. The 'hidden by device makers' claim is false.`,
+    forward:{ scene:`The false statistic spreads into a health presentation at school. Students cite it as fact in essays.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. The real (more modest) research doesn't get distorted.`, mechanism:`Exaggerating real research to make it more shareable is still misinformation. The kernel of truth doesn't justify the false number.` },
+    category:"misinformation"
+  },
+  { id:"local-gossip-411-word-is-the-student-council", sender:"Local_Gossip_411", avatarColor:"#2460a7", avatarText:"LG",
+    sub:`Forwarded 156 times · Anonymous gossip account`, forwardCount:156,
+    claim:`Word is the student council president got caught cheating on the midterm and is being removed from office. Source: someone in admin.`, detail:null, source:`Anonymous gossip account`,
+    truth:false,
+    verifyResult:`The student council president is still in office. No academic integrity case has been filed. The school's registrar confirms no leadership changes.`,
+    forward:{ scene:`The student council president loses three friendships. Her college application essay about leadership is questioned by her counselor.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. An elected student leader keeps her reputation intact.`, mechanism:`Gossip accounts with anonymous sources about named students are almost always wrong and always harmful.` },
+    category:"reputation"
+  },
+  { id:"viral-facts-if-you-get-a-call", sender:"Viral_Facts", avatarColor:"#e1306c", avatarText:"VF",
+    sub:`Forwarded 12,004 times · Viral content account`, forwardCount:12004,
+    claim:`If you get a call from your own phone number, answering it gives hackers access to your microphone permanently. Share to protect your family.`, detail:null, source:`Viral content account`,
+    truth:false,
+    verifyResult:`Answering a call from your own spoofed number does not grant microphone access. This is a persistent myth debunked by the FTC and major cybersecurity firms.`,
+    forward:{ scene:`Your grandmother stops answering her phone entirely for two weeks.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Nobody develops an irrational fear based on a technical impossibility.`, mechanism:`Fear-based tech myths spread fast because people want to protect their family. That urgency is exactly what makes them dangerous.` },
+    category:"misinformation"
+  },
+  { id:"parents-against-tech-the-school-board-voted-5-2", sender:"Parents_Against_Tech", avatarColor:"#00897b", avatarText:"PA",
+    sub:`Forwarded 891 times · Advocacy group`, forwardCount:891,
+    claim:`The school board voted 5-2 last night to ban all personal devices from campus starting next semester. No phones, no earbuds, nothing.`, detail:null, source:`Advocacy group`,
+    truth:false,
+    verifyResult:`Last night's school board meeting minutes are posted online. No device ban was voted on. The agenda covered a budget item and a field trip policy.`,
+    forward:{ scene:`Students panic. Parents call the district. The school board's phone line is overwhelmed for two days.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. The false vote doesn't spread in your network.`, mechanism:`School board meeting minutes are public record. They took 30 seconds to check. Always check official minutes before forwarding policy claims.` },
+    category:"misinformation"
+  },
+  { id:"citynews-unofficial-confirmed-the-city-is-adding", sender:"CityNews_Unofficial", avatarColor:"#357889", avatarText:"CU",
+    sub:`Forwarded 445 times · Unofficial city news parody account`, forwardCount:445,
+    claim:`CONFIRMED: The city is adding a 2% 'phone tax' on all data plans starting January 1st. City council approved it quietly.`, detail:null, source:`Unofficial city news parody account`,
+    truth:false,
+    verifyResult:`The city council's public meeting records show no such tax. The account's bio says 'parody/satire' in small print.`,
+    forward:{ scene:`Several families call their carriers to cancel plans. The carriers are overwhelmed with calls about a tax that doesn't exist.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Nobody wastes time on a nonexistent tax.`, mechanism:`'Unofficial' in an account name is a signal. 'Approved quietly' is almost always false. Always check original sources for government policy claims.` },
+    category:"misinformation"
+  },
+  { id:"anonymous-i-heard-from-someone-at", sender:"Anonymous", avatarColor:"#D34716", avatarText:"A",
+    sub:`Forwarded 67 times · Anonymous`, forwardCount:67,
+    claim:`I heard from someone at the hospital that there's been a spike in a new flu strain in our area that's worse than COVID. Hospitals are preparing for overflow.`, detail:null, source:`Anonymous`,
+    truth:false,
+    verifyResult:`The county health department has issued no alerts. Local hospital systems report normal capacity. No new flu strain has been identified in the area.`,
+    forward:{ scene:`Parents pull children from school. A grocery store is cleared of supplies. The county health department issues a special clarification statement.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. No unnecessary panic in your network.`, mechanism:`'I heard from someone at the hospital' is not a source. Health scares require official health department confirmation before spreading.` },
+    category:"misinformation"
+  },
+  { id:"truth-exposer-the-new-energy-drinks-in", sender:"Truth_Exposer", avatarColor:"#6c5ce7", avatarText:"TE",
+    sub:`Forwarded 2,301 times · Conspiracy-adjacent account`, forwardCount:2301,
+    claim:`The new energy drinks in the vending machines contain a compound linked to kidney damage in teens. The school knows and hasn't removed them.`, detail:null, source:`Conspiracy-adjacent account`,
+    truth:false,
+    verifyResult:`The FDA has not flagged any compound in the listed drinks. The 'linked to kidney damage' claim has no peer-reviewed basis. The account has previously spread false health claims.`,
+    forward:{ scene:`The school receives 40 parent complaints. The vending company loses a contract. No compound issue exists.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. A business doesn't lose a contract over a false claim.`, mechanism:`Product safety claims require regulatory confirmation. An account with a history of false claims is not a source.` },
+    category:"misinformation"
+  },
+  { id:"sports-scoop-daily-your-school-s-basketball-team-i", sender:"Sports_Scoop_Daily", avatarColor:"#2e7d52", avatarText:"SS",
+    sub:`Forwarded 334 times · Unofficial sports account`, forwardCount:334,
+    claim:`Your school's basketball team is being investigated for recruiting violations. Three players could be declared ineligible before playoffs.`, detail:null, source:`Unofficial sports account`,
+    truth:false,
+    verifyResult:`The state athletics association has no open investigation for your school. The athletic director confirmed no violations have been reported.`,
+    forward:{ scene:`Playoff ticket sales drop. Players' parents hire lawyers. The season is disrupted by something that isn't happening.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. The team's playoff run isn't derailed by a false rumor.`, mechanism:`Accusations about teams or players require official confirmation from the relevant governing body. Always.` },
+    category:"reputation"
+  },
+  { id:"food-safety-now-urgent-popular-fast-food-chain", sender:"Food_Safety_Now", avatarColor:"#8a9fac", avatarText:"FS",
+    sub:`Forwarded 1,892 times · Food safety advocacy account`, forwardCount:1892,
+    claim:`URGENT: [Popular fast food chain] near your school has had 12 cases of food poisoning reported this week. Health department inspection failed. Avoid.`, detail:null, source:`Food safety advocacy account`,
+    truth:false,
+    verifyResult:`The county health department's inspection database shows the restaurant passed its last inspection two months ago with no violations. No outbreak has been reported.`,
+    forward:{ scene:`The restaurant loses 60% of its business for two weeks. Three employees are laid off. No food poisoning cases occurred.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. A business doesn't get destroyed by a false claim.`, mechanism:`Health department inspection records are public. It took 90 seconds to check. A business's reputation is worth 90 seconds.` },
+    category:"reputation"
+  },
+  { id:"breaking-local-power-outage-scheduled-for-our", sender:"Breaking_Local", avatarColor:"#e74c3c", avatarText:"BL",
+    sub:`Forwarded 78 times · Account you don't recognize`, forwardCount:78,
+    claim:`Power outage scheduled for our neighborhood this Saturday 10AM-6PM for grid maintenance. Stock up on supplies.`, detail:null, source:`Account you don't recognize`,
+    truth:false,
+    verifyResult:`The power company's outage map shows no planned outages for your area this Saturday. No maintenance notice has been issued.`,
+    forward:{ scene:`Several families buy generators and ice. Spend money they didn't need to spend.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Families don't panic-buy for an outage that isn't coming.`, mechanism:`Utility companies always notify customers of planned outages. Check their official outage map — it took 20 seconds.` },
+    category:"misinformation"
+  },
+  { id:"wellness-truth-wearing-headphones-for-more-than", sender:"Wellness_Truth", avatarColor:"#8e44ad", avatarText:"WT",
+    sub:`Forwarded 4,567 times · Wellness influencer`, forwardCount:4567,
+    claim:`Wearing headphones for more than 1 hour per day causes permanent hearing damage in teens within 2 years. Audiologists are seeing it constantly but aren't allowed to say so publicly.`, detail:null, source:`Wellness influencer`,
+    truth:false,
+    verifyResult:`WHO guidelines recommend keeping volume below 85 decibels — duration alone isn't the risk factor. The 'not allowed to say so' claim has no basis. No professional body has issued this warning.`,
+    forward:{ scene:`Several students throw away their headphones. The real guidance — which is about volume, not time — never reaches them.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. People don't develop irrational fears, and the real (more nuanced) guidance isn't lost.`, mechanism:`'Aren't allowed to say so publicly' is a manipulation signal in health claims. Real health warnings come from real health organizations.` },
+    category:"misinformation"
+  },
+  { id:"anonymous-heads-up-someone-is-going", sender:"Anonymous", avatarColor:"#2460a7", avatarText:"A",
+    sub:`Forwarded 19 times · Anonymous`, forwardCount:19,
+    claim:`Heads up: Someone is going around the parking lot letting air out of tires. Three cars hit already. Check yours before you leave today.`, detail:null, source:`Anonymous`,
+    truth:false,
+    verifyResult:`School security has no reports of this. No student or staff member has reported a flat tire today. Parking lot cameras show normal activity.`,
+    forward:{ scene:`Students leave class early to check their tires. Three parents drive to school unnecessarily.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. No unnecessary disruption to the school day.`, mechanism:`Low-forward-count anonymous claims about immediate local events are often false. Verify with someone who can actually check.` },
+    category:"misinformation"
+  },
+  { id:"education-watch-your-school-district-just-approved", sender:"Education_Watch", avatarColor:"#e1306c", avatarText:"EW",
+    sub:`Forwarded 234 times · Education advocacy account`, forwardCount:234,
+    claim:`Your school district just approved a new policy requiring students to submit all social media passwords to their homeroom teacher. It passed last Tuesday.`, detail:null, source:`Education advocacy account`,
+    truth:false,
+    verifyResult:`No such policy exists. School board meeting minutes from last Tuesday show a discussion about homework policy. No social media password requirement has ever been proposed.`,
+    forward:{ scene:`Students delete social media accounts. Parents call lawyers. The district issues three separate clarification statements.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Students don't make decisions based on a policy that doesn't exist.`, mechanism:`Password-sharing policies would be front-page news. The absence of any coverage is a signal. Always check meeting minutes.` },
+    category:"misinformation"
+  },
+  { id:"communityalert-multiple-reports-of-a-person", sender:"CommunityAlert", avatarColor:"#00897b", avatarText:"C",
+    sub:`Forwarded 892 times · Account you don't recognize`, forwardCount:892,
+    claim:`Multiple reports of a person offering students rides home near the school bus stop. Police have been notified but no arrest yet. SHARE WITH EVERY PARENT.`, detail:null, source:`Account you don't recognize`,
+    truth:false,
+    verifyResult:`The police department's public information officer confirms no such reports have been filed. No incident has occurred at or near the bus stop.`,
+    forward:{ scene:`Parents flood the school phone lines. Bus stop attendance drops. A community is unnecessarily frightened.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You verify before forwarding. You check with the school. No incident occurred.`, mechanism:`Child safety rumors are the most emotionally manipulative type of misinformation precisely because the stakes feel highest. That urgency is why verification matters most.` },
+    category:"misinformation"
+  },
+  { id:"rival-school-fan-your-school-s-star-player-was", sender:"Rival_School_Fan", avatarColor:"#357889", avatarText:"RS",
+    sub:`Forwarded 445 times · Sports fan account`, forwardCount:445,
+    claim:`Your school's star player was caught using performance enhancing drugs. He's being quietly suspended before the championship. Inside source.`, detail:null, source:`Sports fan account`,
+    truth:false,
+    verifyResult:`The athletic director confirms no drug testing violations have occurred. The player is cleared and practicing normally.`,
+    forward:{ scene:`The player's college recruitment is affected. A coach who saw the rumor questions his character reference.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. A student-athlete's future isn't damaged by a rival fan's false claim.`, mechanism:`Rival fan accounts are not sources. Ever.` },
+    category:"reputation"
+  },
+  { id:"parent-network-alert-warning-the-school-cafeteria-", sender:"Parent_Network_Alert", avatarColor:"#D34716", avatarText:"PN",
+    sub:`Forwarded 1,203 times · Unofficial parent group`, forwardCount:1203,
+    claim:`WARNING: The school cafeteria has been failing health inspections for 3 months. Administration is hiding it to avoid bad press. Check what your kids are eating.`, detail:null, source:`Unofficial parent group`,
+    truth:false,
+    verifyResult:`The county health department's public database shows the cafeteria passed its last three inspections with no critical violations.`,
+    forward:{ scene:`Students stop eating at school. Several develop nutritional deficiencies from skipping lunch. Cafeteria staff receive threatening messages.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Nobody stops eating based on a false health claim.`, mechanism:`Health inspection records are public. Always check before accusing anyone of hiding them.` },
+    category:"reputation"
+  },
+  { id:"news-breaker-2026-just-in-major-earthquake-predict", sender:"News_Breaker_2026", avatarColor:"#6c5ce7", avatarText:"NB",
+    sub:`Forwarded 6,721 times · Anonymous breaking news account`, forwardCount:6721,
+    claim:`JUST IN: Major earthquake predicted for our region in the next 72 hours. Geologists are warning residents to prepare. Government hasn't announced yet.`, detail:null, source:`Anonymous breaking news account`,
+    truth:false,
+    verifyResult:`The USGS website confirms: earthquakes cannot be predicted. No geologist has made such a claim. This is a recurring hoax pattern.`,
+    forward:{ scene:`Families evacuate. Hotels fill up. A region is disrupted for 72 hours by something that can't happen.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Nobody evacuates unnecessarily.`, mechanism:`Earthquakes cannot be predicted — this is scientific consensus. Any claim of earthquake prediction is false by definition.` },
+    category:"misinformation"
+  },
+  { id:"tech-insider-pro-if-you-type-your-iphone", sender:"Tech_Insider_Pro", avatarColor:"#2e7d52", avatarText:"TI",
+    sub:`Forwarded 3,344 times · Tech commentary account`, forwardCount:3344,
+    claim:`If you type your iPhone passcode backwards it calls 911 automatically. Emergency feature Apple doesn't advertise. Could save your life — share this.`, detail:null, source:`Tech commentary account`,
+    truth:false,
+    verifyResult:`This feature does not exist on any iPhone model. Apple's support page has no record of it. It has been debunked repeatedly since 2016.`,
+    forward:{ scene:`Several people try it in non-emergencies. 911 dispatch receives calls.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. 911 dispatchers aren't bothered by accidental calls from a nonexistent feature.`, mechanism:`If Apple had this feature, Apple would advertise it. The logic of 'they don't want you to know' fails immediately.` },
+    category:"misinformation"
+  },
+  { id:"anonymous-someone-at-school-tested-positive", sender:"Anonymous", avatarColor:"#8a9fac", avatarText:"A",
+    sub:`Forwarded 31 times · Anonymous`, forwardCount:31,
+    claim:`Someone at school tested positive for COVID and came in anyway. Admin knows but school is staying open to avoid bad optics. Protect yourselves.`, detail:null, source:`Anonymous`,
+    truth:false,
+    verifyResult:`The school nurse's office confirms no COVID cases have been reported this week. The district's health protocols require immediate notification in such cases.`,
+    forward:{ scene:`40% of students stay home the next day. Three teachers are absent in solidarity. No case existed.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. The school day proceeds normally without unnecessary fear.`, mechanism:`Health scares with anonymous sources and 'admin is hiding it' framing follow a predictable misinformation pattern. Check with the school nurse's office directly.` },
+    category:"misinformation"
+  },
+  { id:"fitness-truth-science-confirmed-sitting-for-more", sender:"Fitness_Truth", avatarColor:"#e74c3c", avatarText:"FT",
+    sub:`Forwarded 2,109 times · Fitness influencer account`, forwardCount:2109,
+    claim:`SCIENCE CONFIRMED: Sitting for more than 4 hours straight causes irreversible cellular damage in teens. One study says it ages you 8 years.`, detail:null, source:`Fitness influencer account`,
+    truth:false,
+    verifyResult:`Research does link prolonged sitting to health risks, but not irreversible cellular damage and not the 8-year aging claim. No such study appears in any medical database.`,
+    forward:{ scene:`Students start standing at their desks. Teachers are flooded with requests. The exaggerated claim replaces the real (more nuanced) health guidance.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. The real guidance — break up sitting with movement every hour — doesn't get drowned out by a false dramatic claim.`, mechanism:`Exaggerated health claims crowd out accurate ones. The truth here is real but less dramatic than what was forwarded.` },
+    category:"misinformation"
+  },
+  { id:"local-watch-there-have-been-5-break-ins", sender:"Local_Watch", avatarColor:"#8e44ad", avatarText:"LW",
+    sub:`Forwarded 178 times · Neighborhood watch group`, forwardCount:178,
+    claim:`There have been 5 break-ins on Maple Street in the past week. Police aren't patrolling. Lock your doors and don't leave anything in your car.`, detail:null, source:`Neighborhood watch group`,
+    truth:false,
+    verifyResult:`The police department's public crime log shows one break-in on Maple Street in the past month — not five in a week. No pattern has been identified.`,
+    forward:{ scene:`Residents buy security systems they don't need. A neighborhood lives in unnecessary fear.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. The exaggerated number doesn't fuel unnecessary fear.`, mechanism:`Police crime logs are public. One incident became five in the retelling. Verify numbers, not just events.` },
+    category:"misinformation"
+  },
+  { id:"school-insider-rumor-is-the-principal-is", sender:"School_Insider", avatarColor:"#2460a7", avatarText:"SI",
+    sub:`Forwarded 89 times · Anonymous school gossip account`, forwardCount:89,
+    claim:`Rumor is the principal is getting fired before winter break. District is unhappy with test scores. Multiple teachers have been told.`, detail:null, source:`Anonymous school gossip account`,
+    truth:false,
+    verifyResult:`The district HR office confirms no administrative changes are planned. The principal attended a district leadership meeting yesterday.`,
+    forward:{ scene:`Teachers become anxious about job security. Students ask the principal directly. A normal school week is disrupted.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. A school community doesn't spend a week anxious about something that isn't happening.`, mechanism:`'Multiple teachers have been told' without naming any of them is not a source. Leadership changes go through official channels.` },
+    category:"reputation"
+  },
+  { id:"green-earth-now-the-water-in-our-city", sender:"Green_Earth_Now", avatarColor:"#e1306c", avatarText:"GE",
+    sub:`Forwarded 4,231 times · Environmental advocacy account`, forwardCount:4231,
+    claim:`The water in our city tested 200x over the safe limit for lead last month. The city is covering it up. Drink bottled water only.`, detail:null, source:`Environmental advocacy account`,
+    truth:false,
+    verifyResult:`The city's water quality report — required by law to be published quarterly — shows lead levels well within EPA safe limits. No violations have been reported.`,
+    forward:{ scene:`Families buy thousands of dollars of bottled water. The city's water utility is overwhelmed with calls. Legitimate water safety concerns become harder to raise in the future.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. A community doesn't panic-buy water based on a false claim.`, mechanism:`Water quality reports are legally required to be public. If the city was covering it up, the EPA would be investigating. Always check the actual report.` },
+    category:"misinformation"
+  },
+  { id:"sports-buzz-just-heard-the-championship-game", sender:"Sports_Buzz", avatarColor:"#00897b", avatarText:"SB",
+    sub:`Forwarded 556 times · Sports commentary account`, forwardCount:556,
+    claim:`Just heard the championship game has been moved from Friday to Saturday because the other school complained about the date. Nobody's been officially notified yet.`, detail:null, source:`Sports commentary account`,
+    truth:false,
+    verifyResult:`The state athletic association's website still shows Friday as the game date. Both schools' athletic departments confirm no change has been made.`,
+    forward:{ scene:`Half the student body makes Saturday plans. Several people miss Friday's game.`, mechanism:`You forwarded it before the fact-check caught up. The claim was false, and now it's spreading with your name attached.` },
+    stop:{ scene:`You stop it. Nobody misses the game based on a false schedule change.`, mechanism:`Official game schedules come from official sources. 'Nobody's been officially notified yet' means it isn't true yet.` },
+    category:"misinformation"
+  }
+];
+
+const jodiMoments = [
+  "The number of times something has been forwarded tells you how fast it spread. It tells you nothing about whether it's true.",
+  "Stopping a message at your node isn't doing nothing. It's deciding where the chain ends.",
+  "The verify step costs you time. That's the point. Good information is worth the pause.",
+  "Some things spread because they should. Most things spread because they're exciting. Those are different reasons.",
+  "You're not just a reader. You're a node. What you forward becomes part of what other people believe."
+];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Ticket 5: enforce ~50/50 true/false split per session (5 true, 5 false), same
+// filter-shuffle-slice pattern as buildSession() in Read the Signal.
+function buildRumorSession(pool) {
+  const trueBest = shuffle(pool.filter(s => s.truth));
+  const falseBest = shuffle(pool.filter(s => !s.truth));
+  const picked = [...trueBest.slice(0, 5), ...falseBest.slice(0, 5)];
+  return shuffle(picked);
+}
+
+function fcClassFor(n) {
+  return n < 10 ? 'fc-low' : n < 100 ? 'fc-mid' : 'fc-high';
+}
+
+let session = [], currentIdx = 0, score = 0;
+let timer = null, timeLeft = 30, verified = false, verifying = false;
+let choiceTally = { forward: 0, verify: 0, stop: 0 };
+let misinfoForwarded = 0, truthStopped = 0, verifyUsedCount = 0;
+let scenarioLog = [];
+let deeperLink = '/jsh/digital-decisions-lab/digital-citizenship/';
+
+function show(id) {
+  ['intro', 'game', 'consequence', 'end'].forEach(s => {
+    document.getElementById(s).style.display = 'none';
+  });
+  const target = document.getElementById(id);
+  target.style.display = 'flex';
+  target.style.flexDirection = 'column';
+  target.style.alignItems = 'center';
+}
+
+// --- Telemetry: one game_sessions document per completed session, same
+// sessionStorage-UUID + 90-day-TTL pattern as the other two games.
+function getSessionId() {
+  let id = sessionStorage.getItem('trm_session_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem('trm_session_id', id);
+  }
+  return id;
+}
+
+async function recordSession() {
+  try {
+    const AuthCore = window.AuthCore;
+    if (!AuthCore) return;
+
+    const { collection, addDoc, serverTimestamp, Timestamp } =
+      await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+
+    let user = AuthCore.auth.currentUser;
+    if (!user) {
+      try { await AuthCore.silentSignIn(); } catch (e) { /* telemetry is best-effort */ }
+      user = AuthCore.auth.currentUser;
+    }
+
+    let recruitCode = null;
+    let studentId = null;
+    if (user && !user.isAnonymous) studentId = user.uid;
+    if (user) {
+      try {
+        const account = await AuthCore.getAccount(user.uid);
+        if (account && account.recruitCode) recruitCode = account.recruitCode;
+      } catch (e) { /* telemetry is best-effort */ }
+    }
+
+    const playedAt = new Date();
+    const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const correct = scenarioLog.filter(s => s.correct).length;
+
+    await addDoc(collection(AuthCore.db, 'game_sessions'), {
+      game: 'the-rumor-mill',
+      sessionId: getSessionId(),
+      recruitCode,
+      studentId,
+      playedAt: serverTimestamp(),
+      ttl: Timestamp.fromDate(ttl),
+      scenariosPlayed: scenarioLog.length,
+      correct,
+      choices: choiceTally,
+      misinfoForwarded,
+      truthStopped,
+      verifyUsed: verifyUsedCount,
+      scenarios: scenarioLog
+    });
+  } catch (e) {
+    console.warn('The Rumor Mill telemetry write failed', e);
+  }
+}
+
+function startGame() {
+  window._agSaveOffered = false;
+  window._agCompletionReached = false;
+  session = buildRumorSession(scenarios);
+  currentIdx = 0; score = 0;
+  choiceTally = { forward: 0, verify: 0, stop: 0 };
+  misinfoForwarded = 0; truthStopped = 0; verifyUsedCount = 0;
+  scenarioLog = [];
+  show('game');
+  renderDots();
+  renderNetwork();
+  renderScenario();
+}
+
+// Node positions for the SVG network — YOU at center-left, 9 surrounding nodes.
+const nodePositions = [
+  { x: 50, y: 60, label: 'YOU', you: true },
+  { x: 140, y: 25, label: '' },
+  { x: 220, y: 55, label: '' },
+  { x: 300, y: 25, label: '' },
+  { x: 380, y: 55, label: '' },
+  { x: 460, y: 25, label: '' },
+  { x: 510, y: 60, label: '' },
+  { x: 140, y: 95, label: '' },
+  { x: 300, y: 95, label: '' },
+  { x: 460, y: 95, label: '' }
+];
+const edges = [[0,1],[0,7],[1,2],[1,7],[2,3],[2,8],[3,4],[3,8],[4,5],[4,9],[5,6],[6,9],[7,8],[8,9]];
+
+function renderNetwork(action, truth) {
+  const el = document.getElementById('network');
+  if (!el) return;
+  const W = 560, H = 110;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+  edges.forEach(([a, b]) => {
+    const pa = nodePositions[a], pb = nodePositions[b];
+    let cls = 'edge';
+    if (action === 'forward' && a >= 1) cls += truth ? ' active-true' : ' active-false';
+    if (action === 'stop' && a >= 1) cls += ' active-stopped';
+    svg += `<line class="${cls}" x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}"/>`;
+  });
+
+  nodePositions.forEach((n, i) => {
+    let circleCls = 'node-circle';
+    if (n.you) circleCls += ' you';
+    else if (action === 'forward' && i >= 1) circleCls += truth ? ' lit-true' : ' lit-false';
+    else if (action === 'stop' && i >= 1) circleCls += ' lit-stopped';
+    const labelCls = n.you ? 'node-label you-label' : 'node-label';
+    svg += `<circle class="${circleCls}" cx="${n.x}" cy="${n.y}" r="13"/>`;
+    if (n.label) svg += `<text class="${labelCls}" x="${n.x}" y="${n.y + 4}">${n.label}</text>`;
+  });
+
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function renderDots() {
+  const el = document.getElementById('progressDots');
+  el.innerHTML = '';
+  for (let i = 0; i < session.length; i++) {
+    const d = document.createElement('div');
+    d.className = 'hud-dot' + (i < currentIdx ? ' done' : i === currentIdx ? ' current' : '');
+    el.appendChild(d);
+  }
+}
+
+function renderScenario() {
+  verified = false; verifying = false;
+  const s = session[currentIdx];
+  document.getElementById('scoreVal').textContent = score;
+  renderDots();
+  renderNetwork();
+
+  const vBtn = document.getElementById('verifyBtn');
+  vBtn.className = 'action-btn btn-verify';
+  vBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Verify`;
+  document.getElementById('verifyPanel').style.display = 'none';
+
+  const card = document.getElementById('msgCard');
+  card.innerHTML = `
+    <div class="msg-header">
+      <div class="msg-avatar" style="background:${s.avatarColor}">${s.avatarText}</div>
+      <div class="msg-meta">
+        <div class="msg-sender">${s.sender}</div>
+        <div class="msg-sub">${s.sub}</div>
+      </div>
+      <span class="forward-count ${fcClassFor(s.forwardCount)}">⟳ ${s.forwardCount.toLocaleString()}</span>
+    </div>
+    <div class="msg-body">
+      <div class="msg-claim">${s.claim}</div>
+      ${s.detail ? `<div class="msg-detail">${s.detail}</div>` : ''}
+      <div class="msg-source">Source: ${s.source}</div>
+    </div>
+  `;
+
+  startTimer();
+}
+
+function startTimer() {
+  clearInterval(timer);
+  timeLeft = 30;
+  const fill = document.getElementById('timerFill');
+  fill.style.width = '100%';
+  fill.className = 'countdown-fill';
+  timer = setInterval(() => {
+    timeLeft--;
+    fill.style.width = (timeLeft / 30 * 100) + '%';
+    if (timeLeft <= 10) fill.className = 'countdown-fill urgent';
+    if (timeLeft <= 0) { clearInterval(timer); choose('forward'); } // auto-forward on timeout — impulsive!
+  }, 1000);
+}
+
+function doVerify() {
+  if (verifying || verified) return;
+  verifying = true;
+  verifyUsedCount++;
+  const vBtn = document.getElementById('verifyBtn');
+  vBtn.className = 'action-btn btn-verify verifying';
+  vBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Checking...`;
+
+  const panel = document.getElementById('verifyPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = `<div class="verify-label">VERIFYING</div><div class="verify-loading"><div class="verify-dot"></div><div class="verify-dot"></div><div class="verify-dot"></div></div>`;
+
+  // Pause the timer during verify — resumes below with 12 seconds left.
+  clearInterval(timer);
+
+  setTimeout(() => {
+    verified = true; verifying = false;
+    const s = session[currentIdx];
+    panel.innerHTML = `<div class="verify-label">FACT CHECK</div><div class="verify-result">${s.verifyResult}</div>`;
+    vBtn.className = 'action-btn btn-verify done';
+    vBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><polyline points="20 6 9 17 4 12"/></svg>Verified`;
+    timeLeft = 12;
+    const fill = document.getElementById('timerFill');
+    fill.style.width = (12 / 30 * 100) + '%';
+    fill.className = 'countdown-fill urgent';
+    timer = setInterval(() => {
+      timeLeft--;
+      fill.style.width = (timeLeft / 30 * 100) + '%';
+      if (timeLeft <= 0) { clearInterval(timer); choose('forward'); }
+    }, 1000);
+  }, 4000);
+}
+
+function choose(action) {
+  clearInterval(timer);
+  const s = session[currentIdx];
+  const data = action === 'forward' ? s.forward : s.stop;
+  const timeUsed = 30 - timeLeft;
+
+  // Scoring: +10 for correct call, +3 for incorrect call after verifying
+  // (you had the information and still got it wrong).
+  let correct = false;
+  if (action === 'forward' && s.truth) { correct = true; score += 10; }
+  else if (action === 'stop' && !s.truth) { correct = true; score += 10; }
+  else if (verified) { score += 3; }
+
+  choiceTally[action] = (choiceTally[action] || 0) + 1;
+  if (action === 'forward' && !s.truth) misinfoForwarded++;
+  if (action === 'stop' && s.truth) truthStopped++;
+
+  scenarioLog.push({ id: s.id, truth: s.truth, choice: action, correct, verifyUsed: verified, timeUsed });
+
+  showConsequence(data, action, s.truth);
+}
+
+function showConsequence(data, action, truth) {
+  show('consequence');
+  const el = document.getElementById('consequence');
+  const actionColor = action === 'forward' ? (truth ? '#2E7D52' : '#C0392B') : '#7A909F';
+  const actionLabel = action === 'forward' ? (truth ? 'Forwarded — and it was true.' : 'Forwarded — and it was false.') : 'Stopped here.';
+
+  el.innerHTML = `
+    <div class="consequence">
+      <div class="network" id="consequenceNetwork"></div>
+      <div class="consequence-label" style="color:${actionColor}">${actionLabel}</div>
+      <div class="consequence-scene">${data.scene}</div>
+      <div class="consequence-mechanism">${data.mechanism}</div>
+      <button class="next-btn" onclick="nextScenario()">${currentIdx < session.length - 1 ? 'Next message →' : 'See results'}</button>
+    </div>
+  `;
+  renderNetwork(action, truth);
+  document.getElementById('consequenceNetwork').innerHTML = document.getElementById('network').innerHTML;
+}
+
+function nextScenario() {
+  currentIdx++;
+  if (currentIdx >= session.length) {
+    showEnd();
+  } else {
+    show('game');
+    renderScenario();
+  }
+}
+
+function showEnd() {
+  show('end');
+  const el = document.getElementById('end');
+  const jodi = jodiMoments[Math.floor(Math.random() * jodiMoments.length)];
+  const correctCount = scenarioLog.filter(s => s.correct).length;
+  const rating = score >= 80 ? 'Sharp reader' : score >= 50 ? 'Getting there' : 'Needs work';
+
+  // Ticket 5: adaptive routing based on this session's pattern.
+  let deeperMsg;
+  if (misinfoForwarded >= 4) {
+    deeperMsg = "Your network spread some false information. The Digital Citizenship lab goes deeper on reading a source before you share.";
+  } else if (truthStopped >= 3) {
+    deeperMsg = "You stopped some things that were worth sharing. The Digital Citizenship lab helps you tell the difference.";
+  } else {
+    deeperMsg = "The Digital Citizenship lab sharpens the instincts you just practiced — source evaluation, claim checking, knowing when to stop the chain.";
+  }
+  deeperLink = '/jsh/digital-decisions-lab/digital-citizenship/';
+
+  el.innerHTML = `
+    <div class="end-score">${score}</div>
+    <div class="end-label">OUT OF 100</div>
+    <div class="end-breakdown">
+      <div class="end-row"><span class="end-row-label">Messages reviewed</span><span class="end-row-val">${session.length}</span></div>
+      <div class="end-row"><span class="end-row-label">Right call</span><span class="end-row-val">${correctCount} / ${session.length}</span></div>
+      <div class="end-row"><span class="end-row-label">Your read</span><span class="end-row-val">${rating}</span></div>
+    </div>
+    <div class="jodi-moment">
+      <div class="jodi-moment-label">HEY Y'ALL 💛 FROM JODI</div>
+      <div class="jodi-moment-text">"${jodi}"</div>
+    </div>
+    <div class="deeper-card">
+      <div class="deeper-label">WANT TO GO DEEPER?</div>
+      <div class="deeper-msg">${deeperMsg}</div>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='${deeperLink}'; })">Open the lab →</button>
+    </div>
+    <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
+    <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
+    <div class="wordmark" style="margin-top:16px">Allgood Academy · Free for all learners, always.</div>
+  `;
+
+  recordSession();
+
+  // Same shared save/claim offer as the other two games (window.AuthGate.offerSave()) —
+  // one save flow across the site instead of a bespoke one for each game.
+  window._agCompletionReached = true;
+  if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+    window._agSaveOffered = true;
+    setTimeout(() => {
+      window.AuthGate.offerSave().catch((e) => console.error('[TheRumorMill] offerSave failed', e));
+    }, 1200);
+  }
+}
+
+function restartGame() { startGame(); }
+
+function toggleHomePopover(event) {
+  event.stopPropagation();
+  document.getElementById('home-popover').classList.toggle('show');
+}
+
+function closeHomePopover() {
+  document.getElementById('home-popover').classList.remove('show');
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.home-popover-wrap');
+  if (wrap && !wrap.contains(e.target)) closeHomePopover();
+});
+
+function handleRestartFromPopover() {
+  closeHomePopover();
+  if (document.getElementById('game').style.display === 'flex' ||
+      document.getElementById('consequence').style.display === 'flex' ||
+      document.getElementById('end').style.display === 'flex') {
+    restartGame();
+  } else {
+    startGame();
+  }
+}
+
+if (window.lucide) lucide.createIcons();
+document.addEventListener('DOMContentLoaded', () => { if (window.lucide) lucide.createIcons(); });
+</script>
+</body>
+</html>

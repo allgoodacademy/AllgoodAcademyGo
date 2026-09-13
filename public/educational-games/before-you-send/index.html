@@ -259,6 +259,10 @@
   .jodi-moment { width: 100%; background: var(--teal); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
   .jodi-moment-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; margin-bottom: 6px; }
   .jodi-moment-text { font-family: Georgia, serif; font-size: 13px; color: white; line-height: 1.65; font-style: italic; }
+  .deeper-card { width: 100%; background: rgba(53,120,137,0.14); border: 1px solid rgba(53,120,137,0.35); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
+  .deeper-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.08em; margin-bottom: 8px; }
+  .deeper-msg { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.65; margin-bottom: 14px; }
+  .deeper-btn { background: var(--teal); color: white; border: none; padding: 12px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; width: 100%; }
   .play-again-btn { background: var(--orange); color: white; border: none; padding: 14px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 8px; }
   .hub-btn { background: transparent; color: var(--cream); border: 1px solid rgba(255,255,255,0.15); padding: 12px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 12px; cursor: pointer; width: 100%; }
 </style>
@@ -775,6 +779,7 @@ async function recordSession() {
       ttl: Timestamp.fromDate(ttl),
       scenariosPlayed: scenarioLog.length,
       choices: choiceTally,
+      correct: scenarioLog.filter(s => s.correct).length,
       scenarios: scenarioLog
     });
   } catch (e) {
@@ -932,6 +937,23 @@ function showEnd() {
   const el = document.getElementById('end');
   const jodi = jodiMoments[Math.floor(Math.random() * jodiMoments.length)];
   const correctCount = scenarioLog.filter(s => s.correct).length;
+
+  // Ticket 4: route to the GoodBlock that matches the pattern in this session's
+  // choices — impulsive senders, over-cautious deleters, and low scorers each get
+  // a different nudge; everyone else gets the default Social Intelligence pointer.
+  const correctRate = session.length ? correctCount / session.length : 1;
+  let deeperMsg, deeperLink = '/jsh/digital-decisions-lab/social-intelligence/';
+  if (choiceTally.send >= 5) {
+    deeperMsg = "You sent most things without editing. The Social Intelligence lab goes deeper on reading a situation before you react.";
+  } else if (choiceTally.delete >= 4) {
+    deeperMsg = "You deleted a lot — including some things worth sending. The Professional Brand lab helps you find your voice in digital communication.";
+    deeperLink = '/jsh/digital-decisions-lab/professional-brand/';
+  } else if (correctRate < 0.4) {
+    deeperMsg = "Context changes everything about what to send. The Social Intelligence lab is built around exactly that.";
+  } else {
+    deeperMsg = "The Social Intelligence lab goes deeper on reading a situation before you respond.";
+  }
+
   el.innerHTML = `
     <div class="end-score">${score}</div>
     <div class="end-label">OUT OF 100</div>
@@ -943,6 +965,11 @@ function showEnd() {
     <div class="jodi-moment">
       <div class="jodi-moment-label">HEY Y'ALL 💛 FROM JODI</div>
       <div class="jodi-moment-text">"${jodi}"</div>
+    </div>
+    <div class="deeper-card">
+      <div class="deeper-label">WANT TO GO DEEPER?</div>
+      <div class="deeper-msg">${deeperMsg}</div>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='${deeperLink}'; })">Open the lab →</button>
     </div>
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
     <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>

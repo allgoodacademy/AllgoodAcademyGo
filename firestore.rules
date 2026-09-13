@@ -288,7 +288,13 @@ service cloud.firestore {
           || (request.resource.data.game == 'before-you-send'
             && request.resource.data.keys().hasOnly([
                  'game', 'sessionId', 'recruitCode', 'studentId', 'playedAt', 'ttl',
-                 'scenariosPlayed', 'choices', 'scenarios'
+                 'scenariosPlayed', 'choices', 'correct', 'scenarios'
+               ]))
+          || (request.resource.data.game == 'the-rumor-mill'
+            && request.resource.data.keys().hasOnly([
+                 'game', 'sessionId', 'recruitCode', 'studentId', 'playedAt', 'ttl',
+                 'scenariosPlayed', 'correct', 'choices', 'misinfoForwarded',
+                 'truthStopped', 'verifyUsed', 'scenarios'
                ]))
         );
       allow read, update, delete: if isAllowlistedAdmin();
