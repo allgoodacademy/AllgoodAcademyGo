@@ -446,7 +446,7 @@ const scenarios = [
   },
   { id:"destiny-destiny-is-16-and-gets-200", who:"Destiny", avatar:"D", avatarBg:"#00897b22", category:"Long-Term Thinking",
     situation:`Destiny is 16 and gets $200 for her birthday. Her aunt suggests investing it in an index fund. Destiny says "maybe later" and spends the $200 on clothes within the week.`, detail:`Invested at 16 and left alone until 65 (49 years), assuming a 7% average annual return — the historical long-term average for a diversified stock portfolio — that $200 would have grown to roughly $6,700. That possibility is now off the table for this $200.`,
-    answer:"smart",
+    answer:"costly",
     smart:{ scene:`Destiny asks her aunt one question: "How do I do that?" Twenty minutes later her aunt has helped her open a custodial account. The $200 is invested. Destiny forgets about it for years. Assuming a 7% average annual return — the historical long-term average for a diversified stock portfolio — it grows to roughly $6,700 by the time she's 65. Past performance doesn't guarantee future returns, but starting at 16 instead of 26 or 36 is worth more than most people realize.`, mechanism:`You don't need to understand investing deeply to start. You need to start. The gap between "I'll learn about this later" and "I started at 16" compounds into real money over five decades.` },
     costly:{ scene:`Destiny says "maybe later" and buys clothes. The $200 is gone in a week. She doesn't regret it much. She doesn't know yet what she lost.`, mechanism:`The cost of this decision isn't felt today. It's felt at 65. That's what makes it so easy to make the wrong call.` }
   },
@@ -541,12 +541,20 @@ function shuffle(arr) {
   return a;
 }
 
-// Ticket 1: enforce ~50/50 smart/costly split per session (5 smart, 5 costly), same
-// filter-shuffle-slice pattern as buildSession() in Read the Signal.
+// Ticket 1: aim for a ~50/50 smart/costly split per session (5 smart, 5 costly),
+// same filter-shuffle-slice pattern as buildSession() in Read the Signal — but the
+// scenario bank isn't guaranteed to have 5+ of each answer type, so if one side comes
+// up short, top up from the other side rather than shrinking the session below 10.
 function buildMoneySession(pool) {
-  const smartBest = shuffle(pool.filter(s => s.answer === 'smart'));
-  const costlyBest = shuffle(pool.filter(s => s.answer === 'costly'));
-  const picked = [...smartBest.slice(0, 5), ...costlyBest.slice(0, 5)];
+  const SESSION_SIZE = 10;
+  const HALF = SESSION_SIZE / 2;
+  const smartPool = shuffle(pool.filter(s => s.answer === 'smart'));
+  const costlyPool = shuffle(pool.filter(s => s.answer === 'costly'));
+  const smartPicked = smartPool.slice(0, HALF);
+  const costlyPicked = costlyPool.slice(0, HALF);
+  const shortfall = SESSION_SIZE - smartPicked.length - costlyPicked.length;
+  const leftover = shuffle([...smartPool.slice(HALF), ...costlyPool.slice(HALF)]);
+  const picked = [...smartPicked, ...costlyPicked, ...leftover.slice(0, shortfall)];
   return shuffle(picked);
 }
 
