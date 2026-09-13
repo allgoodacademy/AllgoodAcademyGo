@@ -73,13 +73,13 @@ function parseArgs(argv) {
 async function findRecruitCodeUids(db, appId) {
   const uids = new Map(); // uid -> recruitCode, for logging
 
-  const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
+  const usersSnap = await withRetry(() => db.collection('artifacts').doc(appId).collection('users').get());
   for (const doc of usersSnap.docs) {
     const code = doc.get('recruitCode');
     if (code) uids.set(doc.id, code);
   }
 
-  const codesSnap = await db.collection('artifacts').doc(appId).collection('recruit_codes').get();
+  const codesSnap = await withRetry(() => db.collection('artifacts').doc(appId).collection('recruit_codes').get());
   for (const doc of codesSnap.docs) {
     const uid = doc.get('uid');
     if (uid) uids.set(uid, uids.get(uid) || doc.id);
@@ -88,13 +88,32 @@ async function findRecruitCodeUids(db, appId) {
   return uids;
 }
 
+// Retries a Firestore call on transient RESOURCE_EXHAUSTED (quota) errors with backoff.
+// The free/Spark tier's per-minute read quota is easy to trip when scanning many accounts
+// back to back; this is not a sign anything is wrong with the data.
+async function withRetry(fn, { attempts = 5, baseDelayMs = 1000 } = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isQuotaError = err && (err.code === 8 || /RESOURCE_EXHAUSTED/.test(err.message || ''));
+      if (!isQuotaError || attempt >= attempts) throw err;
+      const delay = baseDelayMs * 2 ** (attempt - 1);
+      console.log(`[delete-guest-accounts]   quota hit, retrying in ${delay}ms (attempt ${attempt}/${attempts})`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 async function deleteDocsInBatches(db, refs, { live, label }) {
   for (let i = 0; i < refs.length; i += BATCH_SIZE) {
     const chunk = refs.slice(i, i + BATCH_SIZE);
     if (!live) continue;
-    const batch = db.batch();
-    for (const ref of chunk) batch.delete(ref);
-    await batch.commit();
+    await withRetry(async () => {
+      const batch = db.batch();
+      for (const ref of chunk) batch.delete(ref);
+      await batch.commit();
+    });
   }
   if (refs.length > 0) {
     console.log(`[delete-guest-accounts]   ${live ? 'deleted' : 'would delete'} ${refs.length} ${label} doc(s)`);
@@ -103,11 +122,11 @@ async function deleteDocsInBatches(db, refs, { live, label }) {
 
 async function deleteAccount(db, { appId, uid, live }) {
   const userRef = db.collection('artifacts').doc(appId).collection('users').doc(uid);
-  const userSnap = await userRef.get();
+  const userSnap = await withRetry(() => userRef.get());
   const recruitCode = userSnap.exists ? userSnap.get('recruitCode') : null;
 
   for (const sub of SUBCOLLECTIONS) {
-    const snap = await userRef.collection(sub).get();
+    const snap = await withRetry(() => userRef.collection(sub).get());
     await deleteDocsInBatches(db, snap.docs.map((d) => d.ref), { live, label: `users/${uid}/${sub}` });
   }
 
@@ -122,7 +141,7 @@ async function deleteAccount(db, { appId, uid, live }) {
 
   for (const collectionName of UID_FIELD_COLLECTIONS) {
     const colRef = db.collection('artifacts').doc(appId).collection(collectionName);
-    const snap = await colRef.where('uid', '==', uid).get();
+    const snap = await withRetry(() => colRef.where('uid', '==', uid).get());
     await deleteDocsInBatches(db, snap.docs.map((d) => d.ref), { live, label: collectionName });
   }
 }
@@ -156,6 +175,7 @@ async function main() {
   for (const uid of targetUids) {
     console.log(`[delete-guest-accounts] ${args.live ? 'deleting' : 'would delete'} uid=${uid} recruitCode=${recruitCodeUids.get(uid)}`);
     await deleteAccount(db, { appId: args.appId, uid, live: args.live });
+    await new Promise((resolve) => setTimeout(resolve, 150)); // light pacing to avoid tripping quota
   }
 
   if (args.live && targetUids.length > 0) {
