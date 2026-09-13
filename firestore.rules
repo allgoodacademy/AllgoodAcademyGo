@@ -278,12 +278,19 @@ service cloud.firestore {
     // Firebase console, not here.
     match /game_sessions/{sessionDocId} {
       allow create: if request.auth != null
-        && request.resource.data.game == 'read-the-signal'
-        && request.resource.data.keys().hasOnly([
-             'game', 'sessionId', 'recruitCode', 'studentId', 'playedAt', 'ttl',
-             'outcome', 'scenariosPlayed', 'correct', 'wrong', 'livesLost',
-             'categories', 'scenarios'
-           ]);
+        && (
+          (request.resource.data.game == 'read-the-signal'
+            && request.resource.data.keys().hasOnly([
+                 'game', 'sessionId', 'recruitCode', 'studentId', 'playedAt', 'ttl',
+                 'outcome', 'scenariosPlayed', 'correct', 'wrong', 'livesLost',
+                 'categories', 'scenarios'
+               ]))
+          || (request.resource.data.game == 'before-you-send'
+            && request.resource.data.keys().hasOnly([
+                 'game', 'sessionId', 'recruitCode', 'studentId', 'playedAt', 'ttl',
+                 'scenariosPlayed', 'choices', 'scenarios'
+               ]))
+        );
       allow read, update, delete: if isAllowlistedAdmin();
     }
 
