@@ -216,6 +216,17 @@ footer{background:var(--surface);padding:0 0 44px}
     </nav>
   </div>
 </div>
+<script>
+/* Same relabel pattern as public/index.html's .nav-signin — a visitor with an existing
+   session should never be told to sign in again. */
+(function(){
+  try{
+    if(localStorage.getItem('ag_signed_in')!=='1')return;
+    var b=document.querySelector('.nav-signin');
+    if(b)b.textContent='Your dashboard';
+  }catch(e){/* storage blocked - button stays "Sign in", which is the safe default */}
+})();
+</script>
 
 <section class="hero">
   <div class="wrap">
@@ -511,7 +522,11 @@ footer{background:var(--surface);padding:0 0 44px}
 (function(){
   var btn=document.querySelector('.nav-signin');
   if(!btn)return;
-  btn.addEventListener('click',function(){location.href='/dashboard/?signin=1';});
+  btn.addEventListener('click',function(){
+    var signedIn=false;
+    try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
+    location.href = signedIn ? '/dashboard/' : '/dashboard/?signin=1';
+  });
 })();
 </script>
 </body>
