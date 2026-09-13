@@ -237,30 +237,49 @@ const RECRUIT_FLAVORS = ['Trot', 'Dash', 'Blanco', 'Run', 'Hop', 'Zoom', 'Bolt',
 
 function randomFrom(list) { return list[Math.floor(Math.random() * list.length)]; }
 
+// A 4-digit numeric suffix (1000-9999) appended to every newly-minted code, widening the
+// word-only space (~6,000 combos — walkable in minutes against firestore.rules #9's
+// open `get`) to ~60,000,000. Deliberately a fixed 4-digit range so it can never be
+// confused with the collision-retry fallback's 2-digit (10-99) trailing number below —
+// the two ranges never overlap, so a real code and a fallback code are never ambiguous
+// with each other purely from digit count.
+function randomSuffix() {
+    return String(Math.floor(1000 + Math.random() * 9000));
+}
+
 function recruitCodeRef(code) {
     return doc(db, 'artifacts', appId, 'recruit_codes', code);
 }
 
-// "arctic-fox-trot" -> "Arctic Fox Trot" — the code IS the display name, just cased
-// for reading rather than typing.
+// "arctic-fox-trot" -> "Arctic Fox Trot", "arctic-fox-trot-4821" -> "Arctic Fox Trot 4821"
+// — the code IS the display name, just cased for reading rather than typing. Works
+// unchanged for both the new 4-segment (word-word-word-####) format and every
+// already-issued 3-segment (word-word-word) code: capitalizing a digit's first
+// character is a no-op, so the numeric suffix passes through untouched either way.
 function codeToDisplayName(code) {
     return code.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 // Forgiving on the way back in: case, extra spaces, and space-vs-hyphen typing all
 // normalize to the same stored key, since a young child is retyping this from memory.
+// Digits are kept (not stripped) so the new word-word-word-#### suffix survives
+// re-typing normalization the same way the three words always have; an old 3-word code
+// with no suffix normalizes exactly as before.
 function normalizeRecruitCode(raw) {
-    return String(raw || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '');
+    return String(raw || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
 async function generateUniqueRecruitCode() {
     for (let i = 0; i < 20; i++) {
-        const code = [randomFrom(RECRUIT_DESCRIPTORS), randomFrom(RECRUIT_ANIMALS), randomFrom(RECRUIT_FLAVORS)].join('-').toLowerCase();
+        const code = [randomFrom(RECRUIT_DESCRIPTORS), randomFrom(RECRUIT_ANIMALS), randomFrom(RECRUIT_FLAVORS), randomSuffix()].join('-').toLowerCase();
         const snap = await getDoc(recruitCodeRef(code));
         if (!snap.exists()) return code;
     }
-    // 20 collisions in a ~6000-word space would mean something is wrong upstream, but
-    // this guarantees termination rather than looping forever.
+    // 20 collisions in a ~60,000,000-combo space would mean something is wrong upstream,
+    // but this guarantees termination rather than looping forever. Unchanged from before
+    // the suffix widening: still a 2-digit (10-99) trailing number, which is exactly what
+    // keeps it visually and numerically distinct from the new 4-digit (1000-9999) suffix
+    // above — a fallback code can never be mistaken for a normal one.
     return [randomFrom(RECRUIT_DESCRIPTORS), randomFrom(RECRUIT_ANIMALS), randomFrom(RECRUIT_FLAVORS), Math.floor(Math.random() * 90 + 10)].join('-').toLowerCase();
 }
 
@@ -421,10 +440,17 @@ async function _claimCode(ageTier) {
         };
     }
 
+    // getOrCreateGuestCode() returns the 3-word (no suffix) name this session has been
+    // displayed as all along — drawn locally, never reserved (see its own comment). The
+    // actual CLAIMED code always gets the 4-digit suffix appended here, even on this
+    // "first try" path: persisting the bare 3-word name as a permanent, reserved code
+    // would silently reopen the ~6,000-combo walkable space this whole change exists to
+    // close. Falling back to generateUniqueRecruitCode() on a collision already produced
+    // a suffixed code, so this keeps both branches on the same wider format.
     const preferred = getOrCreateGuestCode();
-    let code = preferred;
+    let code = `${preferred}-${randomSuffix()}`;
     let changed = false;
-    const taken = await getDoc(recruitCodeRef(preferred));
+    const taken = await getDoc(recruitCodeRef(code));
     if (taken.exists()) {
         code = await generateUniqueRecruitCode();
         changed = true;
@@ -630,8 +656,18 @@ async function mirrorRecruitProgress(uid, moduleSlug, progress) {
         const data = snap.exists() ? snap.data() : null;
         const code = data ? data.recruitCode : null;
         if (!code) return;
+        // A nested object, not a `{'progress.<slug>': progress}` dotted-key literal:
+        // setDoc's dotted-path shorthand only applies to updateDoc(), and a dotted string
+        // key passed to setDoc(..., {merge:true}) becomes a literal top-level field named
+        // "progress.<slug>" (with a dot in it) rather than nesting under "progress" —
+        // never read by anything, since redeemRecruitCode() only ever reads back
+        // `codeData.progress`. setDoc's merge is a recursive/deep merge for nested map
+        // fields, so this still only touches this one module's entry and leaves every
+        // other module's mirrored progress on the document untouched. It also keeps the
+        // set of top-level fields this write can affect limited to `progress` — the field
+        // firestore.rules' recruit_codes update guard (see rule #9) actually allows.
         const payload = {
-            [`progress.${moduleSlug}`]: progress,
+            progress: { [moduleSlug]: progress },
             updatedAt: serverTimestamp(),
         };
         // Carried on the same snapshot this function already reads, so keeping classroom

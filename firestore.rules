@@ -8,8 +8,15 @@ service cloud.firestore {
     function NONE() { return '__none__'; }
 
     function isAllowlistedAdmin() {
+      // email_verified is required in addition to the email match: with "one account per
+      // email address" off in Firebase Auth settings, an unverified account could
+      // otherwise claim one of these two addresses via email/password sign-up (no proof
+      // of ownership) and pass this check on email alone. Verified-status still needs
+      // confirming against live Firebase Auth console settings (see Ticket 5 in the PR
+      // description) — this change is correct hardening regardless of that setting.
       return request.auth != null &&
-        request.auth.token.email in ['balgood93@gmail.com', 'learning@allgoodacademy.com'];
+        request.auth.token.email in ['balgood93@gmail.com', 'learning@allgoodacademy.com'] &&
+        request.auth.token.email_verified == true;
     }
 
     function isOwner(userId) {
@@ -110,12 +117,25 @@ service cloud.firestore {
     //   classroomCode: may be left alone, cleared, or set to a classroom that exists
     //                  (the join-by-code flow — knowing the code is the trust model, as
     //                  for rule #5; joining someone else's classroom grants no read access).
+    // displayName is otherwise unbounded free text a student can put in front of their
+    // teacher in Mission Control (public/mission-control/index.html — rendered via esc(),
+    // so this is a length/abuse guard, not an XSS control). No character restriction:
+    // only a sane length cap. 60 gives generous headroom over the longest real value —
+    // the widest recruit-code-derived name (longest descriptor + animal + flavor words,
+    // plus the " ####" suffix from Ticket 1) tops out well under 30 characters — while
+    // still comfortably fitting any real teacher/account name a person would type.
+    function displayNameOk() {
+      return !('displayName' in request.resource.data)
+        || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 60);
+    }
+
     function profileFieldsOk(appId, priorRole, priorCode) {
       return (request.resource.data.get('role', NONE()) == priorRole
               || request.resource.data.get('role', NONE()) == 'student'
               || (request.resource.data.get('role', NONE()) == 'teacher'
                   && classroomOwnedBy(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid)))
-        && classroomCodeOk(appId, priorCode);
+        && classroomCodeOk(appId, priorCode)
+        && displayNameOk();
     }
 
     // 2. The user's own PROFILE document. Split out from its subcollections (2b) because
@@ -294,7 +314,16 @@ service cloud.firestore {
     match /artifacts/{appId}/recruit_codes/{code} {
       allow get: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update: if request.auth != null;
+      // Field-constrained (not field-open) update: the trust model above is deliberately
+      // "knowing the code is enough," but that should still only ever move the fields the
+      // real write paths in auth-core.js actually touch — uid + updatedAt (redemption,
+      // redeemRecruitCode / mirrorRecruitClassroom / mirrorRecruitProgress), progress
+      // (backfillRecruitProgress, mirrorRecruitProgress), classroomCode
+      // (mirrorRecruitClassroom, mirrorRecruitProgress), and displayName/avatar (kept in
+      // sync by _claimCode/redeemRecruitCode) — never createdAt or anything else.
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['uid', 'updatedAt', 'progress', 'classroomCode', 'displayName', 'avatar']);
       allow list: if isAllowlistedAdmin();
       // Deletion-request fulfilment: Insider removes the code doc along with the rest
       // of a Learner Recruit's data, otherwise their mirrored progress would linger.

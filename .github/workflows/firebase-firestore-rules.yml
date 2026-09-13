@@ -13,7 +13,25 @@ on:
       - 'firebase.json'
 
 jobs:
+  test_rules:
+    name: test-rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Firestore rules tests (against the emulator)
+        run: npm run test:rules
+
   deploy_rules:
+    needs: test_rules
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
