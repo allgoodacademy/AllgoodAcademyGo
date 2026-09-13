@@ -13,6 +13,13 @@
      something explicitly calls window.AuthGate.offerSave()/ensureIdentified(), same as
      every GoodBlock and Read the Signal. Here that's the end-screen save offer. -->
 <script type="module" src="/js/identity-gate.js"></script>
+<!-- Shared telemetry pipe (artifacts/{appId}/sessions + /events) — the same one every
+     GoodBlock and Challenge uses, replacing this game's own root-level game_sessions
+     writer. See /js/telemetry.js. -->
+<script type="module" src="/js/telemetry.js"></script>
+<!-- Shared skill -> GoodBlock resolver, now that this game has real per-scenario
+     categories to route by. See /js/skill-routing.js. -->
+<script type="module" src="/js/skill-routing.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -350,7 +357,13 @@
 
 <script>
 // best: 'send' | 'edit' | 'delete' — the choice the scenario is built to reward.
-// category: used for Firestore telemetry only today (no on-screen breakdown yet,
+// category: the scenario's skill tag. Every scenario carried a flat `"social"` until
+// this sprint, which made the field useless for routing — five real categories now,
+// per the drafted table in the sprint prompt, checked against each scenario's own
+// `mechanism` text. DRAFT: reasoned from content the same way the coverage-map docs
+// were, and NOT yet reviewed by Curriculum & Learning Science. Do not treat these as
+// final, and do not cite them to a teacher, until that review lands.
+// Used for Firestore telemetry and for end-of-round routing (no on-screen breakdown yet,
 // same as the prototype this shipped from — Ticket 3.1 said don't redesign it).
 const scenarios = [
   {
@@ -362,7 +375,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "The group goes quiet for three seconds. Then someone reacts with 😬. Marcus types 'wow ok' and leaves the chat. Two people DM you privately to say they're on your side. One person screenshots it.", mechanism: "Public call-outs put the other person in performance mode — they have to respond to the audience, not to you. You got attention. You didn't get resolution." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change it to a DM: 'Hey, I noticed my name wasn't on the project. Can we talk?' Marcus responds in 20 minutes. Awkward, but fixable.", mechanism: "Removing the audience changes what's possible. Marcus can actually respond honestly instead of performing for 12 people." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You close the app. You're still frustrated. You bring it up with Marcus before class the next morning. It's uncomfortable for about 90 seconds and then it's done.", mechanism: "Sometimes the message isn't the right tool. The conversation you didn't send made room for one that actually worked." },
-    best: "edit", category: "social"
+    best: "edit", category: "audience-choice"
   },
   {
     id: "coach-rivera-playing-time",
@@ -373,7 +386,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "Coach reads it before practice. She pulls you aside. The conversation starts with her defending the other players' effort. You spend 20 minutes on the defensive.", mechanism: "'I deserve' signals entitlement even when it isn't meant that way. It puts the coach in a position where she has to disagree with you before she can hear you." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change 'I deserve more playing time' to 'I'd love to talk about what I can do to earn more time.' Coach responds that afternoon and schedules a meeting.", mechanism: "Same frustration, different frame. Asking for guidance instead of asserting a right gets you the conversation you actually wanted." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You wait until after practice and ask to talk in person. It's harder to say out loud — but Coach hears it differently when you're standing in front of her.", mechanism: "Some conversations need a voice, not a text. The vulnerability of saying it in person changes how it's received." },
-    best: "edit", category: "social"
+    best: "edit", category: "escalation-language"
   },
   {
     id: "instagram-story-callout",
@@ -384,7 +397,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "37 people watch it in the first hour. Three people DM asking who you mean. One person who thinks it might be about them screenshots it. Your friend asks you to take it down — it's making things worse.", mechanism: "Vague public callouts create three problems: they embarrass the target, they create collateral anxiety for everyone else, and they give you no control over where they go." },
     edit: { icon: "✏️", label: "Edited.", scene: "You post a story about something unrelated — a song, a meme. You text your friend privately: 'That was awful, I'm here.' She responds immediately.", mechanism: "Your friend needed support, not a public performance of loyalty. The private message was actually for her. The story would have been for everyone else." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You put the phone down. You find your friend after school. You sit with her for an hour. She says it's the most helpful thing anyone did all day.", mechanism: "Sometimes the most powerful thing isn't a post. It's presence." },
-    best: "edit", category: "social"
+    best: "edit", category: "audience-choice"
   },
   {
     id: "dad-never-listen",
@@ -395,7 +408,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "He doesn't respond for two hours. When he does, it's two sentences: 'That's not fair and you know it. We'll talk when you're calmer.' You both feel worse.", mechanism: "Absolute language — 'never,' 'always,' 'every time' — puts the other person in the position of defending their entire character instead of discussing the actual thing. The conversation you wanted gets buried." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change it to: 'I feel like my reasons didn't get heard this time. Can we talk about it?' He calls you in 10 minutes.", mechanism: "Same feeling, specific framing. 'This time' instead of 'every time' makes it about a moment, not a verdict on who he is." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You wait an hour. You're still frustrated but slightly less raw. You go downstairs. The conversation is hard but it actually happens.", mechanism: "The message you didn't send gave you both time to be human instead of reactive." },
-    best: "edit", category: "social"
+    best: "edit", category: "escalation-language"
   },
   {
     id: "priya-trust-betrayal",
@@ -406,7 +419,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "Priya reads it immediately. She doesn't respond. The next day at school she avoids you. A week later someone tells you she didn't actually tell Jordan — Jordan figured it out on their own.", mechanism: "'We're done' sent in writing is very hard to walk back. The message closes a door before you had all the information." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change it to: 'Did you tell Jordan what I said? I need to know.' Priya calls you. It's messy but you get the actual story.", mechanism: "A question instead of a verdict gets you information. The verdict can wait until you know what actually happened." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You sleep on it. In the morning you ask Priya in person. The conversation is hard but you end up understanding what happened.", mechanism: "Sleeping on something that feels like a betrayal is almost always worth it. The clarity you have the next day usually changes what you actually want to say." },
-    best: "edit", category: "social"
+    best: "edit", category: "escalation-language"
   },
   {
     id: "alejandro-discord-disagreement",
@@ -417,7 +430,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "The server goes quiet. Alejandro responds with 'ok' and goes offline. Three people react with 💀. The conversation you were actually having is over.", mechanism: "'You always' shuts down a debate about an idea and turns it into a debate about someone's character. You won the moment and lost the conversation." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change it to: 'I actually disagree — here's why.' Alejandro responds with a counterargument. The conversation gets interesting.", mechanism: "Challenging the idea instead of the person keeps the discussion alive. And it's more honest — you're not tired of him, you disagree with this specific thing." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You let it go in the server. You DM Alejandro later: 'That thing you said — I actually see it differently.' He's more receptive one-on-one.", mechanism: "Public disagreement activates an audience. Private disagreement activates a conversation." },
-    best: "edit", category: "social"
+    best: "edit", category: "escalation-language"
   },
   {
     id: "ms-patterson-grade-email",
@@ -428,7 +441,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — and it's fine.", scene: "Ms. Patterson responds the next day. She explains her reasoning. You understand more about what she was looking for. The grade doesn't change but you learn something useful for the next essay.", mechanism: "This is a reasonable, respectful email. You advocated for yourself without demanding anything. That's the right move." },
     edit: { icon: "✏️", label: "Edited — but you didn't need to.", scene: "You spend 20 minutes rewriting it. It's marginally more formal. She responds the same way she would have to the original.", mechanism: "This message was already fine. Sometimes editing is procrastination disguised as care." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't send it. The grade stays. You're still frustrated two weeks later.", mechanism: "This was worth sending. Advocating for yourself with a teacher, respectfully, is always appropriate. Deleting this one was the wrong call." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "tyler-apology-text",
@@ -439,7 +452,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "Tyler doesn't respond for two days. Then: 'Thanks for saying that. I've been thinking about it too.' It's not fixed overnight but something shifted.", mechanism: "Apologies without excuses are rare and they land differently. The absence of 'but' in this message is the most important thing in it." },
     edit: { icon: "✏️", label: "Edited — it got worse.", scene: "You add 'I know you also said some things that hurt me.' Tyler reads it and puts his phone down. The 'also' changed everything.", mechanism: "Adding 'but' or 'also' to an apology isn't accountability — it's negotiation. The original was better." },
     del: { icon: "🗑️", label: "Deleted.", scene: "Another month passes. You see Tyler at a party and it's uncomfortable. You both know neither of you said what needed to be said.", mechanism: "Some messages are worth the vulnerability. This was one of them. Deleting it was the wrong call." },
-    best: "send", category: "social"
+    best: "send", category: "vulnerability"
   },
   {
     id: "groupchat-offensive-meme",
@@ -450,7 +463,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "Two people react with 👀. One person says 'it's just a joke.' The person who posted it says nothing. The conversation moves on in 3 minutes.", mechanism: "'lol' in a call-out signals you're not fully serious, which gives everyone permission to not take it seriously. The message was right, the delivery undermined it." },
     edit: { icon: "✏️", label: "Edited.", scene: "You remove the 'lol' and change it to 'Can we not with this one? It punches at people who didn't do anything.' One person says 'fair point.' The group moves on, but differently.", mechanism: "Saying something uncomfortable without softening it is harder and more effective. The laugh was for your own comfort, not for the message." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You screenshot it and send it to one person in the group: 'Is it just me or was that not okay?' They agree. Nothing changes in the group but you're not alone in noticing.", mechanism: "Sometimes the right audience for your concern isn't the whole group. A quieter conversation can do more." },
-    best: "edit", category: "social"
+    best: "edit", category: "tone-under-emotion"
   },
   {
     id: "instagram-vulnerable-post",
@@ -461,7 +474,7 @@ const scenarios = [
     send: { icon: "😬", label: "Posted.", scene: "47 people react with ❤️. Three people comment 'you okay?'. Nobody calls. You feel briefly less alone, then more alone when the notifications stop.", mechanism: "Public vulnerability attracts sympathy but rarely the specific support you actually need. The people who love you most are usually not the ones who comment first." },
     edit: { icon: "✏️", label: "Changed it.", scene: "You post something vague and move on. Still hurting, but privately.", mechanism: "Vague posts are neither honest nor strategic. They get you worry without connection." },
     del: { icon: "🗑️", label: "Didn't post it.", scene: "You text two people directly: 'Having a really hard week. Can we talk?' Both respond within the hour. One calls you.", mechanism: "Targeted vulnerability — asking specific people for specific support — almost always gets you more of what you actually need than a post to everyone." },
-    best: "delete", category: "social"
+    best: "delete", category: "vulnerability"
   },
   {
     id: "grandma-conspiracy-forward",
@@ -472,7 +485,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "Grandma doesn't respond. Your mom calls you an hour later. The family group chat goes quiet for three days.", mechanism: "The word 'embarrassing' in a message to a grandparent lands as shame, not correction. You had the right instinct and the wrong word." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change 'embarrassing' to 'I worry some of these aren't accurate.' She responds: 'I'll be more careful.' It's small but it lands.", mechanism: "Same concern, without the shame. People can receive feedback that doesn't cost them their dignity." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You call her instead. It's awkward for sixty seconds and then she's telling you about her garden. The problem doesn't go away but the relationship stays intact.", mechanism: "Some conversations need a voice. Text flattens tone — a call lets her hear that you love her even when you disagree." },
-    best: "edit", category: "social"
+    best: "edit", category: "tone-under-emotion"
   },
   {
     id: "jordan-cancelled-plans",
@@ -483,7 +496,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "Jordan reads it and doesn't respond for two days. When they do: 'Ok.' You're not sure if the friendship is over or just bruised.", mechanism: "'I'm done' in writing sounds final even when you didn't mean it that way. The message closed a door you might have wanted to leave open." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change it to: 'This is the third time — I need to know if we're actually going to hang out or if I should stop planning on it.' Jordan calls you. Turns out something's been going on.", mechanism: "A question instead of a verdict gets you information. Jordan had a reason — you'd have missed it with the original." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't send anything. You just stop making plans. The friendship fades quietly. You're not sure if that's what you wanted.", mechanism: "Silence communicates something too — just not clearly. The conversation you avoided left both of you uncertain." },
-    best: "edit", category: "social"
+    best: "edit", category: "escalation-language"
   },
   {
     id: "twitter-public-insult",
@@ -494,7 +507,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "It gets 4 likes and 1 quote tweet calling you out. The person you were criticizing never sees it. Three people who follow you unfollow you.", mechanism: "Insult-based criticism doesn't change minds — it performs for an audience that already agrees with you. The target never saw it. The cost was yours." },
     edit: { icon: "✏️", label: "Edited.", scene: "You change it to: 'This take is genuinely harmful because [reason]. Here's what the evidence actually shows.' Two people share it. One person DMs you to say it changed their view.", mechanism: "Criticism with reasoning reaches people who might disagree. Insults reach only people who already agree." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You close the app. You're still frustrated. You share your actual view with a friend over lunch. The conversation is better.", mechanism: "Not every frustration needs a public audience. Some of them are just frustrations." },
-    best: "delete", category: "social"
+    best: "delete", category: "escalation-language"
   },
   {
     id: "study-group-chat-checkin",
@@ -505,7 +518,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "Two people respond within the hour apologizing. One person says they've been sick. The doc gets three contributions by end of day.", mechanism: "Sometimes the direct message is the right message. You were specific, not cruel, and it created accountability. Good call." },
     edit: { icon: "✏️", label: "Edited.", scene: "You soften it slightly: 'Hey — can we check in on the project? I want to make sure we're all on track.' Same two people respond. Same result.", mechanism: "Both versions worked. This one's slightly warmer but the outcome is the same. Either was fine." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You say nothing and do the project yourself. You resent it for two weeks.", mechanism: "This was worth sending. Advocating for fair collaboration in a group project is appropriate and necessary. Silence here was the wrong call." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "mom-facebook-photo",
@@ -516,7 +529,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "She responds: 'I'm sorry, I didn't think.' The photo comes down. She asks before posting next time.", mechanism: "This is a reasonable boundary stated clearly. The 'I've told you' is a little pointed but the message is fair and it worked." },
     edit: { icon: "✏️", label: "Edited.", scene: "You remove 'I've told you this before' and just say 'Can you check with me before posting photos of me? It matters to me.' She apologizes and the photo comes down.", mechanism: "Without the accusation it's just a request. Requests are easier to say yes to than defenses." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You say nothing. She keeps posting. You're frustrated every time.", mechanism: "This was worth saying. Your digital privacy with your own parent is a legitimate thing to advocate for." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "alex-discord-joke",
@@ -527,7 +540,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "Alex gets defensive publicly. Two people jump in on different sides. The conversation becomes about the argument, not the original problem.", mechanism: "Public accountability activates defensiveness. Alex had to perform for the server instead of actually listening to you." },
     edit: { icon: "✏️", label: "Edited.", scene: "You DM Alex: 'Hey — that joke in the server landed badly for me. Can I tell you why?' Alex reads it. Responds: 'I didn't know. I'm sorry.'", mechanism: "Private correction gives people room to actually change. The public call-out made them defend themselves instead." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You leave it. It keeps bothering you. Alex makes a similar joke two weeks later.", mechanism: "This was worth saying — just not in public. The right move was a DM, not silence." },
-    best: "edit", category: "social"
+    best: "edit", category: "audience-choice"
   },
   {
     id: "team-practice-feedback",
@@ -538,7 +551,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "The coach responds the same day: 'Yes — let's talk after practice.' Three teammates reply saying they had similar thoughts.", mechanism: "This is a well-written, collaborative email. You advocated for improvement without criticizing anyone. Send it." },
     edit: { icon: "✏️", label: "Edited — but you didn't need to.", scene: "You spend 20 minutes making it slightly more formal. It lands exactly the same way.", mechanism: "This email was already good. Editing it was procrastination. The original was ready." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't send it. Practice stays the same. You're frustrated that nothing changes.", mechanism: "This was worth sending. Good ideas shared respectfully should be shared. Deleting it was the wrong call." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "nadia-crush-confession",
@@ -549,7 +562,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "Nadia responds in 20 minutes: 'I was hoping you'd say something. I feel the same way.' You both agree that was terrifying and worth it.", mechanism: "Vulnerability sent with honesty is one of the most effective things a message can do. This was the right call." },
     edit: { icon: "✏️", label: "Edited.", scene: "You remove 'I'm terrified to send this' to seem more confident. Nadia responds positively but later says she found your original version 'really sweet' when you tell her about it.", mechanism: "The vulnerability was the best part. Editing it out made the message less you, not more polished." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't send it. Another month passes. Nadia starts dating someone else. You think about the message for a long time.", mechanism: "Some messages are worth the fear. This was one of them. Deleting it was the wrong call." },
-    best: "send", category: "social"
+    best: "send", category: "vulnerability"
   },
   {
     id: "mr-okafor-deadline-email",
@@ -560,7 +573,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "Mr. Okafor responds within the hour: 'I'm so sorry for your loss. Friday is fine. Take care of yourself.' The extension is granted.", mechanism: "This is exactly the right email — honest, specific, with a concrete plan. You communicated like an adult and it worked." },
     edit: { icon: "✏️", label: "Edited.", scene: "You add three more sentences explaining yourself. Mr. Okafor grants the extension and notes in his response that 'the original explanation was more than enough.'", mechanism: "Over-explaining undermines clear communication. The original was already complete." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You say nothing and submit late. Mr. Okafor marks it down without context.", mechanism: "Context matters. A respectful explanation of a genuine hardship is always worth sending. Deleting this was the wrong call." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "groupchat-crying-for-help",
@@ -571,7 +584,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "[name] responds: 'I'm fine, don't worry about it.' The group gets awkward. Later that night [name] texts you privately: 'I wasn't fine. Thanks for noticing.'", mechanism: "Public intervention sometimes puts the person in a position of having to perform being okay. The private text later was what actually helped." },
     edit: { icon: "✏️", label: "Edited.", scene: "You DM [name] directly: 'Hey — I saw what you wrote. Are you actually okay? I'm here.' [name] opens up. You talk for an hour.", mechanism: "The most effective response to someone hurting is often the quietest one. Skipping the group and going directly was the right move." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You say nothing like everyone else. [name] goes quiet for the rest of the night.", mechanism: "Your instinct to act was right. Silence here was the wrong call — but so was the group message. The DM was the move." },
-    best: "edit", category: "social"
+    best: "edit", category: "audience-choice"
   },
   {
     id: "instagram-achievement-post",
@@ -582,7 +595,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "62 people like it. Four people DM you asking what you've been working on. Your coach comments. It sparks three real conversations.", mechanism: "Sharing a genuine achievement in an understated way is exactly how social media can work well. This was the right call." },
     edit: { icon: "✏️", label: "Edited.", scene: "You add hashtags and a longer caption explaining your journey. It gets more reach but the comments are shallower.", mechanism: "The original was better. Sometimes less is more, and the restraint was what made it land." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't post it. The people who would have celebrated with you don't get to.", mechanism: "Sharing real achievements with people who care about you is appropriate and good. This was worth posting." },
-    best: "send", category: "social"
+    best: "send", category: "vulnerability"
   },
   {
     id: "classchat-vote-relitigate",
@@ -593,7 +606,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "Three people respond defensively. One person says 'then you do it yourself.' The group chat goes cold for two days. The project format doesn't change.", mechanism: "Relitigating a group decision publicly after the vote is rarely productive. You expressed frustration without changing anything." },
     edit: { icon: "✏️", label: "Edited.", scene: "You DM the person running the project: 'Can I share one concern about the format privately?' They hear you out and incorporate one of your ideas.", mechanism: "A private suggestion after a public decision is heard differently than a public objection. You got some of what you wanted." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You let it go. You contribute to the project as decided. It turns out fine.", mechanism: "Sometimes the best response to a decision you disagree with is good-faith participation. The vote was fair. Letting it go was mature." },
-    best: "delete", category: "social"
+    best: "delete", category: "audience-choice"
   },
   {
     id: "bestfriend-bad-decision",
@@ -604,7 +617,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "Your friend responds: 'I know you're worried. I've thought about it a lot. I need you to support me even if you're not sure.' You do. It doesn't go perfectly but the friendship survives because you were honest and then let go.", mechanism: "You said what needed to be said, once, with love. That's the right move with a best friend. The outcome was theirs to own." },
     edit: { icon: "✏️", label: "Edited.", scene: "You soften it so much it loses its meaning. They don't realize you're actually worried.", mechanism: "Honesty softened into meaninglessness isn't kindness — it's avoidance. The original said more of what you actually meant." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You say nothing. The decision plays out. You're resentful that you didn't say what you were thinking.", mechanism: "If you'd regret not saying it, say it. This was worth sending." },
-    best: "send", category: "social"
+    best: "send", category: "vulnerability"
   },
   {
     id: "school-portal-bullying-report",
@@ -615,7 +628,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "The teacher responds: 'Thank you for telling me. This is exactly the kind of thing I need to know.' Something changes in the classroom dynamic over the next week.", mechanism: "Reporting a pattern of behavior to a trusted adult through appropriate channels is exactly right. This took courage and it was the right call." },
     edit: { icon: "✏️", label: "Edited.", scene: "You add names of the students doing it. The teacher investigates more formally. It's messier but more complete.", mechanism: "Both versions were appropriate. Adding names escalates the response but may be what the situation needs." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't say anything. The bullying continues. You know you saw it and said nothing.", mechanism: "This was worth sending. Staying silent when you see someone being hurt is a choice too — and usually the wrong one." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "family-goodnight-checkin",
@@ -626,7 +639,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "Your mom responds with three heart emojis. Your dad sends a thumbs up. You sleep well.", mechanism: "Checking in when you're away is considerate and takes thirty seconds. This is just a good thing to do." },
     edit: { icon: "✏️", label: "Edited.", scene: "You spend five minutes making it more detailed. Your parents appreciate it but the original was already everything they needed.", mechanism: "This message was complete. Editing it was unnecessary." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't send it. Your mom texts you at 11pm asking if you're okay.", mechanism: "Thirty seconds of consideration prevents twenty minutes of worry. This was worth sending." },
-    best: "send", category: "social"
+    best: "send", category: "vulnerability"
   },
   {
     id: "student-council-phone-policy",
@@ -637,7 +650,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "47 people react. The student council president responds that they're already drafting a proposal to discuss with administration. Your message gave them permission to act.", mechanism: "Giving voice to a shared frustration through an appropriate channel is exactly what student advocacy looks like. This was the right call." },
     edit: { icon: "✏️", label: "Edited.", scene: "You remove 'instead of just accepting it' and it reads even better. Same outcome, slightly warmer.", mechanism: "Small edit, same result. Either version worked." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You say nothing. The policy stays. You're frustrated that nobody pushed back.", mechanism: "Using appropriate channels to advocate for fair policy is exactly what they're there for. This was worth sending." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "rival-good-game-dm",
@@ -648,7 +661,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "They respond: 'Respect. Same to you.' You follow each other. Two years later you're at the same college and already have a connection.", mechanism: "Graciousness in competition is rare and remembered. This was exactly right." },
     edit: { icon: "✏️", label: "Edited.", scene: "You add more about the specific moments in the competition. It becomes a longer message that loses its elegance.", mechanism: "The original was perfect in its brevity. Editing it made it worse." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You don't reach out. The connection never gets made.", mechanism: "Reaching out with respect after competition is one of the better uses of a DM. This was worth sending." },
-    best: "send", category: "social"
+    best: "send", category: "vulnerability"
   },
   {
     id: "group-project-uneven-work",
@@ -659,7 +672,7 @@ const scenarios = [
     send: { icon: "😬", label: "Sent.", scene: "The person doing less work says 'I've been dealing with stuff.' Someone else says 'we all have stuff.' It gets uncomfortable. The work doesn't improve.", mechanism: "Group messages about individual behavior put everyone on stage. The person knows it's about them. So does everyone else. Nobody can respond honestly." },
     edit: { icon: "✏️", label: "Edited.", scene: "You DM the person directly: 'Hey — we're falling behind on your section. Can we figure out what's going on?' They explain, you problem-solve, the work gets done.", mechanism: "The private conversation got you what you actually needed. The group message would have created drama without solving the problem." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You do their work for them and submit. You resent it.", mechanism: "This needed to be addressed — just not in the group. The DM was the right move, not silence." },
-    best: "edit", category: "social"
+    best: "edit", category: "audience-choice"
   },
   {
     id: "polite-decline-favor",
@@ -670,7 +683,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "They respond: 'No worries, thanks for getting back to me!' You both move on.", mechanism: "Saying no clearly and kindly is a skill. This message did it perfectly. You don't owe anyone a yes." },
     edit: { icon: "✏️", label: "Edited.", scene: "You add three sentences of explanation and apologize twice. They respond: 'Really, it's fine!' They knew it was fine after the first sentence.", mechanism: "Over-explaining a 'no' signals that you feel guilty for having boundaries. You don't need to. The original was complete." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You ghost them. They follow up two days later.", mechanism: "A clear 'no' is kinder than silence. This was worth sending." },
-    best: "send", category: "social"
+    best: "send", category: "self-advocacy"
   },
   {
     id: "coach-cut-disappointment-email",
@@ -681,7 +694,7 @@ const scenarios = [
     send: { icon: "✅", label: "Sent — good call.", scene: "Coach responds the next day: 'I hear you. Your effort was absolutely seen — this was one of the hardest decisions I've made. I'd like to talk.' You meet. It doesn't change the outcome but you leave with more than you had.", mechanism: "Expressing genuine disappointment without demanding a different outcome is emotional maturity. This email was honest, boundaried, and worth sending." },
     edit: { icon: "✏️", label: "Edited.", scene: "You soften it so much it doesn't say anything real. Coach responds with a generic 'thanks for your hard work.'", mechanism: "The original said something true and hard. The edit made it safe but meaningless." },
     del: { icon: "🗑️", label: "Deleted.", scene: "You say nothing. The feeling stays with you longer than it needed to.", mechanism: "This was worth sending. Advocating for being seen — without demanding a different outcome — is always appropriate." },
-    best: "send", category: "social"
+    best: "send", category: "vulnerability"
   }
 ];
 
@@ -722,7 +735,10 @@ let timer = null, timeLeft = 30, readsLeft = 3, readsUsed = 1;
 let choiceTally = { send: 0, edit: 0, delete: 0 };
 let categoryStats = {};
 let scenarioLog = [];
-let lastSessionRef = null;
+let roundsPlayed = 0;
+// Destination for the end-of-round "go deeper" button. showEnd() replaces it; kept as
+// a literal here so the inline onclick always has something live to read.
+let deeperLink = '/jsh/digital-decisions-lab/social-intelligence/';
 
 function show(id) {
   ['intro', 'game', 'consequence', 'end'].forEach(s => {
@@ -734,69 +750,52 @@ function show(id) {
   target.style.alignItems = 'center';
 }
 
-// --- Telemetry (Ticket 3.3): one game_sessions document per completed session,
-// same sessionStorage-UUID + 90-day-TTL pattern as Read the Signal.
-function getSessionId() {
-  let id = sessionStorage.getItem('byu_session_id');
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem('byu_session_id', id);
-  }
-  return id;
+// --- Telemetry: the shared pipe (/js/telemetry.js), same as every GoodBlock and
+// Challenge. This game used to write its own document to a root-level game_sessions
+// collection with its own field allowlist in firestore.rules; both are gone. The
+// per-category breakdown now rides on the session document's `summary` map, which is
+// the part of the pipe a teacher's Mission Control roster can read back.
+function telemetryReady() {
+  return !!window.Telemetry;
 }
 
-async function recordSession() {
-  try {
-    const AuthCore = window.AuthCore;
-    if (!AuthCore) return;
+// telemetry.js is a module script and has not necessarily run when this classic script
+// does. Poll briefly rather than racing it; if it never arrives the game is unaffected.
+function initTelemetry(tries) {
+  if (telemetryReady()) {
+    window.Telemetry.init({ module: 'before-you-send', gameName: 'Before You Send', stepsTotal: 10 });
+    return;
+  }
+  if ((tries || 0) > 100) return;
+  setTimeout(() => initTelemetry((tries || 0) + 1), 50);
+}
+initTelemetry(0);
 
-    const { collection, doc, setDoc, serverTimestamp, Timestamp } =
-      await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+// Best-effort click-through tracking, fire-and-forget — same pattern across all four
+// games. Written to the session doc (teacher-readable) as well as the event stream.
+function markDeeperClicked() {
+  if (!telemetryReady()) return;
+  window.Telemetry.summary({ clickedDeeperLink: true });
+  window.Telemetry.track('deeper_link_click', { destination: deeperLink });
+}
 
-    let user = AuthCore.auth.currentUser;
-    if (!user) {
-      try { await AuthCore.silentSignIn(); } catch (e) { /* telemetry is best-effort */ }
-      user = AuthCore.auth.currentUser;
-    }
-
-    let recruitCode = null;
-    let studentId = null;
-    if (user && !user.isAnonymous) studentId = user.uid;
-    if (user) {
-      try {
-        const account = await AuthCore.getAccount(user.uid);
-        if (account && account.recruitCode) recruitCode = account.recruitCode;
-      } catch (e) { /* telemetry is best-effort */ }
-    }
-
-    const playedAt = new Date();
-    const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
-
-    // Deterministic per-play doc id: getSessionId() alone is stable per tab across
-    // replays, so append Date.now() to give each play-through its own document —
-    // this is what lets the "clicked deeper link" update below target the right one.
-    const sessionDocId = getSessionId() + '_' + Date.now();
-    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
-
-    await setDoc(lastSessionRef, {
+function recordSession() {
+  if (!telemetryReady()) return;
+  const correct = scenarioLog.filter(s => s.correct).length;
+  window.Telemetry.complete({
+    finalScore: score,
+    scenariosPlayed: scenarioLog.length,
+    correct,
+    summary: {
       game: 'before-you-send',
-      sessionId: getSessionId(),
-      recruitCode,
-      studentId,
-      // Always the owning uid, anonymous or not — lets a teacher's roster (Mission Control)
-      // read a Recruit's or a guest's session back via sessionOwnerIsMyStudent().
-      uid: user ? user.uid : null,
-      playedAt: serverTimestamp(),
-      ttl: Timestamp.fromDate(ttl),
+      finalScore: score,
       scenariosPlayed: scenarioLog.length,
       choices: choiceTally,
-      correct: scenarioLog.filter(s => s.correct).length,
+      correct,
       categories: categoryStats,
-      scenarios: scenarioLog
-    });
-  } catch (e) {
-    console.warn('Before You Send telemetry write failed', e);
-  }
+      scenarios: scenarioLog,
+    },
+  });
 }
 
 function startGame() {
@@ -807,7 +806,10 @@ function startGame() {
   choiceTally = { send: 0, edit: 0, delete: 0 };
   categoryStats = {};
   scenarioLog = [];
-  lastSessionRef = null;
+  // Play Again is this game's core loop, so each round gets its own session document
+  // rather than overwriting the last one's numbers.
+  if (window.Telemetry && roundsPlayed > 0) window.Telemetry.restart();
+  roundsPlayed++;
   show('game');
   renderDots();
   renderScenario();
@@ -919,6 +921,13 @@ function choose(action) {
   if (correct) categoryStats[s.category].correct++;
   scenarioLog.push({ id: s.id, category: s.category, choice: action, bestChoice: s.best, correct, timeUsed, readsUsed });
 
+  if (window.Telemetry) {
+    window.Telemetry.step(currentIdx + 1);
+    // `category` is this game's skill tag for the scenario — carried on the choice
+    // event itself rather than as a new event type.
+    window.Telemetry.choice({ scenarioIndex: currentIdx, scenarioId: s.id, choice: action, bestChoice: s.best, correct, category: s.category });
+  }
+
   showConsequence(data, action);
 }
 
@@ -949,26 +958,78 @@ function nextScenario() {
   }
 }
 
+// One message per drafted skill tag, in this game's own voice — used only when the shared
+// resolver actually lands on a lab the behavior-pattern read would not have chosen, so the
+// words on the card always name the lab the button opens.
+const CATEGORY_MESSAGES = {
+  'escalation-language': "The messages that escalated were your hardest — 'never', 'always', 'I'm done'. The Conflict Has a Winner lab goes deeper on disagreeing without making someone defend themselves.",
+  'audience-choice': "Who else was in the room was your toughest call. The Where You Say It lab goes deeper on the same sentence landing four different ways.",
+  'self-advocacy': "Asking for something for yourself was your hardest call. The Professional Brand lab goes deeper on making the ask so it gets heard.",
+  'vulnerability': "The messages that put something of yours on the line were your toughest. The Social Intelligence lab goes deeper on what honesty actually costs and buys.",
+  'tone-under-emotion': "You had the right instinct and the wrong word more than once. The Social Intelligence lab goes deeper on saying the true thing in a way that lands.",
+};
+
 function showEnd() {
   show('end');
   const el = document.getElementById('end');
   const jodi = jodiMoments[Math.floor(Math.random() * jodiMoments.length)];
   const correctCount = scenarioLog.filter(s => s.correct).length;
 
-  // Ticket 4: route to the GoodBlock that matches the pattern in this session's
-  // choices — impulsive senders, over-cautious deleters, and low scorers each get
-  // a different nudge; everyone else gets the default Social Intelligence pointer.
+  // Two independent signals, both kept:
+  //   - the BEHAVIOR PATTERN (impulsive sender / over-cautious deleter / low accuracy)
+  //     is what this game has always read, and it still writes the message. Untouched.
+  //   - the WEAKEST CATEGORY is new, now that every scenario carries a real skill tag
+  //     instead of a flat "social". It only picks the destination, through the shared
+  //     resolver, which can reach a lab in any pack — including ones this game's own
+  //     two hardcoded URLs never knew about.
+  // Category wins the destination when there is a clear one; the behavior pattern is
+  // the fallback destination and always the message.
   const correctRate = session.length ? correctCount / session.length : 1;
-  let deeperMsg, deeperLink = '/jsh/digital-decisions-lab/social-intelligence/';
+  let deeperMsg;
+  let fallbackLink = '/jsh/digital-decisions-lab/social-intelligence/';
+  let fallbackName = 'Social Intelligence';
   if (choiceTally.send >= 5) {
     deeperMsg = "You sent most things without editing. The Social Intelligence lab goes deeper on reading a situation before you react.";
   } else if (choiceTally.delete >= 4) {
     deeperMsg = "You deleted a lot — including some things worth sending. The Professional Brand lab helps you find your voice in digital communication.";
-    deeperLink = '/jsh/digital-decisions-lab/professional-brand/';
+    fallbackLink = '/jsh/digital-decisions-lab/professional-brand/';
+    fallbackName = 'Professional Brand';
   } else if (correctRate < 0.4) {
     deeperMsg = "Context changes everything about what to send. The Social Intelligence lab is built around exactly that.";
   } else {
     deeperMsg = "The Social Intelligence lab goes deeper on reading a situation before you respond.";
+  }
+
+  // Weakest category, same shape as Read the Signal and Money Moves: only categories
+  // actually drawn are eligible, and a category the student got every one of is not a
+  // weakness however few of them there were.
+  //
+  // DRAFT CATEGORIES: the five tags these messages are keyed by were reasoned from each
+  // scenario's own mechanism text and have NOT been through Curriculum & Learning Science
+  // review. The behavior-pattern read above is the reviewed, shipped signal and stays the
+  // fallback for exactly that reason.
+  const withAccuracy = Object.entries(categoryStats)
+    .filter(([, c]) => c.played - c.correct > 0)
+    .map(([cat, c]) => [cat, c.correct / c.played]);
+  const worst = withAccuracy.length ? withAccuracy.sort((a, b) => a[1] - b[1])[0] : null;
+
+  // Render with the fallback immediately, upgrade in place once the registry resolves —
+  // a slow or failed fetch can never leave a student looking at a dead link.
+  //
+  // The MESSAGE moves with the destination, not just the link. A category can now route to
+  // a lab in another pack entirely, and a card that reads "the Social Intelligence lab"
+  // above a button that opens Conflict Has a Winner is worse than no routing at all.
+  deeperLink = fallbackLink;
+  if (window.SkillRouting) {
+    window.SkillRouting
+      .resolve(worst ? worst[0] : null, { defaultUrl: fallbackLink, defaultName: fallbackName })
+      .then((dest) => {
+        deeperLink = dest.url;
+        if (!dest.matched || dest.url === fallbackLink) return;
+        const el = document.querySelector('#end .deeper-msg');
+        if (el && CATEGORY_MESSAGES[worst[0]]) el.textContent = CATEGORY_MESSAGES[worst[0]];
+      })
+      .catch(() => { /* deeperLink and the message are already the behavior-pattern pair */ });
   }
 
   el.innerHTML = `
@@ -986,7 +1047,7 @@ function showEnd() {
     <div class="deeper-card">
       <div class="deeper-label">WANT TO GO DEEPER?</div>
       <div class="deeper-msg">${deeperMsg}</div>
-      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href='${deeperLink}'; })">Open the lab →</button>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href = deeperLink; })">Open the lab →</button>
     </div>
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
     <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
@@ -1010,17 +1071,6 @@ function showEnd() {
       window.AuthGate.offerSave().catch((e) => console.error('[BeforeYouSend] offerSave failed', e));
     }, 1200);
   }
-}
-
-// Best-effort click-through tracking: records that the student followed the
-// end-screen recommendation into the GoodBlock lesson. Fire-and-forget so it
-// never delays navigation — guardedLeave() may itself pause for the save gate,
-// but this write should not add to that delay either way.
-function markDeeperClicked() {
-  if (!lastSessionRef) return;
-  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
-    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
-    .catch(() => {});
 }
 
 function restartGame() { startGame(); }

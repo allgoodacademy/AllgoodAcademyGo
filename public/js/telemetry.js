@@ -8,8 +8,10 @@
 //
 //   window.Telemetry.init({ module: 'privacy-security', gameName: 'Privacy & Security', stepsTotal: 6 });
 //   window.Telemetry.step(3);                      // learner reached step/case/page 3 (1-indexed)
-//   window.Telemetry.choice({ scenarioIndex, choiceIndex, score, effectiveness });
-//   window.Telemetry.complete({ finalScore, percentage, rank });
+//   window.Telemetry.choice({ scenarioIndex, choiceIndex, score, effectiveness, category });
+//   window.Telemetry.complete({ finalScore, percentage, rank, summary: { ... } });
+//   window.Telemetry.summary({ correct, scenariosPlayed, categories });  // session-doc roll-up
+//   window.Telemetry.restart();                    // replay in the same tab: new session doc
 //   window.Telemetry.track('any_custom_event', { ...meta });
 //
 // Two flat, top-level Firestore collections are written (see firestore.rules #10/#11):
@@ -20,7 +22,10 @@
 //     log: uid, module, startedAt, lastSeenAt, activeMs (visibility-aware — a tab left
 //     open in the background does not count), maxStep / stepsTotal, completed, device,
 //     entry (dashboard / lab-hub / direct / external). It is rewritten in place on a
-//     throttled timer, so a 20-minute visit costs ~20 writes, not hundreds.
+//     throttled timer, so a 20-minute visit costs ~20 writes, not hundreds. A module may
+//     also attach a `summary` map (see summary() below) — that is where the four games
+//     put the per-category roll-up a teacher's Mission Control roster reads back, since
+//     the event stream itself is admin-only.
 //
 //   artifacts/{appId}/events/{autoId}
 //     Append-only event stream: module_open, step, choice, module_complete, plus any
@@ -63,6 +68,7 @@ const state = {
     entry: null,
     device: null,
     flushing: false,
+    summary: null,       // per-module end-of-session roll-up merged onto the session doc
 };
 
 function core() { return window.AuthCore || null; }
@@ -138,6 +144,7 @@ async function openSession() {
             device: state.device,
             entry: state.entry,
             path: window.location.pathname,
+            ...(state.summary ? { summary: state.summary } : {}),
         });
         state.sessionOpen = true;
         state.lastFlushAt = Date.now();
@@ -156,6 +163,7 @@ async function flushSession(force) {
             activeMs: Math.round(state.activeMs),
             maxStep: state.maxStep,
             completed: state.completed,
+            ...(state.summary ? { summary: state.summary } : {}),
         }, { merge: true });
         state.dirty = false;
         state.lastFlushAt = Date.now();
@@ -281,6 +289,32 @@ function init({ module: moduleSlug, gameName, stepsTotal } = {}) {
     listenForAuth();
 }
 
+/* Start a fresh session document for a replay in the same tab.
+ *
+ * GoodBlocks and Challenges are finish-once, so one session doc per page load was
+ * always enough. The four standalone games are not: Play Again is their core loop, and
+ * the bespoke game_sessions writer they replaced wrote one document per play-through.
+ * Without this, every round after the first would be invisible — complete() no-ops once
+ * `completed` is set, and the session doc would keep only the first round's numbers.
+ *
+ * Carries nothing forward except the module description and the uid: the new doc gets
+ * its own activeMs, maxStep, completed flag and summary, exactly like a fresh visit.
+ * The previous document is left untouched (its update rule is owner-only, and it is a
+ * real record of a real round). */
+function restart() {
+    if (!state.configured) return;
+    flushSession(true);
+    state.sessionOpen = false;
+    state.activeMs = 0;
+    state.lastVisibleAt = document.visibilityState === 'visible' ? Date.now() : null;
+    state.maxStep = 0;
+    state.completed = false;
+    state.summary = null;
+    state.dirty = false;
+    openSession().then(drainPending);
+    enqueue('module_open', { entry: state.entry, device: state.device, replay: true });
+}
+
 function track(event, meta) {
     if (!state.configured) return;
     enqueue(String(event), meta || {});
@@ -296,8 +330,32 @@ function step(n, meta) {
     }
 }
 
+// A choice event may carry the skill tag the scenario was authored under, so a
+// per-scenario category is recorded on every answer without inventing a new event
+// type. `category` is the field games write (their scenario banks already carry one);
+// `skillTag` is accepted as a synonym and normalized onto `category` so a reader only
+// ever has to look in one place. Everything else passes through untouched.
 function choice(meta) {
-    track('choice', meta || {});
+    const m = { ...(meta || {}) };
+    if (m.skillTag != null && m.category == null) m.category = m.skillTag;
+    delete m.skillTag;
+    track('choice', m);
+}
+
+/* Merge an end-of-session roll-up onto THIS visit's session document.
+ *
+ * The event stream is admin-only by rule (#11), but a teacher can read their own
+ * students' session documents (#10b) — so anything Mission Control has to show about
+ * a game (best score, per-category breakdown, whether the student clicked through to
+ * the recommended lesson) has to live on the session doc, not only in events. This is
+ * that channel, and it is why the four games do not need a collection of their own.
+ *
+ * Merged, not replaced: two calls in one visit combine rather than clobber. */
+function summary(fields) {
+    if (!state.configured || !fields || typeof fields !== 'object') return;
+    state.summary = { ...(state.summary || {}), ...fields };
+    state.dirty = true;
+    flushSession(true);
 }
 
 function complete(meta) {
@@ -306,12 +364,19 @@ function complete(meta) {
     if (state.stepsTotal && state.maxStep < state.stepsTotal) state.maxStep = state.stepsTotal;
     state.dirty = true;
     accumulate();
-    enqueue('module_complete', { ...(meta || {}), activeMs: Math.round(state.activeMs) });
+    const m = { ...(meta || {}) };
+    // `summary` on a complete() call is roll-up for the session doc, not event meta —
+    // lifted out so the event stream keeps its existing shape.
+    if (m.summary && typeof m.summary === 'object') {
+        state.summary = { ...(state.summary || {}), ...m.summary };
+        delete m.summary;
+    }
+    enqueue('module_complete', { ...m, activeMs: Math.round(state.activeMs) });
     flushSession(true);
 }
 
 window.Telemetry = {
-    init, track, step, choice, complete,
+    init, restart, track, step, choice, complete, summary,
     flush: () => flushSession(true),
     get sessionId() { return state.sessionId; },
     get activeMs() { accumulate(); return Math.round(state.activeMs); },

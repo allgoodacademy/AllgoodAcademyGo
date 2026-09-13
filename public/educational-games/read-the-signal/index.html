@@ -14,6 +14,13 @@
      every GoodBlock. Here that's the end-screen save offer, so a finished run has
      somewhere to go instead of vanishing when the tab closes. -->
 <script type="module" src="/js/identity-gate.js"></script>
+<!-- Shared telemetry pipe (artifacts/{appId}/sessions + /events) — the same one every
+     GoodBlock and Challenge uses. Replaces this game's own root-level game_sessions
+     writer; see /js/telemetry.js. -->
+<script type="module" src="/js/telemetry.js"></script>
+<!-- Shared skill -> GoodBlock resolver. The weakest-category computation below is
+     unchanged; only the destination lookup moved out of this file. -->
+<script type="module" src="/js/skill-routing.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1576,104 +1583,82 @@ let lives = 3;
 let round = [];
 let categoryStats = {};
 let scenarioLog = [];
+let roundsPlayed = 0;
 let correctCount = 0;
 let deeperLink = '/jsh/digital-decisions-lab/privacy-security/';
 
-// Ticket 2: route to the GoodBlock matching this session's weakest category.
-// Categories with zero attempts aren't "weak" — they just weren't drawn — so
-// only categories actually played are eligible, and an even spread across
-// everything played defaults to Privacy & Security per the ticket.
-const DEEPER_ROUTES = {
-  phishing: { link: '/jsh/digital-decisions-lab/privacy-security/', msg: "You missed some phishing signals. The Privacy & Security lab goes deeper on spotting what's really trying to get something from you." },
-  privacy: { link: '/jsh/digital-decisions-lab/privacy-security/', msg: 'Permissions and privacy scenarios tripped you up. The Privacy & Security lab is built for exactly this.' },
-  social: { link: '/jsh/digital-decisions-lab/social-intelligence/', msg: 'The social scenarios were your toughest. The Social Intelligence lab goes deeper on reading situations before you react.' },
-  permissions: { link: '/jsh/digital-decisions-lab/privacy-security/', msg: 'App permissions caught you off guard. The Privacy & Security lab breaks down what apps are really asking for.' },
-  'safe-recognition': { link: '/jsh/digital-decisions-lab/digital-citizenship/', msg: 'You stopped some things that were actually safe. The Digital Citizenship lab helps sharpen when to trust and when to question.' },
-  safe: { link: '/jsh/digital-decisions-lab/digital-citizenship/', msg: 'You stopped some things that were actually safe. The Digital Citizenship lab helps sharpen when to trust and when to question.' }
+// Route to the GoodBlock matching this session's weakest category. Categories with
+// zero attempts aren't "weak" — they just weren't drawn — so only categories actually
+// played are eligible, and an even spread across everything played defaults to
+// Privacy & Security.
+//
+// The weakest-category computation below is unchanged. What moved is the destination:
+// each category's *link* now comes from /js/skill-routing.js, which searches every lab
+// in /data/modules-registry.json for one tagged with that category, instead of the
+// three hardcoded URLs this map used to hold. The Jodi-voiced copy stays right here —
+// the resolver returns a destination and has no opinion about words.
+const DEEPER_MESSAGES = {
+  phishing: "You missed some phishing signals. The Privacy & Security lab goes deeper on spotting what's really trying to get something from you.",
+  privacy: 'Permissions and privacy scenarios tripped you up. The Privacy & Security lab is built for exactly this.',
+  social: 'The social scenarios were your toughest. The Social Intelligence lab goes deeper on reading situations before you react.',
+  permissions: 'App permissions caught you off guard. The Privacy & Security lab breaks down what apps are really asking for.',
+  'safe-recognition': 'You stopped some things that were actually safe. The Digital Citizenship lab helps sharpen when to trust and when to question.',
+  safe: 'You stopped some things that were actually safe. The Digital Citizenship lab helps sharpen when to trust and when to question.'
 };
-const DEFAULT_DEEPER = { link: '/jsh/digital-decisions-lab/privacy-security/', msg: 'Every category was close. The Privacy & Security lab is a strong next step for sharpening the reflex further.' };
+const DEFAULT_DEEPER_URL = '/jsh/digital-decisions-lab/privacy-security/';
+const DEFAULT_DEEPER_NAME = 'Privacy & Security';
+const DEFAULT_DEEPER_MSG = 'Every category was close. The Privacy & Security lab is a strong next step for sharpening the reflex further.';
 
-// --- Telemetry (Ticket 3): one game_sessions document per completed session,
-// keyed to a per-tab sessionStorage UUID so replays in the same tab don't
-// collide and a closed tab starts fresh.
-function getSessionId() {
-  let id = sessionStorage.getItem('rts_session_id');
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem('rts_session_id', id);
+// --- Telemetry: the shared pipe (/js/telemetry.js), same as every GoodBlock and
+// Challenge. This game used to write its own document to a root-level game_sessions
+// collection with its own field allowlist in firestore.rules; that collection and
+// those rules are gone. Nothing game-specific is written any more — the per-category
+// breakdown rides on the session document's `summary` map, which is the one part of
+// the pipe a teacher's Mission Control roster can actually read back.
+function telemetryReady() {
+  return !!window.Telemetry;
+}
+
+// telemetry.js is a module script, so it has not necessarily run when this classic
+// script does. Poll briefly rather than racing it; if it never arrives (Firebase
+// blocked, offline) the game is entirely unaffected — telemetry is best-effort.
+function initTelemetry(tries) {
+  if (telemetryReady()) {
+    window.Telemetry.init({ module: 'read-the-signal', gameName: 'Read the Signal', stepsTotal: ROUND_SIZE });
+    return;
   }
-  return id;
+  if ((tries || 0) > 100) return;
+  setTimeout(() => initTelemetry((tries || 0) + 1), 50);
 }
+initTelemetry(0);
 
-let lastSessionRef = null;
-
-// Best-effort click-through tracking, fire-and-forget — same pattern across
-// all four games' telemetry.
+// Best-effort click-through tracking, fire-and-forget — same pattern across all four
+// games. Written to the session doc (teacher-readable) as well as the event stream.
 function markDeeperClicked() {
-  if (!lastSessionRef) return;
-  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
-    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
-    .catch(() => {});
+  if (!telemetryReady()) return;
+  window.Telemetry.summary({ clickedDeeperLink: true });
+  window.Telemetry.track('deeper_link_click', { destination: deeperLink });
 }
 
-async function recordSession(outcome) {
-  try {
-    const AuthCore = window.AuthCore;
-    if (!AuthCore) return; // Firebase module failed to load — never block the game on telemetry.
-
-    const { getFirestore, collection, doc, setDoc, serverTimestamp, Timestamp } =
-      await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
-
-    // Firestore rules require an authenticated request (anonymous auth counts) —
-    // sign in silently, same as every other module on the site, so a first-time
-    // visitor who never touched the login gate still gets a session recorded.
-    let user = AuthCore.auth.currentUser;
-    if (!user) {
-      try { await AuthCore.silentSignIn(); } catch (e) { /* telemetry is best-effort */ }
-      user = AuthCore.auth.currentUser;
-    }
-
-    let recruitCode = null;
-    let studentId = null;
-    if (user && !user.isAnonymous) {
-      studentId = user.uid;
-    }
-    if (user) {
-      try {
-        const account = await AuthCore.getAccount(user.uid);
-        if (account && account.recruitCode) recruitCode = account.recruitCode;
-      } catch (e) { /* telemetry is best-effort */ }
-    }
-
-    const playedAt = new Date();
-    const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
-
-    const sessionDocId = getSessionId() + '_' + Date.now();
-    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
-
-    await setDoc(lastSessionRef, {
+function recordSession(outcome) {
+  if (!telemetryReady()) return;
+  window.Telemetry.complete({
+    outcome,
+    scenariosPlayed: scenarioLog.length,
+    correct: correctCount,
+    wrong: scenarioLog.length - correctCount,
+    livesLost: 3 - lives,
+    summary: {
       game: 'read-the-signal',
-      sessionId: getSessionId(),
-      recruitCode,
-      studentId,
-      // Always the owning uid, anonymous or not — unlike studentId (real accounts only),
-      // this is what lets a teacher's roster (Mission Control) read a Recruit's or a
-      // guest's session back via sessionOwnerIsMyStudent(), same as the sessions collection.
-      uid: user ? user.uid : null,
-      playedAt: serverTimestamp(),
-      ttl: Timestamp.fromDate(ttl),
       outcome,
       scenariosPlayed: scenarioLog.length,
       correct: correctCount,
       wrong: scenarioLog.length - correctCount,
       livesLost: 3 - lives,
       categories: categoryStats,
-      scenarios: scenarioLog
-    });
-  } catch (e) {
-    // Never let a telemetry failure interrupt the game.
-    console.warn('Read the Signal telemetry write failed', e);
-  }
+      scenarios: scenarioLog,
+    },
+  });
 }
 
 function startGame() {
@@ -1690,7 +1675,11 @@ function startGame() {
   correctCount = 0;
   categoryStats = {};
   scenarioLog = [];
-  lastSessionRef = null;
+
+  // Play Again is this game's core loop, so each round gets its own session document
+  // rather than overwriting the last one's numbers. The first round just initializes.
+  if (window.Telemetry && roundsPlayed > 0) window.Telemetry.restart();
+  roundsPlayed++;
 
   document.getElementById('intro').style.display = 'none';
   document.getElementById('end').style.display = 'none';
@@ -1742,6 +1731,13 @@ function choose(pick) {
   if (correct) categoryStats[s.category].correct++;
 
   scenarioLog.push({ id: s.id, answer: s.answer, correct, category: s.category });
+
+  if (window.Telemetry) {
+    window.Telemetry.step(currentIndex + 1);
+    // `category` is this game's skill tag for the scenario — carried on the choice
+    // event itself rather than as a new event type.
+    window.Telemetry.choice({ scenarioIndex: currentIndex, scenarioId: s.id, answer: pickAnswer, correct, category: s.category });
+  }
 
   if (correct) {
     score += 10;
@@ -1804,10 +1800,21 @@ function showEnd(outcome) {
   const jodi = jodiMoments[Math.floor(Math.random() * jodiMoments.length)];
   document.getElementById('jodiMoment').textContent = '"' + jodi + '"';
 
-  const route = worst ? (DEEPER_ROUTES[worst[0]] || DEFAULT_DEEPER) : DEFAULT_DEEPER;
-  deeperLink = route.link;
-  document.getElementById('deeperMsg').textContent = route.msg;
+  // Destination from the shared resolver; copy from this game's own table above.
+  // The card is shown with the default destination immediately and upgraded in place
+  // once the registry resolves, so a slow (or failed) fetch can never leave a student
+  // looking at a blank routing card or a dead link.
+  const worstCategory = worst ? worst[0] : null;
+  deeperLink = DEFAULT_DEEPER_URL;
+  document.getElementById('deeperMsg').textContent =
+    (worstCategory && DEEPER_MESSAGES[worstCategory]) || DEFAULT_DEEPER_MSG;
   document.getElementById('deeperCard').style.display = 'block';
+  if (window.SkillRouting) {
+    window.SkillRouting
+      .resolve(worstCategory, { defaultUrl: DEFAULT_DEEPER_URL, defaultName: DEFAULT_DEEPER_NAME })
+      .then((dest) => { deeperLink = dest.url; })
+      .catch(() => { /* deeperLink is already the default — nothing to recover */ });
+  }
 
   recordSession(outcome);
 

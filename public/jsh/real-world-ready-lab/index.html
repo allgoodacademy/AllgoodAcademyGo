@@ -70,48 +70,20 @@
         <!-- THREE GOODBLOCKS + THE CHALLENGE. Order is deliberate but not enforced. -->
         <section id="labs" class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
 
-            <!-- MONEY AS A SKILL — live. Icon/accent match the GoodBlock's own startup screen
-                 and completion badge (coins / amber #C97D1A). -->
-            <div onclick="window.launchLab('Money as a Skill', '/jsh/real-world-ready-lab/money-as-a-skill/')"
-                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FEF3DC; border:1px solid #F3D9A8;">
-                        <i data-lucide="coins" class="w-7 h-7" style="color:#C97D1A;"></i>
-                    </div>
-                    <span id="lab-status-money-as-a-skill" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                </div>
-                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Money as a Skill</h3>
-                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Splitting, spending, and the ask most people never make.</p>
-                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
-            </div>
-
-            <!-- CONFLICT HAS A WINNER — live. merge / amber. -->
-            <div onclick="window.launchLab('Conflict Has a Winner', '/jsh/real-world-ready-lab/conflict-has-a-winner/')"
-                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FEF3DC; border:1px solid #F3D9A8;">
-                        <i data-lucide="merge" class="w-7 h-7" style="color:#C97D1A;"></i>
-                    </div>
-                    <span id="lab-status-conflict-has-a-winner" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                </div>
-                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Conflict Has a Winner</h3>
-                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Disagreeing without someone having to lose.</p>
-                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
-            </div>
-
-            <!-- READING THE ROOM — live. glasses / amber. -->
-            <div onclick="window.launchLab('Reading the Room', '/jsh/real-world-ready-lab/reading-the-room/')"
-                 class="lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:#FEF3DC; border:1px solid #F3D9A8;">
-                        <i data-lucide="glasses" class="w-7 h-7" style="color:#C97D1A;"></i>
-                    </div>
-                    <span id="lab-status-reading-the-room" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
-                </div>
-                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase">Reading the Room</h3>
-                <p class="text-xs text-slate-500 leading-relaxed flex-grow">Your first read is a signal, not a verdict.</p>
-                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
-            </div>
+            <!-- LIVE LAB CARDS — rendered from public/data/modules-registry.json, filtered to
+                 this pack (see the bootstrap script at the bottom of this file). These were
+                 hand-written cards here until 2026-09-13; the copy, icon and accent for each
+                 one moved into that registry's `hub` block verbatim, so nothing about how they
+                 look changed. Tailwind class names stay in the template below rather than
+                 in the JSON on purpose: the CSS build's content globs scan public/**/*.html and
+                 public/js/**/*.js, not .json, so a class moved into data would be purged out of
+                 the bundle. -->
+            <!-- Anchor, not a wrapper: the cards are appended as direct children of this
+                 grid section so each one is its own grid item, exactly as the hand-written
+                 cards were. A wrapping element would need display:contents to keep the
+                 layout, and that is one more utility to keep alive in the CSS bundle for no
+                 gain. -->
+            <span id="lab-cards-anchor" hidden></span>
 
             <!-- REAL WORLD READY CHALLENGE — live. Covers all three labs; sits last, but nothing
                  blocks a student starting here. -->
@@ -144,15 +116,10 @@
             <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Lab</h2>
             <p class="text-xs text-gray-500 mb-4 font-body">Any order works.</p>
             <div class="space-y-2">
-                <button onclick="window.closeLabMenu(); window.launchLab('Money as a Skill', '/jsh/real-world-ready-lab/money-as-a-skill/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
-                    <span>Money as a Skill</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
-                <button onclick="window.closeLabMenu(); window.launchLab('Conflict Has a Winner', '/jsh/real-world-ready-lab/conflict-has-a-winner/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
-                    <span>Conflict Has a Winner</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
-                <button onclick="window.closeLabMenu(); window.launchLab('Reading the Room', '/jsh/real-world-ready-lab/reading-the-room/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
-                    <span>Reading the Room</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
+                <!-- Lab entries rendered from the registry, same source as the cards above.
+                     The Challenge entry below is hand-written: it is a different kind of
+                     destination, not one of this pack's GoodBlocks. -->
+                <span id="lab-menu-anchor" hidden></span>
                 <button onclick="window.closeLabMenu(); window.launchLab('Real World Ready Challenge', '/educational-games/real-world-ready/')" class="w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between">
                     <span>Real World Ready Challenge</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
@@ -191,6 +158,80 @@
         });
     </script>
 
+    <!-- LAB CARDS FROM THE SHARED REGISTRY.
+         Every live GoodBlock card on this hub, and every lab entry in the "Jump to a Lab"
+         menu, is rendered from public/data/modules-registry.json filtered to this pack. Before
+         this, each hub kept its own hand-written copy of the same list — one of the five places
+         module metadata had to be kept in sync by hand, and the reason a hub could silently
+         disagree with the dashboard about what was live.
+         The markup below is byte-for-byte what the hand-written cards were, with the per-card
+         icon, accent and copy read from each entry's `hub` block. Tailwind class names stay
+         HERE rather than in the JSON: the CSS build scans public/**/*.html and
+         public/js/**/*.js, never .json, so a class moved into data would be purged. -->
+    <script type="module">
+        const PACK = 'real-world-ready';
+
+        function labCard(m) {
+            const hub = m.hub || {};
+            const el = document.createElement('div');
+            el.className = 'lab-card live cursor-pointer bg-white rounded-2xl border border-jodi-border shadow-sm p-6 flex flex-col';
+            el.innerHTML = `
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-sm" style="background-color:${hub.iconBg}; border:1px solid ${hub.iconBorder};">
+                        <i data-lucide="${hub.icon}" class="w-7 h-7" style="color:${hub.iconColor};"></i>
+                    </div>
+                    <span id="lab-status-${m.id}" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Ready</span>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg mb-1 uppercase"></h3>
+                <p class="text-xs text-slate-500 leading-relaxed flex-grow"></p>
+                <span class="mt-4 text-[11px] font-bold text-allgood-primary uppercase tracking-wide flex items-center gap-1">Start the Lab <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            `;
+            // textContent, not interpolation: a name like "Privacy & Security" has to survive
+            // being a name, and nothing from the registry is ever parsed as markup.
+            el.querySelector('h3').textContent = m.name;
+            el.querySelector('p').textContent = hub.cardBlurb || m.blurb || '';
+            el.addEventListener('click', () => window.launchLab(m.name, m.url));
+            return el;
+        }
+
+        function menuItem(m) {
+            const btn = document.createElement('button');
+            btn.className = 'w-full text-left p-3 rounded-lg border border-jodi-border bg-white text-allgood-dark hover:border-rwr-accent text-xs font-bold flex items-center justify-between';
+            btn.innerHTML = '<span></span><i data-lucide="chevron-right" class="w-4 h-4"></i>';
+            btn.querySelector('span').textContent = m.name;
+            btn.addEventListener('click', () => { window.closeLabMenu(); window.launchLab(m.name, m.url); });
+            return btn;
+        }
+
+        // Exposed as a promise so the progress-badge script below can wait for the cards it
+        // needs to write into, instead of racing them.
+        window.hubLabsReady = (async () => {
+            let labs = [];
+            try {
+                const res = await fetch('/data/modules-registry.json', { cache: 'no-cache' });
+                if (!res.ok) throw new Error(`modules-registry.json HTTP ${res.status}`);
+                const data = await res.json();
+                labs = (data.modules || []).filter((m) => m.type === 'lab' && m.pack === PACK && m.url && !m.retired);
+            } catch (e) {
+                // Nothing to fall back to that isn't the duplicated list this change deletes.
+                // The pack's Challenge card and the rest of the page are hand-written and
+                // still render, so the hub degrades to "Challenge only" rather than to blank.
+                console.error('[Lab Pack Hub] could not load /data/modules-registry.json — lab cards will not render', e);
+                return [];
+            }
+            // Inserted BEFORE each anchor, so the pack's Challenge card and Challenge menu
+            // entry keep their place at the end of the list.
+            const cardAnchor = document.getElementById('lab-cards-anchor');
+            const menuAnchor = document.getElementById('lab-menu-anchor');
+            labs.forEach((m) => {
+                if (cardAnchor) cardAnchor.parentNode.insertBefore(labCard(m), cardAnchor);
+                if (menuAnchor) menuAnchor.parentNode.insertBefore(menuItem(m), menuAnchor);
+            });
+            if (window.lucide) window.lucide.createIcons();
+            return labs;
+        })();
+    </script>
+
     <!-- Real per-module progress for a signed-in student — "Ready" is a marketing label for
          an unauthenticated visitor only. Reads the same game_scores / module_progress paths
          the dashboard's MODULE_REGISTRY uses; the predicates here mirror those entries. -->
@@ -200,12 +241,14 @@
         // 64 = the Real World Ready Challenge's certification threshold (of 72), NOT the
         // Digital Decisions Challenge's 80 (of 90). Copying 80 across would make the badge
         // unreachable — a perfect score is 72.
-        const LAB_STATUS_REGISTRY = [
-            { id: 'money-as-a-skill', gameName: 'Money as a Skill', badgeId: 'lab-status-money-as-a-skill', isComplete: (d) => d.completed === true },
-            { id: 'conflict-has-a-winner', gameName: 'Conflict Has a Winner', badgeId: 'lab-status-conflict-has-a-winner', isComplete: (d) => d.completed === true },
-            { id: 'reading-the-room', gameName: 'Reading the Room', badgeId: 'lab-status-reading-the-room', isComplete: (d) => d.completed === true },
+        // The labs come from the shared registry (same fetch that rendered the cards
+        // above), so this list can no longer disagree with what is actually on the page.
+        // A pack's Challenge, where it has a badge on this hub, stays hand-written: it is
+        // not one of the pack's GoodBlocks and its completion rule is its own.
+        const CHALLENGE_STATUS_ROWS = [
             { id: 'rwr-challenge', gameName: 'Real World Ready Challenge', badgeId: 'lab-status-rwr-challenge', isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64, dark: true },
         ];
+        let LAB_STATUS_REGISTRY = CHALLENGE_STATUS_ROWS;
 
         function setLabBadge(lab, status) {
             const el = document.getElementById(lab.badgeId);
@@ -244,7 +287,18 @@
             const check = setInterval(() => { if (window.AuthCore) { clearInterval(check); cb(); } }, 50);
         }
 
-        whenAuthCoreReady(() => {
+        whenAuthCoreReady(async () => {
+            // Wait for the cards: their badge elements are what applyRealLabStatuses writes
+            // into, and the registry is what says which labs exist on this hub at all.
+            const labs = await (window.hubLabsReady || Promise.resolve([]));
+            LAB_STATUS_REGISTRY = [
+                ...labs.map((m) => ({
+                    id: m.id,
+                    gameName: (m.gameNames && m.gameNames[0]) || m.name,
+                    badgeId: `lab-status-${m.id}`,
+                })),
+                ...CHALLENGE_STATUS_ROWS,
+            ];
             window.AuthCore.onAuthStateChanged(window.AuthCore.auth, async (user) => {
                 if (!user) return;
                 try {

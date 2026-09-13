@@ -121,10 +121,11 @@
         }
 
         // --- MODULE REGISTRY ---
-        // Single source of truth for every LIVE module in the library, used by classroom
-        // assignment and generic per-module completion detection. Everything else has been
-        // archived (moved out of public/, no longer hosted) — this registry only lists what's
-        // actually reachable, so a teacher can't accidentally assign a dead link.
+        // Read from the SHARED registry at public/data/modules-registry.json — see the note
+        // on loadSharedRegistry() below. Lists every LIVE lab and Challenge, used by
+        // classroom assignment and generic per-module completion detection. Anything
+        // archived (moved out of public/, no longer hosted) or retired is filtered out, so a
+        // teacher can't accidentally assign a dead link.
         //
         // Rage Revenue and Finding Yourself are archived too (moved to archive/jsh/) —
         // they're being replaced by the four-lab Digital Decisions Lab Pack. Three of those
@@ -148,48 +149,74 @@
         // carry the pack too, for grouping, but only category 'lab' feeds the pack pill.
         // URLs are site-relative on purpose: an absolute production URL would throw a
         // student off a preview channel and onto the live site.
-        const MODULE_REGISTRY = [
+        // Everything below now comes from public/data/modules-registry.json — the shared
+        // registry that games, the Lab Pack hubs and scripts/check-modules.js read too. This
+        // array used to be hand-maintained here and hand-kept in sync with Insider's COURSES,
+        // each hub's cards and the docs table; games appeared in none of them, which is how
+        // four live games went unregistered. One list now, validated by check-modules.js.
+        //
+        // Two things deliberately stay in code rather than in the JSON:
+        //   - isComplete(), because a predicate is a function and JSON cannot hold one. Each
+        //     one is keyed by module id below and is unchanged from what it always was.
+        //   - the GAMES are filtered OUT here. They're in the registry for the resolver and
+        //     for Mission Control, but a teacher doesn't "launch" a game the way they launch
+        //     a GoodBlock, so they get no dashboard card. Filtering at render time (rather
+        //     than leaving them out of the registry) is what lets both be true at once.
+        const MODULE_COMPLETION = {
             // v2: a score document without challengeVersion === 'dd-v2' is a v1 attempt — it
             // still shows in ddcAttempts history (below) so a v1 badge is never hidden or
             // deleted, but it no longer counts as a CURRENT completion/badge.
-            { id: 'ddc', name: 'Digital Decisions', category: 'challenge', pack: 'digital-decisions', url: '/educational-games/digital-decisions/',
-              gameNames: ['Digital Decisions Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 68 && d.challengeVersion === 'dd-v2',
-              badgeThreshold: 68, maxScore: 84, durationMinutes: 25 },
-            { id: 'social-intelligence', name: 'Social Intelligence', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/social-intelligence/',
-              gameNames: ['Social Intelligence'], topic: 'Reading people', blurb: 'How a group read lands, and what it costs to get it wrong.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'privacy-security', name: 'Privacy & Security', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/privacy-security/',
-              gameNames: ['Privacy & Security'], topic: 'Staying private', blurb: 'What you leave behind online, and who can pick it up.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'digital-citizenship', name: 'Digital Citizenship', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/digital-citizenship/',
-              gameNames: ['Digital Citizenship'], topic: 'Being online', blurb: 'The version of you that shows up when you post.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'professional-brand', name: 'Professional Brand', category: 'lab', pack: 'digital-decisions', url: '/jsh/digital-decisions-lab/professional-brand/',
-              gameNames: ['Professional Brand'], topic: 'How you come across', blurb: 'What a stranger decides about you in six seconds.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'money-as-a-skill', name: 'Money as a Skill', category: 'lab', pack: 'real-world-ready', url: '/jsh/real-world-ready-lab/money-as-a-skill/',
-              gameNames: ['Money as a Skill'], topic: 'Money', blurb: 'Money is a skill you practise, not a personality you have.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'conflict-has-a-winner', name: 'Conflict Has a Winner', category: 'lab', pack: 'real-world-ready', url: '/jsh/real-world-ready-lab/conflict-has-a-winner/',
-              gameNames: ['Conflict Has a Winner'], topic: 'Handling conflict', blurb: 'Who actually wins an argument, and what it cost them.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'reading-the-room', name: 'Reading the Room', category: 'lab', pack: 'real-world-ready', url: '/jsh/real-world-ready-lab/reading-the-room/',
-              gameNames: ['Reading the Room'], topic: 'Reading the room', blurb: 'Five first reads, and what checking one would have changed.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            // 64 of 72 — the Real World Ready Challenge's own threshold, NOT the DDC's 80 of 90.
-            { id: 'rwr-challenge', name: 'Real World Ready Challenge', category: 'challenge', pack: 'real-world-ready', url: '/educational-games/real-world-ready/',
-              gameNames: ['Real World Ready Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
-              badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
-            // Room to Think — the third Lab Pack, and complete: all four GoodBlocks are live
-            // and the hub has no coming-soon card left. `topic` and `blurb` sit AFTER gameNames because
-            // scripts/check-modules.js parses id/name/category/pack/url/gameNames positionally
-            // and stops matching if anything is inserted between them.
-            { id: 'ten-voices-one-source', name: 'Ten Voices, One Source', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/ten-voices-one-source/',
-              gameNames: ['Ten Voices, One Source'], topic: 'Checking a claim', blurb: 'Nine people said it. Two of them found out.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'the-question-decides-the-answer', name: 'The Question Decides the Answer', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/the-question-decides-the-answer/',
-              gameNames: ['The Question Decides the Answer'], topic: 'How you ask', blurb: 'Ask it the other way and see what comes back.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
+            'ddc': (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 68 && d.challengeVersion === 'dd-v2',
+            // 64 of 72 — the Real World Ready Challenge's own threshold, NOT the DDC's.
+            'rwr-challenge': (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
             // 64 of 72 again — the same bar as the Real World Ready Challenge, both 88.9%.
-            { id: 'where-you-say-it', name: 'Where You Say It', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/where-you-say-it/',
-              gameNames: ['Where You Say It'], topic: 'Saying the hard thing', blurb: 'The same sentence lands four different ways.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'the-cost-of-later', name: 'The Cost of Later', category: 'lab', pack: 'room-to-think', url: '/jsh/room-to-think-lab/the-cost-of-later/',
-              gameNames: ['The Cost of Later'], topic: 'Starting early', blurb: 'The options run out before the deadline does.', isComplete: (d) => d.completed === true, durationMinutes: 15 },
-            { id: 'rtt-challenge', name: 'Room to Think Challenge', category: 'challenge', pack: 'room-to-think', url: '/educational-games/room-to-think/',
-              gameNames: ['Room to Think Challenge'], isComplete: (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
-              badgeThreshold: 64, maxScore: 72, durationMinutes: 20 },
-        ];
+            'rtt-challenge': (d) => d.completed === true && typeof d.finalScore === 'number' && d.finalScore >= 64,
+        };
+        // A lab is not a graded quiz — no numeric score, just a completed:true flag written
+        // once a student reaches its final Case. That is the default for anything without an
+        // entry above.
+        const LAB_COMPLETE = (d) => d.completed === true;
+
+        // Top-level await in a module script: every consumer below (CHALLENGE_CARDS, the
+        // pack counters, the assignment list) reads MODULE_REGISTRY synchronously, so the
+        // registry has to be in hand before any of them evaluate.
+        async function loadSharedRegistry() {
+            const res = await fetch('/data/modules-registry.json', { cache: 'no-cache' });
+            if (!res.ok) throw new Error(`modules-registry.json HTTP ${res.status}`);
+            const data = await res.json();
+            return Array.isArray(data && data.modules) ? data.modules : [];
+        }
+
+        let SHARED_MODULES = [];
+        try {
+            SHARED_MODULES = await loadSharedRegistry();
+        } catch (e) {
+            // Nothing to fall back to that wouldn't just be the duplicated list this change
+            // exists to delete. Say so loudly; the rest of the dashboard still works.
+            console.error('[Dashboard] could not load /data/modules-registry.json — module cards will not render', e);
+        }
+
+        const MODULE_REGISTRY = SHARED_MODULES
+            .filter(m => (m.type === 'lab' || m.type === 'challenge') && !m.retired && m.url)
+            .map(m => ({
+                id: m.id,
+                name: m.name,
+                category: m.type,          // 'lab' | 'challenge' — the word this page has always used
+                pack: m.pack,
+                url: m.url,
+                gameNames: m.gameNames || [],
+                topic: m.topic,
+                blurb: m.blurb,
+                badgeThreshold: m.badgeThreshold,
+                maxScore: m.maxScore,
+                // durationMinutes are placeholder estimates, not measured data — they exist so
+                // teachers can time-box a module against a class period. Replace with real
+                // numbers once there is completion-time telemetry per module.
+                durationMinutes: m.durationMinutes,
+                skillTags: m.skillTags || [],
+                isComplete: MODULE_COMPLETION[m.id] || LAB_COMPLETE,
+            }));
+
         function getModuleById(id) { return MODULE_REGISTRY.find(m => m.id === id); }
         // Comms (/js/message-hq.js) derives its topic chips and the lab it suggests from
         // this exact array. Exposed rather than duplicated: a second hardcoded list is how

@@ -52,11 +52,35 @@ the moments that matter. Steps per module:
 | The Cost of Later | cases reached | 6 |
 | Room to Think Challenge | scenarios answered | 24 |
 
-Modules belong to a Lab Pack. The dashboard's `MODULE_REGISTRY` (`public/dashboard/index.html`) carries a
-`pack` field on every entry — `'digital-decisions'`, `'real-world-ready'` or `'room-to-think'` — and each pack has
-one dashboard card whose counter, duration and status pill are derived from the entries with
-that pack. Insider's `COURSES` does not carry `pack` today; group by the `category` label or
-by the module ids listed above if you need a per-pack view.
+The table above is hand-written but no longer hand-*checked*: `node scripts/check-modules.js`
+verifies every row against Insider's `COURSES` and against the shared registry, and fails on a
+row with no module or a module with no row. It is not generated, deliberately — generating it
+would mean this file could only be read correctly by running a script, and the numbers in it
+are the ones a reviewer most often wants to read straight off the page. Regenerate-on-drift is
+the check's job; the table stays plain Markdown.
+
+Modules belong to a Lab Pack. **`public/data/modules-registry.json`** is the single list of
+every module — game, GoodBlock and Challenge — and carries `pack` on every entry
+(`'digital-decisions'`, `'real-world-ready'`, `'room-to-think'`, and `null` for a game, which
+routes across packs rather than belonging to one). The dashboard, all three Lab Pack hubs and
+`/js/skill-routing.js` read it; each pack's dashboard card has its counter, duration and
+status pill derived from the entries with that pack. Insider's `COURSES` does not carry `pack`
+today; group by the `category` label or by the module ids listed above if you need a per-pack
+view.
+
+**The four standalone games are in the pipe now too.** Read the Signal, Before You Send, The
+Rumor Mill and Money Moves each used to write a bespoke document to a root-level
+`game_sessions` collection. As of 2026-09-13 they call `Telemetry.init()` / `.step()` /
+`.choice()` / `.complete()` like every other module, so their sessions and events land in
+`artifacts/{appId}/sessions` and `artifacts/{appId}/events` alongside the GoodBlocks. Two
+things are worth knowing when querying them:
+
+- a `choice` event from a game carries the scenario's **skill tag** in `meta.category` — the
+  routing vocabulary in the registry's `skillTags`, not free text;
+- a game's session document carries a **`summary`** map (scenariosPlayed, correct, the
+  per-category breakdown, `clickedDeeperLink`). That is deliberate rather than incidental: a
+  teacher can read their own students' sessions (rules #10b) and cannot read events at all
+  (#11), so Mission Control's per-game strip reads the summary, not the event stream.
 
 A 20-minute visit costs roughly 25 to 30 Firestore writes (one session rewrite per 45s plus
 the events), which is well inside the free tier at current traffic.

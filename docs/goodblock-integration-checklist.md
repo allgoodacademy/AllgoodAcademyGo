@@ -30,11 +30,19 @@ add it here so the next one doesn't repeat it.
   exact bug shipped once already (fixed first in `identity-gate.js`, then found again and
   fixed in Social Intelligence) — grep any new GoodBlock for `const unsub` before shipping.
 
-## Dashboard registration
+## Registry registration
 
-- [ ] Add an entry to `MODULE_REGISTRY` in `public/dashboard/index.html` (`id`, `name`, `category`,
-  `url`, `gameNames`, `isComplete`). Without this, the dashboard has no way to compute a
-  real completed/in-progress/not-started status for the module.
+- [ ] Add an entry to **`public/data/modules-registry.json`** (`id`, `name`, `type`, `pack`,
+  `url`, `gameNames`, `skillTags`, `status`, and for a lab a `hub` block with its icon,
+  accent and card copy). This is the single list: the dashboard, all three Lab Pack hubs,
+  `/js/skill-routing.js` and `scripts/check-modules.js` all read it. Until 2026-09-13 the
+  dashboard's `MODULE_REGISTRY` was a hand-maintained array here and four live games
+  appeared in no list at all — that is the failure this file replaced.
+- [ ] If the module needs a completion rule other than `completed === true` (a Challenge
+  with a score threshold), add the predicate to `MODULE_COMPLETION` in
+  `public/dashboard/index.html`, keyed by the registry id. JSON cannot hold a function, so
+  that map is the one thing that stays in code; `check-modules.js` asserts its threshold
+  matches the registry's `badgeThreshold`.
 - [ ] `url` uses a **trailing-slash directory path** (`/jsh/lab-pack/goodblock-name/`), never
   a literal `.../index.html`. Firebase Hosting serves the same file either way, but the
   literal form shows an ugly URL in the address bar — this exact bug shipped once
@@ -48,14 +56,15 @@ add it here so the next one doesn't repeat it.
 
 ## Lab Pack hub wiring
 
-- [ ] Add a live card to the Lab Pack hub (`public/jsh/<lab-pack>/index.html`)'s main grid,
-  using `window.launchLab(name, url)`. There are two hubs now — `digital-decisions-lab/` and
-  `real-world-ready-lab/` — and the registry entry's `pack` field says which one a module
-  belongs to; `scripts/check-modules.js` checks the matching hub, not both.
-- [ ] Add the **same** entry to the hub's "Jump to a Lab" menu list — this is a second,
-  separate place with its own hardcoded `onclick`, easy to update one and forget the other.
-- [ ] Both use the trailing-slash URL form (see above) — same reasoning, same bug shipped
-  in both places at once last time.
+- [ ] **Nothing to do by hand.** Each hub renders its live cards and its "Jump to a Lab"
+  entries from the registry filtered by `pack`, so a correct registry entry with a `hub`
+  block puts the module on the right hub, in both places, automatically. The two separate
+  hardcoded lists per hub are gone — they were how a hub came to disagree with the
+  dashboard about what was live.
+- [ ] Remove the module's "Coming Soon" placeholder from the hub, if it had one. A
+  placeholder is still hand-written markup, and `check-modules.js` fails when a live lab
+  still has one.
+- [ ] `url` uses the trailing-slash form (see above) — the registry validates this.
 - [ ] The GoodBlock's own "back to hub" button/link (`returnToLabPack()` or equivalent) also
   uses the trailing-slash form.
 
@@ -205,24 +214,24 @@ from an older reference, and check:
 
 ## Publishing a module: every list that has to change together
 
-Shipping one GoodBlock touches several hand-maintained lists. They drift independently,
-so update them in one pass and run `node scripts/check-modules.js` (also run by the
-`Module registry check` GitHub Actions workflow on every push and pull request) before
-calling it done:
+Shipping one GoodBlock is mostly one edit now — the registry — plus the two lists that
+still live elsewhere. Update them in one pass and run `node scripts/check-modules.js` (also
+run by the `Module registry check` GitHub Actions workflow on every push and pull request)
+before calling it done:
 
-- [ ] `MODULE_REGISTRY` in `public/dashboard/index.html` — dashboard completion status. Labs use
-  `category: 'lab'`, and every entry carries `pack` (`'digital-decisions'` or
-  `'real-world-ready'`). Each pack's dashboard card has its status pill and "N live • M
-  coming soon" counter derived from the entries with that pack plus that pack's planned
-  list (`LAB_PACK_PLANNED` / `RWR_PACK_PLANNED`, wired together in `LAB_PACKS`), so do
-  not hand-edit the pill or counter text. When a lab that was only planned ships, its name
-  is already in the planned list; when a brand-new lab is planned, add it there.
+- [ ] `public/data/modules-registry.json` — the module's entry. Dashboard cards, both hub
+  surfaces and skill-based routing all follow from it. A pack's dashboard status pill and
+  "N live • M coming soon" counter are derived from the registry entries with that pack
+  plus that pack's planned list (`LAB_PACK_PLANNED` / `RWR_PACK_PLANNED` /
+  `RTT_PACK_PLANNED`, wired together in `LAB_PACKS`), so do not hand-edit the pill or
+  counter text. When a lab that was only planned ships, its name is already in the planned
+  list; when a brand-new lab is planned, add it there.
 - [ ] `COURSES` in `public/insider/index.html` — Insider analytics (`stepsTotal`,
-  `stepLabel`, `isComplete`, `progressStep`). `stepsTotal` must equal the module's own
-  `Telemetry.init({ stepsTotal })` call.
-- [ ] Lab Pack hub card + "Jump to a Lab" menu entry in the module's own pack hub
-  (`public/jsh/digital-decisions-lab/index.html` or `public/jsh/real-world-ready-lab/index.html`)
-  — student-facing; remove the matching "Coming Soon" placeholder.
+  `stepLabel`, `isComplete`, `progressStep`). Still hand-maintained; `check-modules.js`
+  checks it entry-by-entry against the registry, and `stepsTotal` must equal the module's
+  own `Telemetry.init({ stepsTotal })` call.
+- [ ] Any "Coming Soon" placeholder for the module on its pack hub — still hand-written
+  markup, and the one hub thing a shipping lab has to remove.
 - [ ] The completion badge's "N scenarios" figure must equal the count of that module's
   category in its pack's Challenge `SCENARIO_DATA` (`scripts/check-modules.js` counts it).
   Privacy & Security once shipped "9" against a real count of 8 — an inferred number that

@@ -1,13 +1,23 @@
 #!/usr/bin/env node
-// Cross-checks the hand-maintained module lists so they can't drift apart silently:
-//   - MODULE_REGISTRY (+ its `pack` field), LAB_PACK_PLANNED / RWR_PACK_PLANNED in public/dashboard/index.html
-//   - COURSES in public/insider/index.html (Insider analytics)
-//   - live cards / coming-soon placeholders on EACH Lab Pack hub:
-//       public/jsh/digital-decisions-lab/index.html and public/jsh/real-world-ready-lab/index.html
+// Validates every module surface against ONE list: public/data/modules-registry.json.
+//
+// This script used to cross-check several independently hardcoded lists against each other.
+// That catches drift between them but cannot catch a module missing from all of them at
+// once — which is exactly how four live games went unregistered. The registry is now the
+// single source and every surface is checked against it:
+//   - public/dashboard/index.html reads the registry at runtime, so what is checked here is
+//     that it still does, and that LAB_PACK_PLANNED / RWR_PACK_PLANNED / RTT_PACK_PLANNED
+//     name exactly the labs the registry says are live in each pack
+//   - COURSES in public/insider/index.html (still hand-maintained, so checked entry by entry)
+//   - each Lab Pack hub renders its cards from the registry, so what is checked is that it
+//     still fetches it and still carries the anchors the cards are inserted at
 //   - the "Steps per module" table in docs/insider-analytics.md
-//   - each module page's Telemetry.init({ module, gameName, stepsTotal }) call
+//   - each module page's Telemetry.init({ module, gameName, stepsTotal }) call — INCLUDING
+//     the four games, which had no such check before
 //   - each lab's completion-badge "N scenarios" figure vs the real category count in its
 //     pack's Challenge SCENARIO_DATA (the Privacy & Security "9 vs 8" bug class)
+//   - internal skill tags: every category a game routes by exists on some lab, so
+//     /js/skill-routing.js can never resolve to nothing for a category a game can produce
 //   - public/mission-control/module-data.js is in sync with the arrays it is generated from
 // No dependencies; run with `node scripts/check-modules.js`. Exits 1 on any mismatch.
 const fs = require('fs');
@@ -51,18 +61,83 @@ const PACKS = {
   },
 };
 
-// --- dashboard
-const dash = read('public/dashboard/index.html');
-const registrySrc = (dash.match(/const MODULE_REGISTRY = \[([\s\S]*?)\n\s*\];/) || [])[1];
-if (!registrySrc) fail('dashboard: MODULE_REGISTRY not found');
-const registry = [];
-for (const m of (registrySrc || '').matchAll(/\{\s*id:\s*'([^']+)',\s*name:\s*(?:'([^']*)'|"([^"]*)"),\s*category:\s*'([^']+)',\s*pack:\s*'([^']+)',\s*url:\s*'([^']+)',\s*gameNames:\s*\[([^\]]*)\]/g)) {
-  registry.push({ id: m[1], name: m[2] ?? m[3], category: m[4], pack: m[5], url: m[6], gameNames: [...m[7].matchAll(/'([^']*)'/g)].map(x => x[1]) });
+// --- the shared registry: everything below is checked against this
+let REGISTRY = [];
+try {
+  const raw = JSON.parse(read('public/data/modules-registry.json'));
+  REGISTRY = Array.isArray(raw.modules) ? raw.modules : [];
+  if (!REGISTRY.length) fail('public/data/modules-registry.json: no `modules` array, or it is empty');
+} catch (e) {
+  fail(`public/data/modules-registry.json: not valid JSON — ${e.message}`);
 }
-const entryCount = ((registrySrc || '').match(/\{\s*id:/g) || []).length;
-if (entryCount !== registry.length) fail(`dashboard: ${entryCount} MODULE_REGISTRY entries but only ${registry.length} parsed — every entry needs id, name, category, pack, url, gameNames in that order`);
-for (const r of registry) if (!PACKS[r.pack]) fail(`dashboard: "${r.id}" has unknown pack "${r.pack}"`);
+const TYPES = new Set(['game', 'lab', 'challenge']);
+const seenIds = new Set();
+for (const m of REGISTRY) {
+  if (!m.id) { fail('registry: an entry has no id'); continue; }
+  if (seenIds.has(m.id)) fail(`registry: duplicate id "${m.id}"`);
+  seenIds.add(m.id);
+  if (!TYPES.has(m.type)) fail(`registry: "${m.id}" has unknown type "${m.type}"`);
+  if (!m.name) fail(`registry: "${m.id}" has no name`);
+  if (!['reviewed', 'draft'].includes(m.status)) fail(`registry: "${m.id}" status must be "reviewed" or "draft", got "${m.status}"`);
+  if (!Array.isArray(m.skillTags)) fail(`registry: "${m.id}" skillTags must be an array`);
+  // A game routes ACROSS packs depending on which skill a student is weak in, so it belongs
+  // to none. This is load-bearing, not cosmetic: skill-routing.js uses the calling game's
+  // default destination for its pack tie-break precisely because the game has no pack.
+  if (m.type === 'game' && m.pack !== null) fail(`registry: game "${m.id}" must have pack: null (got ${JSON.stringify(m.pack)})`);
+  if (m.type !== 'game' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
+  if (m.pack && !PACKS[m.pack]) fail(`registry: "${m.id}" has unknown pack "${m.pack}"`);
+  if (m.retired) {
+    if (m.url) fail(`registry: retired "${m.id}" should have url: null — it has no live page`);
+    continue;
+  }
+  if (!m.url) fail(`registry: "${m.id}" has no url`);
+  else {
+    if (/^https?:\/\//.test(m.url)) fail(`registry: "${m.id}" url is absolute ("${m.url}") — module URLs must be site-relative so preview channels stay on the preview`);
+    if (!/\/$/.test(m.url) || /index\.html/.test(m.url)) fail(`registry: "${m.id}" url "${m.url}" is not the trailing-slash directory form`);
+    if (!fs.existsSync(path.join(root, 'public', m.url, 'index.html'))) fail(`registry: "${m.id}" url "${m.url}" has no index.html`);
+  }
+  for (const t of m.skillTags || []) {
+    if (!t || !t.framework || !t.code) fail(`registry: "${m.id}" has a skillTag missing framework or code`);
+    if (t.status && !['reviewed', 'draft'].includes(t.status)) fail(`registry: "${m.id}" skillTag "${t.code}" has an invalid status "${t.status}"`);
+  }
+}
+const byId = Object.fromEntries(REGISTRY.map(m => [m.id, m]));
+const registry = REGISTRY.filter(m => !m.retired && (m.type === 'lab' || m.type === 'challenge'))
+  .map(m => ({ id: m.id, name: m.name, category: m.type, pack: m.pack, url: m.url, gameNames: m.gameNames || [] }));
 const dashLabs = registry.filter(r => r.category === 'lab');
+const games = REGISTRY.filter(m => m.type === 'game');
+if (games.length !== 4) fail(`registry: expected the four standalone games, found ${games.length}`);
+
+// --- internal skill tags: a game must never route to nothing.
+// skill-routing.js falls back to the game's own default when a category matches no lab, so
+// a missing tag is silent — the routing simply stops adapting. Caught here instead.
+const norm = (c) => String(c == null ? '' : c).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const labTagIndex = {};
+for (const m of REGISTRY) {
+  if (m.type !== 'lab' || m.retired) continue;
+  for (const t of m.skillTags || []) if (t.framework === 'internal') (labTagIndex[norm(t.code)] ||= []).push(m.id);
+}
+for (const g of games) {
+  for (const t of g.skillTags || []) {
+    if (t.framework !== 'internal') continue;
+    if (!labTagIndex[norm(t.code)]) fail(`registry: game "${g.id}" routes by "${t.code}" but no lab carries that internal skill tag — skill-routing.js would silently fall back`);
+  }
+}
+// Every category actually present in a game's scenario bank must be a declared skill tag —
+// a category invented in the bank and never registered routes nowhere, which is the exact
+// shape of the Before You Send bug (30 scenarios, one flat `social`).
+const GAME_PAGES = Object.fromEntries(games.map(g => [g.id, path.join('public', g.url, 'index.html')]));
+for (const g of games) {
+  const src = read(GAME_PAGES[g.id]);
+  const declared = new Set((g.skillTags || []).filter(t => t.framework === 'internal').map(t => norm(t.code)));
+  const used = new Set([...src.matchAll(/\bcategory:\s*["']([^"']+)["']/g)].map(m => norm(m[1])));
+  for (const c of used) if (!declared.has(c)) fail(`registry: "${g.id}" has scenarios tagged "${c}" but its skillTags do not declare it`);
+}
+
+// --- dashboard: it reads the registry now, so what is checked is that it still does
+const dash = read('public/dashboard/index.html');
+if (!/fetch\('\/data\/modules-registry\.json'/.test(dash)) fail('dashboard: no longer fetches /data/modules-registry.json — MODULE_REGISTRY must come from the shared registry');
+if (/const MODULE_REGISTRY = \[/.test(dash)) fail('dashboard: MODULE_REGISTRY is a hardcoded array again — it must be derived from the shared registry');
 const plannedByPack = {};
 for (const [pack, cfg] of Object.entries(PACKS)) {
   plannedByPack[pack] = [...((dash.match(new RegExp(`const ${cfg.plannedConst} = \\[([^\\]]*)\\]`)) || ['', ''])[1]).matchAll(/'([^']*)'/g)].map(x => x[1]);
@@ -72,10 +147,17 @@ for (const [pack, cfg] of Object.entries(PACKS)) {
 for (const lab of dashLabs) {
   const cfg = PACKS[lab.pack]; if (!cfg) continue;
   if (!plannedByPack[lab.pack].includes(lab.name)) fail(`dashboard: live lab "${lab.name}" is not in ${cfg.plannedConst}`);
-  if (!new RegExp(`^${cfg.hubPrefix.replace(/\//g, '\\/')}[a-z0-9-]+\\/$`).test(lab.url)) fail(`dashboard: lab "${lab.name}" url "${lab.url}" is not a trailing-slash directory path under ${cfg.hubPrefix}`);
-  if (!fs.existsSync(path.join(root, 'public', lab.url, 'index.html'))) fail(`dashboard: lab "${lab.name}" url "${lab.url}" has no index.html`);
+  if (!new RegExp(`^${cfg.hubPrefix.replace(/\//g, '\\/')}[a-z0-9-]+\\/$`).test(lab.url)) fail(`registry: lab "${lab.name}" url "${lab.url}" is not under ${cfg.hubPrefix}`);
 }
-for (const r of registry) if (/^https?:\/\//.test(r.url)) fail(`dashboard: "${r.id}" url is absolute ("${r.url}") — module URLs must be site-relative so preview channels stay on the preview`);
+// Each Challenge's completion predicate lives in the dashboard's MODULE_COMPLETION map
+// (JSON cannot hold a function); its threshold must still be the registry's badgeThreshold.
+for (const ch of registry.filter(r => r.category === 'challenge')) {
+  const entry = (dash.match(new RegExp(`'${ch.id}':\\s*\\(d\\) =>[^\\n]*`)) || [])[0];
+  if (!entry) { fail(`dashboard: MODULE_COMPLETION has no predicate for challenge "${ch.id}"`); continue; }
+  const predThreshold = Number((entry.match(/finalScore >= (\d+)/) || [])[1]);
+  const declared = byId[ch.id].badgeThreshold;
+  if (predThreshold && declared && predThreshold !== declared) fail(`dashboard: challenge "${ch.id}" isComplete uses >= ${predThreshold} but the registry badgeThreshold is ${declared}`);
+}
 if (/labpack-status-pill[^>]*>\s*Social Intelligence Live/.test(dash)) fail('dashboard: status pill still hardcodes "Social Intelligence Live"');
 for (const cfg of Object.values(PACKS)) {
   // Each pack's card must exist on the dashboard with the ids LAB_PACKS wires up.
@@ -95,15 +177,15 @@ for (const m of (coursesSrc || '').matchAll(/id:\s*'([^']+)',\s*name:\s*(?:'([^'
 const insiderLabs = courses.filter(c => /lab/i.test(c.category));
 for (const lab of dashLabs) {
   const c = insiderLabs.find(x => x.id === lab.id);
-  if (!c) { fail(`insider: no COURSES entry with id "${lab.id}" (dashboard has it)`); continue; }
-  if (c.name !== lab.name) fail(`insider: "${lab.id}" name "${c.name}" != dashboard "${lab.name}"`);
-  if (JSON.stringify(c.gameNames) !== JSON.stringify(lab.gameNames)) fail(`insider: "${lab.id}" gameNames ${JSON.stringify(c.gameNames)} != dashboard ${JSON.stringify(lab.gameNames)}`);
+  if (!c) { fail(`insider: no COURSES entry with id "${lab.id}" (the registry has it)`); continue; }
+  if (c.name !== lab.name) fail(`insider: "${lab.id}" name "${c.name}" != registry "${lab.name}"`);
+  if (JSON.stringify(c.gameNames) !== JSON.stringify(lab.gameNames)) fail(`insider: "${lab.id}" gameNames ${JSON.stringify(c.gameNames)} != registry ${JSON.stringify(lab.gameNames)}`);
 }
-for (const c of insiderLabs) if (!dashLabs.find(l => l.id === c.id)) fail(`dashboard: no MODULE_REGISTRY entry with id "${c.id}" (Insider has it)`);
+for (const c of insiderLabs) if (!dashLabs.find(l => l.id === c.id)) fail(`registry: no entry with id "${c.id}" (Insider's COURSES has it)`);
 // Challenges: Insider must know every Challenge the dashboard lists, by the same gameName.
 for (const ch of registry.filter(r => r.category === 'challenge')) {
   const c = courses.find(x => JSON.stringify(x.gameNames) === JSON.stringify(ch.gameNames) || x.gameNames.includes(ch.gameNames[0]));
-  if (!c) fail(`insider: no COURSES entry for challenge "${ch.name}" (gameNames ${JSON.stringify(ch.gameNames)})`);
+  if (!c) fail(`insider: no COURSES entry for challenge "${ch.name}" (gameNames ${JSON.stringify(ch.gameNames)}) — the registry has it`);
 }
 
 // --- each module page's Telemetry.init
@@ -130,30 +212,58 @@ for (const c of courses) {
   if (Number(m[3]) !== c.stepsTotal) fail(`${page}: Telemetry stepsTotal ${m[3]} != Insider stepsTotal ${c.stepsTotal}`);
 }
 
+// --- the four games' Telemetry.init
+// Games were in none of the lists this script used to check, so nothing verified that a
+// game announced itself to the shared telemetry pipe under the id the registry knows it by.
+// Mission Control reads a game's sessions by exactly that module id, so a mismatch would
+// silently empty a teacher's per-game roster.
+for (const g of games) {
+  const page = GAME_PAGES[g.id];
+  const src = read(page);
+  // Unlike a GoodBlock, a game's stepsTotal is its round size, which some games hold in a
+  // named constant — accept either and resolve the constant, rather than forcing a magic
+  // number into the call just to satisfy a regex.
+  const m = src.match(/Telemetry\.init\(\{\s*module:\s*'([^']+)',\s*gameName:\s*'([^']+)',\s*stepsTotal:\s*([A-Za-z_$][\w$]*|\d+)/);
+  if (!m) { fail(`${page}: no Telemetry.init({ module, gameName, stepsTotal }) call found`); continue; }
+  if (m[1] !== g.id) fail(`${page}: Telemetry module "${m[1]}" != registry id "${g.id}"`);
+  if (m[2] !== g.name) fail(`${page}: Telemetry gameName "${m[2]}" != registry name "${g.name}"`);
+  const steps = /^\d+$/.test(m[3]) ? Number(m[3]) : Number((src.match(new RegExp(`const ${m[3]} = (\\d+);`)) || [])[1]);
+  if (!steps) fail(`${page}: Telemetry stepsTotal "${m[3]}" is not a number and no \`const ${m[3]} = N;\` was found`);
+  if (!/src="\/js\/telemetry\.js"/.test(src)) fail(`${page}: calls Telemetry.init but never loads /js/telemetry.js`);
+  if (!/src="\/js\/skill-routing\.js"/.test(src)) fail(`${page}: does not load /js/skill-routing.js — its end-screen destination would stay hardcoded`);
+  // The retired collection must not come back, in a game or anywhere else.
+  if (/'game_sessions'/.test(src)) fail(`${page}: still writes to the retired root-level game_sessions collection`);
+}
+if (/match \/game_sessions\//.test(read('firestore.rules'))) fail('firestore.rules: a game_sessions match block is back — that collection is retired');
+
 // --- hubs (one per pack)
+// Each hub renders its live lab cards and its "Jump to a Lab" entries from the registry
+// filtered by pack, so there are no hardcoded card names left to cross-check. What is
+// checked instead is that the wiring is still in place: the fetch, the two anchors the
+// cards are inserted at, and the pack the hub filters to. Plus the things that stay
+// hand-written on a hub — the pack's Challenge card, and a Coming Soon placeholder for any
+// planned-but-unbuilt lab.
 for (const [pack, cfg] of Object.entries(PACKS)) {
   const hub = read(cfg.hub).replace(/&amp;/g, '&');
-  const prefixRe = cfg.hubPrefix.replace(/\//g, '\\/');
-  const hubLive = [...hub.matchAll(new RegExp(`launchLab\\('([^']+)',\\s*'(${prefixRe}[^']+)'\\)`, 'g'))].map(m => ({ name: m[1], url: m[2] }));
-  const packLabs = dashLabs.filter(l => l.pack === pack);
-  for (const lab of packLabs) {
-    const cards = hubLive.filter(h => h.url === lab.url);
-    if (!cards.length) fail(`${cfg.hub}: no live card launching "${lab.url}" (dashboard lists "${lab.name}" as live)`);
-    else if (cards.length < 2) fail(`${cfg.hub}: "${lab.name}" is launched from only one place — needs both the card and the "Jump to a Lab" menu entry`);
-    for (const card of cards) if (card.name !== lab.name) fail(`${cfg.hub}: card name "${card.name}" != dashboard "${lab.name}"`);
+  if (!/fetch\('\/data\/modules-registry\.json'/.test(hub)) fail(`${cfg.hub}: does not fetch /data/modules-registry.json — lab cards must come from the shared registry`);
+  if (!new RegExp(`const PACK = '${pack}'`).test(hub)) fail(`${cfg.hub}: does not filter the registry to PACK = '${pack}'`);
+  for (const id of ['lab-cards-anchor', 'lab-menu-anchor']) {
+    if (!hub.includes(`id="${id}"`)) fail(`${cfg.hub}: missing #${id} — the registry-rendered cards have nowhere to be inserted`);
   }
-  for (const h of hubLive) if (!packLabs.find(l => l.url === h.url)) fail(`dashboard: ${cfg.hub} launches "${h.url}" but MODULE_REGISTRY has no lab with that url`);
+  const packLabs = dashLabs.filter(l => l.pack === pack);
+  if (!packLabs.length) fail(`registry: pack "${pack}" has no live labs`);
   for (const name of plannedByPack[pack]) {
-    if (!hub.includes(name)) fail(`${cfg.hub}: planned lab "${name}" appears nowhere on the hub (needs a live card or a Coming Soon placeholder)`);
     const isLive = packLabs.some(l => l.name === name);
+    // A live lab's card is rendered from the registry, so its name is no longer expected in
+    // the hub's markup at all — only a NOT-live one still needs a hand-written placeholder.
     const placeholder = new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]{0,400}?Coming Soon`).test(hub);
     if (isLive && placeholder) fail(`${cfg.hub}: "${name}" is live but still has a Coming Soon placeholder`);
     if (!isLive && !placeholder) fail(`${cfg.hub}: "${name}" is not live and has no Coming Soon placeholder`);
   }
-  // The pack's Challenge must be launchable from its hub too.
+  // The pack's Challenge is hand-written on the hub and must still be launchable from it.
   const ch = registry.find(r => r.id === cfg.challengeId);
   if (ch && !hub.includes(`'${ch.url}'`)) fail(`${cfg.hub}: does not launch the pack's Challenge at "${ch.url}"`);
-  // Every hub launch URL is trailing-slash form.
+  // Every remaining hand-written launch URL is trailing-slash form.
   for (const m of hub.matchAll(/launchLab\('[^']+',\s*'([^']+)'\)/g)) if (!/\/$/.test(m[1]) || /index\.html/.test(m[1])) fail(`${cfg.hub}: launch url "${m[1]}" is not the trailing-slash form`);
 }
 
@@ -187,21 +297,16 @@ for (const [pack, cfg] of Object.entries(PACKS)) {
 // (The Real World Ready Challenge shipped reachable only through its Lab Pack hub once.)
 for (const [pack, cfg] of Object.entries(PACKS)) {
   const ch = registry.find(r => r.id === cfg.challengeId);
-  if (!ch) { fail(`dashboard: no MODULE_REGISTRY entry for challenge "${cfg.challengeId}"`); continue; }
-  // An entry runs from `{ id: '<id>'` to its first `},` — no nested object literals inside.
-  const entry = (registrySrc.match(new RegExp(`\\{\\s*id:\\s*'${cfg.challengeId}'[\\s\\S]*?\\},`)) || [])[0] || '';
-  const threshold = Number((entry.match(/badgeThreshold:\s*(\d+)/) || [])[1]);
-  const maxScore = Number((entry.match(/maxScore:\s*(\d+)/) || [])[1]);
+  if (!ch) { fail(`registry: no entry for challenge "${cfg.challengeId}"`); continue; }
+  const threshold = byId[ch.id].badgeThreshold;
+  const maxScore = byId[ch.id].maxScore;
   const page = read(cfg.challengePage);
   const pageThreshold = Number((page.match(/const BADGE_THRESHOLD = (\d+);/) || [])[1]);
   const pageMax = Number((page.match(/const MAX_SCORE = (\d+);/) || [])[1]);
-  if (!threshold) fail(`dashboard: challenge "${ch.id}" has no badgeThreshold`);
-  else if (threshold !== pageThreshold) fail(`dashboard: challenge "${ch.id}" badgeThreshold ${threshold} != ${cfg.challengePage} BADGE_THRESHOLD ${pageThreshold}`);
-  if (!maxScore) fail(`dashboard: challenge "${ch.id}" has no maxScore`);
-  else if (maxScore !== pageMax) fail(`dashboard: challenge "${ch.id}" maxScore ${maxScore} != ${cfg.challengePage} MAX_SCORE ${pageMax}`);
-  // isComplete's literal threshold must be the same number as badgeThreshold.
-  const predThreshold = Number((entry.match(/finalScore >= (\d+)/) || [])[1]);
-  if (predThreshold && threshold && predThreshold !== threshold) fail(`dashboard: challenge "${ch.id}" isComplete uses >= ${predThreshold} but badgeThreshold is ${threshold}`);
+  if (!threshold) fail(`registry: challenge "${ch.id}" has no badgeThreshold`);
+  else if (threshold !== pageThreshold) fail(`registry: challenge "${ch.id}" badgeThreshold ${threshold} != ${cfg.challengePage} BADGE_THRESHOLD ${pageThreshold}`);
+  if (!maxScore) fail(`registry: challenge "${ch.id}" has no maxScore`);
+  else if (maxScore !== pageMax) fail(`registry: challenge "${ch.id}" maxScore ${maxScore} != ${cfg.challengePage} MAX_SCORE ${pageMax}`);
   // The standalone card: its own launchCourse call plus the elements the status loop writes.
   if (!dash.includes(`window.launchCourse('${ch.name}', '${ch.url}'`)) fail(`dashboard: no standalone Challenges-tab card launching "${ch.name}" at "${ch.url}"`);
   for (const id of [`${ch.id}-status-badge`, `${ch.id}-best-score`]) {
@@ -256,5 +361,5 @@ if (problems.length) {
   console.error(`check-modules: ${problems.length} problem(s)\n - ` + problems.join('\n - '));
   process.exit(1);
 }
-const hubCards = Object.values(PACKS).reduce((n, cfg) => n + [...read(cfg.hub).matchAll(/launchLab\(/g)].length, 0);
-console.log(`check-modules: OK — ${registry.length} dashboard modules (${dashLabs.length} live labs across ${Object.keys(PACKS).length} packs), ${courses.length} Insider courses, ${hubCards} hub launch points, ${rows.length} doc rows all agree.`);
+const internalTags = new Set(Object.keys(labTagIndex));
+console.log(`check-modules: OK — ${REGISTRY.length} registry entries (${games.length} games, ${dashLabs.length} live labs across ${Object.keys(PACKS).length} packs, ${registry.filter(r => r.category === 'challenge').length} Challenges), ${internalTags.size} internal skill tags routable, ${courses.length} Insider courses and ${rows.length} doc rows all agree with the registry.`);
