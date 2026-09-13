@@ -35,13 +35,43 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(code)).data.teacherUid == uid;
     }
 
-    // Is the owner of this telemetry session a student in a classroom this uid teaches?
-    // Same pivot as classroomOwnedBy above and rules #4/#6: authorization comes from the
-    // CLASSROOM document, never from role/classroomCode on the requester's own profile,
-    // which #2 lets them write. Guarded with a shape check and exists() before get() for the
-    // same reason classroomOwnedBy is — rules do not reliably short-circuit, so a malformed
-    // or absent uid must fail a well-formed check rather than raise an evaluation error.
-    function sessionOwnerIsMyStudent(appId, uid, teacherUid) {
+    // A teacher's OWN classroom code — read off their own profile, exactly the same field
+    // the become-a-teacher flow writes there. Unlike a student, a teacher still only ever
+    // teaches ONE classroom (creating a second would need a second flow that doesn't exist),
+    // so this is safe to treat as a single value even after multi-membership below: joining
+    // someone ELSE's Task Force as a member never touches this field (see classroom_members).
+    function myClassroomCode(appId, uid) {
+      return exists(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid))
+        ? get(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid)).data.get('classroomCode', NONE())
+        : NONE();
+    }
+
+    // Is `memberUid` a member of the classroom `code`? Membership is its own join-table
+    // document (classroom_members/{code}_{uid}) rather than a field on the student's
+    // profile, specifically so a student (or a teacher acting as one) can belong to more
+    // than one classroom at once — a single classroomCode field can't represent that, and
+    // a rule that tried to check "any of N codes on this profile" would need an unbounded
+    // loop rules_version 2 cannot express. The deterministic doc ID means this is one
+    // exists() call regardless of how many classrooms the member is actually in.
+    function isMemberOfClassroom(appId, memberUid, code) {
+      return code is string
+        && code != NONE()
+        && code.matches('^[A-Za-z0-9_-]{1,64}$')
+        && memberUid is string
+        && memberUid != NONE()
+        && memberUid.matches('^[A-Za-z0-9_-]{1,128}$')
+        && exists(/databases/$(database)/documents/artifacts/$(appId)/classroom_members/$(code + '_' + memberUid));
+    }
+
+    // The ORIGINAL single-classroomCode-field check, kept verbatim as a fallback: everyone
+    // who joined before classroom_members existed has a classroomCode on their profile and
+    // no membership doc, and deploying the rule below without this would silently drop every
+    // one of them from their teacher's roster the moment it went live — not a hypothetical,
+    // an already-live classroom would break on deploy. New joins get a classroom_members doc
+    // (see #6b) AND still mirror this field for non-teachers (see joinClassroom in
+    // dashboard/index.html), so this path keeps working for both old and new members; only
+    // multi-classroom membership requires the join table.
+    function isLegacySingleClassroomStudent(appId, uid, teacherUid) {
       return uid is string
         && uid != NONE()
         && uid.matches('^[A-Za-z0-9_-]{1,128}$')
@@ -50,6 +80,17 @@ service cloud.firestore {
         && classroomOwnedBy(appId,
              get(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid)).data.get('classroomCode', NONE()),
              teacherUid);
+    }
+
+    // Is the owner of this telemetry session a member of a classroom this uid teaches?
+    // Authorization comes from the CLASSROOM document (via myClassroomCode + the
+    // classroom_members join table, OR the legacy single-field fallback above), never from a
+    // role field alone. No role check on the join-table path — a Task Force Leader who has
+    // also joined another teacher's classroom as a member is exactly as visible there as any
+    // other member, same as everywhere else this pivot is used (rules #4/#6).
+    function sessionOwnerIsMyStudent(appId, uid, teacherUid) {
+      return isMemberOfClassroom(appId, uid, myClassroomCode(appId, teacherUid))
+        || isLegacySingleClassroomStudent(appId, uid, teacherUid);
     }
 
     // A classroom code the client may legitimately move to: unchanged, cleared, or one
@@ -119,17 +160,23 @@ service cloud.firestore {
       allow delete: if isAllowlistedAdmin();
     }
 
-    // 4. NEW — Teachers can list + read (not write) the top-level profiles of students who
-    //    joined THEIR classroom. Students outside a teacher's own classroom stay fully private.
-    //    This does NOT expose a student's subcollections (launches/scores) — only the fields
+    // 4. NEW — Teachers can list + read (not write) the top-level profiles of members who
+    //    joined THEIR classroom. Members outside a teacher's own classroom stay fully private.
+    //    This does NOT expose a member's subcollections (launches/scores) — only the fields
     //    on their main user doc (name, email, classroomCode, role) that the roster view needs.
+    //
+    //    No role check: membership is proven by the classroom_members join table, so a Task
+    //    Force Leader who has also joined another teacher's classroom is visible in that
+    //    roster the same as anyone else — being a teacher of your own classroom elsewhere
+    //    doesn't exempt you from being a member here.
     match /artifacts/{appId}/users/{userId} {
-      //    Authorization comes from the CLASSROOM document's teacherUid, not from role /
-      //    classroomCode on the requester's own profile — those are self-written and were
-      //    trivially forgeable (see rule #2).
+      //    Authorization comes from the CLASSROOM document (via myClassroomCode + the
+      //    classroom_members join table, OR the legacy single-field fallback), not from
+      //    role/classroomCode asserted some other way on the requester's own profile — those
+      //    are self-written and were trivially forgeable (see rule #2).
       allow list, get: if request.auth != null
-        && resource.data.get('role', NONE()) == 'student'
-        && classroomOwnedBy(appId, resource.data.get('classroomCode', NONE()), request.auth.uid);
+        && (isMemberOfClassroom(appId, userId, myClassroomCode(appId, request.auth.uid))
+            || isLegacySingleClassroomStudent(appId, userId, request.auth.uid));
     }
 
     // 5. NEW — Classrooms: holds each teacher's join code.
@@ -145,17 +192,48 @@ service cloud.firestore {
       allow list: if isAllowlistedAdmin();
     }
 
-    // 6. NEW — Teachers can READ (not write) a classroom student's subcollections too
+    // 6. NEW — Teachers can READ (not write) a classroom member's subcollections too
     //    (game_scores, launches) — needed so the roster can show real completion/scores,
     //    not just names. Still fully scoped to the teacher's own classroom, still read-only.
     match /artifacts/{appId}/users/{userId}/{subcollection}/{document=**} {
-      //    Same pivot as #4: the teacher is identified by the classroom document, never by
-      //    fields the requester wrote onto their own profile.
+      //    Same pivot as #4: the teacher is identified by the classroom document (via
+      //    myClassroomCode + classroom_members, OR the legacy fallback), never by fields the
+      //    requester wrote onto their own profile.
       allow read: if request.auth != null
-        && get(/databases/$(database)/documents/artifacts/$(appId)/users/$(userId)).data.get('role', NONE()) == 'student'
-        && classroomOwnedBy(appId,
-             get(/databases/$(database)/documents/artifacts/$(appId)/users/$(userId)).data.get('classroomCode', NONE()),
-             request.auth.uid);
+        && (isMemberOfClassroom(appId, userId, myClassroomCode(appId, request.auth.uid))
+            || isLegacySingleClassroomStudent(appId, userId, request.auth.uid));
+    }
+
+    // 6b. NEW — Classroom membership (many-to-many: a student, or a Task Force Leader
+    //     acting as one, may belong to more than one classroom; a classroom has many
+    //     members). Deterministic doc ID `{classroomCode}_{uid}` so create/delete never
+    //     need a query and a second join to the same classroom is a no-op, not a duplicate.
+    //     - READ: the member themselves, or that classroom's teacher (roster access)
+    //     - CREATE: only naming yourself, only for a classroom that exists, only at the ID
+    //       the classroomCode+uid pair requires — knowing the code is the trust model, same
+    //       as classrooms (#5) and Recruit Codes
+    //     - DELETE: only the member themselves (leaving) — a teacher cannot remove a member
+    //     - UPDATE: never; leave and rejoin instead of editing a membership in place
+    //     - LIST: evaluated per returned document exactly like GET, so a member listing
+    //       their own memberships (uid == me) or a teacher listing their roster
+    //       (classroomCode == my classroom) both work without a separate admin grant
+    match /artifacts/{appId}/classroom_members/{membershipId} {
+      allow read: if request.auth != null
+        && (resource.data.uid == request.auth.uid
+            || classroomOwnedBy(appId, resource.data.get('classroomCode', NONE()), request.auth.uid));
+      // create AND update share one condition — joining a classroom you're already in is a
+      // harmless idempotent setDoc({merge:true}), which Firestore evaluates as an update once
+      // the doc exists, not a second create. Nothing about a membership doc is ever supposed
+      // to change after the fact (that is what "leave and rejoin" is for), so both operations
+      // are held to exactly the same shape rather than letting update be a separate, looser door.
+      allow create, update: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['classroomCode', 'uid', 'joinedAt'])
+        && request.resource.data.classroomCode is string
+        && request.resource.data.classroomCode.matches('^[A-Za-z0-9_-]{1,64}$')
+        && membershipId == (request.resource.data.classroomCode + '_' + request.auth.uid)
+        && exists(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(request.resource.data.classroomCode));
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
     // 7. NEW — Message HQ. Flat top-level collection (not nested per-user) so any portal —

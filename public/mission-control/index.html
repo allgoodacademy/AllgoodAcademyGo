@@ -609,13 +609,33 @@ async function load() {
     document.getElementById('classroom-code').textContent = state.code;
 
     document.getElementById('loading-note').textContent = 'Loading your roster…';
-    const studentsSnap = await getDocs(query(
-        collection(db, 'artifacts', appId, 'users'),
-        where('classroomCode', '==', state.code),
-        where('role', '==', 'student'),
-    ));
+    // Roster membership is the UNION of two sources, deliberately — not a replacement:
+    //   - classroom_members: the join table (see firestore.rules #6b), source of truth for
+    //     anyone who joined after this shipped, and the only source that supports someone
+    //     belonging to more than one classroom (a Task Force Leader included, no role check).
+    //   - the legacy classroomCode+role=='student' query: everyone who joined BEFORE the join
+    //     table existed has a classroomCode on their profile and no classroom_members doc.
+    //     Dropping this query on deploy would have silently emptied every already-live
+    //     roster; it stays until those members are migrated or naturally rejoin.
+    // Excludes this classroom's own teacher explicitly: a Task Force Leader joining their OWN
+    // classroom by mistake shouldn't list themselves as a member of it.
+    const [memberSnap, legacySnap] = await Promise.all([
+        getDocs(query(collection(db, 'artifacts', appId, 'classroom_members'), where('classroomCode', '==', state.code))),
+        getDocs(query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', state.code), where('role', '==', 'student'))),
+    ]);
+    const memberUids = [...new Set([
+        ...memberSnap.docs.map((d) => d.data().uid),
+        ...legacySnap.docs.map((d) => d.id),
+    ])].filter((uid) => uid !== state.classroom.teacherUid);
 
-    const rows = studentsSnap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+    const rows = (await Promise.all(memberUids.map(async (uid) => {
+        try {
+            const snap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+            return snap.exists() ? { uid, ...snap.data() } : null;
+        } catch (e) {
+            return null;
+        }
+    }))).filter(Boolean);
     document.getElementById('loading-note').textContent = `Reading progress for ${rows.length} agent${rows.length === 1 ? '' : 's'}…`;
 
     state.students = await Promise.all(rows.map(loadStudent));

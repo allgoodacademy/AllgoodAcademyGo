@@ -87,7 +87,7 @@
          so there is exactly one initializeApp() call on the page) -->
     <script type="module">
         import { onAuthStateChanged, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit, deleteField } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit, deleteField, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const appId = window.AuthCore.appId;
         const auth = window.AuthCore.auth;
@@ -1118,27 +1118,38 @@
             const assignedHost = document.getElementById('profile-tab-assigned');
             if (packsHost) packsHost.innerHTML = '<p class="text-xs text-gray-400 italic p-4">Loading progress...</p>';
 
-            // Join-a-classroom box vs "already joined" display in the left rail.
+            // Join-a-classroom box (always available — a student, or a Task Force Leader
+            // acting as one, can belong to more than one classroom now) plus a list of
+            // current memberships, each with its own Leave button. "Assigned to me" below
+            // still reads the single legacy classroomCode field, so it only ever reflects
+            // ONE of possibly several joined classrooms — a known v1 limitation, not a bug.
             let classroomCode = null;
+            let memberships = [];
             try {
                 if (uid) {
                     const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
                     if (userSnap.exists()) classroomCode = userSnap.data().classroomCode || null;
+                    const memberSnap = await getDocs(query(collection(db, 'artifacts', appId, 'classroom_members'), where('uid', '==', uid)));
+                    memberships = memberSnap.docs.map(d => d.data().classroomCode).filter(Boolean);
                 }
-            } catch (e) { console.error("Couldn't read profile user doc:", e); }
+            } catch (e) { console.error("Couldn't read profile classroom membership:", e); }
 
-            const joinBox = document.getElementById('profile-join-box');
             const joinedBox = document.getElementById('profile-joined-box');
-            if (classroomCode) {
-                if (joinBox) joinBox.classList.add('hidden');
-                if (joinedBox) {
+            if (joinedBox) {
+                if (memberships.length) {
                     joinedBox.classList.remove('hidden');
-                    const codeEl = document.getElementById('profile-joined-code');
-                    if (codeEl) codeEl.textContent = classroomCode;
+                    joinedBox.innerHTML = memberships.map(code => `
+                        <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left mb-2">
+                            <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1 flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Task Force</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-sm font-bold text-allgood-secondary font-mono">${code}</p>
+                                <button onclick="window.leaveClassroom('${code}')" class="text-[9px] font-bold uppercase text-gray-400 hover:text-red-500 shrink-0">Leave</button>
+                            </div>
+                        </div>`).join('');
+                } else {
+                    joinedBox.classList.add('hidden');
+                    joinedBox.innerHTML = '';
                 }
-            } else {
-                if (joinBox) joinBox.classList.remove('hidden');
-                if (joinedBox) joinedBox.classList.add('hidden');
             }
 
             if (!uid) {
@@ -1345,8 +1356,22 @@
             window.toggleProfileEdit(false);
         }
 
-        // Lets a student join a classroom anytime from their Profile — no longer forced
-        // into the first-touch login form, since it's genuinely optional.
+        // Lets a student (or a Task Force Leader acting as one) join a classroom anytime
+        // from their Profile — no longer forced into the first-touch login form, since it's
+        // genuinely optional, and no longer limited to one at a time. Membership itself lives
+        // in classroom_members/{code}_{uid} (see firestore.rules #6b) so this can be called
+        // any number of times for different codes without one join undoing another.
+        //
+        // ALSO mirrors onto the legacy classroomCode field on the profile — but only when
+        // this account isn't a Task Force Leader (role !== 'teacher'). That field means two
+        // different things depending on who holds it: for a teacher it's the classroom THEY
+        // teach, and overwriting it here would silently break their own roster. For a plain
+        // student it still drives the single-classroom "Assigned to me" tab, so keeping it in
+        // sync there is worth doing even though classroom_members is now the real source of
+        // truth for roster visibility. A student in more than one classroom will only ever
+        // see ONE of them reflected in "Assigned to me" — the most recently joined — which is
+        // a known limitation, not a bug: extending that tab to multiple simultaneous
+        // assignment sources is a separate, larger piece of work.
         window.joinClassroom = async () => {
             const input = document.getElementById('profile-classroom-input');
             const statusEl = document.getElementById('profile-classroom-status');
@@ -1362,11 +1387,25 @@
                     if (statusEl) { statusEl.textContent = "Code not found — double check with your Task Force Leader."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
                     return;
                 }
-                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
-                // Mirror onto the Recruit Code so membership survives a device switch —
-                // redeeming lands on a new uid, and this is what carries the classroom over.
-                // No-op for anyone without a code.
-                if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(code);
+
+                await setDoc(doc(db, 'artifacts', appId, 'classroom_members', `${code}_${user.uid}`), {
+                    classroomCode: code,
+                    uid: user.uid,
+                    joinedAt: serverTimestamp(),
+                }, { merge: true });
+
+                const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                const myRole = meSnap.exists() ? meSnap.data().role : null;
+                if (myRole !== 'teacher') {
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
+                    // Mirror onto the Recruit Code so this one shows up after a device switch —
+                    // redeeming lands on a new uid, and this is what carries it over. No-op for
+                    // anyone without a code. (Older joins in classroom_members under a
+                    // different uid do not currently follow a code redemption — a known gap.)
+                    if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(code);
+                }
+
+                if (input) input.value = '';
                 if (statusEl) { statusEl.textContent = "Joined! Your Task Force Leader can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
                 if (window.sfx) window.sfx.confirm();
                 window.loadProfilePageData();
@@ -1376,27 +1415,30 @@
             }
         };
 
-        // A student is in at most one Task Force at a time (classroomCode is a single field,
-        // not a list) — leaving is how you switch: drop the current one, then the join box
-        // reappears (loadProfilePageData shows it whenever classroomCode is absent) to join
-        // a different one. Confirmed first since it stops a Task Force Leader from seeing
-        // this student's progress going forward.
-        window.leaveClassroom = async () => {
+        // Leaves one specific classroom (a student, or a Task Force Leader acting as one, may
+        // be in several at once now) — deletes that classroom_members doc. Confirmed first,
+        // since leaving stops that classroom's Task Force Leader from seeing this member's
+        // progress going forward.
+        window.leaveClassroom = async (code) => {
             const user = auth.currentUser;
-            if (!user) return;
-            if (!confirm("Leave this Task Force? Your Task Force Leader will no longer see your progress. You can join another (or the same one) any time with its code.")) return;
+            if (!user || !code) return;
+            if (!confirm(`Leave this Task Force (${code})? Its Task Force Leader will no longer see your progress. You can join another — or this one again — any time with its code.`)) return;
 
-            const statusEl = document.getElementById('profile-joined-status');
             try {
-                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: deleteField() }, { merge: true });
-                // Mirrors the clear onto the Recruit Code doc too, same reason joining does —
-                // so a device switch doesn't silently restore the classroom just left.
-                if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(null);
+                await deleteDoc(doc(db, 'artifacts', appId, 'classroom_members', `${code}_${user.uid}`));
+                // If this was the one mirrored onto the legacy classroomCode field (the one
+                // "Assigned to me" reads), clear it there too — same reasoning as joinClassroom
+                // about not touching that field for a Task Force Leader's own classroom.
+                const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+                const meData = meSnap.exists() ? meSnap.data() : {};
+                if (meData.role !== 'teacher' && meData.classroomCode === code) {
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: deleteField() }, { merge: true });
+                    if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(null);
+                }
                 if (window.sfx) window.sfx.click();
                 window.loadProfilePageData();
             } catch (e) {
                 console.error("Failed to leave classroom:", e);
-                if (statusEl) { statusEl.textContent = "Something went wrong — please try again."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
             }
         };
 
@@ -3489,9 +3531,9 @@
                             </div>
                         </div>
 
-                        <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup.
-                             Shown/hidden by window.loadProfilePageData() depending on whether
-                             the signed-in student already has a classroomCode on file. -->
+                        <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup,
+                             and always shown — a student (or a Task Force Leader acting as one)
+                             can belong to more than one classroom, so this never hides itself. -->
                         <div class="mt-3 w-full" id="profile-join-box">
                             <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
                                 <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Task Force Code?</p>
@@ -3503,19 +3545,12 @@
                             </div>
                         </div>
 
-                        <!-- ALREADY JOINED: no teacher display name is readily available on
-                             this document (only the classroom code), so that's what's shown —
-                             no fabricated "assigned by" name. -->
-                        <div class="mt-3 w-full hidden" id="profile-joined-box">
-                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
-                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1 flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Your Task Force</p>
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="text-sm font-bold text-allgood-secondary font-mono" id="profile-joined-code">------</p>
-                                    <button onclick="window.leaveClassroom()" class="text-[9px] font-bold uppercase text-gray-400 hover:text-red-500 shrink-0">Leave</button>
-                                </div>
-                                <p id="profile-joined-status" class="text-[10px] text-gray-400 mt-1"></p>
-                            </div>
-                        </div>
+                        <!-- JOINED TASK FORCES: one card per classroom_members doc, rendered
+                             entirely by window.loadProfilePageData() — no teacher display name
+                             is readily available (only the classroom code), so that's what's
+                             shown, no fabricated "assigned by" name. Hidden (and emptied) here
+                             when there are no memberships. -->
+                        <div class="mt-3 w-full hidden" id="profile-joined-box"></div>
                     </div>
 
                     <!-- RIGHT: TABS -->
