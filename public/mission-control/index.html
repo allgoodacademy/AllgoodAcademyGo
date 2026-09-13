@@ -674,7 +674,7 @@ async function loadStudent(row) {
     if (progressSnap) progressSnap.docs.forEach((d) => { progress[d.id] = d.data(); });
 
     const s = buildStudent({
-        row, assigned: state.assigned, moduleData: MODULE_DATA, scores, attempts, progress, sessions,
+        row, assigned: state.assigned, moduleData: MODULE_DATA, scores, attempts, progress, sessions, gameSessions,
     });
     // The four standalone games aren't part of the assigned-module system (see
     // summarizeGameSessions in derive.js) — attached separately rather than folded into
@@ -696,8 +696,13 @@ async function readSessions(uid) {
         const snap = await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('uid', '==', uid)));
         return snap.docs.map((d) => d.data());
     } catch (e) {
-        // One denial means the grant isn't deployed; stop asking for the rest of the roster.
-        state.sessionsReadable = false;
+        // A real denial (the rules grant isn't deployed) means every future query will fail
+        // the same way, so it's worth latching off for the rest of the roster. A transient
+        // failure (network blip, momentary unavailability) is not that — latching off on one
+        // of those would silently blind the whole page for every other student for no reason,
+        // with no way to recover short of a full reload. Only the former latches.
+        if (e && e.code === 'permission-denied') state.sessionsReadable = false;
+        console.warn('readSessions failed for', uid, e);
         return [];
     }
 }
@@ -710,7 +715,12 @@ async function readGameSessions(uid) {
         const snap = await getDocs(query(collection(db, 'game_sessions'), where('uid', '==', uid)));
         return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch (e) {
-        state.gameSessionsReadable = false;
+        // Same reasoning as readSessions() above: only a genuine permission denial (the rules
+        // grant not yet deployed) is worth latching off for the rest of the roster. A transient
+        // error must not permanently suppress every other student's games for the rest of the
+        // tab's life.
+        if (e && e.code === 'permission-denied') state.gameSessionsReadable = false;
+        console.warn('readGameSessions failed for', uid, e);
         return [];
     }
 }

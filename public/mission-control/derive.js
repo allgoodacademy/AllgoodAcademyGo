@@ -117,7 +117,7 @@ export function deriveStatus({ lastActive, started, allDone }, now = Date.now())
    Progress therefore takes the HIGHEST step any of them can prove rather than the first one
    found: a teacher reading a lower number than the student's real position would chase
    someone who is not actually behind. */
-export function buildStudent({ row, assigned, moduleData, scores = [], attempts = [], progress = {}, sessions = [] }, now = Date.now()) {
+export function buildStudent({ row, assigned, moduleData, scores = [], attempts = [], progress = {}, sessions = [], gameSessions = [] }, now = Date.now()) {
     const name = row.displayName || 'Agent Learner';
     const modules = {};
     let lastActive = 0;
@@ -158,8 +158,16 @@ export function buildStudent({ row, assigned, moduleData, scores = [], attempts 
         };
     }
 
+    // The four standalone games aren't assigned modules, but a student who is actively
+    // playing one is exactly as "active" as one working through a lab — lastActive (and the
+    // status derived from it) must not ignore them just because they never entered the loop
+    // above. playedAt is the field every game's telemetry write actually carries (see the
+    // create rule in firestore.rules and each game's setDoc call).
+    const gamesLastActive = Math.max(0, ...gameSessions.map((s) => toMillis(s.playedAt)));
+    if (gamesLastActive > lastActive) lastActive = gamesLastActive;
+
     const ids = assigned.filter((id) => modules[id]);
-    const started = ids.some((id) => modules[id].maxStep > 0);
+    const started = ids.some((id) => modules[id].maxStep > 0) || gameSessions.length > 0;
     const allDone = ids.length > 0 && ids.every((id) => modules[id].completed);
 
     /* Overall completion is the MEAN of each assigned module's own percentage, not the share
