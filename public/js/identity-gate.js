@@ -83,11 +83,17 @@ function hideAuthSpinner() {
     if (el) el.style.display = 'none';
 }
 
+// A session is "identified" — meaning offerSave() has nothing further to offer — once it
+// either has a real, non-anonymous account (any age tier that can have one, i.e. 13+) or
+// holds a claimed Recruit Code (the code IS the identity, for under-13 and for a 13+ guest
+// who claimed a code without ever creating a real account). Mission Control and every other
+// real-account-only surface still checks `!user.isAnonymous` directly rather than this — a
+// code-only 13+ guest is identified enough to skip the save offer, but a code is never a
+// substitute for a real account where one is actually required.
 function isFullyIdentified(user, account) {
     if (!user || !account) return false;
-    if (account.ageTier === '13plus') return !user.isAnonymous;
-    if (account.ageTier === 'under13') return !!account.recruitCode;
-    return false;
+    if (!user.isAnonymous) return true;
+    return !!account.recruitCode;
 }
 
 // The three properties that decide whether this gate is SEEN AT ALL are set inline, not by
@@ -219,21 +225,24 @@ const TEMPLATE = `
             <button id="ag-btn-recruit-discard" class="w-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-allgood-dark font-bold py-2.5 rounded text-xs uppercase font-body transition-colors">I&rsquo;ve got it written down &mdash; close</button>
         </div>
 
-        <!-- SAVE / CLAIM: the end-of-module offer, in Jodi's voice. It is an offer to keep
-             the run, not a demand to sign in — so it names what the student would lose
-             rather than what the product wants. Shown only once the completion reveal is on
-             screen (each module calls offerSave() from revealCompletion()), and "Not now" is
-             a real, full-width control: declining leaves the completion screen untouched. -->
+        <!-- SAVE / CLAIM: the end-of-module offer, in Jodi's voice. A code is assigned the
+             moment this panel opens — no age question in front of it, and no account
+             required to get it. "Not now" just closes the offer; the code is already
+             theirs either way, written down or not. Only creating a real account (13+
+             only — under-13 can't have one) is the thing that's actually optional here. -->
         <div id="ag-save" class="hidden">
             <h2 class="text-xl font-bold text-allgood-dark mb-1 font-heading">Nice work.</h2>
-            <p class="text-gray-500 text-xs mb-5 font-body leading-relaxed">Want me to hang onto this? You're <strong id="ag-save-name" class="text-allgood-secondary"></strong> right now &mdash; save it and that sticks around, on this device or any other.</p>
+            <p class="text-gray-500 text-xs mb-4 font-body leading-relaxed">Here's your code. Write it down &mdash; it's the only way to get your progress back on another device.</p>
+            <div class="bg-slate-50 border-2 border-dashed border-allgood-secondary rounded-lg py-4 px-3 mb-2">
+                <span id="ag-save-code-display" class="text-lg font-heading font-bold text-allgood-secondary tracking-wide break-words">&hellip;</span>
+            </div>
+            <button id="ag-btn-save-copy-code" class="text-xs text-allgood-primary hover:text-allgood-hover underline decoration-dotted mb-4 font-body">Copy code</button>
+            <p id="ag-save-note" class="hidden text-[11px] text-allgood-primary mb-3 font-body leading-relaxed"></p>
             <p id="ag-save-error" class="text-red-500 text-xs mb-2 hidden font-body"></p>
             <button id="ag-btn-save-13plus" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-[0.98] font-body uppercase mb-3">
-                I'm 13 or older &mdash; Save it
+                Create an account (13+)
             </button>
-            <button id="ag-btn-save-under13" class="w-full bg-white border-2 border-allgood-secondary text-allgood-secondary hover:bg-allgood-secondary hover:text-white font-bold py-3 rounded shadow-sm transition-all font-body uppercase mb-3">
-                I'm younger than 13 &mdash; Save it
-            </button>
+            <p class="text-[11px] text-gray-400 mb-3 font-body">Adds a real sign-in on top of this code &mdash; not required to keep your progress.</p>
             <button id="ag-btn-save-decline" class="w-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-allgood-dark font-bold py-2.5 rounded text-xs uppercase font-body transition-colors">Not now</button>
         </div>
 
@@ -541,10 +550,38 @@ function openGate(onResolved, options) {
     };
 
     // --- SAVE PANEL ---------------------------------------------------------
+    // A code is assigned the instant this panel opens — not gated behind any click, and
+    // not preceded by an age question. "Not now" just closes the offer afterward; by
+    // then the code already exists whether or not the student remembers to write it
+    // down. Only "Create an account" is genuinely optional here.
     const saveError = document.getElementById('ag-save-error');
-    const saveName = document.getElementById('ag-save-name');
-    const recruitNote = document.getElementById('ag-recruit-note');
-    if (saveName) saveName.textContent = opts.guestName || window.AuthCore.guestDisplayName();
+    const saveNote = document.getElementById('ag-save-note');
+    const saveCodeDisplay = document.getElementById('ag-save-code-display');
+
+    async function ensureSaveCode() {
+        if (!saveCodeDisplay) return;
+        saveCodeDisplay.textContent = '…'; // reset in case a prior failed attempt left stale text
+        hideError(saveError);
+        try {
+            const result = await window.AuthCore.claimGuestCode();
+            saveCodeDisplay.textContent = result.code;
+            if (saveNote) {
+                if (result.changed) {
+                    // Say it plainly rather than silently renaming someone who has been
+                    // looking at the old name for the whole module.
+                    saveNote.textContent = 'Heads up: ' + result.previousName + ' was taken while you were working, so your code is ' + result.displayName + ' instead. That is the one to write down.';
+                    saveNote.classList.remove('hidden');
+                } else {
+                    saveNote.classList.add('hidden');
+                }
+            }
+        } catch (e) {
+            console.error('[AuthGate] save-offer code claim failed', e);
+            saveCodeDisplay.textContent = '—';
+            showError(saveError, "Couldn't assign your code just now — Not now still keeps your current run going; try Save again later.");
+        }
+    }
+    if (entryPanel === 'ag-save') ensureSaveCode();
 
     document.getElementById('ag-btn-save-13plus').onclick = () => {
         playSfx('click');
@@ -554,37 +591,15 @@ function openGate(onResolved, options) {
         hideError(signinError);
         // The existing 13+ path already links a real credential onto this anonymous
         // session rather than creating a second account, so the uid — and everything
-        // written under it during the guest run — survives the upgrade untouched.
+        // written under it during the guest run, including the code just assigned
+        // above — survives the upgrade untouched.
         showPanel('ag-signin');
     };
 
-    document.getElementById('ag-btn-save-under13').onclick = async () => {
+    document.getElementById('ag-btn-save-copy-code').onclick = () => {
+        const text = saveCodeDisplay ? saveCodeDisplay.textContent : '';
+        if (text && text !== '…' && text !== '—' && navigator.clipboard) navigator.clipboard.writeText(text);
         playSfx('click');
-        hideError(saveError);
-        const btn = document.getElementById('ag-btn-save-under13');
-        setBusy(btn, 'Saving...', true);
-        try {
-            const result = await window.AuthCore.claimRecruitCode();
-            pendingRecruitContinue = resolveAndClose;
-            codeDisplay.textContent = result.code;
-            if (recruitNote) {
-                if (result.changed) {
-                    // Say it plainly rather than silently renaming someone who has been
-                    // looking at the old name for the whole module.
-                    recruitNote.textContent = 'Heads up: ' + result.previousName + ' was taken while you were working, so your code is ' + result.displayName + ' instead. That is the one to write down.';
-                    recruitNote.classList.remove('hidden');
-                } else {
-                    recruitNote.classList.add('hidden');
-                }
-            }
-            playSfx('confirm');
-            showPanel('ag-recruit-new');
-        } catch (e) {
-            console.error('Recruit code claim failed', e);
-            showError(saveError, 'Something went wrong saving your progress. Please try again.');
-        } finally {
-            setBusy(btn, null, false);
-        }
     };
 
     document.getElementById('ag-btn-save-decline').onclick = () => {

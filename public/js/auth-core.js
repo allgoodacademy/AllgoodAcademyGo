@@ -395,12 +395,20 @@ async function backfillRecruitProgress(uid, code) {
     }
 }
 
-// --- CLAIM (under 13): the ONLY path that mints and reserves a real Recruit Code. Tries
-// the name they have been looking at all session first, so claiming doesn't rename them
-// out from under themselves; falls back to a fresh unique code if that one has been taken
-// in the meantime, and reports `changed: true` so the caller can say so plainly on screen.
-// Collects no name, no email, no birthday — same as recruitSignIn.
-async function claimRecruitCode() {
+// --- CLAIM: mints and reserves a real Recruit Code for the CURRENT anonymous session.
+// Tries the name they have been looking at all session first, so claiming doesn't rename
+// them out from under themselves; falls back to a fresh unique code if that one has been
+// taken in the meantime, and reports `changed: true` so the caller can say so plainly on
+// screen. Collects no name, no email, no birthday — same as recruitSignIn.
+//
+// ageTier is an internal detail, not a question asked here: `claimRecruitCode()` (unchanged
+// call shape) is the under-13 path and stamps ageTier:'under13', same as always. The
+// unified save offer (any guest, any age, one code) calls `claimGuestCode()` instead, which
+// shares every line of this logic but leaves ageTier unset — nobody is asked their age just
+// to get a code back. ageTier only ever becomes '13plus' via finalizeThirteenPlusAccount(),
+// i.e. the moment someone actually creates a real account, which is the one place self-
+// reported age has ever mattered here.
+async function _claimCode(ageTier) {
     const user = auth.currentUser || (await waitForAuthReady()) || (await signInAnonymously(auth)).user;
 
     const existing = await getAccount(user.uid);
@@ -436,16 +444,17 @@ async function claimRecruitCode() {
 
     try { await updateProfile(user, { displayName }); } catch (e) { console.error('[AuthCore] updateProfile failed', e); }
 
-    await setDoc(userRef(user.uid), {
+    const payload = {
         displayName,
         avatar,
         email: null,
         isGuest: true,
         role: existing.role || 'student',
-        ageTier: 'under13',
         recruitCode: code,
         lastLogin: serverTimestamp(),
-    }, { merge: true });
+    };
+    if (ageTier) payload.ageTier = ageTier;
+    await setDoc(userRef(user.uid), payload, { merge: true });
 
     await backfillRecruitProgress(user.uid, code);
 
@@ -453,6 +462,16 @@ async function claimRecruitCode() {
     markSignedIn();
 
     return { code, displayName, changed, previousName: codeToDisplayName(preferred), alreadyClaimed: false };
+}
+
+async function claimRecruitCode() {
+    return _claimCode('under13');
+}
+
+// The unified save-offer path (Ticket: guest save flow) — any guest, 13+ or under-13,
+// gets the same code assigned the same way, with no age question in front of it.
+async function claimGuestCode() {
+    return _claimCode(null);
 }
 
 // --- LEARNER RECRUIT FLOW: under 13. Fully COPPA-compliant — no name/email field, ever,
@@ -958,7 +977,7 @@ async function signOutAndClear() {
 window.AuthCore = {
     auth, db, appId,
     silentSignIn, recruitSignIn, redeemRecruitCode,
-    guestStart, guestDisplayName, claimRecruitCode,
+    guestStart, guestDisplayName, claimRecruitCode, claimGuestCode,
     codeToDisplayName, normalizeRecruitCode,
     markSignedIn, markAccount, clearSignedIn, signOutAndClear, waitForAuthReady,
     googleSignIn, createAccountWithEmail, signInWithEmail,
