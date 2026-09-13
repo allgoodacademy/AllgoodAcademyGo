@@ -631,10 +631,13 @@ function shuffle(arr) {
 // up short, top up from the other side rather than shrinking the session below 10.
 // Plain shuffling of a 5-smart/5-costly set can still land 4-5 same-answer
 // scenarios in a row by chance, which plays like the round is "all costly" even
-// with a balanced pool. Reshuffle (bounded) until no run of 3+ appears; a strict
-// alternating fallback guarantees termination if we're unlucky 40 times running.
-function longestAnswerRun(arr) {
-  let longest = 1, current = 1;
+// with a balanced pool. Reshuffle (bounded) until no run of 3+ appears — counting
+// a carried-over streak from the tail of the previous round (Play Again keeps this
+// page loaded, so a session boundary is invisible to the player and a 3-run ending
+// one round followed by a 3-run starting the next reads as one long streak).
+function longestAnswerRun(arr, leadAnswer = null, leadLen = 0) {
+  let longest = arr.length && arr[0].answer === leadAnswer ? leadLen + 1 : 1;
+  let current = longest;
   for (let i = 1; i < arr.length; i++) {
     current = arr[i].answer === arr[i - 1].answer ? current + 1 : 1;
     longest = Math.max(longest, current);
@@ -642,19 +645,30 @@ function longestAnswerRun(arr) {
   return longest;
 }
 
-function shuffleNoLongRuns(arr, maxRun = 3, maxAttempts = 40) {
+function shuffleNoLongRuns(arr, leadAnswer, leadLen, maxRun = 3, maxAttempts = 40) {
   let best = arr;
   let bestRun = Infinity;
   for (let i = 0; i < maxAttempts; i++) {
     const candidate = shuffle(arr);
-    const run = longestAnswerRun(candidate);
+    const run = longestAnswerRun(candidate, leadAnswer, leadLen);
     if (run <= maxRun) return candidate;
     if (run < bestRun) { bestRun = run; best = candidate; }
   }
   return best;
 }
 
-function buildMoneySession(pool) {
+// Length of the run of identical `answer` values at the end of a finished session —
+// the "carry-over streak" a new session's opening scenarios must not extend past
+// the cap, so back-to-back rounds don't chain into one long streak.
+function trailingAnswerRun(arr) {
+  if (!arr.length) return { answer: null, len: 0 };
+  const answer = arr[arr.length - 1].answer;
+  let len = 1;
+  for (let i = arr.length - 2; i >= 0 && arr[i].answer === answer; i--) len++;
+  return { answer, len };
+}
+
+function buildMoneySession(pool, carryOver = { answer: null, len: 0 }) {
   const SESSION_SIZE = 10;
   const HALF = SESSION_SIZE / 2;
   const smartPool = shuffle(pool.filter(s => s.answer === 'smart'));
@@ -664,7 +678,7 @@ function buildMoneySession(pool) {
   const shortfall = SESSION_SIZE - smartPicked.length - costlyPicked.length;
   const leftover = shuffle([...smartPool.slice(HALF), ...costlyPool.slice(HALF)]);
   const picked = [...smartPicked, ...costlyPicked, ...leftover.slice(0, shortfall)];
-  return shuffleNoLongRuns(picked);
+  return shuffleNoLongRuns(picked, carryOver.answer, carryOver.len);
 }
 
 let session = [], currentIdx = 0, score = 0;
@@ -757,7 +771,8 @@ async function recordSession() {
 function startGame() {
   window._agSaveOffered = false;
   window._agCompletionReached = false;
-  session = buildMoneySession(scenarios);
+  const carryOver = trailingAnswerRun(session);
+  session = buildMoneySession(scenarios, carryOver);
   currentIdx = 0; score = 0;
   categoryStats = {};
   scenarioLog = [];
