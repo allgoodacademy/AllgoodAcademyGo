@@ -206,6 +206,42 @@ export function countActiveThisWeek(students, now = Date.now()) {
     return students.filter((s) => s.lastActive && (now - s.lastActive) < ACTIVE_WINDOW_DAYS * DAY).length;
 }
 
+/* The four standalone games (Read the Signal, Before You Send, The Rumor Mill, Money
+   Moves) are guest-first and randomized-bank — no fixed Case sequence, so they were never
+   folded into MODULE_DATA/MODULE_REGISTRY's step-by-step review model (that would mean a
+   "step 3 of 10" that names a different scenario every time a student replays). They get
+   their own lightweight summary instead: best score and last-played per game, sourced
+   directly from the game_sessions collection rather than assigned/completed/stepped like
+   a GoodBlock or Challenge. */
+export const GAME_REGISTRY = {
+    'read-the-signal':  { name: 'Read the Signal', icon: '📡', url: '/educational-games/read-the-signal/' },
+    'before-you-send':  { name: 'Before You Send', icon: '✉️', url: '/educational-games/before-you-send/' },
+    'the-rumor-mill':   { name: 'The Rumor Mill', icon: '🌀', url: '/educational-games/the-rumor-mill/' },
+    'money-moves':      { name: 'Money Moves', icon: '💸', url: '/educational-games/money-moves/' },
+};
+
+/* One row per game this student has ever played, best-scoring session first read off
+   correct/scenariosPlayed (every game's schema carries both), most-recently-played last
+   read off playedAt. A game never played is simply absent — there is no "not started"
+   state to show for something with no assignment to be behind on. */
+export function summarizeGameSessions(sessions) {
+    const byGame = {};
+    for (const s of sessions) {
+        const meta = GAME_REGISTRY[s.game];
+        if (!meta) continue;
+        const pct = (typeof s.scenariosPlayed === 'number' && s.scenariosPlayed > 0 && typeof s.correct === 'number')
+            ? Math.round((s.correct / s.scenariosPlayed) * 100)
+            : null;
+        const playedAtMs = toMillis(s.playedAt);
+        const g = byGame[s.game] || { id: s.game, meta, plays: 0, bestPct: null, lastPlayed: 0 };
+        g.plays += 1;
+        if (pct != null) g.bestPct = g.bestPct == null ? pct : Math.max(g.bestPct, pct);
+        if (playedAtMs > g.lastPlayed) g.lastPlayed = playedAtMs;
+        byGame[s.game] = g;
+    }
+    return Object.values(byGame).sort((a, b) => b.lastPlayed - a.lastPlayed);
+}
+
 /* Turns a stored choiceIndex back into the words the student saw. The text always comes from
    module-data.js — generated from the Challenge's own SCENARIO_DATA and each lab's
    CASE_CHOICES — never from a copy kept in the dashboard, so a reworded option cannot leave a

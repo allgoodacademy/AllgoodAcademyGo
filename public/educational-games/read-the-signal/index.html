@@ -1642,6 +1642,10 @@ async function recordSession(outcome) {
       sessionId: getSessionId(),
       recruitCode,
       studentId,
+      // Always the owning uid, anonymous or not — unlike studentId (real accounts only),
+      // this is what lets a teacher's roster (Mission Control) read a Recruit's or a
+      // guest's session back via sessionOwnerIsMyStudent(), same as the sessions collection.
+      uid: user ? user.uid : null,
       playedAt: serverTimestamp(),
       ttl: Timestamp.fromDate(ttl),
       outcome,

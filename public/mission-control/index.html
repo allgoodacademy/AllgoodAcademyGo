@@ -491,6 +491,7 @@ import {
 import { MODULE_DATA } from './module-data.js';
 import {
     relativeTime, buildStudent, classAverage, countActiveThisWeek, choiceTextFor,
+    summarizeGameSessions,
 } from './derive.js';
 
 const { db, appId, auth, waitForAuthReady } = window.AuthCore;
@@ -546,6 +547,7 @@ const state = {
     view: 'overview',
     filter: '',
     sessionsReadable: true,   // rules may deny a teacher the sessions collection — see load()
+    gameSessionsReadable: true, // same fail-fast pattern, for the game_sessions grant
     expanded: {},             // moduleId -> bool, so a card stays open across re-renders
 };
 
@@ -626,10 +628,11 @@ async function load() {
 async function loadStudent(row) {
     const base = collection(db, 'artifacts', appId, 'users', row.uid, 'game_scores');
 
-    const [scoreSnap, progressSnap, sessions] = await Promise.all([
+    const [scoreSnap, progressSnap, sessions, gameSessions] = await Promise.all([
         getDocs(base).catch(() => null),
         getDocs(collection(db, 'artifacts', appId, 'users', row.uid, 'module_progress')).catch(() => null),
         readSessions(row.uid),
+        readGameSessions(row.uid),
     ]);
 
     const scores = scoreSnap ? scoreSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
@@ -653,6 +656,10 @@ async function loadStudent(row) {
     const s = buildStudent({
         row, assigned: state.assigned, moduleData: MODULE_DATA, scores, attempts, progress, sessions,
     });
+    // The four standalone games aren't part of the assigned-module system (see
+    // summarizeGameSessions in derive.js) — attached separately rather than folded into
+    // s.modules, so nothing here has to pretend they have steps or an assignment.
+    s.games = summarizeGameSessions(gameSessions);
     // Presentation the shaping layer deliberately has no opinion about.
     s.color = colorForUid(row.uid);
     s.bg = tint(s.color, 0.2);
@@ -671,6 +678,19 @@ async function readSessions(uid) {
     } catch (e) {
         // One denial means the grant isn't deployed; stop asking for the rest of the roster.
         state.sessionsReadable = false;
+        return [];
+    }
+}
+
+async function readGameSessions(uid) {
+    // Same one-uid-at-a-time shape as readSessions() and the same reason — see firestore.rules
+    // rule 11b (sessionOwnerIsMyStudent), which this pins to for the rules-cost reason.
+    if (!state.gameSessionsReadable) return [];
+    try {
+        const snap = await getDocs(query(collection(db, 'game_sessions'), where('uid', '==', uid)));
+        return snap.docs.map((d) => d.data());
+    } catch (e) {
+        state.gameSessionsReadable = false;
         return [];
     }
 }
@@ -806,12 +826,42 @@ function renderDetail(uid) {
     document.getElementById('alert-slot').innerHTML = alertFor(s);
 
     const body = document.getElementById('detail-body');
-    if (!state.assigned.length) {
-        body.innerHTML = '<div class="empty-note">No modules are assigned to this Task Force yet.</div>';
-        return;
-    }
-    body.innerHTML = (state.sessionsReadable ? '' : degradedNote())
-        + state.assigned.map((id) => moduleCard(s, s.modules[id])).join('');
+    body.innerHTML =
+        (state.assigned.length
+            ? (state.sessionsReadable ? '' : degradedNote()) + state.assigned.map((id) => moduleCard(s, s.modules[id])).join('')
+            : '<div class="empty-note">No modules are assigned to this Task Force yet.</div>')
+        + gamesSection(s);
+}
+
+/* The four standalone games are never "assigned" — they're guest-first, so a teacher sees
+   whatever a student has actually played, same spirit as the games hub itself needing no
+   login to try something. Shown below the assigned modules (or the empty-modules note),
+   never gating on state.assigned since a student can play these with zero modules set up. */
+function gamesSection(s) {
+    if (!state.gameSessionsReadable) return '';
+    if (!s.games.length) return '';
+    return `<div class="steps-label" style="margin-top:20px">GAMES PLAYED</div>`
+        + s.games.map(gameCard).join('');
+}
+
+function gameCard(g) {
+    const scoreLine = g.bestPct == null ? '' :
+        `<div style="margin-top:2px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">Best score: <span style="color:#00D4B8">${g.bestPct}%</span></div>`;
+    return `<div class="module-card" style="cursor:default">
+      <div class="module-card-header" style="cursor:default">
+        <div class="module-icon" style="background:rgba(0,212,184,0.15);color:#00D4B8" aria-hidden="true">${g.meta.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div class="module-name">${esc(g.meta.name)}</div>
+          ${scoreLine}
+        </div>
+        <div class="module-status-pill pill-done">${g.plays} play${g.plays === 1 ? '' : 's'}</div>
+      </div>
+      <div class="time-on-task">
+        <span aria-hidden="true">🕐</span>
+        <span>Last played:</span>
+        <span class="tot-val">${esc(relativeTime(g.lastPlayed))}</span>
+      </div>
+    </div>`;
 }
 
 function alertFor(s) {
