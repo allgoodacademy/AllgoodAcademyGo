@@ -1066,7 +1066,9 @@ function doVerify() {
   panel.style.display = 'block';
   panel.innerHTML = `<div class="verify-label">VERIFYING</div><div class="verify-loading"><div class="verify-dot"></div><div class="verify-dot"></div><div class="verify-dot"></div></div>`;
 
-  // Pause the timer during verify — resumes below with 12 seconds left.
+  // Pause the timer during verify — resumes below with 12 seconds left. 1.5s rather
+  // than a longer wait: the timer is paused either way, but this still needs to read
+  // as "checking something real," just not slow enough to feel like a load stall.
   clearInterval(timer);
 
   setTimeout(() => {
@@ -1084,7 +1086,7 @@ function doVerify() {
       fill.style.width = (timeLeft / 30 * 100) + '%';
       if (timeLeft <= 0) { clearInterval(timer); choose('forward'); }
     }, 1000);
-  }, 4000);
+  }, 1500);
 }
 
 function choose(action) {
