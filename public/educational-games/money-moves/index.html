@@ -576,12 +576,23 @@ function getSessionId() {
   return id;
 }
 
+let lastSessionRef = null;
+
+// Best-effort click-through tracking, fire-and-forget — same pattern across
+// all four games' telemetry.
+function markDeeperClicked() {
+  if (!lastSessionRef) return;
+  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
+    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
+    .catch(() => {});
+}
+
 async function recordSession() {
   try {
     const AuthCore = window.AuthCore;
     if (!AuthCore) return;
 
-    const { collection, addDoc, serverTimestamp, Timestamp } =
+    const { collection, doc, setDoc, serverTimestamp, Timestamp } =
       await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
     let user = AuthCore.auth.currentUser;
@@ -604,7 +615,10 @@ async function recordSession() {
     const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
     const correct = scenarioLog.filter(s => s.correct).length;
 
-    await addDoc(collection(AuthCore.db, 'game_sessions'), {
+    const sessionDocId = getSessionId() + '_' + Date.now();
+    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
+
+    await setDoc(lastSessionRef, {
       game: 'money-moves',
       sessionId: getSessionId(),
       recruitCode,
@@ -630,6 +644,7 @@ function startGame() {
   currentIdx = 0; score = 0;
   categoryStats = {};
   scenarioLog = [];
+  lastSessionRef = null;
   show('game');
   renderDots();
   renderScenario();
@@ -752,7 +767,7 @@ function showEnd() {
     <div class="deeper-card">
       <div class="deeper-label">WANT TO GO DEEPER?</div>
       <div class="deeper-msg">${deeperMsg}</div>
-      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='${deeperLink}'; })">Try the Money as a Skill Lab →</button>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href='${deeperLink}'; })">Try the Money as a Skill Lab →</button>
     </div>
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
     <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>

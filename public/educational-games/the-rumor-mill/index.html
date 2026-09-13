@@ -869,7 +869,9 @@ let session = [], currentIdx = 0, score = 0;
 let timer = null, timeLeft = 30, verified = false, verifying = false;
 let choiceTally = { forward: 0, verify: 0, stop: 0 };
 let misinfoForwarded = 0, truthStopped = 0, verifyUsedCount = 0;
+let categoryStats = {};
 let scenarioLog = [];
+let lastSessionRef = null;
 let deeperLink = '/jsh/digital-decisions-lab/digital-citizenship/';
 
 function show(id) {
@@ -898,7 +900,7 @@ async function recordSession() {
     const AuthCore = window.AuthCore;
     if (!AuthCore) return;
 
-    const { collection, addDoc, serverTimestamp, Timestamp } =
+    const { collection, doc, setDoc, serverTimestamp, Timestamp } =
       await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
     let user = AuthCore.auth.currentUser;
@@ -921,7 +923,10 @@ async function recordSession() {
     const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
     const correct = scenarioLog.filter(s => s.correct).length;
 
-    await addDoc(collection(AuthCore.db, 'game_sessions'), {
+    const sessionDocId = getSessionId() + '_' + Date.now();
+    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
+
+    await setDoc(lastSessionRef, {
       game: 'the-rumor-mill',
       sessionId: getSessionId(),
       recruitCode,
@@ -937,6 +942,7 @@ async function recordSession() {
       misinfoForwarded,
       truthStopped,
       verifyUsed: verifyUsedCount,
+      categories: categoryStats,
       scenarios: scenarioLog
     });
   } catch (e) {
@@ -951,7 +957,9 @@ function startGame() {
   currentIdx = 0; score = 0;
   choiceTally = { forward: 0, verify: 0, stop: 0 };
   misinfoForwarded = 0; truthStopped = 0; verifyUsedCount = 0;
+  categoryStats = {};
   scenarioLog = [];
+  lastSessionRef = null;
   show('game');
   renderDots();
   renderNetwork();
@@ -1109,7 +1117,11 @@ function choose(action) {
   if (action === 'forward' && !s.truth) misinfoForwarded++;
   if (action === 'stop' && s.truth) truthStopped++;
 
-  scenarioLog.push({ id: s.id, truth: s.truth, choice: action, correct, verifyUsed: verified, timeUsed });
+  if (!categoryStats[s.category]) categoryStats[s.category] = { played: 0, correct: 0 };
+  categoryStats[s.category].played++;
+  if (correct) categoryStats[s.category].correct++;
+
+  scenarioLog.push({ id: s.id, category: s.category, truth: s.truth, choice: action, correct, verifyUsed: verified, timeUsed });
 
   showConsequence(data, action, s.truth);
 }
@@ -1176,7 +1188,7 @@ function showEnd() {
     <div class="deeper-card">
       <div class="deeper-label">WANT TO GO DEEPER?</div>
       <div class="deeper-msg">${deeperMsg}</div>
-      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='${deeperLink}'; })">Open the lab →</button>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href='${deeperLink}'; })">Open the lab →</button>
     </div>
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
     <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
@@ -1194,6 +1206,15 @@ function showEnd() {
       window.AuthGate.offerSave().catch((e) => console.error('[TheRumorMill] offerSave failed', e));
     }, 1200);
   }
+}
+
+// Best-effort click-through tracking, fire-and-forget — same pattern as the
+// other three games.
+function markDeeperClicked() {
+  if (!lastSessionRef) return;
+  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
+    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
+    .catch(() => {});
 }
 
 function restartGame() { startGame(); }

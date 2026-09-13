@@ -720,7 +720,9 @@ function buildByuSession(pool) {
 let session = [], currentIdx = 0, score = 0;
 let timer = null, timeLeft = 30, readsLeft = 3, readsUsed = 1;
 let choiceTally = { send: 0, edit: 0, delete: 0 };
+let categoryStats = {};
 let scenarioLog = [];
+let lastSessionRef = null;
 
 function show(id) {
   ['intro', 'game', 'consequence', 'end'].forEach(s => {
@@ -748,7 +750,7 @@ async function recordSession() {
     const AuthCore = window.AuthCore;
     if (!AuthCore) return;
 
-    const { collection, addDoc, serverTimestamp, Timestamp } =
+    const { collection, doc, setDoc, serverTimestamp, Timestamp } =
       await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
     let user = AuthCore.auth.currentUser;
@@ -770,7 +772,13 @@ async function recordSession() {
     const playedAt = new Date();
     const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-    await addDoc(collection(AuthCore.db, 'game_sessions'), {
+    // Deterministic per-play doc id: getSessionId() alone is stable per tab across
+    // replays, so append Date.now() to give each play-through its own document —
+    // this is what lets the "clicked deeper link" update below target the right one.
+    const sessionDocId = getSessionId() + '_' + Date.now();
+    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
+
+    await setDoc(lastSessionRef, {
       game: 'before-you-send',
       sessionId: getSessionId(),
       recruitCode,
@@ -783,6 +791,7 @@ async function recordSession() {
       scenariosPlayed: scenarioLog.length,
       choices: choiceTally,
       correct: scenarioLog.filter(s => s.correct).length,
+      categories: categoryStats,
       scenarios: scenarioLog
     });
   } catch (e) {
@@ -796,7 +805,9 @@ function startGame() {
   session = buildByuSession(scenarios);
   currentIdx = 0; score = 0;
   choiceTally = { send: 0, edit: 0, delete: 0 };
+  categoryStats = {};
   scenarioLog = [];
+  lastSessionRef = null;
   show('game');
   renderDots();
   renderScenario();
@@ -903,7 +914,10 @@ function choose(action) {
 
   score += correct ? 10 : 5;
   choiceTally[action] = (choiceTally[action] || 0) + 1;
-  scenarioLog.push({ id: s.id, choice: action, bestChoice: s.best, correct, timeUsed, readsUsed });
+  if (!categoryStats[s.category]) categoryStats[s.category] = { played: 0, correct: 0 };
+  categoryStats[s.category].played++;
+  if (correct) categoryStats[s.category].correct++;
+  scenarioLog.push({ id: s.id, category: s.category, choice: action, bestChoice: s.best, correct, timeUsed, readsUsed });
 
   showConsequence(data, action);
 }
@@ -972,7 +986,7 @@ function showEnd() {
     <div class="deeper-card">
       <div class="deeper-label">WANT TO GO DEEPER?</div>
       <div class="deeper-msg">${deeperMsg}</div>
-      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='${deeperLink}'; })">Open the lab →</button>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href='${deeperLink}'; })">Open the lab →</button>
     </div>
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
     <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
@@ -996,6 +1010,17 @@ function showEnd() {
       window.AuthGate.offerSave().catch((e) => console.error('[BeforeYouSend] offerSave failed', e));
     }, 1200);
   }
+}
+
+// Best-effort click-through tracking: records that the student followed the
+// end-screen recommendation into the GoodBlock lesson. Fire-and-forget so it
+// never delays navigation — guardedLeave() may itself pause for the save gate,
+// but this write should not add to that delay either way.
+function markDeeperClicked() {
+  if (!lastSessionRef) return;
+  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
+    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
+    .catch(() => {});
 }
 
 function restartGame() { startGame(); }

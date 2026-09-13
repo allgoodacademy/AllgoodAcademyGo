@@ -708,7 +708,7 @@ async function readGameSessions(uid) {
     if (!state.gameSessionsReadable) return [];
     try {
         const snap = await getDocs(query(collection(db, 'game_sessions'), where('uid', '==', uid)));
-        return snap.docs.map((d) => d.data());
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch (e) {
         state.gameSessionsReadable = false;
         return [];
@@ -865,22 +865,80 @@ function gamesSection(s) {
 }
 
 function gameCard(g) {
+    const gameKey = `game:${g.id}`;
+    const open = state.expanded[gameKey] ? ' expanded' : '';
     const scoreLine = g.bestPct == null ? '' :
         `<div style="margin-top:2px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">Best score: <span style="color:#00D4B8">${g.bestPct}%</span></div>`;
-    return `<div class="module-card" style="cursor:default">
-      <div class="module-card-header" style="cursor:default">
+    return `<div class="module-card${open}" id="gcard-${esc(g.id)}">
+      <button type="button" class="module-card-header" data-game="${esc(g.id)}" aria-expanded="${state.expanded[gameKey] ? 'true' : 'false'}">
         <div class="module-icon" style="background:rgba(0,212,184,0.15);color:#00D4B8" aria-hidden="true">${g.meta.icon}</div>
         <div style="flex:1;min-width:0">
           <div class="module-name">${esc(g.meta.name)}</div>
           ${scoreLine}
         </div>
         <div class="module-status-pill pill-done">${g.plays} play${g.plays === 1 ? '' : 's'}</div>
-      </div>
+        <div class="module-chevron" aria-hidden="true">▶</div>
+      </button>
       <div class="time-on-task">
         <span aria-hidden="true">🕐</span>
         <span>Last played:</span>
         <span class="tot-val">${esc(relativeTime(g.lastPlayed))}</span>
       </div>
+      <div class="module-steps">
+        ${gameSkillBreakdown(g)}
+        ${gameDeeperLinkLine(g)}
+        <div class="steps-label" style="margin-top:12px">SESSION HISTORY</div>
+        ${g.sessions.map((sess) => gameSessionRow(sess)).join('')}
+      </div>
+    </div>`;
+}
+
+function gameSkillBreakdown(g) {
+    if (!g.strongestCategory && !g.weakestCategory) return '';
+    const row = (label, cat, color) => cat
+        ? `<div class="step-row" style="cursor:default">
+             <div class="step-content">
+               <div class="step-title">${label}: ${esc(catLabel(cat.name))}</div>
+               <div class="step-choice"><span class="choice-label" style="background:${color}22;color:${color}">${cat.accuracy}%</span>${cat.correct}/${cat.played} correct</div>
+             </div>
+           </div>`
+        : '';
+    return row('Strongest skill', g.strongestCategory, '#10B981') + row('Weakest skill', g.weakestCategory, '#F43F5E');
+}
+
+function gameDeeperLinkLine(g) {
+    const clicked = g.deeperLinkClicks > 0;
+    const color = clicked ? '#10B981' : 'var(--text-muted)';
+    const label = clicked
+        ? `Opened the recommended lesson ${g.deeperLinkClicks} time${g.deeperLinkClicks === 1 ? '' : 's'}`
+        : 'Has not opened the recommended lesson yet';
+    return `<div class="time-on-task">
+      <span aria-hidden="true">🔗</span>
+      <span style="color:${color}">${esc(label)}</span>
+    </div>`;
+}
+
+// Category names are stored lowercase/hyphenated (e.g. "safe-recognition") — this only
+// affects display, never the key used to merge stats, so a rename here can't silently
+// split one category's history into two.
+function catLabel(name) {
+    return String(name || '').replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function gameSessionRow(sess) {
+    const scoreTxt = sess.pct == null ? '—' : `${sess.pct}%`;
+    const color = sess.pct == null ? 'var(--text-muted)' : (SCORE_COLOR[Math.round((sess.pct || 0) / 34)] || 'var(--teal)');
+    const catNames = sess.categories ? Object.keys(sess.categories) : [];
+    const catTxt = catNames.length
+        ? catNames.map((n) => `${catLabel(n)} ${sess.categories[n].correct}/${sess.categories[n].played}`).join(' · ')
+        : '';
+    return `<div class="step-row" style="cursor:default">
+      <div class="step-content">
+        <div class="step-title">${esc(relativeTime(sess.playedAt))}${sess.clickedDeeperLink ? ' <span class="replay-tag">opened lesson</span>' : ''}</div>
+        ${catTxt ? `<div class="step-choice">${esc(catTxt)}</div>` : ''}
+      </div>
+      <div class="step-score" style="color:${color}">${scoreTxt}</div>
+      <div class="step-indicator" style="background:${color}"></div>
     </div>`;
 }
 
@@ -1055,6 +1113,14 @@ document.getElementById('overview-grid').addEventListener('click', (e) => {
 document.getElementById('detail-body').addEventListener('click', (e) => {
     const btn = e.target.closest('.module-card-header');
     if (!btn) return;
+    if (btn.dataset.game) {
+        const key = `game:${btn.dataset.game}`;
+        state.expanded[key] = !state.expanded[key];
+        const card = document.getElementById(`gcard-${btn.dataset.game}`);
+        if (card) card.classList.toggle('expanded', state.expanded[key]);
+        btn.setAttribute('aria-expanded', state.expanded[key] ? 'true' : 'false');
+        return;
+    }
     const id = btn.dataset.module;
     state.expanded[id] = !state.expanded[id];
     const card = document.getElementById(`mcard-${id}`);

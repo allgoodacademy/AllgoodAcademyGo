@@ -361,26 +361,34 @@ service cloud.firestore {
             && request.resource.data.keys().hasOnly([
                  'game', 'sessionId', 'recruitCode', 'studentId', 'uid', 'playedAt', 'ttl',
                  'outcome', 'scenariosPlayed', 'correct', 'wrong', 'livesLost',
-                 'categories', 'scenarios'
+                 'categories', 'scenarios', 'clickedDeeperLink'
                ]))
           || (request.resource.data.game == 'before-you-send'
             && request.resource.data.keys().hasOnly([
                  'game', 'sessionId', 'recruitCode', 'studentId', 'uid', 'playedAt', 'ttl',
-                 'scenariosPlayed', 'choices', 'correct', 'scenarios'
+                 'scenariosPlayed', 'choices', 'correct', 'categories', 'scenarios',
+                 'clickedDeeperLink'
                ]))
           || (request.resource.data.game == 'the-rumor-mill'
             && request.resource.data.keys().hasOnly([
                  'game', 'sessionId', 'recruitCode', 'studentId', 'uid', 'playedAt', 'ttl',
                  'scenariosPlayed', 'correct', 'choices', 'misinfoForwarded',
-                 'truthStopped', 'verifyUsed', 'scenarios'
+                 'truthStopped', 'verifyUsed', 'categories', 'scenarios', 'clickedDeeperLink'
                ]))
           || (request.resource.data.game == 'money-moves'
             && request.resource.data.keys().hasOnly([
                  'game', 'sessionId', 'recruitCode', 'studentId', 'uid', 'playedAt', 'ttl',
-                 'scenariosPlayed', 'correct', 'categories'
+                 'scenariosPlayed', 'correct', 'categories', 'clickedDeeperLink'
                ]))
         );
       allow read, update, delete: if isAllowlistedAdmin();
+
+      // NEW — lets a student mark their own session as "clicked through to the
+      // recommended lesson" after finishing a game, without opening up any other
+      // field on their own past sessions to a client-side write.
+      allow update: if request.auth != null
+        && resource.data.get('uid', null) == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clickedDeeperLink']);
     }
 
     // 11b. NEW — Mission Control: game telemetry (Read the Signal, Before You Send, The

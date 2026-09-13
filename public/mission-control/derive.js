@@ -220,10 +220,56 @@ export const GAME_REGISTRY = {
     'money-moves':      { name: 'Money Moves', icon: '💸', url: '/educational-games/money-moves/' },
 };
 
+/* A single session's categories map comes back from Firestore as either `categories` or
+   `categoryStats` depending on which game wrote it (both games in production write
+   `categories`, but this stays tolerant of either key so an older/renamed field never
+   silently drops a session's breakdown). Shape is always { [name]: { played, correct } }. */
+function categoriesOf(session) {
+    return session.categories || session.categoryStats || null;
+}
+
+/* Merges one session's category map into a running per-game total, summing played/correct
+   per category name across every session of that game this student has. */
+function mergeCategories(total, cats) {
+    if (!cats) return total;
+    for (const [name, stat] of Object.entries(cats)) {
+        if (!stat || typeof stat.played !== 'number') continue;
+        const t = total[name] || { played: 0, correct: 0 };
+        t.played += stat.played;
+        t.correct += (typeof stat.correct === 'number') ? stat.correct : 0;
+        total[name] = t;
+    }
+    return total;
+}
+
+/* Picks the strongest/weakest category by accuracy across ALL of a student's sessions of one
+   game, considering only categories actually played (played > 0) — an unplayed category is
+   not "weak", it just never came up. Ties break toward whichever was played more, since a
+   50%-of-2 and a 50%-of-20 are not equally informative about where the student stands. */
+function strongestAndWeakest(categoryTotals) {
+    const withAccuracy = Object.entries(categoryTotals)
+        .filter(([, s]) => s.played > 0)
+        .map(([name, s]) => ({ name, played: s.played, correct: s.correct, accuracy: Math.round((s.correct / s.played) * 100) }));
+    if (!withAccuracy.length) return { strongest: null, weakest: null };
+    const byAccDesc = [...withAccuracy].sort((a, b) => b.accuracy - a.accuracy || b.played - a.played);
+    const byAccAsc = [...withAccuracy].sort((a, b) => a.accuracy - b.accuracy || b.played - a.played);
+    return { strongest: byAccDesc[0], weakest: byAccAsc[0] };
+}
+
 /* One row per game this student has ever played, best-scoring session first read off
    correct/scenariosPlayed (every game's schema carries both), most-recently-played last
    read off playedAt. A game never played is simply absent — there is no "not started"
-   state to show for something with no assignment to be behind on. */
+   state to show for something with no assignment to be behind on.
+
+   Beyond the existing aggregate fields (plays/bestPct/lastPlayed), each row now also carries:
+     categoryTotals    — summed played/correct per category across every session of this game
+     strongestCategory — { name, accuracy, played } by accuracy, ties broken by more played
+     weakestCategory   — same, lowest accuracy first
+     deeperLinkClicks  — count of sessions where the student clicked through to the
+                         recommended lesson after finishing
+     sessions          — the raw per-session list (id, pct, timestamp, this session's own
+                         category breakdown, clickedDeeperLink), newest first, so the UI can
+                         render an actual drill-down instead of only the aggregate. */
 export function summarizeGameSessions(sessions) {
     const byGame = {};
     for (const s of sessions) {
@@ -233,13 +279,36 @@ export function summarizeGameSessions(sessions) {
             ? Math.round((s.correct / s.scenariosPlayed) * 100)
             : null;
         const playedAtMs = toMillis(s.playedAt);
-        const g = byGame[s.game] || { id: s.game, meta, plays: 0, bestPct: null, lastPlayed: 0 };
+        const cats = categoriesOf(s);
+        const g = byGame[s.game] || {
+            id: s.game, meta, plays: 0, bestPct: null, lastPlayed: 0,
+            categoryTotals: {}, deeperLinkClicks: 0, sessions: [],
+        };
         g.plays += 1;
         if (pct != null) g.bestPct = g.bestPct == null ? pct : Math.max(g.bestPct, pct);
         if (playedAtMs > g.lastPlayed) g.lastPlayed = playedAtMs;
+        mergeCategories(g.categoryTotals, cats);
+        if (s.clickedDeeperLink === true) g.deeperLinkClicks += 1;
+        g.sessions.push({
+            id: s.id || null,
+            pct,
+            playedAt: playedAtMs,
+            categories: cats || null,
+            clickedDeeperLink: s.clickedDeeperLink === true,
+        });
         byGame[s.game] = g;
     }
-    return Object.values(byGame).sort((a, b) => b.lastPlayed - a.lastPlayed);
+    return Object.values(byGame)
+        .map((g) => {
+            const { strongest, weakest } = strongestAndWeakest(g.categoryTotals);
+            return {
+                ...g,
+                strongestCategory: strongest,
+                weakestCategory: weakest,
+                sessions: g.sessions.sort((a, b) => b.playedAt - a.playedAt),
+            };
+        })
+        .sort((a, b) => b.lastPlayed - a.lastPlayed);
 }
 
 /* Turns a stored choiceIndex back into the words the student saw. The text always comes from

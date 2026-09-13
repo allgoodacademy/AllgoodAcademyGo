@@ -750,7 +750,7 @@
   <div class="deeper-card" id="deeperCard" style="display:none">
     <div class="deeper-label">WANT TO GO DEEPER?</div>
     <div class="deeper-msg" id="deeperMsg"></div>
-    <button class="deeper-btn" id="deeperBtn" onclick="window.AuthGate.guardedLeave(() => { window.location.href = deeperLink; })">Open the lab →</button>
+    <button class="deeper-btn" id="deeperBtn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href = deeperLink; })">Open the lab →</button>
   </div>
   <div class="end-actions">
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
@@ -1605,12 +1605,23 @@ function getSessionId() {
   return id;
 }
 
+let lastSessionRef = null;
+
+// Best-effort click-through tracking, fire-and-forget — same pattern across
+// all four games' telemetry.
+function markDeeperClicked() {
+  if (!lastSessionRef) return;
+  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
+    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
+    .catch(() => {});
+}
+
 async function recordSession(outcome) {
   try {
     const AuthCore = window.AuthCore;
     if (!AuthCore) return; // Firebase module failed to load — never block the game on telemetry.
 
-    const { getFirestore, collection, addDoc, serverTimestamp, Timestamp } =
+    const { getFirestore, collection, doc, setDoc, serverTimestamp, Timestamp } =
       await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
     // Firestore rules require an authenticated request (anonymous auth counts) —
@@ -1637,7 +1648,10 @@ async function recordSession(outcome) {
     const playedAt = new Date();
     const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-    await addDoc(collection(AuthCore.db, 'game_sessions'), {
+    const sessionDocId = getSessionId() + '_' + Date.now();
+    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
+
+    await setDoc(lastSessionRef, {
       game: 'read-the-signal',
       sessionId: getSessionId(),
       recruitCode,
@@ -1676,6 +1690,7 @@ function startGame() {
   correctCount = 0;
   categoryStats = {};
   scenarioLog = [];
+  lastSessionRef = null;
 
   document.getElementById('intro').style.display = 'none';
   document.getElementById('end').style.display = 'none';
