@@ -25,6 +25,18 @@
   .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
   .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
 
+  /* Mobile hardening for the shared #ag-modal (identity-gate.js), scoped to this page only.
+     Reported symptom: on mobile the screen "freezes" — nothing visible, but every
+     subsequent tap is swallowed. That's the signature of an invisible full-screen
+     pointer-events:auto layer, not an actual hang. Two likely causes:
+     1) backdrop-filter/blur over this page's busy space-image background is a known
+        source of invisible/broken compositing on mobile Safari & some Android WebViews.
+     2) The inner card could in principle render taller than a phone's real visible
+        area (address-bar chrome eats into 100vh-based layouts) with no way to scroll
+        to the rest of it. */
+  #ag-modal { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  #ag-modal > div { max-height: 90dvh; max-height: 90vh; overflow-y: auto; }
+
   :root {
     --teal: #357889;
     --orange: #D34716;
