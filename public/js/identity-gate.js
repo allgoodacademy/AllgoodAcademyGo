@@ -243,7 +243,8 @@ const TEMPLATE = `
                 Create an account (13+)
             </button>
             <p class="text-[11px] text-gray-400 mb-3 font-body">Adds a real sign-in on top of this code &mdash; not required to keep your progress.</p>
-            <button id="ag-btn-save-decline" class="w-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-allgood-dark font-bold py-2.5 rounded text-xs uppercase font-body transition-colors">Not now</button>
+            <button id="ag-btn-save-decline" class="w-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-allgood-dark font-bold py-2.5 rounded text-xs uppercase font-body transition-colors mb-3">Not now</button>
+            <button id="ag-link-save-returning" class="text-xs text-allgood-primary hover:text-allgood-hover font-bold underline decoration-dotted font-body">Already have an account or code? Sign in</button>
         </div>
 
         <!-- REDEEM: entering an existing Recruit Code, either from the root link or a
@@ -605,6 +606,17 @@ function openGate(onResolved, options) {
     document.getElementById('ag-btn-save-decline').onclick = () => {
         playSfx('click');
         resolveAndClose(true);
+    };
+
+    // A guest finishing a run in a fresh session (new browser, incognito, cleared
+    // storage) may already have a real account or an earlier code — the save offer
+    // must not just hand them ANOTHER one with no way back to their own. Routes into
+    // the same returning-panel Google / passphrase / email options every other entry
+    // point already uses; each of those already resolves and closes the gate itself.
+    document.getElementById('ag-link-save-returning').onclick = () => {
+        playSfx('click');
+        hideError(returningError);
+        showPanel('ag-returning');
     };
 
     document.getElementById('ag-btn-copy-code').onclick = () => {
