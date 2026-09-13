@@ -430,7 +430,7 @@
                                         <div class="w-full max-w-md mx-auto mt-8 bg-allgood-dark p-6 rounded-lg shadow-xl border-t-4 border-allgood-primary text-center">
                                             <h3 class="font-heading font-bold text-white text-lg mb-2">Your Next Pragmatic Action</h3>
                                             <p class="text-sm text-gray-300 mb-6">Your brand is secure. Now, keep building — explore the rest of the Lab Pack.</p>
-                                            <button onclick="window.location.href = '/jsh/digital-decisions-lab/'" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
+                                            <button onclick="window.AuthGate.guardedLeave(() => { window.location.href = '/jsh/digital-decisions-lab/'; })" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
                                                 <i data-lucide="play-circle" class="w-5 h-5 mr-2"></i> Explore the Lab Pack
                                             </button>
                                             <button onclick="window.performHardReset()" class="w-full bg-transparent text-gray-400 font-bold py-2 mt-3 hover:text-white transition-colors text-xs uppercase tracking-wider">
@@ -1953,6 +1953,7 @@
                 // finished — there is nothing to congratulate a half-done Challenge on, and
                 // nothing worth asking them to keep. The rating is optional here too and this
                 // does not depend on it. Declining hides nothing.
+                if (isComplete) window._agCompletionReached = true;
                 if (isComplete && !window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
                     window._agSaveOffered = true;
                     setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
@@ -2107,9 +2108,7 @@
                 sfx.powerOff();
             };
 
-            window.handleSystemExit = () => {
-                window.location.href = '/dashboard/';
-            };
+            window.handleSystemExit = () => window.AuthGate.guardedLeave(() => { window.location.href = '/dashboard/'; });
 
             document.getElementById('current-year').textContent = new Date().getFullYear();
 

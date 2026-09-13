@@ -1769,6 +1769,7 @@
             if (window.AuthCore && window.AuthCore.saveModuleProgress) {
                 window.AuthCore.saveModuleProgress('the-cost-of-later', { rated: _agRated });
             }
+            window._agCompletionReached = true;
             if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
                 window._agSaveOffered = true;
                 setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
@@ -1786,11 +1787,11 @@
             setTimeout(() => { window.revealCompletion(); }, 400);
         };
 
-        window.launchRoomToThinkChallenge = () => { window.location.href = '/educational-games/room-to-think/'; };
-        window.returnToLabPack = () => { window.location.href = '/jsh/room-to-think-lab/'; };
+        window.launchRoomToThinkChallenge = () => window.AuthGate.guardedLeave(() => { window.location.href = '/educational-games/room-to-think/'; });
+        window.returnToLabPack = () => window.AuthGate.guardedLeave(() => { window.location.href = '/jsh/room-to-think-lab/'; });
         // Relative on purpose: an absolute production URL would throw a student off a
         // preview channel and onto the live site.
-        window.handleSystemExit = () => { window.location.href = '/dashboard/'; };
+        window.handleSystemExit = () => window.AuthGate.guardedLeave(() => { window.location.href = '/dashboard/'; });
         window.closeSystemMenu = () => {
             document.getElementById('system-menu-modal').classList.add('hidden-modal');
             document.getElementById('system-menu-modal').classList.remove('visible-modal');

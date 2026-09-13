@@ -1740,6 +1740,7 @@
             if (window.AuthCore && window.AuthCore.saveModuleProgress) {
                 window.AuthCore.saveModuleProgress('privacy-security', { rated: _agRated });
             }
+            window._agCompletionReached = true;
             if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
                 window._agSaveOffered = true;
                 setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
@@ -1760,19 +1761,15 @@
             setTimeout(() => { window.revealCompletion(); }, 400);
         };
 
-        window.launchDigitalDecisionsChallenge = async () => {
-            window.location.href = '/educational-games/digital-decisions/';
-        };
+        window.launchDigitalDecisionsChallenge = () => window.AuthGate.guardedLeave(() => { window.location.href = '/educational-games/digital-decisions/'; });
 
         // Primary destination: back to the JSH Lab Pack hub, NOT straight into DDC.
-        window.returnToLabPack = () => {
-            window.location.href = '/jsh/digital-decisions-lab/';
-        };
+        window.returnToLabPack = () => window.AuthGate.guardedLeave(() => { window.location.href = '/jsh/digital-decisions-lab/'; });
 
         // The dashboard moved to /dashboard/ when the marketing site took the site root.
         // Relative on purpose: an absolute production URL would throw a student off a
         // preview channel and onto the live site.
-        window.handleSystemExit = () => { window.location.href = '/dashboard/'; };
+        window.handleSystemExit = () => window.AuthGate.guardedLeave(() => { window.location.href = '/dashboard/'; });
         window.closeSystemMenu = () => {
             document.getElementById('system-menu-modal').classList.add('hidden-modal');
             document.getElementById('system-menu-modal').classList.remove('visible-modal');

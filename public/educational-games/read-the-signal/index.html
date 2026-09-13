@@ -656,13 +656,13 @@
               <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
             </button>
             <div class="home-popover" id="home-popover">
-              <button onclick="window.location.href='/'">Return to dashboard</button>
-              <button onclick="handleRestartFromPopover()">Restart game</button>
-              <button onclick="window.location.href='/educational-games/'">Browse games</button>
+              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/'; })">Return to dashboard</button>
+              <button onclick="window.AuthGate.guardedLeave(handleRestartFromPopover)">Restart game</button>
+              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse games</button>
               <button onclick="window.location.href='/dashboard/?signin=1'">Already have an account? Sign in</button>
             </div>
           </div>
-          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.location.href='/educational-games/'">
+          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">
             <i data-lucide="gamepad-2" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
           </button>
         </div>
@@ -736,8 +736,8 @@
     <div class="jodi-moment-text" id="jodiMoment"></div>
   </div>
   <div class="end-actions">
-    <button class="play-again-btn" onclick="restartGame()">Play again</button>
-    <button class="lab-btn" onclick="window.location.href='/jsh/digital-decisions-lab/'">Try the full Digital Decisions Lab →</button>
+    <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
+    <button class="lab-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/jsh/digital-decisions-lab/'; })">Try the full Digital Decisions Lab →</button>
   </div>
   <div class="wordmark">Allgood Academy · Free for all learners, always.</div>
 </div>
@@ -1632,6 +1632,7 @@ function startGame() {
   // chance to offer a save. offerSave() itself still no-ops quietly once a session
   // is actually saved/identified, so this never re-nags someone who already said yes.
   window._agSaveOffered = false;
+  window._agCompletionReached = false;
   round = buildSession(scenarios);
   currentIndex = 0;
   score = 0;
@@ -1752,6 +1753,12 @@ function showEnd(outcome) {
   document.getElementById('jodiMoment').textContent = '"' + jodi + '"';
 
   recordSession(outcome);
+
+  // Lets any exit button (Home, Browse games, Play again, the Lab Pack link) trigger
+  // the save offer immediately if the timer below hasn't fired yet — see
+  // window.AuthGate.guardedLeave() in identity-gate.js. Set unconditionally, on every
+  // outcome, regardless of whether the auto-offer immediately below also fires.
+  window._agCompletionReached = true;
 
   // Same shape as the GoodBlocks' end-of-module offer: hangs off the completion
   // screen being on screen, once per page load, regardless of win/loss outcome —

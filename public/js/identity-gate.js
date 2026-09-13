@@ -766,11 +766,41 @@ function removeSaveAffordance() {
     if (el) el.remove();
 }
 
+// Every completion screen (GoodBlock badge reveal, Challenge end screen, a game's own
+// end screen) auto-offers a save a beat after it appears, timed to let the reveal
+// animation settle first. That auto-offer is a courtesy, not the actual guarantee — a
+// student who taps Home, Next Lab, Retake, or any other button that leaves the screen
+// BEFORE that timer fires abandons the pending offer along with the page, and it never
+// happens. Wrap every such button's click handler in this instead of calling the
+// navigation directly: it forces the save offer to happen first (skipped instantly if
+// it already has, or if offerSave() itself decides nothing needs offering), and only
+// then runs the actual navigation — so leaving the screen can no longer race the timer.
+// Uses the same window._agSaveOffered flag every completion screen already sets, so it
+// coexists with the existing auto-offer instead of double-prompting.
+// window._agCompletionReached is set by the page itself (revealCompletion(), a
+// Challenge's own end-screen render, a game's showEnd()) the moment there's actually
+// something worth saving — NOT by this function. That's what makes guardedLeave() safe
+// to wrap around shared, page-wide navigation (the Home icon, Restart) rather than only
+// buttons physically inside the completion screen: pressing Home mid-lesson, before
+// anything is reached, passes straight through with no offer and no delay.
+async function guardedLeave(navigate) {
+    if (window._agCompletionReached && !window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+        window._agSaveOffered = true;
+        try {
+            await window.AuthGate.offerSave();
+        } catch (e) {
+            console.error('[AuthGate] guardedLeave: offerSave failed', e);
+        }
+    }
+    navigate();
+}
+
 window.AuthGate = {
     ensureIdentified,
     signIn,
     startGuestSession,
     offerSave,
+    guardedLeave,
     mountSaveAffordance,
     removeSaveAffordance,
 };
