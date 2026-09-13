@@ -19,7 +19,7 @@ import {
     EmailAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-    getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp,
+    getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, deleteField,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -597,19 +597,24 @@ async function redeemRecruitCode(rawCode) {
     return { ok: true, displayName, avatar };
 }
 
-// Called the moment a student joins a Task Force, so membership reaches the code document
-// even if they never open another module afterwards — mirrorRecruitProgress() below would
-// otherwise not carry it across until their next lesson. A no-op for anyone without a
-// Recruit Code (13+ accounts keep their classroom on the profile their real sign-in
-// returns to).
+// Called the moment a student joins OR leaves a Task Force, so membership reaches the code
+// document even if they never open another module afterwards — mirrorRecruitProgress() below
+// would otherwise not carry it across until their next lesson. A no-op for anyone without a
+// Recruit Code (13+ accounts keep their classroom on the profile their real sign-in returns
+// to). classroomCode === null means "leaving" and clears the field on the code document;
+// omitting the argument entirely (undefined) is the original no-op guard, so no existing
+// caller's behavior changes.
 async function mirrorRecruitClassroom(classroomCode) {
     const user = auth.currentUser;
-    if (!user || !classroomCode) return;
+    if (!user || classroomCode === undefined) return;
     try {
         const snap = await getDoc(userRef(user.uid));
         const code = snap.exists() ? snap.data().recruitCode : null;
         if (!code) return;
-        await setDoc(recruitCodeRef(code), { classroomCode, updatedAt: serverTimestamp() }, { merge: true });
+        const payload = classroomCode === null
+            ? { classroomCode: deleteField(), updatedAt: serverTimestamp() }
+            : { classroomCode, updatedAt: serverTimestamp() };
+        await setDoc(recruitCodeRef(code), payload, { merge: true });
     } catch (e) {
         console.error('[AuthCore] mirrorRecruitClassroom failed', e);
     }

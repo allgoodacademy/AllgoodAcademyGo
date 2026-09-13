@@ -87,7 +87,7 @@
          so there is exactly one initializeApp() call on the page) -->
     <script type="module">
         import { onAuthStateChanged, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit, deleteField } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const appId = window.AuthCore.appId;
         const auth = window.AuthCore.auth;
@@ -1369,8 +1369,33 @@
                 if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(code);
                 if (statusEl) { statusEl.textContent = "Joined! Your Task Force Leader can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
                 if (window.sfx) window.sfx.confirm();
+                window.loadProfilePageData();
             } catch (e) {
                 console.error("Failed to join classroom:", e);
+                if (statusEl) { statusEl.textContent = "Something went wrong — please try again."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+            }
+        };
+
+        // A student is in at most one Task Force at a time (classroomCode is a single field,
+        // not a list) — leaving is how you switch: drop the current one, then the join box
+        // reappears (loadProfilePageData shows it whenever classroomCode is absent) to join
+        // a different one. Confirmed first since it stops a Task Force Leader from seeing
+        // this student's progress going forward.
+        window.leaveClassroom = async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            if (!confirm("Leave this Task Force? Your Task Force Leader will no longer see your progress. You can join another (or the same one) any time with its code.")) return;
+
+            const statusEl = document.getElementById('profile-joined-status');
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: deleteField() }, { merge: true });
+                // Mirrors the clear onto the Recruit Code doc too, same reason joining does —
+                // so a device switch doesn't silently restore the classroom just left.
+                if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(null);
+                if (window.sfx) window.sfx.click();
+                window.loadProfilePageData();
+            } catch (e) {
+                console.error("Failed to leave classroom:", e);
                 if (statusEl) { statusEl.textContent = "Something went wrong — please try again."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
             }
         };
@@ -3484,7 +3509,11 @@
                         <div class="mt-3 w-full hidden" id="profile-joined-box">
                             <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
                                 <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1 flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Your Task Force</p>
-                                <p class="text-sm font-bold text-allgood-secondary font-mono" id="profile-joined-code">------</p>
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-sm font-bold text-allgood-secondary font-mono" id="profile-joined-code">------</p>
+                                    <button onclick="window.leaveClassroom()" class="text-[9px] font-bold uppercase text-gray-400 hover:text-red-500 shrink-0">Leave</button>
+                                </div>
+                                <p id="profile-joined-status" class="text-[10px] text-gray-400 mt-1"></p>
                             </div>
                         </div>
                     </div>
