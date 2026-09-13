@@ -296,6 +296,11 @@ service cloud.firestore {
                  'scenariosPlayed', 'correct', 'choices', 'misinfoForwarded',
                  'truthStopped', 'verifyUsed', 'scenarios'
                ]))
+          || (request.resource.data.game == 'money-moves'
+            && request.resource.data.keys().hasOnly([
+                 'game', 'sessionId', 'recruitCode', 'studentId', 'playedAt', 'ttl',
+                 'scenariosPlayed', 'correct', 'categories'
+               ]))
         );
       allow read, update, delete: if isAllowlistedAdmin();
     }

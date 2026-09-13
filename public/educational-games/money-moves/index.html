@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money Moves — Allgood Academy</title>
+<link rel="stylesheet" href="/assets/css/tailwind.min.css">
+<script src="/assets/js/lucide.min.js"></script>
+<!-- Shared identity module — see /js/auth-core.js. -->
+<script type="module" src="/js/auth-core.js"></script>
+<!-- Shared identity gate (age question / Sign In / Recruit Code) — see /js/identity-gate.js.
+     Loading this does NOT put a login wall on the game: the gate only ever opens when
+     something explicitly calls window.AuthGate.offerSave()/ensureIdentified(), same as
+     every GoodBlock and the other three games. Here that's the end-screen save offer. -->
+<script type="module" src="/js/identity-gate.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Required by /js/identity-gate.js's injected #ag-modal — copied verbatim from the
+     other three games. */
+  .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+  .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+  .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+  /* Mobile hardening for #ag-modal — same fix as the other three games (a backdrop-filter
+     over a busy background is a known cause of an invisible, fully-blocking overlay on
+     mobile Safari/Android WebViews). */
+  #ag-modal { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  #ag-modal > div { max-height: 90dvh; max-height: 90vh; overflow-y: auto; }
+
+  :root {
+    --teal: #357889;
+    --orange: #D34716;
+    --cream: #FBF6EE;
+    --dark: #0F1923;
+    --dark-card: #1C2E3A;
+    --muted: #7A909F;
+    --warm-white: #F8F4EE;
+    --smart: #2E7D52;
+    --smart-bg: #E8F5EE;
+    --costly: #C0392B;
+    --costly-bg: #FDEAEA;
+  }
+
+  /* =============================================
+     DASHBOARD CHASSIS — copied verbatim from before-you-send/index.html, which itself
+     is copied verbatim from public/dashboard/index.html. Do not hand-tune these values
+     here — change the dashboard, then re-copy to all four games.
+     ============================================= */
+  body {
+    font-family: Verdana, sans-serif;
+    background-color: #0f172a;
+    min-height: 100vh;
+    min-height: 100dvh;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #bg-video-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: -50;
+    overflow: hidden;
+  }
+
+  #bg-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 1.0;
+  }
+
+  .tablet-frame {
+    height: 88vh;
+    width: auto;
+    aspect-ratio: 16/10;
+    max-width: min(1700px, 94vw);
+    max-height: 96vh;
+    min-height: 0;
+    min-width: 0;
+    background-image:
+        radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+        radial-gradient(circle at 100% 100%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+        linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow:
+        inset 1px 1px 2px rgba(255,255,255, 0.6),
+        inset -1px -1px 2px rgba(0,0,0, 0.8),
+        0 30px 60px -12px rgba(0, 0, 0, 0.8),
+        0 0 0 1px #111;
+    border: 1px solid #333;
+    position: relative;
+    margin: 20px auto;
+    transition: width 0.3s, height 0.3s, padding 0.3s;
+  }
+
+  .tablet-frame::before {
+    content: ''; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border-radius: 6px; background: #111; z-index: 0;
+  }
+
+  .screen-container {
+    width: 100%; height: 100%;
+    background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    position: relative; z-index: 1; overflow: hidden;
+    display: flex; flex-direction: column;
+    border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+  }
+
+  .navbar-content { flex: 0 0 60px; z-index: 30; background: rgba(15, 25, 35, 0.92); backdrop-filter: blur(5px); border-bottom: 1px solid rgba(255,255,255,0.1); color: white; position: relative; }
+
+  @media (max-width: 640px) {
+    body {
+        padding: 0;
+        align-items: flex-start;
+        background-image: none;
+        background-color: #f8fafc;
+    }
+    .tablet-frame {
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background-image: none !important;
+        aspect-ratio: auto !important;
+    }
+    .tablet-frame::before { display: none; }
+    .screen-container {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    main { padding: 0 !important; }
+  }
+
+  /* Home popover — copied verbatim from the other three games */
+  .home-popover-wrap { position: relative; }
+  .home-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    padding: 6px;
+    min-width: 190px;
+    z-index: 50;
+  }
+  .home-popover.show { display: block; }
+  .home-popover button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: Verdana, sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0F1923;
+    cursor: pointer;
+  }
+  .home-popover button:hover { background: #f0f0f0; }
+
+  /* --- Game screen: content area inside the chassis --- */
+  .mm-page {
+    flex: 1 1 auto;
+    position: relative;
+    overflow-y: auto;
+    background: var(--dark);
+    color: var(--cream);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 28px 24px;
+  }
+
+  /* ── INTRO ── */
+  #intro { text-align: center; max-width: 440px; margin: auto 0; }
+  #intro h1 { font-family: Georgia, serif; font-size: clamp(2rem,6vw,2.8rem); font-weight: 700; color: var(--cream); line-height: 1.1; margin-bottom: 12px; }
+  #intro h1 em { color: var(--orange); font-style: normal; }
+  #intro p { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 28px; }
+  .start-btn {
+    background: var(--orange); color: white; border: none;
+    padding: 14px 40px; border-radius: 50px;
+    font-family: Verdana, sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+  }
+  .start-btn:hover { opacity: 0.9; transform: scale(1.02); }
+  .wordmark { font-family: Georgia, serif; font-size: 0.8rem; color: rgba(255,255,255,0.2); margin-top: 16px; letter-spacing: 0.04em; }
+
+  /* ── GAME (no timer — this game is deliberate, not fast) ── */
+  #game { display: none; width: 100%; max-width: 540px; margin: auto 0; flex-direction: column; align-items: center; }
+  .hud { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .hud-score { font-size: 13px; color: var(--muted); font-weight: 700; }
+  .hud-score span { color: var(--cream); font-size: 18px; }
+  .hud-progress { display: flex; gap: 5px; }
+  .hud-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: background 0.3s; }
+  .hud-dot.done { background: var(--teal); }
+  .hud-dot.current { background: var(--orange); }
+
+  .scenario-card { background: var(--warm-white); border-radius: 18px; width: 100%; overflow: hidden; margin-bottom: 16px; animation: cardIn 0.3s ease; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .card-header { padding: 14px 18px; border-bottom: 1px solid rgba(0,0,0,0.06); display: flex; align-items: center; gap: 10px; }
+  .card-avatar { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .card-meta { flex: 1; min-width: 0; }
+  .card-who { font-size: 12px; font-weight: 700; color: #0F1923; }
+  .card-context { font-size: 10px; color: #8a9fac; }
+  .card-category { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.04em; white-space: nowrap; }
+  .card-body { padding: 18px; }
+  .card-situation { font-size: 14px; color: #0F1923; line-height: 1.6; margin-bottom: 12px; font-family: Georgia, serif; }
+  .card-detail { font-size: 11px; color: #555; padding: 10px 12px; background: #f0ece6; border-radius: 8px; line-height: 1.55; }
+
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 10px; }
+  .choice-btn { padding: 16px 12px; border: none; border-radius: 14px; font-family: Verdana, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.1s; display: flex; flex-direction: column; align-items: center; gap: 7px; letter-spacing: 0.01em; }
+  .choice-btn:hover { transform: scale(1.03); }
+  .choice-btn .icon { font-size: 22px; }
+  .btn-smart { background: var(--smart-bg); color: var(--smart); }
+  .btn-costly { background: var(--costly-bg); color: var(--costly); }
+  .hint { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+
+  /* ── CONSEQUENCE ── */
+  #consequence { display: none; width: 100%; max-width: 540px; margin: auto 0; flex-direction: column; align-items: center; }
+  .consequence { width: 100%; animation: cardIn 0.4s ease; text-align: center; }
+  .consequence-icon { font-size: 44px; margin-bottom: 14px; display: block; }
+  .consequence-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .consequence-scene { background: rgba(255,255,255,0.05); border-radius: 14px; padding: 20px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.75; margin-bottom: 14px; text-align: left; font-family: Georgia, serif; }
+  .consequence-mechanism { font-size: 11px; color: var(--muted); line-height: 1.65; margin-bottom: 20px; padding: 14px 16px; background: rgba(255,255,255,0.04); border-radius: 12px; text-align: left; }
+  .next-btn { background: var(--teal); color: white; border: none; padding: 13px 32px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; }
+
+  /* ── END ── */
+  #end { display: none; text-align: center; max-width: 440px; margin: auto 0; }
+  .end-score { font-family: Georgia, serif; font-size: clamp(3rem,12vw,5rem); font-weight: 700; color: var(--orange); line-height: 1; }
+  .end-label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; font-weight: 700; margin-bottom: 20px; }
+  .end-breakdown { width: 100%; background: rgba(255,255,255,0.04); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; text-align: left; }
+  .end-row { display: flex; justify-content: space-between; font-size: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .end-row:last-child { border: none; }
+  .end-row-label { color: var(--muted); }
+  .end-row-val { font-weight: 700; color: var(--cream); }
+  .jodi-moment { width: 100%; background: var(--teal); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; text-align: left; }
+  .jodi-moment-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; margin-bottom: 6px; }
+  .jodi-moment-text { font-family: Georgia, serif; font-size: 13px; color: white; line-height: 1.65; font-style: italic; }
+  .deeper-card { width: 100%; background: rgba(53,120,137,0.14); border: 1px solid rgba(53,120,137,0.35); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; text-align: left; }
+  .deeper-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.08em; margin-bottom: 8px; }
+  .deeper-msg { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.65; margin-bottom: 14px; }
+  .deeper-btn { background: var(--teal); color: white; border: none; padding: 12px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; width: 100%; }
+  .play-again-btn { background: var(--orange); color: white; border: none; padding: 14px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 8px; }
+  .hub-btn { background: transparent; color: var(--cream); border: 1px solid rgba(255,255,255,0.15); padding: 12px; border-radius: 50px; font-family: Verdana, sans-serif; font-size: 12px; cursor: pointer; width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- ORBITAL LINK: Static Feed Injection — same space background as the dashboard -->
+<div id="bg-video-container">
+  <img id="bg-image" src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Orbital View">
+</div>
+
+<main class="flex-grow flex items-center justify-center py-8">
+  <div class="tablet-frame">
+    <div class="screen-container" id="screen">
+
+      <header class="navbar-content flex items-center justify-between px-6 shadow-md relative z-30">
+        <div class="flex items-center overflow-hidden">
+          <div class="flex-shrink-0 text-white font-heading font-bold text-lg tracking-tight truncate select-none uppercase">
+            ALLGOOD ACADEMY <span class="opacity-60 text-sm font-normal">| Games</span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-1 shrink-0 relative">
+          <div class="home-popover-wrap">
+            <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home" onclick="toggleHomePopover(event)">
+              <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+            </button>
+            <div class="home-popover" id="home-popover">
+              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/'; })">Return to dashboard</button>
+              <button onclick="window.AuthGate.guardedLeave(handleRestartFromPopover)">Restart game</button>
+              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse games</button>
+              <button onclick="window.location.href='/dashboard/?signin=1'">Already have an account? Sign in</button>
+            </div>
+          </div>
+          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">
+            <i data-lucide="gamepad-2" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="mm-page">
+
+<!-- INTRO -->
+<div id="intro">
+  <div style="font-size:48px;margin-bottom:16px">💸</div>
+  <h1>Money <em>Moves.</em></h1>
+  <p>10 real money situations. One question each time:<br>Smart move or costly mistake?</p>
+  <button class="start-btn" onclick="startGame()">Start</button>
+  <div class="wordmark">Allgood Academy · Free for all learners</div>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div class="hud">
+    <div class="hud-score">Score <span id="scoreVal">0</span></div>
+    <div class="hud-progress" id="progressDots"></div>
+  </div>
+  <div class="scenario-card" id="scenarioCard"></div>
+  <div class="choices">
+    <button class="choice-btn btn-smart" onclick="choose('smart')">
+      <span class="icon">✅</span>Smart Move
+    </button>
+    <button class="choice-btn btn-costly" onclick="choose('costly')">
+      <span class="icon">💸</span>Costly Mistake
+    </button>
+  </div>
+  <div class="hint">Is this a smart move or a costly mistake?</div>
+</div>
+
+<!-- CONSEQUENCE -->
+<div id="consequence"></div>
+
+<!-- END -->
+<div id="end"></div>
+
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// answer: 'smart' | 'costly' — the choice the scenario is built to reward.
+// category: one of the 9 Money as a Skill categories — used for the Firestore
+// telemetry categories map and the end-screen adaptive routing (Ticket 4).
+const scenarios = [
+  { id:"you-you-just-got-your-first-paycheck", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"First Paycheck",
+    situation:`You just got your first paycheck — $240 from your part-time job. Your friends are going to Six Flags this weekend. Tickets are $85. You have $0 in savings.`, detail:`You've been wanting to go all summer. Everyone's going.`,
+    answer:"costly",
+    smart:{ scene:`You tell your friends you'll catch the next one. You put $100 in savings, keep $140 for the month. Three weeks later your car needs a $90 repair. You cover it without asking your parents.`, mechanism:`The first thing you do with money you earn defines a habit. Spending everything before you save means the next emergency finds you empty.` },
+    costly:{ scene:`You go. It's a great day. Two weeks later your phone screen cracks. Repair is $120. You have $4 left. You borrow from your mom and don't pay her back until March.`, mechanism:`Spending before saving isn't enjoying your money — it's borrowing against your future self. The fun was real. The debt was realer.` }
+  },
+  { id:"jordan-a-store-offers-jordan-a-credit", who:"Jordan", avatar:"J", avatarBg:"#f0eeff", category:"Predatory Offer",
+    situation:`A store offers Jordan a credit card: 0% interest for 12 months on a $400 gaming setup. After 12 months, interest jumps to 29.99% on any remaining balance.`, detail:`Jordan plans to pay it off 'eventually.' Monthly minimum is $15.`,
+    answer:"costly",
+    smart:{ scene:`Jordan passes. Saves $35/month for 12 months instead. Buys the setup outright. Owns it with no strings attached.`, mechanism:`0% interest is a timer, not a gift. If you don't pay the full balance before month 13, the interest rate applies retroactively to the original amount in many cases.` },
+    costly:{ scene:`Jordan pays the minimum. At month 13, $280 is still owed. The 29.99% rate kicks in. Jordan pays $84 in interest that year — on a purchase that was supposed to be free to finance.`, mechanism:`'0% interest' is one of the most misunderstood financial offers. Read the fine print before you sign anything.` }
+  },
+  { id:"you-your-cousin-made-800-last-month", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Investment Curiosity",
+    situation:`Your cousin made $800 last month on crypto. He says Bitcoin is about to 'go crazy again' and you should put your $300 savings in now.`, detail:`He made money last month. He lost $1,200 the month before that.`,
+    answer:"costly",
+    smart:{ scene:`You ask one more question: 'What happened the month before?' He gets quiet. You keep your $300. It's not exciting, but it's yours.`, mechanism:`Past gains from a single person are not a strategy. Crypto can rise 40% and fall 60% in the same month. Your $300 emergency fund is worth more than a lottery ticket.` },
+    costly:{ scene:`You invest $300. Bitcoin drops 45% in three weeks. Your $300 is now $165. Your cousin says 'just hold it, it'll come back.' You needed that money for your school trip deposit.`, mechanism:`Taking investment advice from someone who isn't accountable for your losses is a costly mistake — even when they mean well.` }
+  },
+  { id:"alex-the-friend-group-is-planning-a", who:"Alex", avatar:"A", avatarBg:"#E8F5EE", category:"Peer Pressure",
+    situation:`The friend group is planning a spring break trip. Cost: $350 each. Alex has $200 saved. Everyone's already committed. Alex doesn't want to be the only one left out.`, detail:`There's a payment plan available: $175 now, $175 in 60 days.`,
+    answer:"costly",
+    smart:{ scene:`Alex says 'I'm in for next time — I don't have the full amount yet.' Two friends admit they're also stretching. The trip happens. Alex has a good week at home and $200 still in savings.`, mechanism:`FOMO is expensive. The friends who went came back broke and stressed. Alex started summer with a head start.` },
+    costly:{ scene:`Alex takes the payment plan. Pays $175 now. 60 days later, the $175 is due. Alex's hours got cut at work. Asks parents. Gets a lecture. Pays late.`, mechanism:`A payment plan is still a commitment. If the money isn't there in 60 days, the plan becomes a debt.` }
+  },
+  { id:"you-your-job-offers-a-roth-ira", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Long-Term Thinking",
+    situation:`Your job offers a Roth IRA option. You're 17. You'd contribute $50/month. You don't really understand what a Roth IRA is.`, detail:`Your manager says 'you won't miss the $50, trust me.'`,
+    answer:"smart",
+    smart:{ scene:`You sign up. You don't really feel the $50. At 65, assuming average market returns, that $50/month started at 17 is worth over $340,000. You didn't get rich. You just started early.`, mechanism:`Compound interest rewards time more than amount. $50/month at 17 beats $500/month at 40. This is the one financial decision where starting late genuinely costs you.` },
+    costly:{ scene:`You pass. $50 feels too important right now. You spend it on nothing specific. At 40 you start contributing. Your balance at 65 is a fraction of what it would have been.`, mechanism:`Retirement feels irrelevant at 17. That's exactly why starting then matters so much. The cost of waiting isn't paid now — it's paid later.` }
+  },
+  { id:"morgan-morgan-gets-a-student-credit-card", who:"Morgan", avatar:"M", avatarBg:"#FCE4EC", category:"Credit Basics",
+    situation:`Morgan gets a student credit card with a $500 limit. Buys $480 in clothes. Makes the minimum payment of $15 next month.`, detail:`Interest rate: 24.99% APR. Morgan figures they'll 'pay it off eventually.'`,
+    answer:"costly",
+    smart:{ scene:`Morgan uses the card for one $40 purchase, pays it in full that month. Credit score starts building. No interest paid. The card works for Morgan.`, mechanism:`A credit card used correctly is a tool that builds your credit score for free. Used incorrectly, it's a 24.99% loan.` },
+    costly:{ scene:`A year later Morgan has paid $180 in minimums. Still owes $390. Has paid $90 in interest. The clothes are worth $0. The debt is still real.`, mechanism:`Minimum payments on high-interest debt are designed to keep you paying as long as possible. The credit card company profits every month you don't pay in full.` }
+  },
+  { id:"you-you-re-starting-a-job-hr-asks", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Financial Conversations",
+    situation:`You're starting a job. HR asks if you want to fill out a W-4. You have no idea what it is. You nod and take the form.`, detail:`You could ask HR to walk you through it — or guess and hope for the best.`,
+    answer:"smart",
+    smart:{ scene:`You say 'I haven't filled one of these out before — can you walk me through it?' HR spends four minutes explaining. You fill it out correctly and understand what it means. Next time someone asks you about a W-4, you actually know.`, mechanism:`Asking a question costs nothing. Every professional you'll ever work with has answered a basic question for a new employee. Nobody expects you to know everything on day one.` },
+    costly:{ scene:`You guess. You fill it out wrong. For months your paycheck is off. You don't know why. You're too embarrassed to ask. It takes your mom three phone calls to HR to sort it out.`, mechanism:`Pretending to understand something you don't is the most common and most costly financial habit. The embarrassment of asking lasts thirty seconds. The cost of not knowing can last much longer.` }
+  },
+  { id:"sam-sam-is-80-short-on-rent", who:"Sam", avatar:"S", avatarBg:"#FFF3E0", category:"Predatory Offer",
+    situation:`Sam is $80 short on rent this month. A payday loan app offers $80 now, repaid in two weeks with a $12 fee. Seems fine.`, detail:`$12 on $80 for two weeks = 390% APR.`,
+    answer:"costly",
+    smart:{ scene:`Sam texts a family member, explains the situation honestly, and borrows $80 with a plan to pay it back in two weeks. Awkward for 30 seconds. Costs nothing.`, mechanism:`Asking someone you trust for a short-term loan is uncomfortable. It's also free. A payday loan on the same amount costs 390% annually. The discomfort is worth it.` },
+    costly:{ scene:`Sam takes the loan. Pays back $92 two weeks later. Is now $12 short for something else. Takes another loan. This is how the cycle starts.`, mechanism:`Payday loans are designed for repeat use. The fee seems small. At 390% APR, it's one of the most expensive forms of borrowing that exists.` }
+  },
+  { id:"you-you-make-280-every-two-weeks", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Income vs. Expenses",
+    situation:`You make $280 every two weeks. Your subscriptions, phone plan, and spending add up to $260/pay period. You have $20 left over.`, detail:`You've been meaning to cancel two subscriptions you don't use but haven't gotten around to it.`,
+    answer:"costly",
+    smart:{ scene:`You cancel the unused subscriptions — $28/month back in your pocket. You now save $48/pay period. In six months that's $576. You didn't make more money. You just stopped spending it on nothing.`, mechanism:`Most people have $30-60/month in subscriptions they don't use. Auditing your expenses is the fastest way to find money you already have.` },
+    costly:{ scene:`You keep meaning to cancel. Six months pass. You've spent $168 on services you never used. One unexpected cost — a medical copay, a car issue — and you have nothing to cover it.`, mechanism:`'I'll get to it' is the most expensive habit in personal finance. Small recurring costs compound just like investments — in the wrong direction.` }
+  },
+  { id:"you-your-friends-talk-about-stocks-crypto", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Taking Ownership",
+    situation:`Your friends talk about stocks, crypto, and investing like they know what they're doing. You smile and nod. You have no idea what any of it means and feel too embarrassed to ask.`, detail:`One friend says 'you should really start investing' and looks at you.`,
+    answer:"costly",
+    smart:{ scene:`You say 'honestly I'm still learning this stuff — where did you start?' Your friend spends ten minutes explaining. You go home and spend an hour reading. Next week you sound like you know what you're talking about. Because you do.`, mechanism:`Financial literacy isn't something you either have or you don't. It's something you build by asking questions, reading, and practicing. Every expert started knowing nothing.` },
+    costly:{ scene:`You keep nodding. Five years later you're still nodding. Your friends have been investing since high school. The gap in your knowledge — and in your account — is real.`, mechanism:`Pretending to understand something financial costs you every year you don't actually learn it. The embarrassment of asking is temporary. The cost of not knowing is permanent.` }
+  },
+  { id:"you-you-got-paid-180-for-two", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"First Paycheck",
+    situation:`You got paid $180 for two weeks of work. Your mom suggests you open a savings account. You've been meaning to but keep forgetting.`, detail:`It takes 15 minutes at the bank. You've been putting it off for three months.`,
+    answer:"costly",
+    smart:{ scene:`You go Saturday morning. 15 minutes later you have a savings account. You transfer $40 in. It earns almost nothing in interest — but it exists. Six months later it has $280 in it.`, mechanism:`A savings account doesn't make you rich. It makes the money you save real instead of invisible. Money in your checking account gets spent. Money in savings doesn't.` },
+    costly:{ scene:`You forget again. The $180 sits in checking. By the end of the month it's $12. You genuinely don't know where it went.`, mechanism:`Without a savings account, saving is an intention. With one, it's a structure. Intentions lose to impulses every time.` }
+  },
+  { id:"priya-priya-s-friends-all-have-the-latest", who:"Priya", avatar:"P", avatarBg:"#6c5ce722", category:"Peer Pressure",
+    situation:`Priya's friends all have the latest phone. Hers works fine but it's two years old. A carrier offers an upgrade: $0 down, $35/month added to her bill for 24 months.`, detail:`$35 × 24 = $840 for a phone she doesn't need.`,
+    answer:"costly",
+    smart:{ scene:`Priya keeps her phone. Puts $35/month into savings instead. In 24 months she has $840 — enough to buy the next phone outright with cash.`, mechanism:`A phone upgrade that "costs nothing upfront" costs $840 over two years. The phone that works is always cheaper than the phone that's new.` },
+    costly:{ scene:`Priya upgrades. 8 months later she drops it. Screen repair: $180. She still has 16 months of payments left on a cracked phone.`, mechanism:`Monthly payment plans make expensive things feel affordable. They're not cheaper — they're just spread out.` }
+  },
+  { id:"you-you-get-your-first-pay-stub", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Taking Ownership",
+    situation:`You get your first pay stub. There are deductions you don't recognize — FICA, state tax, Medicare. You make $12/hour but your take-home is way less than you calculated.`, detail:`You could ask HR what each deduction is, or just accept it and move on.`,
+    answer:"smart",
+    smart:{ scene:`You ask HR. Spend ten minutes learning what each line means. You now understand why your take-home is lower than your hourly rate. You can budget accurately. You stop being surprised by your paycheck.`, mechanism:`Understanding your pay stub is one of the most practical financial skills you can have. Every job you ever have will have one. Most people never learn what's on it.` },
+    costly:{ scene:`You shrug and move on. For the next two years you budget based on your hourly rate, not your take-home. You're consistently short. You think you're bad at saving. You're actually just bad at math — because you're using the wrong number.`, mechanism:`You can't manage money you don't understand. Learning what's on your pay stub takes fifteen minutes and changes how you see every paycheck you'll ever receive.` }
+  },
+  { id:"marcus-marcus-is-19-and-has-no", who:"Marcus", avatar:"M", avatarBg:"#2e7d5222", category:"Credit Basics",
+    situation:`Marcus is 19 and has no credit history. He wants to rent an apartment next year. His friend says "credit doesn't matter until you need it."`, detail:`Building credit takes time. You can't do it overnight.`,
+    answer:"costly",
+    smart:{ scene:`Marcus opens a secured credit card with a $200 limit. Uses it for gas. Pays it in full every month. A year later he has a credit score. The apartment application goes smoothly.`, mechanism:`Credit history is built over time — you can't rush it. Starting at 19 means having real credit at 20. Starting at 22 means having no credit when you need it.` },
+    costly:{ scene:`Marcus waits. At 20 he applies for the apartment. No credit history. Landlord requires a cosigner or double deposit. His parents have to sign. He's embarrassed. The apartment is his but on someone else's credit.`, mechanism:`"I'll deal with credit when I need it" is a common mistake. When you need it is exactly when you don't have time to build it.` }
+  },
+  { id:"you-you-have-500-saved-a-classmate", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Investment Curiosity",
+    situation:`You have $500 saved. A classmate says his uncle made 300% returns day-trading stocks last year. He wants to teach you. You'd need to give him access to your account to get started.`, detail:`Giving someone else access to your financial account is never the first step.`,
+    answer:"costly",
+    smart:{ scene:`You pass immediately. You don't give anyone access to your accounts. Ever. You put the $500 in a high-yield savings account earning 4.5% APY instead.`, mechanism:`Anyone asking for access to your financial accounts — regardless of their story — is a red flag. Full stop. No legitimate investment opportunity starts that way.` },
+    costly:{ scene:`You give him access. $500 disappears within two weeks. He stops responding. You learn what a social engineering scam is the expensive way.`, mechanism:`Day-trading stories are almost always survivorship bias — you hear about the wins, not the losses. And handing someone your account credentials is never investing. It's just giving money away.` }
+  },
+  { id:"jamie-jamie-just-got-a-raise", who:"Jamie", avatar:"J", avatarBg:"#8e44ad22", category:"Income vs. Expenses",
+    situation:`Jamie just got a raise — from $10 to $12/hour. Instead of saving the extra $2/hour, Jamie immediately upgrades their lifestyle: better phone plan, more eating out, new clothes.`, detail:`This is called lifestyle creep. It's how people earn more and save the same.`,
+    answer:"costly",
+    smart:{ scene:`Jamie keeps expenses the same. The extra $2/hour — about $160/month — goes straight into savings. In six months that's nearly $1,000. Jamie has a real emergency fund for the first time.`, mechanism:`Every raise is an opportunity to save more or spend more. Most people automatically spend more. The ones who build wealth automatically save more first.` },
+    costly:{ scene:`Jamie's expenses grow to match the new income. Three months later Jamie has the same $40 in savings as before the raise. The extra money is gone and Jamie doesn't know where.`, mechanism:`Lifestyle creep is invisible while it's happening. You don't feel richer. You just feel like your new normal costs more.` }
+  },
+  { id:"you-an-app-on-your-phone-sends", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Predatory Offer",
+    situation:`An app on your phone sends a notification: "You qualify for $500 cash — deposited instantly. Repay in 30 days with a small fee." The "small fee" is $75.`, detail:`$75 on $500 for 30 days = 180% APR.`,
+    answer:"costly",
+    smart:{ scene:`You close the notification. You don't need $500 badly enough to pay 180% for it. If you did need emergency cash, you'd call a family member first.`, mechanism:`"Small fee" cash advance apps are one of the fastest-growing predatory financial products targeting young people. The fee always sounds small. The APR never is.` },
+    costly:{ scene:`You take it. You need the $500 for something real. 30 days later you owe $575. You're $75 short. You take another advance. This is the cycle.`, mechanism:`Cash advance apps are designed to be used repeatedly. The first loan creates the conditions for the second one.` }
+  },
+  { id:"destiny-destiny-is-16-and-gets-200", who:"Destiny", avatar:"D", avatarBg:"#00897b22", category:"Long-Term Thinking",
+    situation:`Destiny is 16 and gets $200 for her birthday. Her aunt suggests putting it in an index fund. Destiny has never heard of an index fund and finds the conversation boring.`, detail:`$200 invested at 16 with average market returns becomes roughly $3,200 by age 65.`,
+    answer:"smart",
+    smart:{ scene:`Destiny asks her aunt one question: "How do I do that?" Twenty minutes later her aunt has helped her open a custodial account. The $200 is invested. Destiny forgets about it for years. It grows.`, mechanism:`You don't need to understand investing deeply to start. You need to start. The gap between "I'll learn about this later" and "I started at 16" is worth tens of thousands of dollars.` },
+    costly:{ scene:`Destiny says "maybe later" and buys clothes. The $200 is gone in a week. She doesn't regret it much. She doesn't know yet what she lost.`, mechanism:`The cost of this decision isn't felt today. It's felt at 65. That's what makes it so easy to make the wrong call.` }
+  },
+  { id:"you-you-re-negotiating-your-first-real-job", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Financial Conversations",
+    situation:`You're negotiating your first real job offer. They offer $15/hour. You know from Glassdoor that similar roles pay $17-18. You're nervous to say anything.`, detail:null,
+    answer:"smart",
+    smart:{ scene:`You say "I was hoping we could discuss the rate — based on what I've seen for this role, I was thinking closer to $17." They counter at $16. You accept. That's $2,080 more per year than you would have made.`, mechanism:`The first job you negotiate sets the baseline for every raise after it. People who don't negotiate at the start earn less for years. The ask is uncomfortable for thirty seconds.` },
+    costly:{ scene:`You say "that sounds great, thank you." You start at $15. A year later you find out a coworker doing the same job started at $17. You're now negotiating from behind.`, mechanism:`Not negotiating is a decision. It just feels like not doing anything. The $2,080/year difference compounds across your entire career.` }
+  },
+  { id:"ryan-ryan-s-friends-are-all-going-to", who:"Ryan", avatar:"R", avatarBg:"#E6510022", category:"Peer Pressure",
+    situation:`Ryan's friends are all going to a concert. Tickets are $120. Ryan has $90 saved and $0 income right now. One friend says "just put it on your parents' card and pay them back."`, detail:`Ryan has no money coming in. There's no realistic payback plan.`,
+    answer:"costly",
+    smart:{ scene:`Ryan is honest: "I can't swing it right now — I'll catch the next one." Two friends who also couldn't afford it are relieved someone said it first. They find something free to do together.`, mechanism:`Being honest about what you can afford is a financial skill and a social one. It gets easier every time you do it.` },
+    costly:{ scene:`Ryan charges $120 to his mom's card with vague plans to pay it back. Six months later it's still not paid. His mom brings it up at dinner. Awkward for everyone.`, mechanism:`"I'll pay you back" is a promise that requires a plan. Without one, it's just a transfer of debt and discomfort.` }
+  },
+  { id:"you-you-re-about-to-sign-a-12-month", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Taking Ownership",
+    situation:`You're about to sign a 12-month lease for an apartment. You haven't read the lease. It's 18 pages. Your landlord says "it's pretty standard."`, detail:`The lease has a $500 early termination fee buried on page 14.`,
+    answer:"costly",
+    smart:{ scene:`You spend 40 minutes reading it. You find the early termination fee, the noise policy, and a clause about renewing automatically. You ask three questions. You sign knowing what you agreed to.`, mechanism:`"Pretty standard" doesn't mean "nothing unusual." Every document you sign is a contract. Contracts have consequences. Reading them is the minimum.` },
+    costly:{ scene:`You sign without reading. Eight months later you need to move. Early termination fee: $500. You didn't know it was there. It was on page 14.`, mechanism:`Financial literacy includes reading what you sign. The landlord isn't obligated to highlight the expensive parts.` }
+  },
+  { id:"aaliyah-aaliyah-makes-320-every-two-weeks", who:"Aaliyah", avatar:"A", avatarBg:"#6c5ce722", category:"First Paycheck",
+    situation:`Aaliyah makes $320 every two weeks. She wants to start saving but doesn't know how much. She's heard "pay yourself first" but doesn't know what that means.`, detail:`Most financial advisors suggest saving 20% of income. 20% of $320 is $64.`,
+    answer:"smart",
+    smart:{ scene:`Aaliyah sets up an automatic transfer of $64 to savings every payday before she touches the rest. She budgets with $256. The $64 disappears before she can spend it. In a year she has $1,664.`, mechanism:`"Pay yourself first" means saving before you spend — not with whatever's left over. Automating it removes the decision entirely.` },
+    costly:{ scene:`Aaliyah saves "whatever's left at the end of the month." Most months that's $0-20. She's not undisciplined — she just spent first and saved last. The math doesn't work that way.`, mechanism:`Saving what's left after spending is the least effective savings strategy. There's almost never anything left.` }
+  },
+  { id:"you-you-ve-been-hearing-about-index-funds", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Investment Curiosity",
+    situation:`You've been hearing about index funds. You have $150 to invest. You could put it all in one company's stock or spread it across an index fund that holds 500 companies.`, detail:`In any given year, most individual stocks underperform the index.`,
+    answer:"smart",
+    smart:{ scene:`You put $150 in a broad market index fund. You don't check it obsessively. Over time it grows at roughly the market rate. You add to it when you can. It becomes a habit.`, mechanism:`Index funds beat most individual stock pickers over the long term — including professional ones. Diversification isn't exciting. It's effective.` },
+    costly:{ scene:`You pick a company that seems exciting. It drops 60% in three months. You sell at a loss. You swear off investing. You've missed the point.`, mechanism:`Individual stock picking feels like control. It's mostly luck. Diversification across an index is the closest thing to a reliable strategy accessible to regular people.` }
+  },
+  { id:"devon-devon-s-car-needs-a-400-repair", who:"Devon", avatar:"D", avatarBg:"#2e7d5222", category:"Predatory Offer",
+    situation:`Devon's car needs a $400 repair. A shop offers "90 days same as cash" — meaning no interest for 90 days. After that, 26.99% APR applies retroactively to the full amount if not paid.`, detail:`Devon plans to pay it off "before the 90 days is up."`,
+    answer:"costly",
+    smart:{ scene:`Devon asks one question: "What happens if I don't pay it all off in 90 days?" Hears the answer. Decides to borrow $400 from their parents instead at zero interest. Pays parents back $50/month.`, mechanism:`"Same as cash" is only same as cash if you actually pay it within the window. With a real plan it's fine. Without one it's an expensive trap.` },
+    costly:{ scene:`Devon intends to pay it off. Life happens. Day 91 arrives with $200 still owed. 26.99% interest applies to the full $400 retroactively. The repair that cost $400 now costs significantly more.`, mechanism:`Deferred interest isn't no interest — it's delayed interest. The difference matters enormously.` }
+  },
+  { id:"you-you-need-a-car-for-work", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Income vs. Expenses",
+    situation:`You need a car for work. Option A: a used 2019 Honda for $8,500 cash (you'd need to save 6 more months). Option B: a new 2026 model for $350/month for 60 months.`, detail:`Option B total cost: $21,000. Option A total cost: $8,500.`,
+    answer:"smart",
+    smart:{ scene:`You wait six months, save the money, buy the Honda outright. No monthly payment. If you lose your job, you still own your car. It's yours.`, mechanism:`A $350/month car payment for five years costs $21,000 for a car worth far less by the end. Waiting six months and buying used saves $12,500.` },
+    costly:{ scene:`You take the new car. $350/month for 60 months. 18 months in you have an unexpected expense. The $350 still comes out. You can't miss it. You feel trapped.`, mechanism:`Car payments are one of the largest drains on young people's finances. A used car you own beats a new car you owe on almost every financial dimension.` }
+  },
+  { id:"keisha-keisha-s-employer-offers-health-insurance-i", who:"Keisha", avatar:"K", avatarBg:"#8e44ad22", category:"Taking Ownership",
+    situation:`Keisha's employer offers health insurance. It costs $45/month but she's young and healthy and has never needed a doctor. She opts out to save the money.`, detail:`One ER visit without insurance: $1,200-3,000 average.`,
+    answer:"costly",
+    smart:{ scene:`Keisha opts in. Pays $45/month. Goes 14 months without needing it. Month 15 she breaks her wrist at practice. ER visit, X-ray, cast: her cost with insurance is $380. Without insurance it would have been $2,800.`, mechanism:`Insurance is a bet that you hope to lose. You pay monthly hoping you never need it. When you do need it, you're very glad you have it.` },
+    costly:{ scene:`Keisha opts out. Saves $540 over a year. Month 13 she needs stitches. $800 ER bill. Her savings from opting out are gone plus $260 more.`, mechanism:`Young and healthy isn't the same as invincible. Health insurance isn't a luxury — it's financial protection against a bad day.` }
+  },
+  { id:"you-you-re-applying-to-college-fafsa-asks", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Financial Conversations",
+    situation:`You're applying to college. FAFSA asks detailed questions about your family's finances. You find it overwhelming and want to skip the parts you don't understand.`, detail:`Incomplete FAFSA = less financial aid.`,
+    answer:"smart",
+    smart:{ scene:`You sit down with your parent for two hours, gather the tax documents, and complete it fully. You get $3,400 in grants you didn't know you qualified for.`, mechanism:`FAFSA is one of the most valuable financial forms you'll ever fill out. Incomplete forms result in less aid. The time investment directly converts to money.` },
+    costly:{ scene:`You skip the confusing parts and submit incomplete. You qualify for less aid than you should. You take out $3,400 more in loans instead. With interest, that's closer to $4,200 over repayment.`, mechanism:`Avoiding financial paperwork is expensive. Every form you don't fill out correctly is money you leave on the table.` }
+  },
+  { id:"tyler-tyler-co-signs-a-car-loan-for", who:"Tyler", avatar:"T", avatarBg:"#00897b22", category:"Credit Basics",
+    situation:`Tyler co-signs a car loan for a friend who "just needs help getting approved." Tyler isn't making payments — the friend is. Tyler figures there's no real risk.`, detail:`If the friend misses payments, Tyler's credit takes the hit.`,
+    answer:"costly",
+    smart:{ scene:`Tyler says no. Explains he can't risk his credit for someone else's loan. The friend finds another way. The friendship survives because money never became part of it.`, mechanism:`Co-signing means you're equally responsible for the debt. There's no such thing as co-signing without risk.` },
+    costly:{ scene:`The friend misses three payments. Tyler's credit score drops 80 points. Tyler is applying for an apartment next month. The application is denied.`, mechanism:`"They'll make the payments" is not a financial plan. When someone can't get approved on their own, there's a reason.` }
+  },
+  { id:"you-you-re-choosing-between-two-summer-jobs", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Long-Term Thinking",
+    situation:`You're choosing between two summer jobs. Job A pays $14/hour with no benefits. Job B pays $12/hour but offers a 401k with a 50% employer match on contributions up to 6% of your salary.`, detail:`The match on Job B is essentially a 3% raise — free money.`,
+    answer:"smart",
+    smart:{ scene:`You take Job B. Contribute 6%. Your employer adds 3% on top. You earn $12/hour but your total compensation including the match is closer to $12.36/hour — and you're building retirement savings at 17.`, mechanism:`An employer match is the only guaranteed 50% return on investment that exists. Turning it down to earn $2 more per hour is usually the wrong math.` },
+    costly:{ scene:`You take Job A for the higher hourly rate. You earn more per paycheck. You don't think about the match you're not getting. At 40 you learn what compound interest means. You wish you'd known at 17.`, mechanism:`Benefits are part of compensation. $2/hour more today versus a 50% match on retirement contributions — the match usually wins over a career.` }
+  },
+  { id:"you-you-just-turned-18-you-could", who:"You", avatar:"👤", avatarBg:"#EEF6F9", category:"Taking Ownership",
+    situation:`You just turned 18. You could check your credit report for free at annualcreditreport.com. You've never done it. You don't think you have a credit history yet so it probably doesn't matter.`, detail:`Identity theft can create a credit history before you even know you have one.`,
+    answer:"smart",
+    smart:{ scene:`You check it. Turns out there's a collection account you didn't know about — someone used your information. You dispute it. It gets removed. Your credit starts clean.`, mechanism:`Checking your credit report is free, takes ten minutes, and can reveal problems you don't know exist. 18 is the right age to start. Most people wait until they need credit to discover a problem.` },
+    costly:{ scene:`You don't check. At 20 you apply for your first apartment. Your credit report has a two-year-old collection account from identity theft. Fixing it takes six months. You lose the apartment.`, mechanism:`Financial ownership means knowing what's in your name. You can't fix what you don't know about.` }
+  }
+];
+
+const jodiMoments = [
+  "Financial literacy isn't something adults have that you don't. It's something you build by asking questions they didn't think to ask at your age.",
+  "The money decisions you make at 16 don't feel important. They are. The habits you form now are the ones you'll have at 36.",
+  "Every costly mistake in this game has one thing in common: someone knew something the person with the money didn't. That's the gap financial literacy closes.",
+  "Taking ownership of your financial life isn't a one-time decision. It's every small call you make when nobody's watching.",
+  "The most expensive thing you can do with money is nothing — letting it sit in subscriptions you don't use, loans that compound, and opportunities you didn't know existed."
+];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Ticket 1: enforce ~50/50 smart/costly split per session (5 smart, 5 costly), same
+// filter-shuffle-slice pattern as buildSession() in Read the Signal.
+function buildMoneySession(pool) {
+  const smartBest = shuffle(pool.filter(s => s.answer === 'smart'));
+  const costlyBest = shuffle(pool.filter(s => s.answer === 'costly'));
+  const picked = [...smartBest.slice(0, 5), ...costlyBest.slice(0, 5)];
+  return shuffle(picked);
+}
+
+let session = [], currentIdx = 0, score = 0;
+let categoryStats = {};
+let scenarioLog = [];
+let deeperLink = '/jsh/real-world-ready-lab/money-as-a-skill/';
+
+function show(id) {
+  ['intro', 'game', 'consequence', 'end'].forEach(s => {
+    document.getElementById(s).style.display = 'none';
+  });
+  const target = document.getElementById(id);
+  target.style.display = 'flex';
+  target.style.flexDirection = 'column';
+  target.style.alignItems = 'center';
+}
+
+// --- Telemetry (Ticket 2): one game_sessions document per completed session, same
+// sessionStorage-UUID + 90-day-TTL pattern as the other three games.
+function getSessionId() {
+  let id = sessionStorage.getItem('mm_session_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem('mm_session_id', id);
+  }
+  return id;
+}
+
+async function recordSession() {
+  try {
+    const AuthCore = window.AuthCore;
+    if (!AuthCore) return;
+
+    const { collection, addDoc, serverTimestamp, Timestamp } =
+      await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+
+    let user = AuthCore.auth.currentUser;
+    if (!user) {
+      try { await AuthCore.silentSignIn(); } catch (e) { /* telemetry is best-effort */ }
+      user = AuthCore.auth.currentUser;
+    }
+
+    let recruitCode = null;
+    let studentId = null;
+    if (user && !user.isAnonymous) studentId = user.uid;
+    if (user) {
+      try {
+        const account = await AuthCore.getAccount(user.uid);
+        if (account && account.recruitCode) recruitCode = account.recruitCode;
+      } catch (e) { /* telemetry is best-effort */ }
+    }
+
+    const playedAt = new Date();
+    const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const correct = scenarioLog.filter(s => s.correct).length;
+
+    await addDoc(collection(AuthCore.db, 'game_sessions'), {
+      game: 'money-moves',
+      sessionId: getSessionId(),
+      recruitCode,
+      studentId,
+      playedAt: serverTimestamp(),
+      ttl: Timestamp.fromDate(ttl),
+      scenariosPlayed: scenarioLog.length,
+      correct,
+      categories: categoryStats
+    });
+  } catch (e) {
+    console.warn('Money Moves telemetry write failed', e);
+  }
+}
+
+function startGame() {
+  window._agSaveOffered = false;
+  window._agCompletionReached = false;
+  session = buildMoneySession(scenarios);
+  currentIdx = 0; score = 0;
+  categoryStats = {};
+  scenarioLog = [];
+  show('game');
+  renderDots();
+  renderScenario();
+}
+
+function renderDots() {
+  const el = document.getElementById('progressDots');
+  el.innerHTML = '';
+  for (let i = 0; i < session.length; i++) {
+    const d = document.createElement('div');
+    d.className = 'hud-dot' + (i < currentIdx ? ' done' : i === currentIdx ? ' current' : '');
+    el.appendChild(d);
+  }
+}
+
+function renderScenario() {
+  const s = session[currentIdx];
+  document.getElementById('scoreVal').textContent = score;
+  renderDots();
+  const card = document.getElementById('scenarioCard');
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="card-avatar" style="background:${s.avatarBg}">${s.avatar}</div>
+      <div class="card-meta">
+        <div class="card-who">${s.who}</div>
+        <div class="card-context">${s.category}</div>
+      </div>
+      <span class="card-category" style="background:${s.avatarBg};color:#0F1923">${s.category}</span>
+    </div>
+    <div class="card-body">
+      <div class="card-situation">${s.situation}</div>
+      ${s.detail ? `<div class="card-detail">${s.detail}</div>` : ''}
+    </div>
+  `;
+}
+
+function choose(pick) {
+  const s = session[currentIdx];
+  const correct = pick === s.answer;
+
+  if (!categoryStats[s.category]) categoryStats[s.category] = { played: 0, correct: 0 };
+  categoryStats[s.category].played++;
+  if (correct) { categoryStats[s.category].correct++; score += 10; }
+
+  scenarioLog.push({ id: s.id, category: s.category, correct });
+
+  const data = pick === 'smart' ? s.smart : s.costly;
+  showConsequence(data, correct, pick);
+}
+
+function showConsequence(data, correct, pick) {
+  show('consequence');
+  const el = document.getElementById('consequence');
+
+  let verdictIcon, verdictText, verdictColor;
+  if (correct && pick === 'smart') {
+    verdictIcon = '✅'; verdictText = 'Good read — that was the smart move.'; verdictColor = '#2E7D52';
+  } else if (correct && pick === 'costly') {
+    verdictIcon = '✅'; verdictText = 'Good read — you spotted the costly mistake.'; verdictColor = '#2E7D52';
+  } else if (!correct && pick === 'smart') {
+    verdictIcon = '❌'; verdictText = 'Not quite — that one cost more than it looked.'; verdictColor = '#C0392B';
+  } else {
+    verdictIcon = '❌'; verdictText = 'Not quite — that was actually the smart move.'; verdictColor = '#C0392B';
+  }
+
+  el.innerHTML = `
+    <div class="consequence">
+      <span class="consequence-icon">${verdictIcon}</span>
+      <div class="consequence-label" style="color:${verdictColor}">${verdictText}</div>
+      <div class="consequence-scene">${data.scene}</div>
+      <div class="consequence-mechanism">${data.mechanism}</div>
+      <button class="next-btn" onclick="nextScenario()">${currentIdx < session.length - 1 ? 'Next situation →' : 'See results'}</button>
+    </div>
+  `;
+}
+
+function nextScenario() {
+  currentIdx++;
+  if (currentIdx >= session.length) {
+    showEnd();
+  } else {
+    show('game');
+    renderScenario();
+  }
+}
+
+// Ticket 4: route to the GoodBlock matching this session's weakest category.
+const DEEPER_MESSAGES = {
+  'Predatory Offer': "Predatory offers caught you. The Money as a Skill lab breaks down exactly how 0% interest, payday loans, and payment plans actually work.",
+  'Investment Curiosity': "Investment decisions were your toughest calls. The Money as a Skill lab teaches you how to think about risk before anyone asks you to put money in.",
+  'Peer Pressure': "Peer pressure around money is real and expensive. The Money as a Skill lab covers making calls when everyone else is going a different direction.",
+  'Taking Ownership': "Taking ownership of your financial literacy is the first skill. The Money as a Skill lab is exactly where to start building it seriously."
+};
+const DEFAULT_DEEPER_MSG = "The Money as a Skill lab goes deeper on the decisions you just practiced — with Jodi walking you through the real cost of each call.";
+
+function showEnd() {
+  show('end');
+  const el = document.getElementById('end');
+  const jodi = jodiMoments[Math.floor(Math.random() * jodiMoments.length)];
+  const correctCount = scenarioLog.filter(s => s.correct).length;
+  const rating = score >= 80 ? 'Money-smart' : score >= 60 ? 'Getting there' : 'Time to learn';
+
+  const withAccuracy = Object.entries(categoryStats)
+    .filter(([, s]) => s.played - s.correct > 0)
+    .map(([cat, s]) => [cat, s.correct / s.played]);
+  const worst = withAccuracy.length ? withAccuracy.sort((a, b) => a[1] - b[1])[0] : null;
+  const deeperMsg = worst ? (DEEPER_MESSAGES[worst[0]] || DEFAULT_DEEPER_MSG) : DEFAULT_DEEPER_MSG;
+
+  el.innerHTML = `
+    <div class="end-score">${score}</div>
+    <div class="end-label">OUT OF 100</div>
+    <div class="end-breakdown">
+      <div class="end-row"><span class="end-row-label">Situations reviewed</span><span class="end-row-val">${session.length}</span></div>
+      <div class="end-row" style="margin-top:4px"><span class="end-row-label">Your read</span><span class="end-row-val">${rating}</span></div>
+    </div>
+    <div class="jodi-moment">
+      <div class="jodi-moment-label">HEY Y'ALL 💛 FROM JODI</div>
+      <div class="jodi-moment-text">"${jodi}"</div>
+    </div>
+    <div class="deeper-card">
+      <div class="deeper-label">WANT TO GO DEEPER?</div>
+      <div class="deeper-msg">${deeperMsg}</div>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='${deeperLink}'; })">Try the Money as a Skill Lab →</button>
+    </div>
+    <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
+    <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
+    <div class="wordmark" style="margin-top:16px">Allgood Academy · Free for all learners, always.</div>
+  `;
+
+  recordSession();
+
+  // Same shared save/claim offer as the other three games (window.AuthGate.offerSave()) —
+  // one save flow across the site instead of a bespoke one for each game.
+  window._agCompletionReached = true;
+  if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
+    window._agSaveOffered = true;
+    setTimeout(() => {
+      window.AuthGate.offerSave().catch((e) => console.error('[MoneyMoves] offerSave failed', e));
+    }, 1200);
+  }
+}
+
+function restartGame() { startGame(); }
+
+function toggleHomePopover(event) {
+  event.stopPropagation();
+  document.getElementById('home-popover').classList.toggle('show');
+}
+
+function closeHomePopover() {
+  document.getElementById('home-popover').classList.remove('show');
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.home-popover-wrap');
+  if (wrap && !wrap.contains(e.target)) closeHomePopover();
+});
+
+function handleRestartFromPopover() {
+  closeHomePopover();
+  if (document.getElementById('game').style.display === 'flex' ||
+      document.getElementById('consequence').style.display === 'flex' ||
+      document.getElementById('end').style.display === 'flex') {
+    restartGame();
+  } else {
+    startGame();
+  }
+}
+
+if (window.lucide) lucide.createIcons();
+document.addEventListener('DOMContentLoaded', () => { if (window.lucide) lucide.createIcons(); });
+</script>
+</body>
+</html>
