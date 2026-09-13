@@ -54,7 +54,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
 const guest = env.authenticatedContext('guest_1', { provider_id: 'anonymous' }).firestore();
 const teacher = env.authenticatedContext('teacher_1', { email: 't@school.org' }).firestore();
 const student = env.authenticatedContext('student_1').firestore();
-const admin = env.authenticatedContext('admin_1', { email: 'balgood93@gmail.com' }).firestore();
+const admin = env.authenticatedContext('admin_1', { email: 'balgood93@gmail.com', email_verified: true }).firestore();
 
 console.log('\nTHE EXPLOIT — an anonymous guest must not become a teacher');
 await it('guest CANNOT merge role:teacher + someone else\'s classroomCode onto its own profile', async () => {
@@ -247,6 +247,61 @@ await it('a signed-in non-admin CANNOT read the telemetry sources', async () => 
   await assertFails(getDocs(collection(guest, 'artifacts', APP, 'sessions')));
   await assertFails(getDocs(collection(guest, 'artifacts', APP, 'events')));
   await assertFails(getDocs(collectionGroup(guest, 'game_scores')));
+});
+
+// RECRUIT CODE ENTROPY (Ticket 1) — the code doc's `update` used to be open to any
+// signed-in user with no field constraint at all; it is now field-constrained to exactly
+// what auth-core.js's real write paths touch. Also exercises the new suffixed
+// (word-word-word-####) format alongside an old-format (word-word-word, no suffix) code
+// that must keep working — real codes already exist in production and won't be
+// regenerated.
+console.log('\nRECRUIT CODES — update is field-constrained, old and new code formats both work');
+const CODE = (db, code) => doc(db, 'artifacts', APP, 'recruit_codes', code);
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(CODE(db, 'arctic-fox-trot-4821'), { uid: 'recruit_new', displayName: 'Arctic Fox Trot 4821', avatar: 'owl', progress: {}, createdAt: 1, updatedAt: 1 });
+  await setDoc(CODE(db, 'sunny-bear-glide'), { uid: 'recruit_old', displayName: 'Sunny Bear Glide', avatar: 'bee', progress: {}, createdAt: 1, updatedAt: 1 });
+});
+const recruitNew = env.authenticatedContext('recruit_new').firestore();
+const recruitOld = env.authenticatedContext('recruit_old').firestore();
+const anyoneElse = env.authenticatedContext('some_other_uid').firestore();
+
+await it('a NEW-format (word-word-word-####) code accepts an allowed-field update (progress mirroring)', async () => {
+  await assertSucceeds(setDoc(CODE(recruitNew, 'arctic-fox-trot-4821'),
+    { progress: { 'social-intelligence': { highestUnlocked: 2 } }, updatedAt: 2 }, { merge: true }));
+});
+await it('an OLD-format (word-word-word, no suffix) code STILL accepts redemption-shaped update (backward compatibility)', async () => {
+  await assertSucceeds(setDoc(CODE(recruitOld, 'sunny-bear-glide'),
+    { uid: 'recruit_old', updatedAt: 3 }, { merge: true }));
+});
+await it('any signed-in user CAN update a code they do not own (knowing-the-code trust model, unchanged)', async () => {
+  await assertSucceeds(setDoc(CODE(anyoneElse, 'sunny-bear-glide'),
+    { classroomCode: 'KM7QPD', updatedAt: 4 }, { merge: true }));
+});
+await it('update is DENIED when it touches a field outside the allowed set', async () => {
+  await assertFails(setDoc(CODE(recruitNew, 'arctic-fox-trot-4821'),
+    { createdAt: 999 }, { merge: true }));
+});
+await it('update is DENIED when a disallowed field rides along with allowed ones', async () => {
+  await assertFails(setDoc(CODE(recruitNew, 'arctic-fox-trot-4821'),
+    { updatedAt: 5, notAllowed: 'nope' }, { merge: true }));
+});
+
+// DISPLAY NAME LENGTH (Ticket 2) — displayName on the profile doc is otherwise
+// unconstrained free text a student could put in front of their teacher in Mission
+// Control. 60 chars is well over the longest real value (a recruit-code-derived name).
+console.log('\nPROFILE displayName — length-capped, characters unrestricted');
+await it('a normal displayName write still succeeds', async () => {
+  await assertSucceeds(setDoc(U(guest, 'guest_1'), { displayName: 'Sunny Bear Glide' }, { merge: true }));
+});
+await it('a recruit-code-derived displayName (with the new numeric suffix) still succeeds', async () => {
+  await assertSucceeds(setDoc(U(guest, 'guest_1'), { displayName: 'Arctic Fox Trot 4821' }, { merge: true }));
+});
+await it('a displayName over 60 characters is DENIED', async () => {
+  await assertFails(setDoc(U(guest, 'guest_1'), { displayName: 'x'.repeat(61) }, { merge: true }));
+});
+await it('a displayName at exactly 60 characters succeeds', async () => {
+  await assertSucceeds(setDoc(U(guest, 'guest_1'), { displayName: 'x'.repeat(60) }, { merge: true }));
 });
 
 await env.cleanup();
