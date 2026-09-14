@@ -27,6 +27,12 @@ const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const problems = [];
 const fail = (msg) => problems.push(msg);
+// A warning is something a human must see on every run but which does not stop a build.
+// There is exactly one source of these today: a skill on the registry's `orphanedSkills`
+// list. It is deliberately loud rather than a log line — the whole point of the list is
+// that a known gap stays visible instead of being papered over with a fake destination.
+const warnings = [];
+const warn = (msg) => warnings.push(msg);
 
 // Lab Packs: which hub and which Challenge each pack's modules belong to, and which
 // Challenge category each lab's badge counts. Add a row here when a pack or lab ships.
@@ -64,10 +70,16 @@ const PACKS = {
 
 // --- the shared registry: everything below is checked against this
 let REGISTRY = [];
+let ORPHANED = [];
 try {
   const raw = JSON.parse(read('public/data/modules-registry.json'));
   REGISTRY = Array.isArray(raw.modules) ? raw.modules : [];
   if (!REGISTRY.length) fail('public/data/modules-registry.json: no `modules` array, or it is empty');
+  if (raw.orphanedSkills !== undefined && !Array.isArray(raw.orphanedSkills)) {
+    fail('public/data/modules-registry.json: `orphanedSkills` must be an array');
+  } else {
+    ORPHANED = Array.isArray(raw.orphanedSkills) ? raw.orphanedSkills : [];
+  }
 } catch (e) {
   fail(`public/data/modules-registry.json: not valid JSON — ${e.message}`);
 }
@@ -126,10 +138,48 @@ for (const m of REGISTRY) {
   if (m.type !== 'lab' || m.retired) continue;
   for (const t of m.skillTags || []) if (t.framework === 'internal') (labTagIndex[norm(t.code)] ||= []).push(m.id);
 }
+// The ONE exception is a skill on `orphanedSkills`: a gap we have decided to carry and
+// said so in the registry. That is a warning on every run, never a silent pass — see the
+// ORPHANED SKILLS note in the registry's own _comment block.
+const orphanIndex = {};
+for (const o of ORPHANED) {
+  if (!o || typeof o !== 'object') { fail('registry: an `orphanedSkills` entry is not an object'); continue; }
+  const code = norm(o.tag);
+  if (!code) { fail('registry: an `orphanedSkills` entry has no `tag`'); continue; }
+  if (orphanIndex[code]) fail(`registry: \`orphanedSkills\` lists "${o.tag}" twice`);
+  // An orphan entry is a debt record, so it must say when and why — the same standard the
+  // `evidence` rule holds a placement to. A bare tag would be an ignore file.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(o.since || ''))) fail(`registry: \`orphanedSkills\` entry "${o.tag}" needs a \`since\` date (YYYY-MM-DD)`);
+  if (!(o.reason && String(o.reason).trim().length > 30)) fail(`registry: \`orphanedSkills\` entry "${o.tag}" needs a \`reason\` saying what decision is pending`);
+  orphanIndex[code] = o;
+  // The list must not outlive the gap. Once a lab teaches the skill the entry is stale and
+  // would mask the next real break of the same tag, so removing it is a build requirement.
+  if (labTagIndex[code]) fail(`registry: \`orphanedSkills\` lists "${o.tag}" but ${labTagIndex[code].join(', ')} now carries that tag — remove the orphan entry, the gap is closed`);
+}
+const diagnosedCodes = new Set();
 for (const g of games) {
   for (const t of g.skillTags || []) {
     if (t.framework !== 'internal') continue;
-    if (!labTagIndex[norm(t.code)]) fail(`registry: game "${g.id}" routes by "${t.code}" but no lab carries that internal skill tag — skill-routing.js would silently fall back`);
+    const code = norm(t.code);
+    diagnosedCodes.add(code);
+    if (labTagIndex[code]) continue;
+    const orphan = orphanIndex[code];
+    if (!orphan) {
+      fail(`registry: game "${g.id}" routes by "${t.code}" but no lab carries that internal skill tag — skill-routing.js would silently fall back. If this gap is known and intentional, add "${norm(t.code)}" to \`orphanedSkills\` in the registry with a \`since\` date and a \`reason\`.`);
+      continue;
+    }
+    warn(`ORPHANED SKILL: game "${g.id}" diagnoses "${t.code}" and NO GoodBlock teaches it. `
+      + `Students weak in it fall through to ${g.id}'s own default destination. `
+      + `Orphaned since ${orphan.since}: ${String(orphan.reason).trim()}`);
+  }
+}
+// A tag listed as orphaned that no game diagnoses either is not a build break — a skill can
+// sit in the Dictionary before any game diagnoses it — but it is not the gap this list is
+// for, so say so rather than letting the entry sit unexamined.
+for (const o of ORPHANED) {
+  const code = norm(o && o.tag);
+  if (code && !labTagIndex[code] && !diagnosedCodes.has(code)) {
+    warn(`ORPHANED SKILL: "${o.tag}" is on \`orphanedSkills\` but no game diagnoses it and no GoodBlock teaches it — nothing routes by it at all. Check the entry is still the record you want.`);
   }
 }
 // Every category actually present in a game's scenario bank must be a declared skill tag —
@@ -366,9 +416,17 @@ try {
     + ((e.stderr && e.stderr.toString().trim()) ? `\n     (${e.stderr.toString().trim().split('\n')[0]})` : ''));
 }
 
+// Printed BEFORE the pass/fail verdict and to stderr, so a warning cannot scroll off behind
+// a green OK line or be swallowed by a CI step that only echoes the last line.
+if (warnings.length) {
+  const bar = '='.repeat(78);
+  console.error(`\n${bar}\ncheck-modules: ${warnings.length} WARNING(S) — build not failed, but read these\n${bar}`);
+  for (const w of warnings) console.error(` !  ${w}`);
+  console.error(`${bar}\n`);
+}
 if (problems.length) {
   console.error(`check-modules: ${problems.length} problem(s)\n - ` + problems.join('\n - '));
   process.exit(1);
 }
 const internalTags = new Set(Object.keys(labTagIndex));
-console.log(`check-modules: OK — ${REGISTRY.length} registry entries (${games.length} games, ${dashLabs.length} live labs across ${Object.keys(PACKS).length} packs, ${registry.filter(r => r.category === 'challenge').length} Challenges), ${internalTags.size} internal skill tags routable, ${courses.length} Insider courses and ${rows.length} doc rows all agree with the registry.`);
+console.log(`check-modules: ${warnings.length ? `OK with ${warnings.length} warning(s) above` : 'OK'} — ${REGISTRY.length} registry entries (${games.length} games, ${dashLabs.length} live labs across ${Object.keys(PACKS).length} packs, ${registry.filter(r => r.category === 'challenge').length} Challenges), ${internalTags.size} internal skill tags routable, ${courses.length} Insider courses and ${rows.length} doc rows all agree with the registry.`);

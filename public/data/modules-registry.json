@@ -37,6 +37,17 @@
     "              'draft' when this sprint proposed it and Curriculum & Learning Science has",
     "              not yet reviewed it.",
     "",
+    "ORPHANED SKILLS (top-level `orphanedSkills`, a sibling of `modules`)",
+    "  A game diagnosing a skill that no GoodBlock teaches is normally a BUILD FAILURE: the",
+    "  routing silently stops adapting and nobody finds out. That default stays. This list is",
+    "  the one narrow exception — a skill we KNOW has no teaching destination, said out loud",
+    "  here rather than hidden by inventing a fake destination to quiet the check.",
+    "  Being on this list downgrades the failure to a warning that check-modules.js prints on",
+    "  every run. It is a debt register, not an ignore file: an entry must carry `tag`,",
+    "  `since` and a `reason` saying what the pending decision is. Remove the entry the",
+    "  moment a GoodBlock teaches the skill — check-modules.js fails on a stale one, so this",
+    "  list cannot quietly outlive the gap it documents.",
+    "",
     "Presentation fields (gameNames, topic, blurb, durationMinutes, badgeThreshold, maxScore,",
     "hub) are a straight port of what the dashboard and hubs already rendered. Tailwind class",
     "names deliberately stay in the HTML templates that use them: the CSS build's content globs",
@@ -44,6 +55,13 @@
     "purged out of the bundle. Only data (icon name, hex colors, copy) lives here.",
     "",
     "isComplete() predicates stay in the dashboard — a JSON file cannot hold a function."
+  ],
+  "orphanedSkills": [
+    {
+      "tag": "vulnerability",
+      "since": "2026-09-14",
+      "reason": "Removed from Social Intelligence — the placement was a content-similarity guess (Case 5's \"warm private check-in\" read as emotional disclosure). Case 5's actual mechanic is audience choice: public counter-attack vs. private support. No GoodBlock currently teaches vulnerability, and Before You Send has 8 scenarios diagnosing it. Pending a Curriculum & Learning Science decision on whether to build content for it or fold it into an existing GoodBlock; not resolvable by re-tagging."
+    }
   ],
   "modules": [
     {
@@ -246,9 +264,21 @@
         },
         {
           "framework": "internal",
-          "code": "vulnerability",
+          "code": "audience-choice",
           "status": "draft",
-          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Social Intelligence Case 4 (The Script Lab: Observation + Impact + Clean Ask) and Case 5 (The Ally Protocol: a warm private check-in), CASEL Relationship Skills. NEW THIS SPRINT — the weakest of the placements here; see the PR."
+          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Social Intelligence Case 3 (The Theater Trap: a dial between \"public bleachers, 40 watching\" and \"private hallway\", Marcus's defensiveness tracking audience size to 95% in public) is the strongest evidence for this skill anywhere in the platform. Case 2 (The Inciting Incident: public callout vs. passive vent vs. private backchannel) and Case 5 (The Ally Protocol: public counter-attack vs. private support) carry the same mechanic. NEW THIS SPRINT."
+        },
+        {
+          "framework": "internal",
+          "code": "escalation-language",
+          "status": "draft",
+          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Social Intelligence Case 4 (The Script Lab): the paired option \"You always take credit for group work\", set against \"Hey Marcus, I noticed my name was left off the title slide\", is the escalating half of the Observation + Impact + Clean Ask construction. NEW THIS SPRINT."
+        },
+        {
+          "framework": "internal",
+          "code": "self-advocacy",
+          "status": "draft",
+          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Social Intelligence Case 4 (The Script Lab): the Observation + Impact + Clean Ask construction is self-advocacy practised, not merely recognised — CASEL Relationship Skills, \"communicating effectively and resolving conflict constructively\". NEW THIS SPRINT."
         },
         {
           "framework": "internal",

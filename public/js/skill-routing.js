@@ -104,20 +104,35 @@ async function resolve(category, opts = {}) {
     if (!matches.length) return fallback;
 
     // Tie-break, in order:
-    //   1. the game's own existing default destination, if it matches — this is what
-    //      keeps Read the Signal's and Money Moves' routing byte-for-byte unchanged;
-    //   2. any lab in the same Lab Pack as that default, so a tie resolves toward the
+    //   1. SPECIALIZATION — the lab with the fewest skillTags overall. A GoodBlock built
+    //      narrowly around two or three skills is a better destination for a match than one
+    //      that happens to cover this skill as one of eight. This rule replaced "prefer the
+    //      calling game's own default", which was harmless only while overlaps were rare:
+    //      once Social Intelligence was correctly tagged with `self-advocacy`,
+    //      `audience-choice` and `escalation-language`, being Before You Send's own default
+    //      made it win every one of those ties and swallow the more specific homes for them
+    //      (Professional Brand, Where You Say It, Conflict Has a Winner). Correctly tagging a
+    //      second GoodBlock for a skill must BROADEN routing, never hijack it.
+    //   2. the game's own existing default destination, if it matches and the counts tie —
+    //      this is what keeps Read the Signal's and Money Moves' routing unchanged;
+    //   3. any lab in the same Lab Pack as that default, so a tie resolves toward the
     //      pack the game already pointed into;
-    //   3. first match in registry order, which is how a game reaches a lab in a pack
+    //   4. first match in registry order, which is how a game reaches a lab in a pack
     //      its original hardcoded logic never knew about.
-    const exact = matches.find((m) => m.url === opts.defaultUrl);
-    let picked = exact;
+    //
+    // Counting ALL skillTags, not just the internal ones, is deliberate: breadth of claimed
+    // coverage is the thing being measured, and the framework tags are part of that claim.
+    const breadth = (m) => (m.skillTags || []).length;
+    const narrowest = Math.min(...matches.map(breadth));
+    const shortlist = matches.filter((m) => breadth(m) === narrowest);
+
+    let picked = shortlist.find((m) => m.url === opts.defaultUrl);
     if (!picked) {
         const defaultEntry = modules.find((m) => m.url === opts.defaultUrl);
         const samePack = defaultEntry && defaultEntry.pack
-            ? matches.find((m) => m.pack === defaultEntry.pack)
+            ? shortlist.find((m) => m.pack === defaultEntry.pack)
             : null;
-        picked = samePack || matches[0];
+        picked = samePack || shortlist[0];
     }
     const tag = (picked.skillTags || []).find((t) => t.framework === 'internal' && normalize(t.code) === code);
     return {
