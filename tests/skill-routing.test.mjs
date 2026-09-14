@@ -278,6 +278,29 @@ test('a genuine tie still falls back to the caller\'s own default', async () => 
     }
 });
 
+// The real thing, against the shipped registry: each of Before You Send's three overlapping
+// categories must reach the GoodBlock built around it, not the one it shares a default with.
+const BYS_SPECIALIZED = {
+    'self-advocacy': 'professional-brand',
+    'escalation-language': 'conflict-has-a-winner',
+    'audience-choice': 'where-you-say-it',
+};
+for (const [category, expectedId] of Object.entries(BYS_SPECIALIZED)) {
+    test(`Before You Send: "${category}" reaches ${expectedId}, not its own default`, async () => {
+        const labs = REGISTRY.modules.filter((m) => m.type === 'lab' && !m.retired
+            && (m.skillTags || []).some((t) => t.framework === 'internal' && normalize(t.code) === category));
+        // If this stops being a contested category the test is no longer testing anything,
+        // so say that rather than passing vacuously.
+        assert.ok(labs.length > 1,
+            `"${category}" is carried by only ${labs.map((m) => m.id).join(', ')} — this test needs the overlap to be meaningful`);
+        assert.ok(labs.some((m) => m.id === 'social-intelligence'),
+            `"${category}" is no longer on Social Intelligence — the hijack this pins is gone, re-point or retire this test`);
+        const dest = await resolve(category, BYS);
+        assert.equal(dest.matchedId, expectedId);
+        assert.notEqual(dest.url, SOCIAL_INTELLIGENCE);
+    });
+}
+
 test('Social Intelligence is still a REACHABLE match for the skills it teaches', async () => {
     // The other half of the fix: specialization must not make a correct second home dead.
     // Read the Signal has no Social Intelligence-shadowing alternative for `social`, and a
