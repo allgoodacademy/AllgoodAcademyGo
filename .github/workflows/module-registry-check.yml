@@ -5,6 +5,12 @@
 # Also runs the Challenge copy validator, which enforces the authored Voice Standard on
 # every Challenge's SCENARIO_DATA (setup under 45 words and 3 sentences, options readable
 # on their own). Structural checks say nothing about whether the question can be read.
+#
+# And the brand-token check, which fails when tailwind/theme.js and
+# public/assets/css/design-tokens.css disagree about a shared color or font stack. Those
+# two files feed different consumers (utility classes vs. hand-written CSS in a page's
+# <style> block) and neither can import the other, so nothing but this check stops them
+# drifting into rendering two different oranges.
 name: Module registry check
 
 on:
@@ -21,3 +27,4 @@ jobs:
           node-version: '22'
       - run: node scripts/check-modules.js
       - run: node scripts/check-challenge-copy.js
+      - run: node scripts/check-tokens.js

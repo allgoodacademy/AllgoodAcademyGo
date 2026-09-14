@@ -39,8 +39,10 @@ module.exports = {
         'rtt-accent-light': '#FBEAF0',
         'rtt-accent-dark': '#7A2B45',
     },
+    // Fallback chains match --font-display / --font-ui in
+    // public/assets/css/design-tokens.css; check-tokens.js enforces that.
     fontFamily: {
-        heading: ['Georgia', 'serif'],
-        body: ['Verdana', 'sans-serif'],
+        heading: ['Georgia', 'Times New Roman', 'serif'],
+        body: ['Verdana', 'Geneva', 'sans-serif'],
     },
 };
