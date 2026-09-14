@@ -16,8 +16,9 @@
 //     the four games, which had no such check before
 //   - each lab's completion-badge "N scenarios" figure vs the real category count in its
 //     pack's Challenge SCENARIO_DATA (the Privacy & Security "9 vs 8" bug class)
-//   - internal skill tags: every category a game routes by exists on some lab, so
-//     /js/skill-routing.js can never resolve to nothing for a category a game can produce
+//   - internal skill tags: every category a game routes by exists on some lab (so
+//     /js/skill-routing.js can never resolve to nothing), AND every such tag cites the
+//     evidence its placement rests on (so a placement can be reviewed rather than trusted)
 //   - public/mission-control/module-data.js is in sync with the arrays it is generated from
 // No dependencies; run with `node scripts/check-modules.js`. Exits 1 on any mismatch.
 const fs = require('fs');
@@ -99,6 +100,14 @@ for (const m of REGISTRY) {
   for (const t of m.skillTags || []) {
     if (!t || !t.framework || !t.code) fail(`registry: "${m.id}" has a skillTag missing framework or code`);
     if (t.status && !['reviewed', 'draft'].includes(t.status)) fail(`registry: "${m.id}" skillTag "${t.code}" has an invalid status "${t.status}"`);
+    // An internal tag is a ROUTING decision — it can send a student to a different lab in a
+    // different pack. `reputation` was placed on Social Intelligence by content-similarity
+    // judgment, with nothing recording why, and The Rumor Mill routed there on staging.
+    // Social Intelligence does not teach reputational harm. A placement nobody can cite is a
+    // placement nobody can review, so an uncited one is a build failure, not a style note.
+    if (t.framework === 'internal' && !(t.evidence && String(t.evidence).trim().length > 30)) {
+      fail(`registry: "${m.id}" internal skillTag "${t.code}" has no \`evidence\` — cite the shipped routing or the coverage-map Case this placement rests on`);
+    }
   }
 }
 const byId = Object.fromEntries(REGISTRY.map(m => [m.id, m]));

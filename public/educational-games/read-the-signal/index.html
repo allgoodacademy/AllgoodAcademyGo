@@ -1640,10 +1640,33 @@ function markDeeperClicked() {
   window.Telemetry.track('deeper_link_click', { destination: deeperLink });
 }
 
-function recordSession(outcome) {
+// Which PATH picked the destination, not just where it landed. A URL alone cannot tell a
+// proven route from a proposed one, or a category match from a fallback — see the
+// `routingReason` note in /js/skill-routing.js. Written into the session doc and the
+// module_complete event; a debugging/verification field, never shown to a student.
+function routingReasonFrom(dest, fallback) {
+  if (dest && dest.reason === 'category-match') {
+    return {
+      signal: 'category-match',
+      category: dest.category,
+      matchedModuleId: dest.matchedId,
+      matchedPack: dest.matchedPack,
+      tagStatus: dest.tagStatus,
+      destination: dest.url,
+    };
+  }
+  return {
+    ...fallback,
+    destination: (dest && dest.url) || fallback.destination,
+    resolverReason: dest ? dest.reason : 'resolver-unavailable',
+  };
+}
+
+function recordSession(outcome, routingReason) {
   if (!telemetryReady()) return;
   window.Telemetry.complete({
     outcome,
+    routingReason,
     scenariosPlayed: scenarioLog.length,
     correct: correctCount,
     wrong: scenarioLog.length - correctCount,
@@ -1657,6 +1680,7 @@ function recordSession(outcome) {
       livesLost: 3 - lives,
       categories: categoryStats,
       scenarios: scenarioLog,
+      routingReason,
     },
   });
 }
@@ -1809,14 +1833,21 @@ function showEnd(outcome) {
   document.getElementById('deeperMsg').textContent =
     (worstCategory && DEEPER_MESSAGES[worstCategory]) || DEFAULT_DEEPER_MSG;
   document.getElementById('deeperCard').style.display = 'block';
+
+  // The session is recorded once the destination is settled, so `routingReason` describes
+  // the decision that actually shipped rather than the placeholder rendered a beat earlier.
+  const fallbackReason = { signal: 'default-fallback', category: worstCategory, destination: DEFAULT_DEEPER_URL };
   if (window.SkillRouting) {
     window.SkillRouting
       .resolve(worstCategory, { defaultUrl: DEFAULT_DEEPER_URL, defaultName: DEFAULT_DEEPER_NAME })
-      .then((dest) => { deeperLink = dest.url; })
-      .catch(() => { /* deeperLink is already the default — nothing to recover */ });
+      .then((dest) => {
+        deeperLink = dest.url;
+        recordSession(outcome, routingReasonFrom(dest, fallbackReason));
+      })
+      .catch(() => recordSession(outcome, routingReasonFrom(null, fallbackReason)));
+  } else {
+    recordSession(outcome, routingReasonFrom(null, fallbackReason));
   }
-
-  recordSession(outcome);
 
   // Lets any exit button (Home, Browse games, Play again, the Lab Pack link) trigger
   // the save offer immediately if the timer below hasn't fired yet — see

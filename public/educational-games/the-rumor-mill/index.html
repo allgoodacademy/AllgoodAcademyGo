@@ -921,10 +921,36 @@ function markDeeperClicked() {
   window.Telemetry.track('deeper_link_click', { destination: deeperLink });
 }
 
-function recordSession() {
+// Which PATH picked the destination, not just where it landed. A URL alone cannot tell a
+// category match from a behaviour-pattern read or a plain fallback. See the `routingReason`
+// note in /js/skill-routing.js. Written into the session doc and the module_complete event;
+// a debugging/verification field, never shown to a student.
+function routingReasonFrom(dest, fallback) {
+  if (dest && dest.reason === 'category-match') {
+    return {
+      signal: 'category-match',
+      category: dest.category,
+      matchedModuleId: dest.matchedId,
+      matchedPack: dest.matchedPack,
+      tagStatus: dest.tagStatus,
+      destination: dest.url,
+      // Recorded even when the category decided it, so a reviewer can see whether the two
+      // signals agreed or the category overrode the behaviour read.
+      ...(fallback.behaviorPattern ? { behaviorPattern: fallback.behaviorPattern } : {}),
+    };
+  }
+  return {
+    ...fallback,
+    destination: (dest && dest.url) || fallback.destination,
+    resolverReason: dest ? dest.reason : 'resolver-unavailable',
+  };
+}
+
+function recordSession(routingReason) {
   if (!telemetryReady()) return;
   const correct = scenarioLog.filter(s => s.correct).length;
   window.Telemetry.complete({
+    routingReason,
     finalScore: score,
     scenariosPlayed: scenarioLog.length,
     correct,
@@ -939,6 +965,7 @@ function recordSession() {
       verifyUsed: verifyUsedCount,
       categories: categoryStats,
       scenarios: scenarioLog,
+      routingReason,
     },
   });
 }
@@ -1158,6 +1185,23 @@ function nextScenario() {
   }
 }
 
+// A category is only worth routing on if the student actually missed in it more than once.
+// A single miss in a two-scenario category reads as 100%-weakest and is noise: a student who
+// scored 8/10 with their two misses in different categories has no categorical weakness, and
+// routing hard off one of them is how The Rumor Mill sent a strong player somewhere unrelated
+// on staging. Two misses is the floor for "pattern".
+//
+// Deliberately NOT applied to Read the Signal or Money Moves: their weakest-category
+// computation shipped and works, and changing it was explicitly out of scope. This floor
+// guards the category routing introduced this sprint.
+const MIN_MISSES_TO_ROUTE = 2;
+function weakestActionableCategory(stats) {
+  const eligible = Object.entries(stats)
+    .filter(([, c]) => (c.played - c.correct) >= MIN_MISSES_TO_ROUTE)
+    .map(([cat, c]) => [cat, c.correct / c.played]);
+  return eligible.length ? eligible.sort((a, b) => a[1] - b[1])[0] : null;
+}
+
 // One message per category this game already tracks, same shape as Money Moves'
 // DEEPER_MESSAGES. The resolver picks the destination; these words stay here, in this
 // game's own voice.
@@ -1187,10 +1231,7 @@ function showEnd() {
   // So the category picks the destination (through the shared resolver, which can
   // reach a lab in any pack) and leads the message; the behavior pattern still colors
   // the message, and is the whole message when no category stands out.
-  const withAccuracy = Object.entries(categoryStats)
-    .filter(([, c]) => c.played - c.correct > 0)
-    .map(([cat, c]) => [cat, c.correct / c.played]);
-  const worst = withAccuracy.length ? withAccuracy.sort((a, b) => a[1] - b[1])[0] : null;
+  const worst = weakestActionableCategory(categoryStats);
 
   let deeperMsg;
   if (worst) {
@@ -1211,12 +1252,14 @@ function showEnd() {
   // Render with the default destination immediately and upgrade in place once the
   // registry resolves, so a slow or failed fetch can never leave a dead link.
   deeperLink = DEFAULT_DEEPER_URL;
-  if (window.SkillRouting) {
-    window.SkillRouting
-      .resolve(worst ? worst[0] : null, { defaultUrl: DEFAULT_DEEPER_URL, defaultName: DEFAULT_DEEPER_NAME })
-      .then((dest) => { deeperLink = dest.url; })
-      .catch(() => { /* deeperLink is already the default */ });
-  }
+  const behaviorPattern = misinfoForwarded >= 4 ? 'spread-misinformation'
+    : truthStopped >= 3 ? 'over-stopped-truth' : null;
+  const fallbackReason = {
+    signal: behaviorPattern ? 'behavior-pattern' : 'default-fallback',
+    category: worst ? worst[0] : null,
+    destination: DEFAULT_DEEPER_URL,
+    ...(behaviorPattern ? { behaviorPattern } : {}),
+  };
 
   el.innerHTML = `
     <div class="end-score">${score}</div>
@@ -1240,7 +1283,16 @@ function showEnd() {
     <div class="wordmark" style="margin-top:16px">Allgood Academy · Free for all learners, always.</div>
   `;
 
-  recordSession();
+  // Recorded once the destination is settled, so `routingReason` describes the decision
+  // that actually shipped rather than the placeholder rendered a beat earlier.
+  if (window.SkillRouting) {
+    window.SkillRouting
+      .resolve(worst ? worst[0] : null, { defaultUrl: DEFAULT_DEEPER_URL, defaultName: DEFAULT_DEEPER_NAME })
+      .then((dest) => { deeperLink = dest.url; recordSession(routingReasonFrom(dest, fallbackReason)); })
+      .catch(() => recordSession(routingReasonFrom(null, fallbackReason)));
+  } else {
+    recordSession(routingReasonFrom(null, fallbackReason));
+  }
 
   // Same shared save/claim offer as the other two games (window.AuthGate.offerSave()) —
   // one save flow across the site instead of a bespoke one for each game.

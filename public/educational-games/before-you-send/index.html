@@ -779,10 +779,38 @@ function markDeeperClicked() {
   window.Telemetry.track('deeper_link_click', { destination: deeperLink });
 }
 
-function recordSession() {
+// Which PATH picked the destination, not just where it landed. This game is the reason the
+// field exists: Professional Brand is reachable down two completely different roads — the
+// over-cautious delete count, or a `self-advocacy` category match — and the URL alone cannot
+// tell them apart. See the `routingReason` note in /js/skill-routing.js. Written into the
+// session doc and the module_complete event; a debugging/verification field, never shown to
+// a student.
+function routingReasonFrom(dest, fallback) {
+  if (dest && dest.reason === 'category-match') {
+    return {
+      signal: 'category-match',
+      category: dest.category,
+      matchedModuleId: dest.matchedId,
+      matchedPack: dest.matchedPack,
+      tagStatus: dest.tagStatus,
+      destination: dest.url,
+      // Recorded even when the category decided it, so a reviewer can see whether the two
+      // signals agreed or the category overrode the behaviour read.
+      ...(fallback.behaviorPattern ? { behaviorPattern: fallback.behaviorPattern } : {}),
+    };
+  }
+  return {
+    ...fallback,
+    destination: (dest && dest.url) || fallback.destination,
+    resolverReason: dest ? dest.reason : 'resolver-unavailable',
+  };
+}
+
+function recordSession(routingReason) {
   if (!telemetryReady()) return;
   const correct = scenarioLog.filter(s => s.correct).length;
   window.Telemetry.complete({
+    routingReason,
     finalScore: score,
     scenariosPlayed: scenarioLog.length,
     correct,
@@ -794,6 +822,7 @@ function recordSession() {
       correct,
       categories: categoryStats,
       scenarios: scenarioLog,
+      routingReason,
     },
   });
 }
@@ -958,6 +987,20 @@ function nextScenario() {
   }
 }
 
+// A category is only worth routing on if the student actually missed in it more than once.
+// A single miss in a two-scenario category reads as 100%-weakest and is noise — that is how
+// The Rumor Mill sent an 8/10 player somewhere unrelated on staging. Two misses is the floor
+// for "pattern". Applies to the category routing introduced this sprint (this game and The
+// Rumor Mill); Read the Signal's and Money Moves' shipped computation is deliberately
+// untouched.
+const MIN_MISSES_TO_ROUTE = 2;
+function weakestActionableCategory(stats) {
+  const eligible = Object.entries(stats)
+    .filter(([, c]) => (c.played - c.correct) >= MIN_MISSES_TO_ROUTE)
+    .map(([cat, c]) => [cat, c.correct / c.played]);
+  return eligible.length ? eligible.sort((a, b) => a[1] - b[1])[0] : null;
+}
+
 // One message per drafted skill tag, in this game's own voice — used only when the shared
 // resolver actually lands on a lab the behavior-pattern read would not have chosen, so the
 // words on the card always name the lab the button opens.
@@ -988,13 +1031,17 @@ function showEnd() {
   let deeperMsg;
   let fallbackLink = '/jsh/digital-decisions-lab/social-intelligence/';
   let fallbackName = 'Social Intelligence';
+  let behaviorPattern = null;
   if (choiceTally.send >= 5) {
+    behaviorPattern = 'impulsive-sender';
     deeperMsg = "You sent most things without editing. The Social Intelligence lab goes deeper on reading a situation before you react.";
   } else if (choiceTally.delete >= 4) {
+    behaviorPattern = 'over-cautious-deleter';
     deeperMsg = "You deleted a lot — including some things worth sending. The Professional Brand lab helps you find your voice in digital communication.";
     fallbackLink = '/jsh/digital-decisions-lab/professional-brand/';
     fallbackName = 'Professional Brand';
   } else if (correctRate < 0.4) {
+    behaviorPattern = 'low-accuracy';
     deeperMsg = "Context changes everything about what to send. The Social Intelligence lab is built around exactly that.";
   } else {
     deeperMsg = "The Social Intelligence lab goes deeper on reading a situation before you respond.";
@@ -1008,10 +1055,7 @@ function showEnd() {
   // scenario's own mechanism text and have NOT been through Curriculum & Learning Science
   // review. The behavior-pattern read above is the reviewed, shipped signal and stays the
   // fallback for exactly that reason.
-  const withAccuracy = Object.entries(categoryStats)
-    .filter(([, c]) => c.played - c.correct > 0)
-    .map(([cat, c]) => [cat, c.correct / c.played]);
-  const worst = withAccuracy.length ? withAccuracy.sort((a, b) => a[1] - b[1])[0] : null;
+  const worst = weakestActionableCategory(categoryStats);
 
   // Render with the fallback immediately, upgrade in place once the registry resolves —
   // a slow or failed fetch can never leave a student looking at a dead link.
@@ -1020,17 +1064,12 @@ function showEnd() {
   // a lab in another pack entirely, and a card that reads "the Social Intelligence lab"
   // above a button that opens Conflict Has a Winner is worse than no routing at all.
   deeperLink = fallbackLink;
-  if (window.SkillRouting) {
-    window.SkillRouting
-      .resolve(worst ? worst[0] : null, { defaultUrl: fallbackLink, defaultName: fallbackName })
-      .then((dest) => {
-        deeperLink = dest.url;
-        if (!dest.matched || dest.url === fallbackLink) return;
-        const el = document.querySelector('#end .deeper-msg');
-        if (el && CATEGORY_MESSAGES[worst[0]]) el.textContent = CATEGORY_MESSAGES[worst[0]];
-      })
-      .catch(() => { /* deeperLink and the message are already the behavior-pattern pair */ });
-  }
+  const fallbackReason = {
+    signal: behaviorPattern ? 'behavior-pattern' : 'default-fallback',
+    category: worst ? worst[0] : null,
+    destination: fallbackLink,
+    ...(behaviorPattern ? { behaviorPattern } : {}),
+  };
 
   el.innerHTML = `
     <div class="end-score">${score}</div>
@@ -1054,7 +1093,24 @@ function showEnd() {
     <div class="wordmark" style="margin-top:16px">Allgood Academy · Free for all learners, always.</div>
   `;
 
-  recordSession();
+  // Recorded once the destination is settled, so `routingReason` describes the decision that
+  // actually shipped. This is what tells a Professional Brand result produced by the delete
+  // count apart from one produced by a `self-advocacy` category match.
+  if (window.SkillRouting) {
+    window.SkillRouting
+      .resolve(worst ? worst[0] : null, { defaultUrl: fallbackLink, defaultName: fallbackName })
+      .then((dest) => {
+        deeperLink = dest.url;
+        if (dest.reason === 'category-match' && dest.url !== fallbackLink) {
+          const el = document.querySelector('#end .deeper-msg');
+          if (el && CATEGORY_MESSAGES[worst[0]]) el.textContent = CATEGORY_MESSAGES[worst[0]];
+        }
+        recordSession(routingReasonFrom(dest, fallbackReason));
+      })
+      .catch(() => recordSession(routingReasonFrom(null, fallbackReason)));
+  } else {
+    recordSession(routingReasonFrom(null, fallbackReason));
+  }
 
   // Ticket 3.4's "want to save your progress?" prompt is the existing shared
   // save/claim offer (window.AuthGate.offerSave() — see identity-gate.js's #ag-save

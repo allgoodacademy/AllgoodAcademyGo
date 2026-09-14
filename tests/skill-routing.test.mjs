@@ -105,3 +105,102 @@ test('normalize() maps a game\'s display string onto the registry vocabulary', (
     assert.equal(normalize('safe-recognition'), 'safe-recognition');
     assert.equal(normalize(null), '');
 });
+
+
+// --- THE STAGING BUG (2026-09-13), pinned so it cannot come back.
+//
+// The Rumor Mill routed a student to Social Intelligence. `reputation` had been placed on
+// Social Intelligence's skillTags by content-similarity judgment — reputational harm reads
+// adjacent to allyship — with nothing in the repo recording why and nothing able to check it.
+// The resolver did exactly what the data told it. Social Intelligence does not teach
+// reputational harm; Digital Citizenship does (Cases 5 and 6).
+const TRM_CATEGORIES = ['misinformation', 'accuracy', 'reputation'];
+const SOCIAL_INTELLIGENCE = '/jsh/digital-decisions-lab/social-intelligence/';
+
+test('The Rumor Mill can never route to Social Intelligence', () => {
+    // Asserted against the registry rather than the resolver: this was a DATA error, and the
+    // data is where it has to stay fixed. Social Intelligence's territory is phishing /
+    // privacy / permissions / social — none of The Rumor Mill's three categories belong to it.
+    const si = REGISTRY.modules.find((m) => m.id === 'social-intelligence');
+    const codes = si.skillTags.filter((t) => t.framework === 'internal').map((t) => t.code);
+    for (const c of TRM_CATEGORIES) {
+        assert.ok(!codes.includes(c), `Social Intelligence must not carry "${c}" — it does not teach it`);
+    }
+});
+
+test('reputation routes to Digital Citizenship, where the evidence is', async () => {
+    const dest = await resolve('reputation', { defaultUrl: '/jsh/digital-decisions-lab/digital-citizenship/' });
+    assert.equal(dest.url, '/jsh/digital-decisions-lab/digital-citizenship/');
+    assert.equal(dest.matchedId, 'digital-citizenship');
+});
+
+test('no Rumor Mill category resolves to Social Intelligence', async () => {
+    for (const c of TRM_CATEGORIES) {
+        const dest = await resolve(c, { defaultUrl: '/jsh/digital-decisions-lab/digital-citizenship/' });
+        assert.notEqual(dest.url, SOCIAL_INTELLIGENCE, `"${c}" resolved to Social Intelligence`);
+    }
+});
+
+// The bug CLASS, not the one symptom: an internal tag placed by inference with nothing
+// recording why. Every one must cite the shipped routing or the coverage-map Case it rests on.
+test('every internal skill tag cites the evidence its placement rests on', () => {
+    for (const m of REGISTRY.modules) {
+        for (const t of m.skillTags || []) {
+            if (t.framework !== 'internal') continue;
+            assert.ok(t.evidence && t.evidence.length > 30,
+                `${m.id} / ${t.code} has no evidence — an uncitable placement cannot be reviewed`);
+        }
+    }
+});
+
+// --- the resolver itself was NOT at fault; this pins that it stays that way.
+test('resolving for one game does not affect the next game\'s result', async () => {
+    const RTS_ = { defaultUrl: '/jsh/digital-decisions-lab/privacy-security/' };
+    const TRM_ = { defaultUrl: '/jsh/digital-decisions-lab/digital-citizenship/' };
+    const interleaved = [];
+    for (const [c, o] of [['social', RTS_], ['reputation', TRM_], ['social', RTS_], ['reputation', TRM_]]) {
+        interleaved.push((await resolve(c, o)).url);
+    }
+    assert.equal(interleaved[0], interleaved[2], 'Read the Signal drifted after a Rumor Mill resolve');
+    assert.equal(interleaved[1], interleaved[3], 'The Rumor Mill drifted after a Read the Signal resolve');
+});
+
+test('concurrent resolves from different games stay independent', async () => {
+    const [a, b, c] = await Promise.all([
+        resolve('phishing', { defaultUrl: '/jsh/digital-decisions-lab/privacy-security/' }),
+        resolve('reputation', { defaultUrl: '/jsh/digital-decisions-lab/digital-citizenship/' }),
+        resolve('accuracy', { defaultUrl: '/jsh/digital-decisions-lab/digital-citizenship/' }),
+    ]);
+    assert.equal(a.matchedId, 'privacy-security');
+    assert.equal(b.matchedId, 'digital-citizenship');
+    assert.equal(c.matchedId, 'ten-voices-one-source');
+});
+
+test('resolve() does not mutate the registry it read', async () => {
+    const before = JSON.stringify(REGISTRY);
+    await resolve('social', { defaultUrl: SOCIAL_INTELLIGENCE });
+    await resolve('reputation', { defaultUrl: '/jsh/digital-decisions-lab/digital-citizenship/' });
+    assert.equal(JSON.stringify(REGISTRY), before);
+});
+
+// --- routing decisions have to be checkable after the fact.
+test('a match reports which category and which registry entry decided it', async () => {
+    const dest = await resolve('self-advocacy', { defaultUrl: SOCIAL_INTELLIGENCE });
+    assert.equal(dest.reason, 'category-match');
+    assert.equal(dest.category, 'self-advocacy');
+    assert.equal(dest.matchedModuleId ?? dest.matchedId, 'professional-brand');
+    assert.equal(dest.matchedPack, 'digital-decisions');
+    assert.equal(dest.tagStatus, 'draft', 'an unreviewed placement must say so in telemetry');
+});
+
+test('a fallback says WHY it fell back', async () => {
+    const noCategory = await resolve(null, { defaultUrl: SOCIAL_INTELLIGENCE });
+    assert.equal(noCategory.reason, 'no-category');
+    const noMatch = await resolve('not-a-real-skill', { defaultUrl: SOCIAL_INTELLIGENCE });
+    assert.equal(noMatch.reason, 'no-match');
+});
+
+test('a reviewed placement reports tagStatus reviewed', async () => {
+    const dest = await resolve('phishing', { defaultUrl: '/jsh/digital-decisions-lab/privacy-security/' });
+    assert.equal(dest.tagStatus, 'reviewed');
+});

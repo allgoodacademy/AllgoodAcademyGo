@@ -74,15 +74,29 @@ function internalCodes(entry) {
  *                                     existed — used as the fallback AND as the pack
  *                                     tie-break below. Required.
  * @param {string} [opts.defaultName]  display name for the fallback destination.
- * @returns {Promise<{url: string, name: string|null, matched: boolean}>}
+ * @returns {Promise<{url, name, matched, reason, category, matchedId, matchedPack, tagStatus}>}
+ *
+ * `reason` says WHICH PATH produced the destination, so a routing decision can be checked
+ * after the fact instead of guessed at from the URL. Before You Send can reach Professional
+ * Brand down two completely different roads — an over-cautious delete count, or a
+ * `self-advocacy` category match — and the URL alone cannot tell them apart. Games write
+ * this into their session telemetry as `routingReason`.
+ *   'category-match'   — a lab in the registry carries this category
+ *   'no-match'         — the category resolved to nothing; caller's default used
+ *   'no-category'      — no category was passed (nothing weak enough to act on)
  */
 async function resolve(category, opts = {}) {
+    const code = normalize(category);
     const fallback = {
         url: opts.defaultUrl,
         name: opts.defaultName || null,
         matched: false,
+        reason: code ? 'no-match' : 'no-category',
+        category: code || null,
+        matchedId: null,
+        matchedPack: null,
+        tagStatus: null,
     };
-    const code = normalize(category);
     if (!code || !opts.defaultUrl) return fallback;
 
     const modules = await loadRegistry();
@@ -97,14 +111,27 @@ async function resolve(category, opts = {}) {
     //   3. first match in registry order, which is how a game reaches a lab in a pack
     //      its original hardcoded logic never knew about.
     const exact = matches.find((m) => m.url === opts.defaultUrl);
-    if (exact) return { url: exact.url, name: exact.name, matched: true };
-
-    const defaultEntry = modules.find((m) => m.url === opts.defaultUrl);
-    const samePack = defaultEntry && defaultEntry.pack
-        ? matches.find((m) => m.pack === defaultEntry.pack)
-        : null;
-    const picked = samePack || matches[0];
-    return { url: picked.url, name: picked.name, matched: true };
+    let picked = exact;
+    if (!picked) {
+        const defaultEntry = modules.find((m) => m.url === opts.defaultUrl);
+        const samePack = defaultEntry && defaultEntry.pack
+            ? matches.find((m) => m.pack === defaultEntry.pack)
+            : null;
+        picked = samePack || matches[0];
+    }
+    const tag = (picked.skillTags || []).find((t) => t.framework === 'internal' && normalize(t.code) === code);
+    return {
+        url: picked.url,
+        name: picked.name,
+        matched: true,
+        reason: 'category-match',
+        category: code,
+        matchedId: picked.id,
+        matchedPack: picked.pack || null,
+        // A draft tag is an unreviewed routing decision. Carrying it into telemetry is how
+        // anyone auditing a destination later can tell a proven route from a proposed one.
+        tagStatus: (tag && tag.status) || 'reviewed',
+    };
 }
 
 // Games use the global (they are classic scripts, not modules); the guard is for
