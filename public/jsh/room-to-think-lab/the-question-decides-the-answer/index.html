@@ -68,14 +68,15 @@
         }
     </script>
 
+    <link rel="stylesheet" href="/assets/css/design-tokens.css">
     <style>
         body {
-            font-family: Verdana, sans-serif; background-color: #F7F7F7;
+            font-family: Verdana, Geneva, sans-serif; background-color: #F7F7F7;
             min-height: 100vh; min-height: 100dvh; margin: 0; padding: 0; overflow: hidden;
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
         input, textarea { -webkit-user-select: text; user-select: text; }
-        h1, h2, h3, h4, h5, h6 { font-family: Georgia, serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: Georgia, 'Times New Roman', serif; }
 
         .app-shell { width: 100%; height: 100dvh; display: flex; flex-direction: column; background-color: #F7F7F7; position: relative; overflow: hidden; }
         .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
@@ -84,17 +85,17 @@
 
         .content-column::-webkit-scrollbar { width: 10px; }
         .content-column::-webkit-scrollbar-track { background: transparent; border-left: 1px solid #e5e7eb; }
-        .content-column::-webkit-scrollbar-thumb { background-color: #D34716; border-radius: 5px; border: 2px solid #F9FAFB; }
+        .content-column::-webkit-scrollbar-thumb { background-color: var(--color-orange); border-radius: 5px; border: 2px solid #F9FAFB; }
 
         .navbar-content { flex: 0 0 48px; z-index: 30; position: relative; }
         .footer-content { flex: 0 0 36px; z-index: 30; background-color: white; border-top: 1px solid #e5e7eb; position: relative; }
         #flex-progress-bar { height: 4px; width: 100%; background-color: rgba(255,255,255,0.22); position: absolute; bottom: 0; left: 0; }
-        #flex-progress-fill { height: 100%; background-color: #D34716; width: 0%; transition: width 0.3s ease; }
+        #flex-progress-fill { height: 100%; background-color: var(--color-orange); width: 0%; transition: width 0.3s ease; }
 
         .split-layout { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
         .sidebar-jodi {
-            width: 100%; height: auto; min-height: 140px; background-color: #FBF6EE;
-            border-bottom: 1px solid #E8DFCE; display: flex; align-items: flex-end; padding: 10px;
+            width: 100%; height: auto; min-height: 140px; background-color: var(--color-cream);
+            border-bottom: 1px solid var(--color-cream-border); display: flex; align-items: flex-end; padding: 10px;
             position: relative; z-index: 10; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden;
         }
         .content-column { flex: 1; overflow-y: auto; position: relative; background-color: #F9FAFB; padding-bottom: 20px; }
@@ -115,7 +116,7 @@
         .jodi-avatar.jodi-stage img, .jodi-avatar.jodi-stage svg { width: 100%; height: 100%; display: block; }
 
         .jodi-bubble {
-            background: white; border: 1px solid #E8DFCE; border-radius: 16px; border-bottom-left-radius: 0;
+            background: white; border: 1px solid var(--color-cream-border); border-radius: 16px; border-bottom-left-radius: 0;
             padding: 14px 16px; font-size: 0.85rem; color: #4C4C4C; line-height: 1.5;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; flex: 1;
             transform-origin: bottom left; opacity: 0; transition: opacity 0.3s;
@@ -123,7 +124,7 @@
         }
         .jodi-bubble.visible { opacity: 1; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .jodi-bubble::-webkit-scrollbar { width: 5px; }
-        .jodi-bubble::-webkit-scrollbar-thumb { background-color: #D8CDBA; border-radius: 3px; }
+        .jodi-bubble::-webkit-scrollbar-thumb { background-color: var(--color-cream-scroll); border-radius: 3px; }
         .jodi-bubble::-webkit-scrollbar-track { background: transparent; }
 
         #jodi-whiteboard { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; overflow: hidden; transition: opacity 0.3s ease, max-height 0.3s ease; }
@@ -132,7 +133,7 @@
 
         @media (min-width: 768px) {
             .split-layout { flex-direction: row; }
-            .sidebar-jodi { width: 25%; min-width: 300px; height: 100%; border-bottom: none; border-right: 1px solid #E8DFCE; flex-direction: column; justify-content: flex-end; padding: 20px; }
+            .sidebar-jodi { width: 25%; min-width: 300px; height: 100%; border-bottom: none; border-right: 1px solid var(--color-cream-border); flex-direction: column; justify-content: flex-end; padding: 20px; }
             .content-column { width: 75%; }
             .jodi-wrapper { flex-direction: column-reverse; align-items: center; width: 100%; }
             .jodi-avatar.jodi-stage { width: min(200px, 26vh); height: min(200px, 26vh); margin-right: 0; margin-top: 20px; }
@@ -195,7 +196,7 @@
         .doc-sheet { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); overflow: hidden; }
         .doc-bar { background: #F3F4F6; border-bottom: 1px solid #e5e7eb; padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #6b7280; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .doc-body { padding: 16px 18px; }
-        .doc-title { font-family: Georgia, serif; font-size: 17px; font-weight: 700; color: #111827; }
+        .doc-title { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; font-weight: 700; color: #111827; }
         .caret { display: inline-block; width: 1px; height: 15px; background: #9B3B5A; vertical-align: -2px; animation: caretBlink 1s step-end infinite; }
         @keyframes caretBlink { 50% { opacity: 0; } }
         .doc-fill { margin-top: 10px; font-size: 12.5px; color: #7A2B45; background: #FBEAF0; border-left: 3px solid #9B3B5A; border-radius: 0 8px 8px 0; padding: 9px 12px; line-height: 1.5; display: none; }
@@ -241,7 +242,7 @@
         /* ---- Case 4: word-level strike editing (registry #34) ----
            Over-striking a neutral word un-strikes ITSELF, with a visible animation. Without
            the animation the restore reads as a dead tap or a bug. Storyboard do-not-undo #4. */
-        .q-line { font-family: Georgia, serif; font-size: 17px; line-height: 2; color: #111827; }
+        .q-line { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 2; color: #111827; }
         .q-word { display: inline-block; padding: 2px 5px; border-radius: 6px; cursor: pointer; transition: background-color .15s ease, color .15s ease, opacity .2s ease; }
         .q-word.load { background: #FBEAF0; color: #7A2B45; }
         .q-word.load:hover { background: #F3CCD9; }
