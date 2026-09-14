@@ -575,11 +575,11 @@ function showGate(title, body, linkText, linkHref) {
    Firestore rules decide what a teacher may see, and they are not uniform:
      - the roster (users where classroomCode == code, role == student) is rule #4
      - a student's game_scores / scenario_attempts / module_progress are rule #6
-     - the sessions collection is rule #10, which is ADMIN-ONLY today
-   The last one is why every session read is wrapped and a denial degrades instead of
-   failing: without it there is no activeMs, so "time on task" cannot be shown, but every
-   other number here has a second source (module_progress and game_scores both carry
-   lastUpdated) and the dashboard stays useful. */
+     - the sessions collection is rule #10b, which grants a teacher read access to the
+       sessions of students in a classroom they demonstrably own
+   The last one is still wrapped so a denial degrades instead of failing: without activeMs
+   "time on task" cannot be shown, but every other number here has a second source
+   (module_progress and game_scores both carry lastUpdated) and the dashboard stays useful. */
 async function load() {
     const user = await waitForAuthReady();
     if (!user) {
@@ -699,8 +699,9 @@ async function readSessions(uid) {
         const snap = await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('uid', '==', uid)));
         return snap.docs.map((d) => d.data());
     } catch (e) {
-        // A real denial (the rules grant isn't deployed) means every future query will fail
-        // the same way, so it's worth latching off for the rest of the roster. A transient
+        // A real denial means this teacher is not provably this student's teacher as far as
+        // the rules are concerned, and every future query will fail the same way, so it's
+        // worth latching off for the rest of the roster. A transient
         // failure (network blip, momentary unavailability) is not that — latching off on one
         // of those would silently blind the whole page for every other student for no reason,
         // with no way to recover short of a full reload. Only the former latches.
@@ -802,8 +803,12 @@ function renderOverview() {
       </button>`).join('');
 }
 
+/* Shown only when a session read actually came back denied (see readSessions). The teacher
+   read grant is deployed and works for every membership shape the join flow produces, so in
+   practice this is reachable only when an agent is not linked to this Task Force the way the
+   roster thinks they are — which is something a teacher can act on, unlike the mechanism. */
 function degradedNote() {
-    return '<div class="degraded"><strong>Time on task is unavailable.</strong> It comes from the telemetry <code>sessions</code> collection, which Firestore rules currently open to admins only — everything else on this page is read from each agent’s own records and is complete. Deploying the teacher read grant in firestore.rules turns these figures on.</div>';
+    return '<div class="degraded"><strong>Time on task isn’t showing for this Task Force yet.</strong> Everything else on this page — progress, scores and last-active times — is complete and accurate. If it stays blank, check that each agent joined using your Task Force code.</div>';
 }
 
 function renderDetail(uid) {
