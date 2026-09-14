@@ -13,6 +13,13 @@
      something explicitly calls window.AuthGate.offerSave()/ensureIdentified(), same as
      every GoodBlock and the other three games. Here that's the end-screen save offer. -->
 <script type="module" src="/js/identity-gate.js"></script>
+<!-- Shared telemetry pipe (artifacts/{appId}/sessions + /events) — the same one every
+     GoodBlock and Challenge uses, replacing this game's own root-level game_sessions
+     writer. See /js/telemetry.js. -->
+<script type="module" src="/js/telemetry.js"></script>
+<!-- Shared skill -> GoodBlock resolver. The weakest-category computation below is
+     unchanged; only the destination lookup moved out of this file. -->
+<script type="module" src="/js/skill-routing.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -684,6 +691,10 @@ function buildMoneySession(pool, carryOver = { answer: null, len: 0 }) {
 let session = [], currentIdx = 0, score = 0;
 let categoryStats = {};
 let scenarioLog = [];
+let roundsPlayed = 0;
+// Default destination until showEnd() resolves one. Kept as a literal (rather than a
+// reference to DEFAULT_DEEPER_URL, which is declared further down beside the message
+// table) so this binding never sits in the temporal dead zone at script-eval time.
 let deeperLink = '/jsh/real-world-ready-lab/money-as-a-skill/';
 
 function show(id) {
@@ -696,76 +707,78 @@ function show(id) {
   target.style.alignItems = 'center';
 }
 
-// --- Telemetry (Ticket 2): one game_sessions document per completed session, same
-// sessionStorage-UUID + 90-day-TTL pattern as the other three games.
-function getSessionId() {
-  let id = sessionStorage.getItem('mm_session_id');
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem('mm_session_id', id);
+// --- Telemetry: the shared pipe (/js/telemetry.js), same as every GoodBlock and
+// Challenge. This game used to write its own document to a root-level game_sessions
+// collection with its own field allowlist in firestore.rules; both are gone. The
+// per-category breakdown now rides on the session document's `summary` map, which is
+// the part of the pipe a teacher's Mission Control roster can read back.
+function telemetryReady() {
+  return !!window.Telemetry;
+}
+
+// telemetry.js is a module script and has not necessarily run when this classic script
+// does. Poll briefly rather than racing it; if it never arrives the game is unaffected.
+function initTelemetry(tries) {
+  if (telemetryReady()) {
+    window.Telemetry.init({ module: 'money-moves', gameName: 'Money Moves', stepsTotal: 10 });
+    return;
   }
-  return id;
+  if ((tries || 0) > 100) return;
+  setTimeout(() => initTelemetry((tries || 0) + 1), 50);
 }
+initTelemetry(0);
 
-let lastSessionRef = null;
-
-// Best-effort click-through tracking, fire-and-forget — same pattern across
-// all four games' telemetry.
+// Best-effort click-through tracking, fire-and-forget — same pattern across all four
+// games. Written to the session doc (teacher-readable) as well as the event stream.
 function markDeeperClicked() {
-  if (!lastSessionRef) return;
-  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
-    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
-    .catch(() => {});
+  if (!telemetryReady()) return;
+  window.Telemetry.summary({ clickedDeeperLink: true });
+  window.Telemetry.track('deeper_link_click', { destination: deeperLink });
 }
 
-async function recordSession() {
-  try {
-    const AuthCore = window.AuthCore;
-    if (!AuthCore) return;
+// Which PATH picked the destination, not just where it landed. A URL alone cannot tell a
+// category match from a fallback — Before You Send can reach Professional Brand down two
+// completely different roads. See the `routingReason` note in /js/skill-routing.js.
+// Written into the session doc and the module_complete event; a debugging/verification
+// field, never shown to a student.
+function routingReasonFrom(dest, fallback) {
+  if (dest && dest.reason === 'category-match') {
+    return {
+      signal: 'category-match',
+      category: dest.category,
+      matchedModuleId: dest.matchedId,
+      matchedPack: dest.matchedPack,
+      tagStatus: dest.tagStatus,
+      destination: dest.url,
+      // Recorded even when the category decided it, so a reviewer can see whether the two
+      // signals agreed or the category overrode the behaviour read.
+      ...(fallback.behaviorPattern ? { behaviorPattern: fallback.behaviorPattern } : {}),
+    };
+  }
+  return {
+    ...fallback,
+    destination: (dest && dest.url) || fallback.destination,
+    resolverReason: dest ? dest.reason : 'resolver-unavailable',
+  };
+}
 
-    const { collection, doc, setDoc, serverTimestamp, Timestamp } =
-      await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
-
-    let user = AuthCore.auth.currentUser;
-    if (!user) {
-      try { await AuthCore.silentSignIn(); } catch (e) { /* telemetry is best-effort */ }
-      user = AuthCore.auth.currentUser;
-    }
-
-    let recruitCode = null;
-    let studentId = null;
-    if (user && !user.isAnonymous) studentId = user.uid;
-    if (user) {
-      try {
-        const account = await AuthCore.getAccount(user.uid);
-        if (account && account.recruitCode) recruitCode = account.recruitCode;
-      } catch (e) { /* telemetry is best-effort */ }
-    }
-
-    const playedAt = new Date();
-    const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
-    const correct = scenarioLog.filter(s => s.correct).length;
-
-    const sessionDocId = getSessionId() + '_' + Date.now();
-    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
-
-    await setDoc(lastSessionRef, {
+function recordSession(routingReason) {
+  if (!telemetryReady()) return;
+  const correct = scenarioLog.filter(s => s.correct).length;
+  window.Telemetry.complete({
+    routingReason,
+    finalScore: score,
+    scenariosPlayed: scenarioLog.length,
+    correct,
+    summary: {
       game: 'money-moves',
-      sessionId: getSessionId(),
-      recruitCode,
-      studentId,
-      // Always the owning uid, anonymous or not — lets a teacher's roster (Mission Control)
-      // read a Recruit's or a guest's session back via sessionOwnerIsMyStudent().
-      uid: user ? user.uid : null,
-      playedAt: serverTimestamp(),
-      ttl: Timestamp.fromDate(ttl),
+      finalScore: score,
       scenariosPlayed: scenarioLog.length,
       correct,
-      categories: categoryStats
-    });
-  } catch (e) {
-    console.warn('Money Moves telemetry write failed', e);
-  }
+      categories: categoryStats,
+      routingReason,
+    },
+  });
 }
 
 function startGame() {
@@ -776,7 +789,10 @@ function startGame() {
   currentIdx = 0; score = 0;
   categoryStats = {};
   scenarioLog = [];
-  lastSessionRef = null;
+  // Play Again is this game's core loop, so each round gets its own session document
+  // rather than overwriting the last one's numbers.
+  if (window.Telemetry && roundsPlayed > 0) window.Telemetry.restart();
+  roundsPlayed++;
   show('game');
   renderDots();
   renderScenario();
@@ -823,6 +839,13 @@ function choose(pick) {
 
   scenarioLog.push({ id: s.id, category: s.category, correct });
 
+  if (window.Telemetry) {
+    window.Telemetry.step(currentIdx + 1);
+    // `category` is this game's skill tag for the scenario — carried on the choice
+    // event itself rather than as a new event type.
+    window.Telemetry.choice({ scenarioIndex: currentIdx, scenarioId: s.id, correct, category: s.category });
+  }
+
   const data = pick === 'smart' ? s.smart : s.costly;
   showConsequence(data, correct, pick);
 }
@@ -863,7 +886,13 @@ function nextScenario() {
   }
 }
 
-// Ticket 4: route to the GoodBlock matching this session's weakest category.
+// Route to the GoodBlock matching this session's weakest category. The computation is
+// unchanged; what moved is the destination — /js/skill-routing.js searches every lab
+// in /data/modules-registry.json for one tagged with that category, instead of the one
+// hardcoded URL this game knew about. The Jodi-voiced copy stays here: the resolver
+// returns a destination and has no opinion about words.
+const DEFAULT_DEEPER_URL = '/jsh/real-world-ready-lab/money-as-a-skill/';
+const DEFAULT_DEEPER_NAME = 'Money as a Skill';
 const DEEPER_MESSAGES = {
   'Predatory Offer': "Predatory offers caught you. The Money as a Skill lab breaks down exactly how 0% interest, payday loans, and payment plans actually work.",
   'Investment Curiosity': "Investment decisions were your toughest calls. The Money as a Skill lab teaches you how to think about risk before anyone asks you to put money in.",
@@ -885,6 +914,12 @@ function showEnd() {
   const worst = withAccuracy.length ? withAccuracy.sort((a, b) => a[1] - b[1])[0] : null;
   const deeperMsg = worst ? (DEEPER_MESSAGES[worst[0]] || DEFAULT_DEEPER_MSG) : DEFAULT_DEEPER_MSG;
 
+  // The card below renders with the default destination immediately and is upgraded in
+  // place once the registry resolves, so a slow or failed fetch can never leave a
+  // student looking at a dead link.
+  deeperLink = DEFAULT_DEEPER_URL;
+  const fallbackReason = { signal: 'default-fallback', category: worst ? worst[0] : null, destination: DEFAULT_DEEPER_URL };
+
   el.innerHTML = `
     <div class="end-score">${score}</div>
     <div class="end-label">OUT OF 100</div>
@@ -899,7 +934,7 @@ function showEnd() {
     <div class="deeper-card">
       <div class="deeper-label">WANT TO GO DEEPER?</div>
       <div class="deeper-msg">${deeperMsg}</div>
-      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href='${deeperLink}'; })">Try the Money as a Skill Lab →</button>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href = deeperLink; })">Try the Money as a Skill Lab →</button>
     </div>
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
     <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
@@ -907,7 +942,16 @@ function showEnd() {
     <div style="margin-top:8px;font-size:11px;line-height:1.4;color:#8a8a8a;max-width:420px;margin-left:auto;margin-right:auto;text-align:center">Scenarios use realistic averages to build financial intuition, not exact predictions. Talk to a trusted adult or financial professional about your specific situation.</div>
   `;
 
-  recordSession();
+  // Recorded once the destination is settled, so `routingReason` describes the decision
+  // that actually shipped rather than the placeholder rendered a beat earlier.
+  if (window.SkillRouting) {
+    window.SkillRouting
+      .resolve(worst ? worst[0] : null, { defaultUrl: DEFAULT_DEEPER_URL, defaultName: DEFAULT_DEEPER_NAME })
+      .then((dest) => { deeperLink = dest.url; recordSession(routingReasonFrom(dest, fallbackReason)); })
+      .catch(() => recordSession(routingReasonFrom(null, fallbackReason)));
+  } else {
+    recordSession(routingReasonFrom(null, fallbackReason));
+  }
 
   // Same shared save/claim offer as the other three games (window.AuthGate.offerSave()) —
   // one save flow across the site instead of a bespoke one for each game.

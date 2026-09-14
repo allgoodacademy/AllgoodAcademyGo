@@ -228,6 +228,42 @@ export const GAME_REGISTRY = {
     'money-moves':      { name: 'Money Moves', icon: '💸', url: '/educational-games/money-moves/' },
 };
 
+/* Pull the four standalone games out of a student's telemetry session documents.
+ *
+ * A game's session doc is an ordinary telemetry session — uid, module, startedAt,
+ * activeMs, completed — plus a `summary` map the game attaches on complete()
+ * (Telemetry.summary(); see public/js/telemetry.js). The summary is where the numbers a
+ * teacher actually wants live: scenariosPlayed, correct, the per-category breakdown, and
+ * whether the student clicked through to the recommended lesson. It rides on the session
+ * document rather than in the event stream because a teacher can read their own students'
+ * sessions (firestore.rules 10b) and cannot read events at all (rule 11).
+ *
+ * Flattened here into the shape summarizeGameSessions() already consumed, so everything
+ * downstream — and the roster UI — is unchanged by where the data came from. A session
+ * for a module that is not one of the four games, or one with no summary yet (a round
+ * still in progress), is skipped rather than counted as a play. */
+export function gameSessionsFromTelemetry(sessions = []) {
+    const out = [];
+    for (const s of sessions) {
+        if (!s || !GAME_REGISTRY[s.module]) continue;
+        const summary = s.summary || {};
+        if (!summary || typeof summary !== 'object' || summary.scenariosPlayed == null) continue;
+        out.push({
+            id: s.sessionId || null,
+            game: s.module,
+            // A game's round is over the moment the end screen renders, so lastSeenAt is the
+            // closest thing to the old playedAt; startedAt covers a doc flushed before the
+            // first heartbeat.
+            playedAt: s.lastSeenAt || s.startedAt || null,
+            scenariosPlayed: summary.scenariosPlayed,
+            correct: summary.correct,
+            categories: summary.categories || null,
+            clickedDeeperLink: summary.clickedDeeperLink === true,
+        });
+    }
+    return out;
+}
+
 /* A single session's categories map comes back from Firestore as either `categories` or
    `categoryStats` depending on which game wrote it (both games in production write
    `categories`, but this stays tolerant of either key so an older/renamed field never

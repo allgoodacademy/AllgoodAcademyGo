@@ -492,6 +492,7 @@ import { MODULE_DATA } from './module-data.js';
 import {
     relativeTime, buildStudent, classAverage, countActiveThisWeek, choiceTextFor,
     summarizeGameSessions,
+    gameSessionsFromTelemetry,
 } from './derive.js';
 
 const { db, appId, auth, waitForAuthReady } = window.AuthCore;
@@ -547,7 +548,6 @@ const state = {
     view: 'overview',
     filter: '',
     sessionsReadable: true,   // rules may deny a teacher the sessions collection — see load()
-    gameSessionsReadable: true, // same fail-fast pattern, for the game_sessions grant
     expanded: {},             // moduleId -> bool, so a card stays open across re-renders
 };
 
@@ -648,12 +648,15 @@ async function load() {
 async function loadStudent(row) {
     const base = collection(db, 'artifacts', appId, 'users', row.uid, 'game_scores');
 
-    const [scoreSnap, progressSnap, sessions, gameSessions] = await Promise.all([
+    const [scoreSnap, progressSnap, sessions] = await Promise.all([
         getDocs(base).catch(() => null),
         getDocs(collection(db, 'artifacts', appId, 'users', row.uid, 'module_progress')).catch(() => null),
         readSessions(row.uid),
-        readGameSessions(row.uid),
     ]);
+    // The four standalone games are telemetry sessions like everything else now (they used
+    // to have a root-level game_sessions collection of their own), so they come out of the
+    // snapshot already read above — one query per student instead of two.
+    const gameSessions = gameSessionsFromTelemetry(sessions);
 
     const scores = scoreSnap ? scoreSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
 
@@ -703,24 +706,6 @@ async function readSessions(uid) {
         // with no way to recover short of a full reload. Only the former latches.
         if (e && e.code === 'permission-denied') state.sessionsReadable = false;
         console.warn('readSessions failed for', uid, e);
-        return [];
-    }
-}
-
-async function readGameSessions(uid) {
-    // Same one-uid-at-a-time shape as readSessions() and the same reason — see firestore.rules
-    // rule 11b (sessionOwnerIsMyStudent), which this pins to for the rules-cost reason.
-    if (!state.gameSessionsReadable) return [];
-    try {
-        const snap = await getDocs(query(collection(db, 'game_sessions'), where('uid', '==', uid)));
-        return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    } catch (e) {
-        // Same reasoning as readSessions() above: only a genuine permission denial (the rules
-        // grant not yet deployed) is worth latching off for the rest of the roster. A transient
-        // error must not permanently suppress every other student's games for the rest of the
-        // tab's life.
-        if (e && e.code === 'permission-denied') state.gameSessionsReadable = false;
-        console.warn('readGameSessions failed for', uid, e);
         return [];
     }
 }
@@ -868,7 +853,7 @@ function renderDetail(uid) {
    login to try something. Shown below the assigned modules (or the empty-modules note),
    never gating on state.assigned since a student can play these with zero modules set up. */
 function gamesSection(s) {
-    if (!state.gameSessionsReadable) return '';
+    if (!state.sessionsReadable) return '';
     if (!s.games.length) return '';
     return `<div class="steps-label" style="margin-top:20px">GAMES PLAYED</div>`
         + s.games.map(gameCard).join('');

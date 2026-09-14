@@ -1,0 +1,732 @@
+{
+  "_comment": [
+    "SHARED MODULE REGISTRY — the single list of every game, GoodBlock and Challenge.",
+    "",
+    "Plain JSON so a browser page can fetch() it and a Node script can read it with fs.",
+    "Consumers today: public/dashboard/index.html (MODULE_REGISTRY), the three Lab Pack hubs",
+    "(public/jsh/*/index.html), public/js/skill-routing.js (the shared game -> GoodBlock",
+    "resolver) and scripts/check-modules.js (which validates every other surface against it).",
+    "",
+    "FIELDS",
+    "  id          module slug; matches Telemetry.init({ module }) and Insider's COURSES id.",
+    "  name        display name; must match the dashboard card and Insider exactly.",
+    "  type        'game' | 'lab' | 'challenge'.",
+    "  pack        pack id for labs/challenges. ALWAYS null for a game: a game routes across",
+    "              packs depending on which skill a student is weak in, so it belongs to none.",
+    "  url         site-relative, trailing-slash. null for a retired module with no live page.",
+    "  skillTags   [{ framework, code }]. framework 'internal' is the ROUTING vocabulary —",
+    "              the category system Read the Signal proved out. 'CASEL' / 'ISTE' ride along",
+    "              for reporting and are ported verbatim from the coverage-map docs in",
+    "              docs/goodblocks/ — nothing here was invented. A tag may carry its own",
+    "              \"status\": \"draft\" when that ONE tag is new this sprint and unreviewed,",
+    "              even on an entry whose other tags are signed off.",
+    "              An `alias_of` on a tag means the scenario bank spells that category two",
+    "              ways (Read the Signal has both `safe` and `safe-recognition` in its bank)",
+    "              and both must resolve; it is not a second skill. Registered rather than",
+    "              renamed, because relabelling a live game's working categories is not",
+    "              this sprint's job.",
+    "  evidence    REQUIRED on every internal tag: where this placement comes from. Either the",
+    "              shipped routing that already proved it, or the coverage-map Case it rests on.",
+    "              scripts/check-modules.js fails the build on an internal tag without one.",
+    "              This exists because of a real bug: `reputation` was placed on Social",
+    "              Intelligence by content-similarity judgment, with nothing recording why and",
+    "              nothing able to check it, and The Rumor Mill routed there on staging. Social",
+    "              Intelligence does not teach reputational harm — Digital Citizenship does. A",
+    "              placement nobody can cite is a placement nobody can review.",
+    "  status      'reviewed' when the entry's skill tagging has a sign-off behind it,",
+    "              'draft' when this sprint proposed it and Curriculum & Learning Science has",
+    "              not yet reviewed it.",
+    "",
+    "Presentation fields (gameNames, topic, blurb, durationMinutes, badgeThreshold, maxScore,",
+    "hub) are a straight port of what the dashboard and hubs already rendered. Tailwind class",
+    "names deliberately stay in the HTML templates that use them: the CSS build's content globs",
+    "scan public/**/*.html and public/js/**/*.js, NOT .json, so a class moved here would be",
+    "purged out of the bundle. Only data (icon name, hex colors, copy) lives here.",
+    "",
+    "isComplete() predicates stay in the dashboard — a JSON file cannot hold a function."
+  ],
+  "modules": [
+    {
+      "id": "read-the-signal",
+      "name": "Read the Signal",
+      "type": "game",
+      "pack": null,
+      "url": "/educational-games/read-the-signal/",
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "phishing",
+          "evidence": "Read the Signal's own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "privacy",
+          "evidence": "Read the Signal's own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "permissions",
+          "evidence": "Read the Signal's own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "social",
+          "evidence": "Read the Signal's own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "safe-recognition",
+          "evidence": "Read the Signal's own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "safe",
+          "alias_of": "safe-recognition",
+          "evidence": "Read the Signal's own scenario bank (`category` on each scenario)."
+        }
+      ],
+      "status": "reviewed",
+      "defaultDestination": "/jsh/digital-decisions-lab/privacy-security/"
+    },
+    {
+      "id": "before-you-send",
+      "name": "Before You Send",
+      "type": "game",
+      "pack": null,
+      "url": "/educational-games/before-you-send/",
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "escalation-language",
+          "status": "draft",
+          "evidence": "Before You Send's own scenario bank. DRAFT — reasoned from each scenario's `mechanism` text, not yet reviewed by Curriculum & Learning Science."
+        },
+        {
+          "framework": "internal",
+          "code": "audience-choice",
+          "status": "draft",
+          "evidence": "Before You Send's own scenario bank. DRAFT — reasoned from each scenario's `mechanism` text, not yet reviewed by Curriculum & Learning Science."
+        },
+        {
+          "framework": "internal",
+          "code": "self-advocacy",
+          "status": "draft",
+          "evidence": "Before You Send's own scenario bank. DRAFT — reasoned from each scenario's `mechanism` text, not yet reviewed by Curriculum & Learning Science."
+        },
+        {
+          "framework": "internal",
+          "code": "vulnerability",
+          "status": "draft",
+          "evidence": "Before You Send's own scenario bank. DRAFT — reasoned from each scenario's `mechanism` text, not yet reviewed by Curriculum & Learning Science."
+        },
+        {
+          "framework": "internal",
+          "code": "tone-under-emotion",
+          "status": "draft",
+          "evidence": "Before You Send's own scenario bank. DRAFT — reasoned from each scenario's `mechanism` text, not yet reviewed by Curriculum & Learning Science."
+        }
+      ],
+      "status": "draft",
+      "defaultDestination": "/jsh/digital-decisions-lab/social-intelligence/"
+    },
+    {
+      "id": "the-rumor-mill",
+      "name": "The Rumor Mill",
+      "type": "game",
+      "pack": null,
+      "url": "/educational-games/the-rumor-mill/",
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "misinformation",
+          "evidence": "The Rumor Mill's own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "accuracy",
+          "evidence": "The Rumor Mill's own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "reputation",
+          "evidence": "The Rumor Mill's own scenario bank (`category` on each scenario)."
+        }
+      ],
+      "status": "reviewed",
+      "defaultDestination": "/jsh/digital-decisions-lab/digital-citizenship/"
+    },
+    {
+      "id": "money-moves",
+      "name": "Money Moves",
+      "type": "game",
+      "pack": null,
+      "url": "/educational-games/money-moves/",
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "first-paycheck",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "predatory-offer",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "investment-curiosity",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "peer-pressure",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "long-term-thinking",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "credit-basics",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "financial-conversations",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "income-vs-expenses",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        },
+        {
+          "framework": "internal",
+          "code": "taking-ownership",
+          "evidence": "Money Moves' own scenario bank (`category` on each scenario)."
+        }
+      ],
+      "status": "reviewed",
+      "defaultDestination": "/jsh/real-world-ready-lab/money-as-a-skill/"
+    },
+    {
+      "id": "ddc",
+      "name": "Digital Decisions",
+      "type": "challenge",
+      "pack": "digital-decisions",
+      "url": "/educational-games/digital-decisions/",
+      "gameNames": [
+        "Digital Decisions Challenge"
+      ],
+      "badgeThreshold": 68,
+      "maxScore": 84,
+      "durationMinutes": 25,
+      "skillTags": [],
+      "status": "reviewed"
+    },
+    {
+      "id": "social-intelligence",
+      "name": "Social Intelligence",
+      "type": "lab",
+      "pack": "digital-decisions",
+      "url": "/jsh/digital-decisions-lab/social-intelligence/",
+      "gameNames": [
+        "Social Intelligence"
+      ],
+      "topic": "Reading people",
+      "blurb": "How a group read lands, and what it costs to get it wrong.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "social",
+          "evidence": "Shipped routing: Read the Signal sent `social` here before this sprint. Content: docs/goodblocks/digital-decisions-coverage-map.md — Social Intelligence, CASEL Social Awareness · Relationship Skills."
+        },
+        {
+          "framework": "internal",
+          "code": "vulnerability",
+          "status": "draft",
+          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Social Intelligence Case 4 (The Script Lab: Observation + Impact + Clean Ask) and Case 5 (The Ally Protocol: a warm private check-in), CASEL Relationship Skills. NEW THIS SPRINT — the weakest of the placements here; see the PR."
+        },
+        {
+          "framework": "internal",
+          "code": "tone-under-emotion",
+          "status": "draft",
+          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Social Intelligence Case 6 (The Temperature Check: an abrasive message lands, a high-heat reply is staged, one tap runs a three-second reset). NEW THIS SPRINT."
+        },
+        {
+          "framework": "CASEL",
+          "code": "Social Awareness"
+        },
+        {
+          "framework": "CASEL",
+          "code": "Relationship Skills"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2b"
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "radar",
+        "iconColor": "#D34716",
+        "iconBg": "#FFF7ED",
+        "iconBorder": "#FFEDD5",
+        "cardBlurb": "Read the room before you react — audiences, scripts, allyship, and the three-second pause that changes an outcome."
+      }
+    },
+    {
+      "id": "privacy-security",
+      "name": "Privacy & Security",
+      "type": "lab",
+      "pack": "digital-decisions",
+      "url": "/jsh/digital-decisions-lab/privacy-security/",
+      "gameNames": [
+        "Privacy & Security"
+      ],
+      "topic": "Staying private",
+      "blurb": "What you leave behind online, and who can pick it up.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "phishing",
+          "evidence": "Shipped routing: Read the Signal sent `phishing` here before this sprint. Content: docs/goodblocks/digital-decisions-coverage-map.md — Privacy & Security Case 2 (The Scam Sort), Case 5 (The DM Redirect)."
+        },
+        {
+          "framework": "internal",
+          "code": "privacy",
+          "evidence": "Shipped routing: Read the Signal sent `privacy` here before this sprint. Content: docs/goodblocks/digital-decisions-coverage-map.md — Privacy & Security Case 5, ISTE 2d."
+        },
+        {
+          "framework": "internal",
+          "code": "permissions",
+          "evidence": "Shipped routing: Read the Signal sent `permissions` here before this sprint. Content: docs/goodblocks/digital-decisions-coverage-map.md — Privacy & Security Case 3 (The Permission Calibration), ISTE 2d."
+        },
+        {
+          "framework": "CASEL",
+          "code": "Responsible Decision-Making"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2d"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2b"
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "search-check",
+        "iconColor": "#5646A8",
+        "iconBg": "#EEEBFA",
+        "iconBorder": "#D8D2F0",
+        "cardBlurb": "Scams, permissions, passwords, and phishing DMs — spotting what's actually trying to get something from you."
+      }
+    },
+    {
+      "id": "digital-citizenship",
+      "name": "Digital Citizenship",
+      "type": "lab",
+      "pack": "digital-decisions",
+      "url": "/jsh/digital-decisions-lab/digital-citizenship/",
+      "gameNames": [
+        "Digital Citizenship"
+      ],
+      "topic": "Being online",
+      "blurb": "The version of you that shows up when you post.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "safe-recognition",
+          "evidence": "Shipped routing: Read the Signal sent `safe-recognition` here before this sprint. Content: docs/goodblocks/digital-decisions-coverage-map.md — Digital Citizenship, ISTE 3b."
+        },
+        {
+          "framework": "internal",
+          "code": "safe",
+          "alias_of": "safe-recognition",
+          "evidence": "Alias of `safe-recognition` — same placement, same evidence. Read the Signal's bank spells the category both ways."
+        },
+        {
+          "framework": "internal",
+          "code": "misinformation",
+          "evidence": "Shipped routing: The Rumor Mill's pre-sprint destination for every session. Content: docs/goodblocks/digital-decisions-coverage-map.md — Digital Citizenship ISTE 3b (four Challenge items judging a source, an AI-cited fact, a fundraiser, a screenshot) and Case 4 (The One You've Never Heard Of)."
+        },
+        {
+          "framework": "internal",
+          "code": "reputation",
+          "status": "draft",
+          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Digital Citizenship Case 5 (The One You Know Is Fake: \"saying nothing is a choice too, and somebody else pays for it\" — the cost is carried by Della and the donors) and Case 6 (The Toxic Lobby: Report/Mute/Block), ISTE 2b. NEW THIS SPRINT."
+        },
+        {
+          "framework": "CASEL",
+          "code": "Responsible Decision-Making"
+        },
+        {
+          "framework": "CASEL",
+          "code": "Social Awareness"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2c"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2b"
+        },
+        {
+          "framework": "ISTE",
+          "code": "3b"
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "globe",
+        "iconColor": "#2B5FA8",
+        "iconBg": "#E9EFF9",
+        "iconBorder": "#CBD9EF",
+        "cardBlurb": "Sources, reposts, fact-checks, and pile-ons — verifying before you share, and using the tools instead of taking the bait."
+      }
+    },
+    {
+      "id": "professional-brand",
+      "name": "Professional Brand",
+      "type": "lab",
+      "pack": "digital-decisions",
+      "url": "/jsh/digital-decisions-lab/professional-brand/",
+      "gameNames": [
+        "Professional Brand"
+      ],
+      "topic": "How you come across",
+      "blurb": "What a stranger decides about you in six seconds.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "self-advocacy",
+          "status": "draft",
+          "evidence": "docs/goodblocks/digital-decisions-coverage-map.md — Professional Brand Case 3 (The Draft: a real bug, written as felt, \"not wrong; aimed at the wrong room\" — rewrite before sending). That is Before You Send's `self-advocacy` cluster exactly. NEW THIS SPRINT."
+        },
+        {
+          "framework": "CASEL",
+          "code": "Self-Awareness"
+        },
+        {
+          "framework": "CASEL",
+          "code": "Responsible Decision-Making"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2a"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2c"
+        },
+        {
+          "framework": "ISTE",
+          "code": "2b"
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "briefcase-business",
+        "iconColor": "#7C3D8E",
+        "iconBg": "#F3E8F9",
+        "iconBorder": "#E3CBEF",
+        "cardBlurb": "One ordinary week of small choices — a profile, a bug report, a group project, a class, a Friday — and what they add up to."
+      }
+    },
+    {
+      "id": "money-as-a-skill",
+      "name": "Money as a Skill",
+      "type": "lab",
+      "pack": "real-world-ready",
+      "url": "/jsh/real-world-ready-lab/money-as-a-skill/",
+      "gameNames": [
+        "Money as a Skill"
+      ],
+      "topic": "Money",
+      "blurb": "Money is a skill you practise, not a personality you have.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "first-paycheck",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "predatory-offer",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "investment-curiosity",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "peer-pressure",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "long-term-thinking",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "credit-basics",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "financial-conversations",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "income-vs-expenses",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "internal",
+          "code": "taking-ownership",
+          "evidence": "Shipped routing: Money Moves sent all nine of its categories here before this sprint. Content: docs/goodblocks/real-world-ready-coverage-map.md — Money as a Skill, CASEL Responsible Decision-Making · Self-Management."
+        },
+        {
+          "framework": "CASEL",
+          "code": "Responsible Decision-Making"
+        },
+        {
+          "framework": "CASEL",
+          "code": "Self-Management"
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "coins",
+        "iconColor": "#C97D1A",
+        "iconBg": "#FEF3DC",
+        "iconBorder": "#F3D9A8",
+        "cardBlurb": "Splitting, spending, and the ask most people never make."
+      }
+    },
+    {
+      "id": "conflict-has-a-winner",
+      "name": "Conflict Has a Winner",
+      "type": "lab",
+      "pack": "real-world-ready",
+      "url": "/jsh/real-world-ready-lab/conflict-has-a-winner/",
+      "gameNames": [
+        "Conflict Has a Winner"
+      ],
+      "topic": "Handling conflict",
+      "blurb": "Who actually wins an argument, and what it cost them.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "escalation-language",
+          "status": "draft",
+          "evidence": "docs/goodblocks/real-world-ready-coverage-map.md — Conflict Has a Winner Case 3 (The Cost of Being Right: \"being right is a fact, being effective is a choice\") and Case 6 (When You're the One Who's Wrong). NEW THIS SPRINT."
+        },
+        {
+          "framework": "CASEL",
+          "code": "Relationship Skills"
+        },
+        {
+          "framework": "CASEL",
+          "code": "Self-Management"
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "merge",
+        "iconColor": "#C97D1A",
+        "iconBg": "#FEF3DC",
+        "iconBorder": "#F3D9A8",
+        "cardBlurb": "Disagreeing without someone having to lose."
+      }
+    },
+    {
+      "id": "reading-the-room",
+      "name": "Reading the Room",
+      "type": "lab",
+      "pack": "real-world-ready",
+      "url": "/jsh/real-world-ready-lab/reading-the-room/",
+      "gameNames": [
+        "Reading the Room"
+      ],
+      "topic": "Reading the room",
+      "blurb": "Five first reads, and what checking one would have changed.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "CASEL",
+          "code": "Social Awareness"
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "glasses",
+        "iconColor": "#C97D1A",
+        "iconBg": "#FEF3DC",
+        "iconBorder": "#F3D9A8",
+        "cardBlurb": "Your first read is a signal, not a verdict."
+      }
+    },
+    {
+      "id": "rwr-challenge",
+      "name": "Real World Ready Challenge",
+      "type": "challenge",
+      "pack": "real-world-ready",
+      "url": "/educational-games/real-world-ready/",
+      "gameNames": [
+        "Real World Ready Challenge"
+      ],
+      "badgeThreshold": 64,
+      "maxScore": 72,
+      "durationMinutes": 20,
+      "skillTags": [],
+      "status": "reviewed"
+    },
+    {
+      "id": "ten-voices-one-source",
+      "name": "Ten Voices, One Source",
+      "type": "lab",
+      "pack": "room-to-think",
+      "url": "/jsh/room-to-think-lab/ten-voices-one-source/",
+      "gameNames": [
+        "Ten Voices, One Source"
+      ],
+      "topic": "Checking a claim",
+      "blurb": "Nine people said it. Two of them found out.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "accuracy",
+          "status": "draft",
+          "evidence": "docs/goodblocks/room-to-think-coverage-map.md section 3, Category 1 `source_counting`: \"Independence is counted at the origin, not the headline\" and \"Repetition without a source is one rumour, forwarded\" — The Rumor Mill's `accuracy` scenarios are that mechanism. NEW THIS SPRINT."
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "git-merge",
+        "iconColor": "#9B3B5A",
+        "iconBg": "#FBEAF0",
+        "iconBorder": "#EBC6D3",
+        "cardBlurb": "Nine people said it. Two of them found out."
+      }
+    },
+    {
+      "id": "the-question-decides-the-answer",
+      "name": "The Question Decides the Answer",
+      "type": "lab",
+      "pack": "room-to-think",
+      "url": "/jsh/room-to-think-lab/the-question-decides-the-answer/",
+      "gameNames": [
+        "The Question Decides the Answer"
+      ],
+      "topic": "How you ask",
+      "blurb": "Ask it the other way and see what comes back.",
+      "durationMinutes": 15,
+      "skillTags": [],
+      "status": "reviewed",
+      "hub": {
+        "icon": "scan-search",
+        "iconColor": "#9B3B5A",
+        "iconBg": "#FBEAF0",
+        "iconBorder": "#EBC6D3",
+        "cardBlurb": "Ask it the other way and see what comes back."
+      }
+    },
+    {
+      "id": "where-you-say-it",
+      "name": "Where You Say It",
+      "type": "lab",
+      "pack": "room-to-think",
+      "url": "/jsh/room-to-think-lab/where-you-say-it/",
+      "gameNames": [
+        "Where You Say It"
+      ],
+      "topic": "Saying the hard thing",
+      "blurb": "The same sentence lands four different ways.",
+      "durationMinutes": 15,
+      "skillTags": [
+        {
+          "framework": "internal",
+          "code": "audience-choice",
+          "status": "draft",
+          "evidence": "docs/goodblocks/room-to-think-coverage-map.md section 3, Category 3 — the pack's own category is literally named `audience_choice`; A1/A3 are the same mechanism Before You Send tags. NEW THIS SPRINT."
+        }
+      ],
+      "status": "reviewed",
+      "hub": {
+        "icon": "megaphone",
+        "iconColor": "#9B3B5A",
+        "iconBg": "#FBEAF0",
+        "iconBorder": "#EBC6D3",
+        "cardBlurb": "The same sentence lands four different ways."
+      }
+    },
+    {
+      "id": "the-cost-of-later",
+      "name": "The Cost of Later",
+      "type": "lab",
+      "pack": "room-to-think",
+      "url": "/jsh/room-to-think-lab/the-cost-of-later/",
+      "gameNames": [
+        "The Cost of Later"
+      ],
+      "topic": "Starting early",
+      "blurb": "The options run out before the deadline does.",
+      "durationMinutes": 15,
+      "skillTags": [],
+      "status": "reviewed",
+      "hub": {
+        "icon": "calendar-clock",
+        "iconColor": "#9B3B5A",
+        "iconBg": "#FBEAF0",
+        "iconBorder": "#EBC6D3",
+        "cardBlurb": "The options run out before the deadline does."
+      }
+    },
+    {
+      "id": "rtt-challenge",
+      "name": "Room to Think Challenge",
+      "type": "challenge",
+      "pack": "room-to-think",
+      "url": "/educational-games/room-to-think/",
+      "gameNames": [
+        "Room to Think Challenge"
+      ],
+      "badgeThreshold": 64,
+      "maxScore": 72,
+      "durationMinutes": 20,
+      "skillTags": [],
+      "status": "reviewed"
+    },
+    {
+      "id": "jolenes-lemonade",
+      "name": "Jolene's Lemonade Challenge",
+      "type": "challenge",
+      "pack": null,
+      "url": null,
+      "gameNames": [
+        "Jolenes Lemonade Challenge",
+        "Jolene's Lemonade"
+      ],
+      "retired": true,
+      "skillTags": [],
+      "status": "reviewed"
+    }
+  ]
+}

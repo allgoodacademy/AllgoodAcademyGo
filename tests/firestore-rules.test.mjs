@@ -180,6 +180,38 @@ await it('a student CANNOT read a classmate\'s sessions', async () => {
 await it('teacher still CANNOT write or delete a session', async () => {
   await assertFails(setDoc(doc(teacher, 'artifacts', APP, 'sessions', 's1'), { uid: 'student_1', activeMs: 999 }, { merge: true }));
 });
+console.log('\nRETIRED game_sessions — the four games write through the shared pipe now');
+// The root-level `game_sessions` collection and its two match blocks were deleted when the
+// games moved onto /js/telemetry.js. Nothing writes there any more, and the catch-all deny
+// at the bottom of firestore.rules must be what answers anything that tries.
+const GAME_SESSION = (db) => doc(db, 'game_sessions', 'anything');
+await it('a signed-in student CANNOT create a game_sessions document any more', async () => {
+  await assertFails(setDoc(GAME_SESSION(student), {
+    game: 'read-the-signal', sessionId: 's', uid: 'student_1', scenariosPlayed: 10, correct: 7,
+  }));
+});
+await it('a guest CANNOT create one either', async () => {
+  await assertFails(setDoc(GAME_SESSION(guest), { game: 'money-moves', uid: 'guest_1' }));
+});
+await it('a teacher CANNOT read game_sessions (the old rule 11b grant is gone)', async () => {
+  await assertFails(getDocs(query(collection(teacher, 'game_sessions'), where('uid', '==', 'student_1'))));
+});
+await it('a game session IS recordable at the shared path instead', async () => {
+  // The replacement path, exercised the way telemetry.js writes it — including the
+  // `summary` map the games attach, which is what Mission Control reads back.
+  await assertSucceeds(setDoc(doc(student, 'artifacts', APP, 'sessions', 'game_s1'), {
+    uid: 'student_1', module: 'read-the-signal', gameName: 'Read the Signal', startedAt: 1,
+    summary: { game: 'read-the-signal', scenariosPlayed: 10, correct: 7, categories: { phishing: { played: 5, correct: 2 } } },
+  }));
+});
+await it('...and a choice event carrying a skill tag is accepted by the events rule', async () => {
+  await assertSucceeds(setDoc(doc(student, 'artifacts', APP, 'events', 'game_e1'), {
+    uid: 'student_1', module: 'read-the-signal', gameName: 'Read the Signal',
+    sessionId: 'game_s1', event: 'choice', step: 3,
+    meta: { scenarioIndex: 2, correct: false, category: 'phishing' }, ts: 1, clientTs: 1,
+  }));
+});
+
 await it('teacher CAN read a classroom student\'s scenario_attempts (the drill-down)', async () => {
   // Rule #6 already covers this; asserted here because Mission Control's step-by-step
   // breakdown is unreadable without it, and #6 is the rule a future roster change is most

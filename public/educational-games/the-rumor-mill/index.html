@@ -14,6 +14,13 @@
      every GoodBlock, Read the Signal, and Before You Send. Here that's the end-screen
      save offer. -->
 <script type="module" src="/js/identity-gate.js"></script>
+<!-- Shared telemetry pipe (artifacts/{appId}/sessions + /events) — the same one every
+     GoodBlock and Challenge uses, replacing this game's own root-level game_sessions
+     writer. See /js/telemetry.js. -->
+<script type="module" src="/js/telemetry.js"></script>
+<!-- Shared skill -> GoodBlock resolver. This game already tracked real per-category
+     performance and then never read it; it does now. See /js/skill-routing.js. -->
+<script type="module" src="/js/skill-routing.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -871,7 +878,7 @@ let choiceTally = { forward: 0, verify: 0, stop: 0 };
 let misinfoForwarded = 0, truthStopped = 0, verifyUsedCount = 0;
 let categoryStats = {};
 let scenarioLog = [];
-let lastSessionRef = null;
+let roundsPlayed = 0;
 let deeperLink = '/jsh/digital-decisions-lab/digital-citizenship/';
 
 function show(id) {
@@ -884,58 +891,72 @@ function show(id) {
   target.style.alignItems = 'center';
 }
 
-// --- Telemetry: one game_sessions document per completed session, same
-// sessionStorage-UUID + 90-day-TTL pattern as the other two games.
-function getSessionId() {
-  let id = sessionStorage.getItem('trm_session_id');
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem('trm_session_id', id);
-  }
-  return id;
+// --- Telemetry: the shared pipe (/js/telemetry.js), same as every GoodBlock and
+// Challenge. This game used to write its own document to a root-level game_sessions
+// collection with its own field allowlist in firestore.rules; both are gone. What gets
+// tracked is unchanged — the per-category breakdown now rides on the session
+// document's `summary` map, which is the part of the pipe a teacher's Mission Control
+// roster can read back.
+function telemetryReady() {
+  return !!window.Telemetry;
 }
 
-async function recordSession() {
-  try {
-    const AuthCore = window.AuthCore;
-    if (!AuthCore) return;
+// telemetry.js is a module script and has not necessarily run when this classic script
+// does. Poll briefly rather than racing it; if it never arrives the game is unaffected.
+function initTelemetry(tries) {
+  if (telemetryReady()) {
+    window.Telemetry.init({ module: 'the-rumor-mill', gameName: 'The Rumor Mill', stepsTotal: 10 });
+    return;
+  }
+  if ((tries || 0) > 100) return;
+  setTimeout(() => initTelemetry((tries || 0) + 1), 50);
+}
+initTelemetry(0);
 
-    const { collection, doc, setDoc, serverTimestamp, Timestamp } =
-      await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+// Best-effort click-through tracking, fire-and-forget — same pattern across all four
+// games. Written to the session doc (teacher-readable) as well as the event stream.
+function markDeeperClicked() {
+  if (!telemetryReady()) return;
+  window.Telemetry.summary({ clickedDeeperLink: true });
+  window.Telemetry.track('deeper_link_click', { destination: deeperLink });
+}
 
-    let user = AuthCore.auth.currentUser;
-    if (!user) {
-      try { await AuthCore.silentSignIn(); } catch (e) { /* telemetry is best-effort */ }
-      user = AuthCore.auth.currentUser;
-    }
+// Which PATH picked the destination, not just where it landed. A URL alone cannot tell a
+// category match from a behaviour-pattern read or a plain fallback. See the `routingReason`
+// note in /js/skill-routing.js. Written into the session doc and the module_complete event;
+// a debugging/verification field, never shown to a student.
+function routingReasonFrom(dest, fallback) {
+  if (dest && dest.reason === 'category-match') {
+    return {
+      signal: 'category-match',
+      category: dest.category,
+      matchedModuleId: dest.matchedId,
+      matchedPack: dest.matchedPack,
+      tagStatus: dest.tagStatus,
+      destination: dest.url,
+      // Recorded even when the category decided it, so a reviewer can see whether the two
+      // signals agreed or the category overrode the behaviour read.
+      ...(fallback.behaviorPattern ? { behaviorPattern: fallback.behaviorPattern } : {}),
+    };
+  }
+  return {
+    ...fallback,
+    destination: (dest && dest.url) || fallback.destination,
+    resolverReason: dest ? dest.reason : 'resolver-unavailable',
+  };
+}
 
-    let recruitCode = null;
-    let studentId = null;
-    if (user && !user.isAnonymous) studentId = user.uid;
-    if (user) {
-      try {
-        const account = await AuthCore.getAccount(user.uid);
-        if (account && account.recruitCode) recruitCode = account.recruitCode;
-      } catch (e) { /* telemetry is best-effort */ }
-    }
-
-    const playedAt = new Date();
-    const ttl = new Date(playedAt.getTime() + 90 * 24 * 60 * 60 * 1000);
-    const correct = scenarioLog.filter(s => s.correct).length;
-
-    const sessionDocId = getSessionId() + '_' + Date.now();
-    lastSessionRef = doc(AuthCore.db, 'game_sessions', sessionDocId);
-
-    await setDoc(lastSessionRef, {
+function recordSession(routingReason) {
+  if (!telemetryReady()) return;
+  const correct = scenarioLog.filter(s => s.correct).length;
+  window.Telemetry.complete({
+    routingReason,
+    finalScore: score,
+    scenariosPlayed: scenarioLog.length,
+    correct,
+    summary: {
       game: 'the-rumor-mill',
-      sessionId: getSessionId(),
-      recruitCode,
-      studentId,
-      // Always the owning uid, anonymous or not — lets a teacher's roster (Mission Control)
-      // read a Recruit's or a guest's session back via sessionOwnerIsMyStudent().
-      uid: user ? user.uid : null,
-      playedAt: serverTimestamp(),
-      ttl: Timestamp.fromDate(ttl),
+      finalScore: score,
       scenariosPlayed: scenarioLog.length,
       correct,
       choices: choiceTally,
@@ -943,11 +964,10 @@ async function recordSession() {
       truthStopped,
       verifyUsed: verifyUsedCount,
       categories: categoryStats,
-      scenarios: scenarioLog
-    });
-  } catch (e) {
-    console.warn('The Rumor Mill telemetry write failed', e);
-  }
+      scenarios: scenarioLog,
+      routingReason,
+    },
+  });
 }
 
 function startGame() {
@@ -959,7 +979,10 @@ function startGame() {
   misinfoForwarded = 0; truthStopped = 0; verifyUsedCount = 0;
   categoryStats = {};
   scenarioLog = [];
-  lastSessionRef = null;
+  // Play Again is this game's core loop, so each round gets its own session document
+  // rather than overwriting the last one's numbers.
+  if (window.Telemetry && roundsPlayed > 0) window.Telemetry.restart();
+  roundsPlayed++;
   show('game');
   renderDots();
   renderNetwork();
@@ -1123,6 +1146,13 @@ function choose(action) {
 
   scenarioLog.push({ id: s.id, category: s.category, truth: s.truth, choice: action, correct, verifyUsed: verified, timeUsed });
 
+  if (window.Telemetry) {
+    window.Telemetry.step(currentIdx + 1);
+    // `category` is this game's skill tag for the scenario — carried on the choice
+    // event itself rather than as a new event type.
+    window.Telemetry.choice({ scenarioIndex: currentIdx, scenarioId: s.id, choice: action, correct, verifyUsed: verified, category: s.category });
+  }
+
   showConsequence(data, action, s.truth);
 }
 
@@ -1155,6 +1185,35 @@ function nextScenario() {
   }
 }
 
+// A category is only worth routing on if the student actually missed in it more than once.
+// A single miss in a two-scenario category reads as 100%-weakest and is noise: a student who
+// scored 8/10 with their two misses in different categories has no categorical weakness, and
+// routing hard off one of them is how The Rumor Mill sent a strong player somewhere unrelated
+// on staging. Two misses is the floor for "pattern".
+//
+// Deliberately NOT applied to Read the Signal or Money Moves: their weakest-category
+// computation shipped and works, and changing it was explicitly out of scope. This floor
+// guards the category routing introduced this sprint.
+const MIN_MISSES_TO_ROUTE = 2;
+function weakestActionableCategory(stats) {
+  const eligible = Object.entries(stats)
+    .filter(([, c]) => (c.played - c.correct) >= MIN_MISSES_TO_ROUTE)
+    .map(([cat, c]) => [cat, c.correct / c.played]);
+  return eligible.length ? eligible.sort((a, b) => a[1] - b[1])[0] : null;
+}
+
+// One message per category this game already tracks, same shape as Money Moves'
+// DEEPER_MESSAGES. The resolver picks the destination; these words stay here, in this
+// game's own voice.
+const CATEGORY_MESSAGES = {
+  misinformation: "False claims got past you. The lab goes deeper on reading a source before you pass anything on — who said it first, and how you would know.",
+  accuracy: "Judging what was actually true was your toughest call. The lab goes deeper on counting how many people really found out, as against how many repeated it.",
+  reputation: "The calls with someone's reputation on the line were your hardest. The lab goes deeper on what a forwarded claim costs the person in it.",
+};
+const DEFAULT_DEEPER_URL = '/jsh/digital-decisions-lab/digital-citizenship/';
+const DEFAULT_DEEPER_NAME = 'Digital Citizenship';
+const DEFAULT_DEEPER_MSG = "The Digital Citizenship lab sharpens the instincts you just practiced — source evaluation, claim checking, knowing when to stop the chain.";
+
 function showEnd() {
   show('end');
   const el = document.getElementById('end');
@@ -1162,16 +1221,45 @@ function showEnd() {
   const correctCount = scenarioLog.filter(s => s.correct).length;
   const rating = score >= 80 ? 'Sharp reader' : score >= 50 ? 'Getting there' : 'Needs work';
 
-  // Ticket 5: adaptive routing based on this session's pattern.
+  // Two signals, and until this sprint only one of them was read. categoryStats has
+  // always tracked misinformation / accuracy / reputation correctness — exactly like
+  // Money Moves — and showEnd() ignored it completely, picking from misinfoForwarded /
+  // truthStopped and then sending everyone to Digital Citizenship regardless. Both
+  // signals are real and they measure different things:
+  //   - the CATEGORY read says which topic the student is weak in;
+  //   - the BEHAVIOR PATTERN says how they tend to act under virality pressure.
+  // So the category picks the destination (through the shared resolver, which can
+  // reach a lab in any pack) and leads the message; the behavior pattern still colors
+  // the message, and is the whole message when no category stands out.
+  const worst = weakestActionableCategory(categoryStats);
+
   let deeperMsg;
-  if (misinfoForwarded >= 4) {
+  if (worst) {
+    deeperMsg = CATEGORY_MESSAGES[worst[0]] || DEFAULT_DEEPER_MSG;
+    // Behavior pattern as tone, not as the whole read — a student who forwarded four
+    // false claims and one who stopped three true ones need the same lesson said
+    // differently.
+    if (misinfoForwarded >= 4) deeperMsg = 'Your network spread some false information. ' + deeperMsg;
+    else if (truthStopped >= 3) deeperMsg = 'You stopped some things that were worth sharing. ' + deeperMsg;
+  } else if (misinfoForwarded >= 4) {
     deeperMsg = "Your network spread some false information. The Digital Citizenship lab goes deeper on reading a source before you share.";
   } else if (truthStopped >= 3) {
     deeperMsg = "You stopped some things that were worth sharing. The Digital Citizenship lab helps you tell the difference.";
   } else {
-    deeperMsg = "The Digital Citizenship lab sharpens the instincts you just practiced — source evaluation, claim checking, knowing when to stop the chain.";
+    deeperMsg = DEFAULT_DEEPER_MSG;
   }
-  deeperLink = '/jsh/digital-decisions-lab/digital-citizenship/';
+
+  // Render with the default destination immediately and upgrade in place once the
+  // registry resolves, so a slow or failed fetch can never leave a dead link.
+  deeperLink = DEFAULT_DEEPER_URL;
+  const behaviorPattern = misinfoForwarded >= 4 ? 'spread-misinformation'
+    : truthStopped >= 3 ? 'over-stopped-truth' : null;
+  const fallbackReason = {
+    signal: behaviorPattern ? 'behavior-pattern' : 'default-fallback',
+    category: worst ? worst[0] : null,
+    destination: DEFAULT_DEEPER_URL,
+    ...(behaviorPattern ? { behaviorPattern } : {}),
+  };
 
   el.innerHTML = `
     <div class="end-score">${score}</div>
@@ -1188,14 +1276,23 @@ function showEnd() {
     <div class="deeper-card">
       <div class="deeper-label">WANT TO GO DEEPER?</div>
       <div class="deeper-msg">${deeperMsg}</div>
-      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href='${deeperLink}'; })">Open the lab →</button>
+      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href = deeperLink; })">Open the lab →</button>
     </div>
     <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
     <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
     <div class="wordmark" style="margin-top:16px">Allgood Academy · Free for all learners, always.</div>
   `;
 
-  recordSession();
+  // Recorded once the destination is settled, so `routingReason` describes the decision
+  // that actually shipped rather than the placeholder rendered a beat earlier.
+  if (window.SkillRouting) {
+    window.SkillRouting
+      .resolve(worst ? worst[0] : null, { defaultUrl: DEFAULT_DEEPER_URL, defaultName: DEFAULT_DEEPER_NAME })
+      .then((dest) => { deeperLink = dest.url; recordSession(routingReasonFrom(dest, fallbackReason)); })
+      .catch(() => recordSession(routingReasonFrom(null, fallbackReason)));
+  } else {
+    recordSession(routingReasonFrom(null, fallbackReason));
+  }
 
   // Same shared save/claim offer as the other two games (window.AuthGate.offerSave()) —
   // one save flow across the site instead of a bespoke one for each game.
@@ -1206,15 +1303,6 @@ function showEnd() {
       window.AuthGate.offerSave().catch((e) => console.error('[TheRumorMill] offerSave failed', e));
     }, 1200);
   }
-}
-
-// Best-effort click-through tracking, fire-and-forget — same pattern as the
-// other three games.
-function markDeeperClicked() {
-  if (!lastSessionRef) return;
-  import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
-    .then(({ updateDoc }) => updateDoc(lastSessionRef, { clickedDeeperLink: true }))
-    .catch(() => {});
 }
 
 function restartGame() { startGame(); }

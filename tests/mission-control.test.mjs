@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import {
     DAY, toMillis, relativeTime, initialsOf, stepFromProgress, bestScore,
     attemptsByStep, deriveStatus, buildStudent, classAverage, countActiveThisWeek, choiceTextFor,
+    gameSessionsFromTelemetry, summarizeGameSessions,
 } from '../public/mission-control/derive.js';
 import { MODULE_DATA } from '../public/mission-control/module-data.js';
 
@@ -283,4 +284,73 @@ test('every lab Case wired with Telemetry.choice has choice text to render it wi
             assert.ok(step.choices && step.choices.length, `${id} Case ${i + 1} commits a choice but has no CASE_CHOICES entry`);
         }
     }
+});
+
+
+// --- the four standalone games, after they moved onto the shared telemetry pipe.
+// They used to write their own documents to a root-level game_sessions collection; they now
+// write ordinary telemetry session documents with a `summary` map. gameSessionsFromTelemetry
+// is the whole of the difference, so everything Mission Control shows per game depends on it
+// getting exactly these cases right.
+const gameSession = (over = {}) => ({
+    module: 'read-the-signal', sessionId: 'rts_1', startedAt: 100, lastSeenAt: 500,
+    summary: { game: 'read-the-signal', scenariosPlayed: 10, correct: 7, categories: { phishing: { played: 5, correct: 2 } } },
+    ...over,
+});
+
+test('a game session document is flattened into the shape the summary code consumes', () => {
+    const [g] = gameSessionsFromTelemetry([gameSession()]);
+    assert.equal(g.game, 'read-the-signal');
+    assert.equal(g.id, 'rts_1');
+    assert.equal(g.scenariosPlayed, 10);
+    assert.equal(g.correct, 7);
+    assert.equal(g.playedAt, 500, 'lastSeenAt is the closest thing to the old playedAt');
+    assert.deepEqual(g.categories, { phishing: { played: 5, correct: 2 } });
+    assert.equal(g.clickedDeeperLink, false);
+});
+
+test('a GoodBlock session is not a game session', () => {
+    // Every module writes to the same collection now, so the filter is the only thing
+    // keeping labs out of the games strip — and a lab has no summary to misread either.
+    const out = gameSessionsFromTelemetry([
+        { module: 'social-intelligence', sessionId: 'si_1', lastSeenAt: 5, activeMs: 900 },
+        { module: 'ddc', sessionId: 'ddc_1', lastSeenAt: 6 },
+    ]);
+    assert.deepEqual(out, []);
+});
+
+test('a round still in progress is not counted as a play', () => {
+    // complete() is what attaches the summary. Until then there are no numbers to show, and
+    // counting it would inflate `plays` every time a student opened a game and wandered off.
+    const out = gameSessionsFromTelemetry([
+        gameSession({ summary: undefined }),
+        gameSession({ sessionId: 'rts_2', summary: {} }),
+    ]);
+    assert.deepEqual(out, []);
+});
+
+test('startedAt stands in when a session was never flushed again', () => {
+    const [g] = gameSessionsFromTelemetry([gameSession({ lastSeenAt: null })]);
+    assert.equal(g.playedAt, 100);
+});
+
+test('the deeper-link click survives the move onto the session document', () => {
+    // It used to be its own field on a game_sessions doc with its own update rule; it is
+    // now part of the summary, written through Telemetry.summary().
+    const [g] = gameSessionsFromTelemetry([gameSession({ summary: { ...gameSession().summary, clickedDeeperLink: true } })]);
+    assert.equal(g.clickedDeeperLink, true);
+});
+
+test('two rounds in one tab are two plays, and the best one is the best score', () => {
+    // Telemetry.restart() gives each replay its own session document precisely so this
+    // holds; before it, a second round would have overwritten the first one's numbers.
+    const rows = summarizeGameSessions(gameSessionsFromTelemetry([
+        gameSession({ sessionId: 'rts_1', lastSeenAt: 500, summary: { scenariosPlayed: 10, correct: 4, categories: { phishing: { played: 6, correct: 1 } } } }),
+        gameSession({ sessionId: 'rts_2', lastSeenAt: 900, summary: { scenariosPlayed: 10, correct: 9, categories: { phishing: { played: 4, correct: 4 }, social: { played: 6, correct: 5 } } } }),
+    ]));
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].plays, 2);
+    assert.equal(rows[0].bestPct, 90);
+    assert.equal(rows[0].lastPlayed, 900);
+    assert.equal(rows[0].weakestCategory.name, 'phishing', 'summed across both rounds: 5 of 10');
 });
