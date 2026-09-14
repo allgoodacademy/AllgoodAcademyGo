@@ -37,6 +37,17 @@
     "              'draft' when this sprint proposed it and Curriculum & Learning Science has",
     "              not yet reviewed it.",
     "",
+    "ORPHANED SKILLS (top-level `orphanedSkills`, a sibling of `modules`)",
+    "  A game diagnosing a skill that no GoodBlock teaches is normally a BUILD FAILURE: the",
+    "  routing silently stops adapting and nobody finds out. That default stays. This list is",
+    "  the one narrow exception — a skill we KNOW has no teaching destination, said out loud",
+    "  here rather than hidden by inventing a fake destination to quiet the check.",
+    "  Being on this list downgrades the failure to a warning that check-modules.js prints on",
+    "  every run. It is a debt register, not an ignore file: an entry must carry `tag`,",
+    "  `since` and a `reason` saying what the pending decision is. Remove the entry the",
+    "  moment a GoodBlock teaches the skill — check-modules.js fails on a stale one, so this",
+    "  list cannot quietly outlive the gap it documents.",
+    "",
     "Presentation fields (gameNames, topic, blurb, durationMinutes, badgeThreshold, maxScore,",
     "hub) are a straight port of what the dashboard and hubs already rendered. Tailwind class",
     "names deliberately stay in the HTML templates that use them: the CSS build's content globs",
@@ -45,6 +56,7 @@
     "",
     "isComplete() predicates stay in the dashboard — a JSON file cannot hold a function."
   ],
+  "orphanedSkills": [],
   "modules": [
     {
       "id": "read-the-signal",
