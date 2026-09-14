@@ -204,3 +204,85 @@ test('a reviewed placement reports tagStatus reviewed', async () => {
     const dest = await resolve('phishing', { defaultUrl: '/jsh/digital-decisions-lab/privacy-security/' });
     assert.equal(dest.tagStatus, 'reviewed');
 });
+
+// --- THE HIJACK BUG (2026-09-14), pinned so it cannot come back.
+//
+// The tie-break used to be "when several labs carry a category, prefer the one that is the
+// calling game's own default destination." That was harmless only while overlaps were rare.
+// Social Intelligence genuinely does teach `audience-choice`, `escalation-language` and
+// `self-advocacy` — Cases 2/3/4/5 — and it is also Before You Send's default. So tagging it
+// CORRECTLY made it win all three ties and swallow the more specific homes for those skills.
+// Adding a second right answer for a skill has to broaden routing, not collapse it.
+//
+// The rule now prefers SPECIALIZATION: fewest skillTags overall wins, caller identity only
+// breaks a genuine tie.
+const BYS = { defaultUrl: SOCIAL_INTELLIGENCE, defaultName: 'Social Intelligence' };
+
+test('the narrower GoodBlock wins a tie-break, even against the caller\'s own default', async () => {
+    // Synthetic, so this pins the MECHANISM and keeps holding if the real tagging is
+    // rearranged later. `broad-lab` is the caller's own default AND carries the category;
+    // under the old rule it won on both counts.
+    const synthetic = [
+        {
+            id: 'synthetic-broad', name: 'Synthetic Broad', type: 'lab', pack: 'digital-decisions',
+            url: '/jsh/digital-decisions-lab/synthetic-broad/',
+            skillTags: [
+                { framework: 'internal', code: 'synthetic-skill' },
+                { framework: 'internal', code: 'synthetic-other-a' },
+                { framework: 'internal', code: 'synthetic-other-b' },
+                { framework: 'CASEL', code: 'Social Awareness' },
+            ],
+        },
+        {
+            id: 'synthetic-narrow', name: 'Synthetic Narrow', type: 'lab', pack: 'room-to-think',
+            url: '/jsh/room-to-think-lab/synthetic-narrow/',
+            skillTags: [{ framework: 'internal', code: 'synthetic-skill' }],
+        },
+    ];
+    REGISTRY.modules.push(...synthetic);
+    try {
+        const dest = await resolve('synthetic-skill', {
+            defaultUrl: '/jsh/digital-decisions-lab/synthetic-broad/',
+            defaultName: 'Synthetic Broad',
+        });
+        assert.equal(dest.matchedId, 'synthetic-narrow',
+            'the broad lab won because it was the caller\'s default — the hijack bug is back');
+        assert.equal(dest.matchedPack, 'room-to-think', 'specialization must beat pack affinity too');
+    } finally {
+        for (const m of synthetic) REGISTRY.modules.splice(REGISTRY.modules.indexOf(m), 1);
+    }
+});
+
+test('a genuine tie still falls back to the caller\'s own default', async () => {
+    // Equal breadth: the old rule is still the right answer, and must still apply.
+    const synthetic = [
+        {
+            id: 'synthetic-tie-a', name: 'Synthetic Tie A', type: 'lab', pack: 'room-to-think',
+            url: '/jsh/room-to-think-lab/synthetic-tie-a/',
+            skillTags: [{ framework: 'internal', code: 'synthetic-tied-skill' }],
+        },
+        {
+            id: 'synthetic-tie-b', name: 'Synthetic Tie B', type: 'lab', pack: 'digital-decisions',
+            url: '/jsh/digital-decisions-lab/synthetic-tie-b/',
+            skillTags: [{ framework: 'internal', code: 'synthetic-tied-skill' }],
+        },
+    ];
+    REGISTRY.modules.push(...synthetic);
+    try {
+        const dest = await resolve('synthetic-tied-skill', {
+            defaultUrl: '/jsh/digital-decisions-lab/synthetic-tie-b/',
+        });
+        assert.equal(dest.matchedId, 'synthetic-tie-b');
+    } finally {
+        for (const m of synthetic) REGISTRY.modules.splice(REGISTRY.modules.indexOf(m), 1);
+    }
+});
+
+test('Social Intelligence is still a REACHABLE match for the skills it teaches', async () => {
+    // The other half of the fix: specialization must not make a correct second home dead.
+    // Read the Signal has no Social Intelligence-shadowing alternative for `social`, and a
+    // caller whose default is elsewhere must still be able to land there.
+    const dest = await resolve('social', RTS);
+    assert.equal(dest.matchedId, 'social-intelligence');
+    assert.equal(dest.matched, true);
+});
