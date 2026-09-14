@@ -5,6 +5,12 @@
 // That CDN is a dev-only shim and district content filters block it, so the
 // bundles in public/assets/css/ are built locally instead — and this file is now
 // the single definition those builds share.
+//
+// Its counterpart is public/assets/css/design-tokens.css, which carries the same
+// brand values as CSS custom properties for hand-written CSS inside a page's
+// <style> block — the one place a Tailwind utility class cannot reach. The two
+// files must agree: change a shared value here and change it there in the same
+// commit. design-tokens.css names the theme.js key beside each shared value.
 module.exports = {
     colors: {
         // Allgood Academy brand.

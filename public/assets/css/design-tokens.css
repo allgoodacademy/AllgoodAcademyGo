@@ -1,0 +1,67 @@
+/* ============================================================================
+   ALLGOOD ACADEMY — DESIGN TOKENS
+   The single CSS-side definition of every brand value that was previously
+   restated in each page's inline <style> block.
+
+   RELATIONSHIP TO tailwind/theme.js
+   ---------------------------------
+   This file is NOT a second source of truth. tailwind/theme.js already owns
+   these same values for everything expressed as a Tailwind utility class
+   (text-allgood-secondary, bg-jodi-warmth, ...), and the bundles in this
+   directory are generated from it by `npm run build:css`. What theme.js could
+   never reach is hand-written CSS inside a page's <style> block — that is what
+   this file is for. The two must agree; the shared values are marked below
+   with the theme.js key they mirror, so a change to one is an obvious prompt
+   to change the other.
+
+   HOW PAGES USE IT
+   ----------------
+   Pages that already kept a local :root palette keep their own short names and
+   source them from here (--teal: var(--color-teal)), so every existing
+   var(--teal) reference in those files keeps working untouched. Pages with no
+   :root of their own reference var(--color-*) directly.
+
+   Load it before the page's own <style> block so a page can still override a
+   token locally when it genuinely needs to.
+   ============================================================================ */
+
+:root {
+  /* --- Brand core -------------------------------------------------------- */
+  --color-teal: #357889;        /* theme.js allgood-secondary */
+  --color-teal-deep: #2D6473;   /* theme.js allgood-accent */
+  --color-teal-wash: #E3EDEF;   /* marketing tint of the teal; no theme.js twin */
+  --color-orange: #D34716;      /* theme.js allgood-primary */
+  --color-orange-deep: #B23A0F; /* pressed/hover depth under the orange button */
+  --color-grey: #4C4C4C;        /* theme.js allgood-dark */
+  --color-light: #F7F7F7;       /* theme.js allgood-light */
+
+  /* --- Jodi's Schoolhouse surfaces --------------------------------------- */
+  --color-cream: #FBF6EE;         /* theme.js jodi-warmth */
+  --color-cream-border: #E8DFCE;  /* theme.js jodi-border */
+  --color-cream-scroll: #D8CDBA;  /* jodi-bubble scrollbar thumb, all 10 GoodBlocks */
+
+  /* --- Game chassis (the dark shell the four games share) ---------------- */
+  --color-dark: #0F1923;
+  --color-dark-card: #1C2E3A;
+  --color-muted: #7A909F;
+  --color-warm-white: #F8F4EE;
+  --navbar-bg: rgba(15, 25, 35, 0.92);  /* game navbar chrome, over the dark shell */
+
+  /* --- Marketing surface (homepage, about, legal, for-teachers, 404) ------ */
+  --color-canvas: #EAEEEF;
+  --color-surface: #FFFFFF;
+  --color-ink: #17272C;
+  --color-ink-soft: #5C6E75;
+  --color-ink-faint: #8A9AA0;
+  --color-hairline: #D8DFE1;
+
+  /* --- Type --------------------------------------------------------------
+     Mirrors theme.js fontFamily. NOTE: the repo also uses the shorter stacks
+     `Georgia, serif` and `Verdana, sans-serif` in ~130 declarations. Those are
+     not identical to these tokens — they drop the 'Times New Roman' and
+     'Geneva' fallbacks, which changes rendering on machines without Georgia or
+     Verdana. Normalising them is a real rendering decision, not a refactor, so
+     this pass left them alone; see the PR description. ---------------------- */
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-ui: Verdana, Geneva, sans-serif;
+}
