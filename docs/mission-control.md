@@ -123,7 +123,22 @@ dashboard confidently attributing a sentence to a student that nobody was ever s
 ## Tests
 
     node --test tests/mission-control.test.mjs   # the shaping layer (public/mission-control/derive.js)
-    ./scripts/run-rules-tests.sh                 # includes the MISSION CONTROL rules block
+    ./scripts/run-rules-tests.sh                 # includes the ROSTER LIST + MISSION CONTROL blocks
+
+The rules suite runs in CI on **every pull request and every push to main, with no path
+filter**, plus a weekly cron. That breadth is deliberate and was bought the hard way: the
+workflow used to run only on pushes to `main` touching `firestore.rules` or `firebase.json`,
+and the roster-list denial above reached production through all three of the gaps that leaves —
+a client change issuing a query the rules never allowed, a dependency change moving the rules
+engine itself, and drift with no commit behind it at all. `firebase-tools` is exact-pinned in
+`devDependencies` for the same reason: the rules engine lives in the emulator JAR that CLI
+downloads, so an unpinned CLI meant an unpinned verdict. `scripts/run-rules-tests.sh` asserts
+the JAR version rather than assuming it, and fails loudly if it drifts.
+
+Deploy is still main-only, but it is no longer path-filtered: `firebase deploy --only
+firestore:rules` is idempotent and takes seconds, so a redundant deploy costs nothing, while a
+rules change that silently does *not* deploy is the expensive failure — and a path filter is
+exactly how you get one.
 
 The shaping layer lives in `derive.js` rather than inside `index.html` specifically so it can
 be tested: the mistakes that matter here are arithmetic, and none of them are visible by
