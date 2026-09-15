@@ -783,3 +783,82 @@ export function perStepTiming(module) {
     }
     return out;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PER-STUDENT EXTRAS
+
+   A Task Force has one class-wide assigned set (classrooms/{code}.assignedModules
+   and .assignedGames). On top of that, a teacher can give ONE named student extra
+   work — the "Jamal also gets Money as a Skill because he's stuck" case — stored
+   per student in classroom_assignments/{code}_{uid} (firestore.rules #6c).
+
+   ADDITIVE, NOT A REPLACEMENT, and that is the load-bearing choice. If each
+   student's set were wholly their own, the roster grid would lose its shared
+   columns (every student a different set of modules), classAverage would be
+   averaging students who were set different work, and changing what the class
+   does would mean rewriting N documents instead of one. Extras keep the class
+   set as the spine and let individuals hang off it.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* One student's effective assignment: the class set, then anything extra given to
+   them, deduped, class set first.
+
+   Order matters and is not cosmetic. The class set leads so a student's roster row
+   lines up column-for-column with everyone else's, and their extras appear after —
+   the same reading order as the roster grid itself. A duplicate (a teacher assigns
+   an extra that later becomes class-wide) collapses to one entry rather than being
+   counted twice in "3 of 5 complete". */
+export function effectiveAssignment({ classModules = [], classGames = [], extras = null } = {}) {
+    const merge = (base, extra) => {
+        const out = [...base];
+        for (const id of (extra || [])) if (!out.includes(id)) out.push(id);
+        return out;
+    };
+    return {
+        modules: merge(classModules, extras && extras.modules),
+        games: merge(classGames, extras && extras.games),
+        // What this student has that the class does not — the UI marks these, and the
+        // student-detail page needs to tell an extra apart from class work to explain it.
+        extraModules: (extras && extras.modules ? extras.modules : []).filter((id) => !classModules.includes(id)),
+        extraGames: (extras && extras.games ? extras.games : []).filter((id) => !classGames.includes(id)),
+    };
+}
+
+/* Every module id anyone in the Task Force is working on: the class set plus the union
+   of all extras, class set first.
+
+   This is what the roster-wide functions take. stallPoints() and attentionList() both
+   index into a student's OWN s.modules, which buildStudent only populates for that
+   student's own effective assignment — so passing the union is correct and self-filtering:
+   a student who was never given a module simply has no entry for it and is skipped,
+   rather than being counted as "not started" on work that was never theirs. */
+export function unionAssigned(classModules = [], extrasByUid = {}) {
+    const out = [...classModules];
+    for (const extras of Object.values(extrasByUid || {})) {
+        for (const id of (extras && extras.modules ? extras.modules : [])) {
+            if (!out.includes(id)) out.push(id);
+        }
+    }
+    return out;
+}
+
+/* Is this module/game an extra for anyone at all? Used to decide whether a roster column
+   or CSV column needs the "not assigned to this student" state at all — with no extras
+   anywhere, every column applies to everyone and the export stays exactly as it was. */
+export function hasAnyExtras(extrasByUid = {}) {
+    return Object.values(extrasByUid || {}).some(
+        (e) => e && ((e.modules && e.modules.length) || (e.games && e.games.length)),
+    );
+}
+
+/* Normalises one classroom_assignments document into the shape everything above expects.
+   A missing document, a document with neither array, or a malformed one all collapse to
+   null rather than a half-populated object — a student with no extras and a student whose
+   extras failed to load must not be distinguishable by accident. */
+export function extrasFromDoc(docData) {
+    if (!docData || typeof docData !== 'object') return null;
+    const modules = Array.isArray(docData.modules) ? docData.modules.filter((x) => typeof x === 'string') : [];
+    const games = Array.isArray(docData.games) ? docData.games.filter((x) => typeof x === 'string') : [];
+    if (!modules.length && !games.length) return null;
+    return { modules, games };
+}

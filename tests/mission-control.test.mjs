@@ -18,6 +18,7 @@ import {
     stallPoints, othersStalledAt, stuckModule, attentionList,
     perStepTiming, STEP_GAP_CEILING_MS,
     MODULE_MINUTES, GAME_MINUTES,
+    effectiveAssignment, unionAssigned, hasAnyExtras, extrasFromDoc,
 } from '../public/mission-control/derive.js';
 import { readFileSync } from 'node:fs';
 import { MODULE_DATA } from '../public/mission-control/module-data.js';
@@ -780,4 +781,135 @@ test('an attempt with no usable timestamp contributes no timing', () => {
     const t = perStepTiming(m);
     assert.equal(t[0], undefined);
     assert.equal(t[1], 2 * MIN);
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PER-STUDENT EXTRAS — additive on top of the class set, never a replacement
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+test('with no extras, a student\'s assignment is exactly the class set', () => {
+    const e = effectiveAssignment({ classModules: ['a', 'b'], classGames: ['g1'], extras: null });
+    assert.deepEqual(e.modules, ['a', 'b']);
+    assert.deepEqual(e.games, ['g1']);
+    assert.deepEqual(e.extraModules, []);
+    assert.deepEqual(e.extraGames, []);
+});
+
+test('extras append after the class set, so roster columns still line up', () => {
+    const e = effectiveAssignment({
+        classModules: ['a', 'b'], classGames: ['g1'],
+        extras: { modules: ['z'], games: ['g2'] },
+    });
+    assert.deepEqual(e.modules, ['a', 'b', 'z'], 'class set leads, extra follows');
+    assert.deepEqual(e.games, ['g1', 'g2']);
+    assert.deepEqual(e.extraModules, ['z']);
+    assert.deepEqual(e.extraGames, ['g2']);
+});
+
+test('an extra that is ALSO class-wide collapses to one entry, not two', () => {
+    // A teacher gives one student a module early; it later becomes class-wide. Counting it
+    // twice would make "3 of 4 complete" read wrong for exactly that student.
+    const e = effectiveAssignment({
+        classModules: ['a', 'b'], classGames: [],
+        extras: { modules: ['b', 'c'], games: [] },
+    });
+    assert.deepEqual(e.modules, ['a', 'b', 'c']);
+    assert.deepEqual(e.extraModules, ['c'], 'b is class work, not an extra, so it is not marked as one');
+});
+
+test('unionAssigned collects every module anyone is working on, class set first', () => {
+    const union = unionAssigned(['a', 'b'], {
+        s1: { modules: ['z'], games: [] },
+        s2: { modules: ['y', 'a'], games: [] },
+        s3: null,
+    });
+    assert.deepEqual(union, ['a', 'b', 'z', 'y']);
+});
+
+test('unionAssigned with no extras anywhere is just the class set', () => {
+    assert.deepEqual(unionAssigned(['a', 'b'], {}), ['a', 'b']);
+    assert.deepEqual(unionAssigned(['a', 'b'], { s1: null }), ['a', 'b']);
+});
+
+// This is the property that lets the roster-wide functions take the union safely.
+test('the union is SELF-FILTERING: a student is never judged on work that was never theirs', () => {
+    const NOWX = NOW;
+    const classSet = ['privacy-security'];
+    const extras = { jamal: { modules: ['social-intelligence'], games: [] } };
+    const union = unionAssigned(classSet, extras);
+
+    // `completed` comes from a game_scores document, not from module_progress — a lab writes
+    // that flag only on completion, which is the whole reason buildStudent reads both.
+    const done = (name) => [{ gameName: name, completed: true, lastUpdated: NOWX }];
+
+    // Jamal has the class module plus his extra; Devon has only the class module.
+    const jamal = buildStudent({
+        row: { uid: 'jamal', displayName: 'Jamal W' },
+        assigned: effectiveAssignment({ classModules: classSet, extras: extras.jamal }).modules,
+        moduleData: MODULE_DATA,
+        scores: done('Privacy & Security'),
+        progress: {
+            'privacy-security': { highestUnlocked: 5, lastUpdated: NOWX },
+            'social-intelligence': { highestUnlocked: 1, lastUpdated: NOWX },
+        },
+    }, NOWX);
+    const devon = buildStudent({
+        row: { uid: 'devon', displayName: 'Devon A' },
+        assigned: effectiveAssignment({ classModules: classSet, extras: null }).modules,
+        moduleData: MODULE_DATA,
+        scores: done('Privacy & Security'),
+        progress: { 'privacy-security': { highestUnlocked: 5, lastUpdated: NOWX } },
+    }, NOWX);
+
+    assert.ok(jamal.modules['social-intelligence'], 'Jamal has his extra');
+    assert.equal(devon.modules['social-intelligence'], undefined, 'Devon was never given it');
+
+    // Passing the UNION to the roster-wide functions must not invent a stall for Devon on a
+    // module he was never assigned.
+    const stalls = stallPoints([jamal, devon], union);
+    const siStalls = Object.values(stalls['social-intelligence'] || {}).flat();
+    assert.deepEqual(siStalls, ['jamal'], 'only the student who actually has it can be stalled in it');
+
+    // ...and Devon's "all done" is about HIS work, not Jamal's.
+    assert.equal(devon.allDone, true, 'Devon finished everything he was assigned');
+    assert.equal(jamal.allDone, false, 'Jamal has not finished his extra');
+});
+
+test('an extra changes that student\'s completion denominator, and nobody else\'s', () => {
+    const classSet = ['privacy-security'];
+    const withExtra = buildStudent({
+        row: { uid: 'a', displayName: 'A' },
+        assigned: effectiveAssignment({ classModules: classSet, extras: { modules: ['social-intelligence'] } }).modules,
+        moduleData: MODULE_DATA,
+        progress: { 'privacy-security': { highestUnlocked: 5, lastUpdated: NOW } },
+    }, NOW);
+    const without = buildStudent({
+        row: { uid: 'b', displayName: 'B' },
+        assigned: classSet,
+        moduleData: MODULE_DATA,
+        progress: { 'privacy-security': { highestUnlocked: 5, lastUpdated: NOW } },
+    }, NOW);
+    assert.equal(without.pct, 100, 'the class set alone is complete');
+    assert.ok(withExtra.pct < 100, 'the extra is real work and counts against their own total');
+});
+
+test('hasAnyExtras is false until somebody actually has one', () => {
+    assert.equal(hasAnyExtras({}), false);
+    assert.equal(hasAnyExtras({ s1: null }), false);
+    assert.equal(hasAnyExtras({ s1: { modules: [], games: [] } }), false);
+    assert.equal(hasAnyExtras({ s1: { modules: ['z'], games: [] } }), true);
+    assert.equal(hasAnyExtras({ s1: { modules: [], games: ['g'] } }), true);
+});
+
+test('extrasFromDoc collapses "no extras" and "malformed" to the same null', () => {
+    // A student with no extras and a student whose extras failed to parse must not be
+    // distinguishable by accident downstream.
+    assert.equal(extrasFromDoc(null), null);
+    assert.equal(extrasFromDoc(undefined), null);
+    assert.equal(extrasFromDoc({}), null);
+    assert.equal(extrasFromDoc({ modules: [], games: [] }), null);
+    assert.equal(extrasFromDoc({ modules: 'not-a-list' }), null);
+    assert.deepEqual(extrasFromDoc({ modules: ['a'], games: [] }), { modules: ['a'], games: [] });
+    // Non-string entries are dropped rather than carried into a document path.
+    assert.deepEqual(extrasFromDoc({ modules: ['a', 7, null], games: ['g'] }), { modules: ['a'], games: ['g'] });
 });
