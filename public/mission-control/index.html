@@ -494,6 +494,11 @@
   .mrow input { margin-top: 2px; width: 15px; height: 15px; accent-color: var(--teal); cursor: pointer; flex-shrink: 0; }
   .mrow-info { flex: 1; min-width: 0; }
   .mrow-name { font-size: 12.5px; color: var(--text-primary); }
+  .mrow-name .tiny-tag {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted);
+    border: 1px solid var(--navy-border); border-radius: 3px; padding: 1px 4px; margin-left: 6px;
+    vertical-align: 1px;
+  }
   .mrow-name .capstone-tag {
     font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: var(--amber);
     border: 1px solid var(--amber); border-radius: 3px; padding: 1px 4px; margin-left: 6px;
@@ -687,11 +692,7 @@
 
     <!-- Ticket 2/3: assignment as a full page, not a modal. -->
     <div class="assign-panel" id="assign-panel">
-      <div class="mc-note">
-        Nothing here is locked. Assigning a module puts it on your roster and on each
-        student's list — it doesn't stop them opening others, and it doesn't stop them
-        finishing on their own time.
-      </div>
+      <div class="mc-note" id="assign-standing-note"></div>
       <div class="assign-grid" id="assign-modules"></div>
 
       <div class="sec-head">GAMES <span class="sec-note">Assign as a warm-up or a diagnostic — see the note below on tracking</span></div>
@@ -737,7 +738,7 @@
 <script type="module" src="/js/auth-core.js"></script>
 <script type="module">
 import {
-    doc, getDoc, getDocs, setDoc, collection, query, where,
+    doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 import { MODULE_DATA } from './module-data.js';
 import {
@@ -748,6 +749,7 @@ import {
     classGameStats, WEAK_SKILL_MIN_PLAYERS,
     stallPoints, othersStalledAt, stuckModule, attentionList,
     perStepTiming,
+    effectiveAssignment, unionAssigned, hasAnyExtras, extrasFromDoc,
 } from './derive.js';
 // The registry loader the four games already share, reused rather than re-fetched: one
 // cached fetch of /data/modules-registry.json, and the same parse every other consumer
@@ -842,6 +844,15 @@ const state = {
     catalog: null,            // built from /data/modules-registry.json; null until it loads
     draft: null,              // { modules:Set, games:Set } while the Assign page is open
     stalls: {},               // moduleId -> stepIndex -> [uid], for the reteach signal
+    // uid -> { modules, games }: what ONE student was given on top of the class set.
+    // Stored per student in classroom_assignments/{code}_{uid} (firestore.rules #6c) rather
+    // than as a map on the classroom document, because rule #5 makes a classroom document
+    // readable by any signed-in user who knows the code — see load() and the rule's comment.
+    extrasByUid: {},
+    // The class set plus every extra anyone has. Roster-wide functions take this; it is
+    // self-filtering, because a student's s.modules only holds their OWN assignment.
+    unionAssigned: [],
+    assignDraftUid: null,     // non-null while the Assign tab is scoped to one student
 };
 
 /* ── clock ─────────────────────────────────────────────────────────────────── */
@@ -960,6 +971,26 @@ async function load() {
         ...(legacySnap ? legacySnap.docs.map((d) => d.id) : []),
     ])].filter((uid) => uid !== state.classroom.teacherUid);
 
+    // Per-student extras. One query for the whole classroom (rule #6c's list grant resolves
+    // classroomOwnedBy against the same classroom path for every row, so this is O(1)
+    // document accesses however many students have extras). A failure here costs the extras
+    // and nothing else: every student still gets the class-wide set, which is the assignment
+    // that matters most and the one the roster columns are built from.
+    state.extrasByUid = {};
+    try {
+        const extraSnap = await getDocs(query(
+            collection(db, 'artifacts', appId, 'classroom_assignments'),
+            where('classroomCode', '==', state.code),
+        ));
+        extraSnap.docs.forEach((d) => {
+            const data = d.data() || {};
+            const parsed = extrasFromDoc(data);
+            if (parsed && data.uid) state.extrasByUid[data.uid] = parsed;
+        });
+    } catch (e) {
+        console.warn('[Mission Control] per-student extras unavailable — showing the class set only', e);
+    }
+
     const rows = (await Promise.all(memberUids.map(async (uid) => {
         try {
             const snap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
@@ -975,6 +1006,47 @@ async function load() {
 
     document.getElementById('screen-loading').hidden = true;
     renderAll();
+}
+
+/* The class-wide set plus whatever this one student was given on top.
+ *
+ * Returns TWO views of the same assignment, and the distinction matters:
+ *
+ *   modules / extraModules       — trackable: MODULE_DATA has step data, so these can be
+ *                                  rendered step-by-step and are what buildStudent() gets.
+ *   allModules / allExtraModules — everything actually assigned, trackable or not.
+ *
+ * They differ because module-data.js's generator still covers the Digital Decisions lab only
+ * (see docs/mission-control.md), while the Assign tab offers every Lab Pack in the registry.
+ * Filtering to the trackable set and stopping there is what made an extra from another pack
+ * vanish silently: it saved, and the teacher saw nothing change — indistinguishable from a
+ * failed write. Counts, badges, the CSV and the "we can't chart this yet" note all read the
+ * ALL view, so an assignment is never invisible just because it cannot be charted. */
+function assignmentFor(uid) {
+    const merged = effectiveAssignment({
+        classModules: state.classroom && Array.isArray(state.classroom.assignedModules)
+            ? state.classroom.assignedModules : [],
+        classGames: state.assignedGames,
+        extras: state.extrasByUid[uid] || null,
+    });
+    return {
+        modules: merged.modules.filter((id) => MODULE_DATA[id]),
+        games: merged.games,
+        extraModules: merged.extraModules.filter((id) => MODULE_DATA[id]),
+        extraGames: merged.extraGames,
+        allModules: merged.modules,
+        allExtraModules: merged.extraModules,
+        untrackable: merged.modules.filter((id) => !MODULE_DATA[id]),
+    };
+}
+
+/* A module's display name, wherever it is known from. MODULE_DATA covers the modules Mission
+   Control can chart; the registry covers everything assignable. Falling through to the raw id
+   is the last resort and should be unreachable for anything the picker offered. */
+function moduleName(id) {
+    if (MODULE_DATA[id]) return MODULE_DATA[id].name;
+    const entry = state.catalog && state.catalog.byId ? state.catalog.byId.get(id) : null;
+    return (entry && entry.name) || id;
 }
 
 async function loadStudent(row) {
@@ -1008,9 +1080,20 @@ async function loadStudent(row) {
     const progress = {};
     if (progressSnap) progressSnap.docs.forEach((d) => { progress[d.id] = d.data(); });
 
+    // Each student is built against THEIR OWN assignment, not the class set — that is what
+    // makes an extra real work for them and invisible to everyone else. buildStudent already
+    // took `assigned` per call, so this is the whole of the per-student change here.
+    const mine = assignmentFor(row.uid);
     const s = buildStudent({
-        row, assigned: state.assigned, moduleData: MODULE_DATA, scores, attempts, progress, sessions, gameSessions,
+        row, assigned: mine.modules, moduleData: MODULE_DATA, scores, attempts, progress, sessions, gameSessions,
     });
+    s.assigned = mine.modules;
+    s.assignedGames = mine.games;
+    s.extraModules = mine.extraModules;
+    s.extraGames = mine.extraGames;
+    s.allAssigned = mine.allModules;
+    s.allExtraModules = mine.allExtraModules;
+    s.untrackable = mine.untrackable;
     // The four standalone games aren't part of the assigned-module system (see
     // summarizeGameSessions in derive.js) — attached separately rather than folded into
     // s.modules, so nothing here has to pretend they have steps or an assignment.
@@ -1033,11 +1116,19 @@ async function loadStudent(row) {
 function rebuildStudent(s) {
     const raw = s.raw;
     if (!raw) return s;
+    const mine = assignmentFor(raw.row.uid);
     const next = buildStudent({
-        row: raw.row, assigned: state.assigned, moduleData: MODULE_DATA,
+        row: raw.row, assigned: mine.modules, moduleData: MODULE_DATA,
         scores: raw.scores, attempts: raw.attempts, progress: raw.progress,
         sessions: raw.sessions, gameSessions: raw.gameSessions,
     });
+    next.assigned = mine.modules;
+    next.assignedGames = mine.games;
+    next.extraModules = mine.extraModules;
+    next.extraGames = mine.extraGames;
+    next.allAssigned = mine.allModules;
+    next.allExtraModules = mine.allExtraModules;
+    next.untrackable = mine.untrackable;
     next.games = s.games;   // game results do not depend on the assignment set
     next.color = s.color;
     next.bg = s.bg;
@@ -1074,9 +1165,15 @@ function renderAll() {
     document.getElementById('toolbar-title').innerHTML =
         `Class overview — <span>${state.students.length} agent${state.students.length === 1 ? '' : 's'}</span>`;
     renderStats();
+    // The class set plus every extra anyone has. Safe to pass to the roster-wide functions
+    // because each student's s.modules only holds their own assignment, so a student is
+    // never judged on a module that was never theirs (see unionAssigned in derive.js).
+    // Built from the class set plus every extra, trackable or not, so a module only one
+    // student has still gets a roster-wide identity (a CSV column, a stall cohort).
+    state.unionAssigned = unionAssigned(state.assigned, state.extrasByUid);
     // Computed once per render for the whole roster, because "two other students stalled at
     // the same point" is a class fact and cannot be derived from one student's documents.
-    state.stalls = stallPoints(state.students, state.assigned);
+    state.stalls = stallPoints(state.students, state.unionAssigned);
     renderRoster();
     renderOverview();
     renderAttention();
@@ -1089,6 +1186,9 @@ function renderStats() {
     const active = countActiveThisWeek(state.students);
     const behind = state.students.filter((s) => s.status === 'needs-attention').length;
     const risk = state.students.filter((s) => s.status === 'at-risk').length;
+    // Deliberately the CLASS set, not the union: a class average is a comparison, and
+    // averaging in work only some students were given would compare them against each other
+    // on different assignments. Extras show on the student, not in the class figure.
     const avg = classAverage(state.students, state.assigned);
 
     document.getElementById('stat-active').textContent = active;
@@ -1154,6 +1254,9 @@ function renderOverview() {
           ${state.assigned.map((id) => {
             const m = s.modules[id];
             const st = styleFor(id);
+            // A student can only be missing a class-set module if the class set changed
+            // under them mid-render; render an inert row rather than throwing.
+            if (!m) return '';
             return `<div class="ov-mod-row" title="${esc(m.meta.name)}">
               <div style="font-size:11px;flex-shrink:0" aria-hidden="true">${st.icon}</div>
               <div class="ov-mod-bar"><div class="ov-mod-fill" style="width:${m.pct}%;background:${m.completed ? '#10B981' : st.color}"></div></div>
@@ -1161,6 +1264,7 @@ function renderOverview() {
             </div>`;
           }).join('')}
         </div>
+        ${extrasBadge(s)}
         <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">Last active: ${esc(relativeTime(s.lastActive))}</div>
       </button>`).join('');
 }
@@ -1177,7 +1281,7 @@ function renderOverview() {
 function renderAttention() {
     const list = document.getElementById('attn-list');
     const note = document.getElementById('attn-note');
-    const rows = attentionList(state.students, state.assigned);
+    const rows = attentionList(state.students, state.unionAssigned);
 
     if (!state.students.length) {
         note.textContent = '';
@@ -1224,7 +1328,7 @@ function attentionFactHtml(row) {
 function attentionRow(row) {
     const label = row.action === 'assign-more' ? 'Assign more' : 'Open';
     const act = row.action === 'assign-more'
-        ? `<button class="mc-btn" type="button" data-attn-assign="1">${label}</button>`
+        ? `<button class="mc-btn" type="button" data-attn-assign="${esc(row.uid)}">${label}</button>`
         : `<button class="mc-btn" type="button" data-attn-uid="${esc(row.uid)}">${label}</button>`;
     return `<div class="attn-row sev-${esc(row.severity)}">
       <div class="attn-who">${esc(row.name)}</div>
@@ -1296,15 +1400,51 @@ function renderGameStrip() {
 
 // The draft is separate from state.assigned so Cancel is a real cancel and the save bar can
 // tell a teacher whether anything is actually pending.
+//
+// With state.assignDraftUid set, the Assign tab is scoped to ONE student and the draft holds
+// that student's EXTRAS only — never the class set, which stays visible but locked. Keeping
+// the two in the same draft object would make "save" ambiguous about which document it
+// writes, so the uid is what decides, in exactly one place: saveAssignments().
 function resetDraft() {
+    const uid = state.assignDraftUid;
+    if (uid) {
+        const extras = state.extrasByUid[uid] || { modules: [], games: [] };
+        state.draft = { modules: new Set(extras.modules), games: new Set(extras.games) };
+        return;
+    }
     state.draft = {
         modules: new Set(state.classroom && Array.isArray(state.classroom.assignedModules) ? state.classroom.assignedModules : []),
         games: new Set(state.assignedGames),
     };
 }
 
+// The class-wide set, as a lookup — rows in it render checked-and-disabled in per-student
+// mode, so a teacher can see what the student already has without being able to remove
+// class work from one individual (that is an exemption, which this feature is not).
+function classSetIds() {
+    return {
+        modules: new Set((state.classroom && state.classroom.assignedModules) || []),
+        games: new Set(state.assignedGames),
+    };
+}
+
+function studentNamed(uid) {
+    const s = state.students.find((x) => x.uid === uid);
+    return s ? s.name : 'this agent';
+}
+
 function renderAssign() {
     if (!state.draft) resetDraft();
+    // The standing note is scope-dependent: "on each student's list" is true of the
+    // class-wide set and actively misleading when editing one person's extras.
+    const standing = document.getElementById('assign-standing-note');
+    standing.textContent = state.assignDraftUid
+        ? `Nothing here is locked. Extra work sits on top of what the whole Task Force has — `
+          + `it doesn't replace it, it doesn't stop ${studentNamed(state.assignDraftUid)} opening `
+          + `anything else, and nobody else's list changes.`
+        : "Nothing here is locked. Assigning a module puts it on your roster and on each "
+          + "student's list — it doesn't stop them opening others, and it doesn't stop them "
+          + "finishing on their own time.";
     const modulesEl = document.getElementById('assign-modules');
     const gamesEl = document.getElementById('assign-games');
 
@@ -1317,24 +1457,39 @@ function renderAssign() {
     }
     document.getElementById('btn-save-assign').disabled = false;
 
-    modulesEl.innerHTML = state.catalog.packs.map((pack) => packHtml(pack, state.draft.modules)).join('');
-    gamesEl.innerHTML = state.catalog.gamePacks.map((pack) => packHtml(pack, state.draft.games)).join('')
+    const locked = state.assignDraftUid ? classSetIds() : { modules: new Set(), games: new Set() };
+    modulesEl.innerHTML = scopeNoteHtml()
+        + state.catalog.packs.map((pack) => packHtml(pack, state.draft.modules, locked.modules)).join('');
+    gamesEl.innerHTML = state.catalog.gamePacks.map((pack) => packHtml(pack, state.draft.games, locked.games)).join('')
         + whyAssignAGameHtml();
     renderAssignCount();
 }
 
-function packHtml(pack, picked) {
-    const on = pack.items.filter((i) => picked.has(i.id)).length;
+/* Says whose assignment is being edited. Without it, a teacher who arrived here from a
+   student page has no way to tell that saving affects one person rather than the class —
+   and the two look identical otherwise. Spans the grid so it cannot be mistaken for a pack. */
+function scopeNoteHtml() {
+    if (!state.assignDraftUid) return '';
+    return `<div class="mc-note" style="grid-column:1/-1;border-color:var(--amber)">
+      <strong>Assigning just for ${esc(studentNamed(state.assignDraftUid))}.</strong>
+      Everything the whole Task Force already has is ticked and locked below — this adds on
+      top of it for this one agent, and changes nothing for anyone else.
+      <button class="mc-btn" type="button" id="btn-assign-whole-class" style="margin-left:10px">Switch to the whole Task Force</button>
+    </div>`;
+}
+
+function packHtml(pack, picked, locked = new Set()) {
+    const on = pack.items.filter((i) => picked.has(i.id) || locked.has(i.id)).length;
     return `<div class="pack">
       <div class="pack-head">
         <span class="pack-name">${esc(pack.name)}</span>
         <span class="pack-count">${on} of ${pack.items.length}</span>
       </div>
-      <div class="pack-body">${pack.items.map((i) => assignRowHtml(i, picked.has(i.id))).join('')}</div>
+      <div class="pack-body">${pack.items.map((i) => assignRowHtml(i, picked.has(i.id), locked.has(i.id))).join('')}</div>
     </div>`;
 }
 
-function assignRowHtml(item, checked) {
+function assignRowHtml(item, checked, isClassWide = false) {
     // A game's subtitle names where it actually routes a weak player, derived from its
     // skillTags and every lab that claims them (routingTargetsFor) — not a hardcoded string,
     // so retagging a lab moves the sentence with it.
@@ -1342,10 +1497,16 @@ function assignRowHtml(item, checked) {
         ? [item.routesTo && item.routesTo.length ? `routes to ${formatList(item.routesTo)}` : 'no routing target tagged yet']
             .filter(Boolean).join(' · ')
         : item.blurb;
-    return `<label class="mrow">
-      <input type="checkbox" data-assign-id="${esc(item.id)}" data-assign-kind="${item.type === 'game' ? 'game' : 'module'}"${checked ? ' checked' : ''}>
+    // A class-wide row in per-student mode is ticked and disabled: a teacher can see the
+    // student already has it, and cannot remove class work from one individual here. That
+    // would be an exemption, which is a different feature with different consequences
+    // (a student quietly excused from work the class is doing).
+    return `<label class="mrow"${isClassWide ? ' style="opacity:.62"' : ''}>
+      <input type="checkbox" data-assign-id="${esc(item.id)}" data-assign-kind="${item.type === 'game' ? 'game' : 'module'}"${
+        isClassWide ? ' checked disabled' : (checked ? ' checked' : '')}>
       <div class="mrow-info">
-        <div class="mrow-name">${esc(item.name)}${item.isCapstone ? '<span class="capstone-tag">CAPSTONE</span>' : ''}</div>
+        <div class="mrow-name">${esc(item.name)}${item.isCapstone ? '<span class="capstone-tag">CAPSTONE</span>' : ''}${
+          isClassWide ? '<span class="tiny-tag">WHOLE TASK FORCE</span>' : ''}</div>
         ${sub ? `<div class="mrow-sub">${esc(sub)}</div>` : ''}
       </div>
       <div class="mrow-time">~${item.minutes}m</div>
@@ -1371,12 +1532,27 @@ function renderAssignCount() {
         modules: [...state.draft.modules], games: [...state.draft.games], catalog: state.catalog,
     });
     const dirty = isAssignDirty();
-    el.textContent = summary.label + (dirty ? ' · unsaved' : '');
+    // In per-student mode the numbers are the EXTRAS only, so the label has to say so —
+    // "4 modules assigned · about 78 minutes" would otherwise read as the student's whole
+    // workload when it is the part on top of it.
+    const prefix = state.assignDraftUid
+        ? (summary.moduleCount || summary.gameCount
+            ? `Extra for ${esc(studentNamed(state.assignDraftUid))}: `
+            : `Nothing extra for ${esc(studentNamed(state.assignDraftUid))} yet`)
+        : '';
+    const body = (state.assignDraftUid && !(summary.moduleCount || summary.gameCount))
+        ? ''
+        : summary.label;
+    el.textContent = prefix + body + (dirty ? ' · unsaved' : '');
     el.classList.toggle('dirty', dirty);
 }
 
 function isAssignDirty() {
     const same = (set, arr) => set.size === arr.length && arr.every((id) => set.has(id));
+    if (state.assignDraftUid) {
+        const extras = state.extrasByUid[state.assignDraftUid] || { modules: [], games: [] };
+        return !(same(state.draft.modules, extras.modules) && same(state.draft.games, extras.games));
+    }
     return !(same(state.draft.modules, (state.classroom && state.classroom.assignedModules) || [])
         && same(state.draft.games, state.assignedGames));
 }
@@ -1407,6 +1583,7 @@ function isAssignDirty() {
  * assignedModules keeps meaning precisely what every existing consumer already believes.
  */
 async function saveAssignments() {
+    if (state.assignDraftUid) return saveStudentExtras();
     const btn = document.getElementById('btn-save-assign');
     btn.disabled = true;
     const modules = [...state.draft.modules];
@@ -1439,6 +1616,92 @@ async function saveAssignments() {
     }
 }
 
+/* The roster grid's columns stay the CLASS set for every student, deliberately: shared
+   columns are what makes a roster scannable, and giving each student their own columns would
+   make every row a different shape. A student with extra work gets a compact marker instead,
+   and the work itself is listed on their detail page. This is the whole reason extras are
+   additive rather than a per-student replacement. */
+/* The entry point for giving ONE student extra work, on the page where a teacher has just
+   read why they might need it. This is the loop the triage list's "Assign more" implies:
+   a student finished everything, so give them something — not everyone. */
+/* A module can be assigned from any Lab Pack, but Mission Control can only chart the ones
+   module-data.js has step data for (the Digital Decisions lab today — see
+   docs/mission-control.md). Saying so is the whole point: without this the module is simply
+   absent from the page, which reads as "the assignment did not save" rather than "this is
+   assigned and I cannot show you progress on it yet". */
+function untrackableNote(s) {
+    const ids = s.untrackable || [];
+    if (!ids.length) return '';
+    const names = ids.map((id) => esc(moduleName(id)));
+    return `<div class="mc-note" style="margin-top:20px;border-color:var(--amber)">
+      <strong>${names.join('</strong>, <strong>')}</strong> ${ids.length === 1 ? 'is' : 'are'} assigned to
+      ${esc(s.name.split(' ')[0])}, but Mission Control can't show step-by-step progress for
+      ${ids.length === 1 ? 'it' : 'them'} yet — only the Digital Decisions lab reports its Cases
+      back in that detail. ${ids.length === 1 ? 'It counts' : 'They count'} toward their total above,
+      and ${ids.length === 1 ? 'it is' : 'they are'} on the student's own list as normal.
+    </div>`;
+}
+
+function assignExtraButton(s) {
+    return `<div style="margin-top:22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="mc-btn primary" type="button" data-assign-for="${esc(s.uid)}">Assign something just for ${esc(s.name.split(' ')[0])}</button>
+      <span style="font-size:11px;color:var(--text-muted)">Adds to what the whole Task Force already has — it doesn't replace it.</span>
+    </div>`;
+}
+
+function extrasBadge(s) {
+    // The ALL view, so an extra Mission Control cannot chart still shows as assigned.
+    const n = (s.allExtraModules || s.extraModules || []).length + (s.extraGames || []).length;
+    if (!n) return '';
+    return `<div style="margin-top:6px;font-size:10px;color:var(--amber)">+${n} just for them</div>`;
+}
+
+/* Writes ONE student's extras to classroom_assignments/{code}_{uid} (firestore.rules #6c).
+ *
+ * The class set is never touched here, and the document holds only the extras — not the
+ * merged result. Storing the merged set would fossilise the class assignment at the moment
+ * an extra was given: change what the Task Force does next week and this student would
+ * silently keep last week's list. Extras stay a delta; the merge happens at read time in
+ * assignmentFor().
+ *
+ * Empty extras DELETE the row rather than writing an empty document, so "no extras" has one
+ * representation rather than two, and a cleared student costs no read. */
+async function saveStudentExtras() {
+    const uid = state.assignDraftUid;
+    const btn = document.getElementById('btn-save-assign');
+    btn.disabled = true;
+    const modules = [...state.draft.modules];
+    const games = [...state.draft.games];
+    const ref = doc(db, 'artifacts', appId, 'classroom_assignments', `${state.code}_${uid}`);
+    try {
+        if (!modules.length && !games.length) {
+            await deleteDoc(ref).catch((e) => {
+                // Deleting a row that was never created is not a failure.
+                if (!e || e.code !== 'not-found') throw e;
+            });
+            delete state.extrasByUid[uid];
+        } else {
+            await setDoc(ref, {
+                classroomCode: state.code, uid, modules, games, updatedAt: Date.now(),
+            });
+            state.extrasByUid[uid] = { modules, games };
+        }
+        state.students = state.students.map((s) => (s.uid === uid ? rebuildStudent(s) : s));
+        state.assignDraftUid = null;
+        resetDraft();
+        renderAll();
+        selectStudent(uid);
+        toast(modules.length || games.length
+            ? `Saved — ${studentNamed(uid)} has ${modules.length + games.length} extra item${modules.length + games.length === 1 ? '' : 's'}.`
+            : `Cleared ${studentNamed(uid)}'s extras. They still have everything the Task Force has.`);
+    } catch (e) {
+        console.error('[Mission Control] saving per-student extras failed', e);
+        toast('That did not save. Your changes are still here — try again.', true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 /* Shown only when a session read actually came back denied (see readSessions). The teacher
    read grant is deployed and works for every membership shape the join flow produces, so in
    practice this is reachable only when an agent is not linked to this Task Force the way the
@@ -1460,7 +1723,9 @@ function renderDetail(uid) {
         <div class="detail-meta">
           <div class="dmeta"><div class="dmeta-dot" style="background:${c}"></div>${esc(STATUS_LABEL[s.status])}</div>
           <div class="dmeta">Last active: ${esc(relativeTime(s.lastActive))}</div>
-          <div class="dmeta">${state.assigned.length} module${state.assigned.length === 1 ? '' : 's'} assigned</div>
+          <div class="dmeta">${(s.allAssigned || state.assigned).length} module${(s.allAssigned || state.assigned).length === 1 ? '' : 's'} assigned${
+            (s.allExtraModules || []).length ? ` <span style="color:var(--amber)">(${s.allExtraModules.length} just for them)</span>` : ''
+          }</div>
           ${isToday(s.lastActive) ? '<div class="live-badge"><div class="live-dot"></div>Active today</div>' : ''}
         </div>
       </div>
@@ -1474,19 +1739,34 @@ function renderDetail(uid) {
           <div class="qstat-label">time on task</div>
         </div>
         <div class="qstat">
-          <div class="qstat-val">${s.completedCount}/${state.assigned.length}</div>
+          <div class="qstat-val">${s.completedCount}/${(s.assigned || state.assigned).length}</div>
           <div class="qstat-label">completed</div>
         </div>
       </div>`;
 
     document.getElementById('alert-slot').innerHTML = alertFor(s);
 
+    const mine = s.assigned || state.assigned;
+    const extraSet = new Set(s.extraModules || []);
+    const classCards = mine.filter((id) => !extraSet.has(id) && s.modules[id]);
+    const extraCards = mine.filter((id) => extraSet.has(id) && s.modules[id]);
+
     const body = document.getElementById('detail-body');
     body.innerHTML =
-        (state.assigned.length
-            ? (state.sessionsReadable ? '' : degradedNote()) + state.assigned.map((id) => moduleCard(s, s.modules[id])).join('')
+        (mine.length
+            ? (state.sessionsReadable ? '' : degradedNote())
+              + classCards.map((id) => moduleCard(s, s.modules[id])).join('')
+              // Extras are listed apart from the class work and labelled, because "why does
+              // this student have a module the others don't" is the first question the page
+              // has to answer, and an unmarked extra reads as a rendering bug.
+              + (extraCards.length
+                  ? `<div class="steps-label" style="margin-top:20px">ASSIGNED JUST FOR ${esc(s.name.split(' ')[0].toUpperCase())}</div>`
+                    + extraCards.map((id) => moduleCard(s, s.modules[id])).join('')
+                  : '')
             : '<div class="empty-note">No modules are assigned to this Task Force yet — pick some on the Assign tab.</div>')
-        + gamesSection(s);
+        + untrackableNote(s)
+        + gamesSection(s)
+        + assignExtraButton(s);
 }
 
 /* The games a student has played, plus — since Ticket 3 — any game that is ASSIGNED and
@@ -1504,7 +1784,8 @@ function gamesSection(s) {
     if (!state.sessionsReadable) return '';
     const played = new Set(s.games.map((g) => g.id));
     const catalogGames = state.catalog ? state.catalog.gamePacks.flatMap((p) => p.items) : [];
-    const assignedUnplayed = catalogGames.filter((g) => state.assignedGames.includes(g.id) && !played.has(g.id));
+    const myGames = s.assignedGames || state.assignedGames;
+    const assignedUnplayed = catalogGames.filter((g) => myGames.includes(g.id) && !played.has(g.id));
 
     if (!s.games.length && !assignedUnplayed.length) return '';
 
@@ -1607,7 +1888,7 @@ function gameSessionRow(sess) {
    OTHER students are stalled at this exact step, which is what turns one student's problem
    into a reteach decision. */
 function alertFor(s) {
-    const row = attentionList([s], state.assigned)[0];
+    const row = attentionList([s], s.assigned || state.assigned)[0];
     if (!row) return '';
     const cls = { 'at-risk': 'alert-rose', 'needs-attention': 'alert-amber', 'all-done': 'alert-green' }[row.severity];
     const icon = { 'at-risk': '⚠', 'needs-attention': '⚡', 'all-done': '✓' }[row.severity];
@@ -1621,7 +1902,7 @@ function alertFor(s) {
  * specific module and at least one OTHER student is sitting on that same step. Zero others
  * produces nothing at all rather than "0 other students", which would read as a claim. */
 function cohortSentence(s) {
-    const stuck = stuckModule(s, state.assigned);
+    const stuck = stuckModule(s, s.assigned || state.assigned);
     if (!stuck) return '';
     const others = othersStalledAt(state.stalls, stuck.id, stuck.maxStep - 1, s.uid);
     if (others < 1) return '';
@@ -1795,8 +2076,9 @@ function switchView(view) {
         renderRoster();
         renderOverview();
     } else if (view === 'assign') {
-        document.getElementById('toolbar-title').innerHTML =
-            'Assign — <span>pick what this class works through</span>';
+        document.getElementById('toolbar-title').innerHTML = state.assignDraftUid
+            ? `Assign — <span>just for ${esc(studentNamed(state.assignDraftUid))}</span>`
+            : 'Assign — <span>pick what this class works through</span>';
         renderAssign();
     } else if (!state.activeUid && state.students.length) {
         selectStudent(visibleStudents()[0] ? visibleStudents()[0].uid : state.students[0].uid);
@@ -1817,7 +2099,12 @@ function switchViewTabsOnly(view) {
 }
 
 for (const v of VIEWS) {
-    document.getElementById(`tab-${v}`).addEventListener('click', () => switchView(v));
+    document.getElementById(`tab-${v}`).addEventListener('click', () => {
+        // Reaching Assign from the tab itself always means the whole Task Force; the
+        // per-student scope is only ever entered deliberately, from a student.
+        if (v === 'assign') { openAssignForClass(); return; }
+        switchView(v);
+    });
 }
 
 /* ── Ticket 4: the Task Force code — copy, print, CSV ──────────────────────── */
@@ -1853,19 +2140,33 @@ document.getElementById('btn-print-code').addEventListener('click', () => window
    comma in one would otherwise shift every column after it. */
 function rosterCsv() {
     const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-    const statusOf = (m) => {
-        if (!m) return 'not_started';
+    // `m` is absent for a module that is assigned but has no step data (see moduleName /
+    // untrackableNote). That is not "not started" — nothing is known either way — so it gets
+    // its own value rather than being reported as a student who ignored the work.
+    const statusOf = (m, assigned) => {
+        if (!m) return assigned ? 'assigned_no_progress_data' : 'not_assigned';
         if (m.completed) return 'completed';
         return m.maxStep > 0 ? `in_progress_step_${m.maxStep}_of_${m.meta.stepsTotal}` : 'not_started';
     };
+    // Columns are the UNION, so a module given to only one student still exports. The
+    // distinction that matters is the third state: a student who was never assigned a module
+    // is "not_assigned", NOT "not_started" — reporting them as not started would put them in
+    // the same bucket as a student who was given the work and ignored it, which is exactly
+    // the wrong conclusion to hand a teacher or an administrator.
+    const cols = state.unionAssigned.length ? state.unionAssigned : state.assigned;
     const header = ['Name', 'Email', 'Last Active']
-        .concat(state.assigned.map((id) => (MODULE_DATA[id] ? MODULE_DATA[id].name : id)))
+        .concat(cols.map(moduleName))
         .map(q).join(',');
-    const rows = state.students.map((s) => [
-        q(s.name),
-        q((s.raw && s.raw.row && s.raw.row.email) || ''),
-        q(s.lastActive ? new Date(s.lastActive).toISOString() : 'never'),
-    ].concat(state.assigned.map((id) => q(statusOf(s.modules[id])))).join(','));
+    const rows = state.students.map((s) => {
+        // The ALL view: a module this teacher assigned belongs in the export whether or not
+        // Mission Control can chart its steps, and marking it not_assigned would be a lie.
+        const mine = new Set(s.allAssigned || s.assigned || state.assigned);
+        return [
+            q(s.name),
+            q((s.raw && s.raw.row && s.raw.row.email) || ''),
+            q(s.lastActive ? new Date(s.lastActive).toISOString() : 'never'),
+        ].concat(cols.map((id) => q(mine.has(id) ? statusOf(s.modules[id], true) : 'not_assigned'))).join(',');
+    });
     return [header, ...rows].join('\n') + '\n';
 }
 
@@ -1887,7 +2188,31 @@ document.getElementById('btn-export-csv').addEventListener('click', () => {
 document.getElementById('attn-list').addEventListener('click', (e) => {
     const open = e.target.closest('[data-attn-uid]');
     if (open) { selectStudent(open.dataset.attnUid); return; }
-    if (e.target.closest('[data-attn-assign]')) switchView('assign');
+    // "Assign more" is about the ONE student who finished everything, so it opens their
+    // extras rather than the class-wide set — assigning the whole Task Force more work
+    // because one agent is ahead is the opposite of what that row is telling you.
+    const more = e.target.closest('[data-attn-assign]');
+    if (more) openAssignFor(more.dataset.attnAssign);
+});
+
+/* Opens the Assign tab scoped to one student. */
+function openAssignFor(uid) {
+    state.assignDraftUid = uid;
+    resetDraft();
+    switchView('assign');
+}
+
+/* ...and back to the whole Task Force. */
+function openAssignForClass() {
+    state.assignDraftUid = null;
+    resetDraft();
+    switchView('assign');
+}
+
+// The scope banner's switch is re-rendered on every renderAssign(), so it is delegated
+// rather than bound to an element that will not exist yet.
+document.getElementById('assign-panel').addEventListener('click', (e) => {
+    if (e.target.closest('#btn-assign-whole-class')) openAssignForClass();
 });
 
 /* ── Tickets 2 and 3: the Assign page ─────────────────────────────────────── */
@@ -1916,9 +2241,13 @@ function refreshPackCounts() {
 
 document.getElementById('btn-save-assign').addEventListener('click', saveAssignments);
 document.getElementById('btn-cancel-assign').addEventListener('click', () => {
+    const wasFor = state.assignDraftUid;
+    state.assignDraftUid = null;
     resetDraft();
     renderAssign();
-    switchView('overview');
+    // Cancelling out of a per-student edit returns to that student, not to the roster —
+    // they are where the teacher was working.
+    if (wasFor) selectStudent(wasFor); else switchView('overview');
 });
 
 document.getElementById('roster').addEventListener('click', (e) => {
@@ -1932,6 +2261,9 @@ document.getElementById('overview-grid').addEventListener('click', (e) => {
 });
 
 document.getElementById('detail-body').addEventListener('click', (e) => {
+    const forStudent = e.target.closest('[data-assign-for]');
+    if (forStudent) { openAssignFor(forStudent.dataset.assignFor); return; }
+
     const btn = e.target.closest('.module-card-header');
     if (!btn) return;
     if (btn.dataset.game) {

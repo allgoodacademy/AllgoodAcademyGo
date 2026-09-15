@@ -10,7 +10,7 @@ import {
   initializeTestEnvironment, assertFails, assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import {
-  doc, getDoc, setDoc, collection, collectionGroup, getDocs, query, where, orderBy, limit,
+  doc, getDoc, setDoc, deleteDoc, collection, collectionGroup, getDocs, query, where, orderBy, limit,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -259,6 +259,103 @@ await it('a student writing a classroomCode onto their own profile gains no read
     { role: 'student', classroomCode: 'KM7QPD', displayName: 'Keen Lynx Turn' }, { merge: true }));
   await assertFails(rosterQuery(joiner, 'KM7QPD'));
   await assertFails(getDoc(U(joiner, 'student_1')));
+});
+
+console.log('\nPER-STUDENT EXTRAS — only the teacher assigns, only the student and teacher read (rule #6c)');
+// Why this collection exists at all: the obvious design is a map on the classroom document,
+// and rule #5 grants `get` there to ANY signed-in user (so a student can validate a code
+// before joining). Per-student assignments there would be readable by every classmate. The
+// tests below are what keep that boundary honest.
+const ASSIGN = (db, code, uid) => doc(db, 'artifacts', APP, 'classroom_assignments', `${code}_${uid}`);
+const assignmentsFor = (db, code) => getDocs(query(
+  collection(db, 'artifacts', APP, 'classroom_assignments'), where('classroomCode', '==', code)));
+const extrasDoc = (code, uid, modules = ['money-as-a-skill'], games = []) =>
+  ({ classroomCode: code, uid, modules, games, updatedAt: 1 });
+
+await it('a teacher CAN assign an extra module to one of their own students', async () => {
+  await assertSucceeds(setDoc(ASSIGN(teacher, 'KM7QPD', 'student_1'), extrasDoc('KM7QPD', 'student_1')));
+});
+await it('...and re-saving it is an ordinary idempotent update, not a second create', async () => {
+  await assertSucceeds(setDoc(ASSIGN(teacher, 'KM7QPD', 'student_1'),
+    extrasDoc('KM7QPD', 'student_1', ['money-as-a-skill', 'reading-the-room'], ['money-moves']), { merge: true }));
+});
+await it('a teacher CAN read back one student\'s extras', async () => {
+  const snap = await assertSucceeds(getDoc(ASSIGN(teacher, 'KM7QPD', 'student_1')));
+  if (!snap.exists()) throw new Error('expected the assignment document to exist');
+});
+await it('a teacher CAN list every extra assignment in their own classroom', async () => {
+  const snap = await assertSucceeds(assignmentsFor(teacher, 'KM7QPD'));
+  if (!snap.docs.length) throw new Error('expected at least one assignment row');
+});
+await it('...and that list works for a classroom with NO extras assigned yet', async () => {
+  // The rule #4 failure mode in miniature: a list whose condition touched the {assignmentId}
+  // wildcard would error on null before returning a verdict, and an empty result is the case
+  // seeding data can never rescue.
+  const newTeacher = env.authenticatedContext('teacher_empty', { email: 'new@school.org' }).firestore();
+  const snap = await assertSucceeds(assignmentsFor(newTeacher, 'EMPTY1'));
+  if (snap.docs.length !== 0) throw new Error(`expected no rows, got ${snap.docs.length}`);
+});
+
+await it('the STUDENT can read their own extras', async () => {
+  await assertSucceeds(getDoc(ASSIGN(student, 'KM7QPD', 'student_1')));
+});
+await it('a student CANNOT read a CLASSMATE\'s extras', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(ASSIGN(ctx.firestore(), 'KM7QPD', 'member_1'), extrasDoc('KM7QPD', 'member_1'));
+  });
+  await assertFails(getDoc(ASSIGN(student, 'KM7QPD', 'member_1')));
+});
+await it('a student CANNOT enumerate the classroom\'s assignments to see everyone\'s', async () => {
+  await assertFails(assignmentsFor(student, 'KM7QPD'));
+});
+await it('a guest CANNOT read a student\'s extras, or list them', async () => {
+  await assertFails(getDoc(ASSIGN(guest, 'KM7QPD', 'student_1')));
+  await assertFails(assignmentsFor(guest, 'KM7QPD'));
+});
+
+// The write side is the mirror image of #6b: a membership is the student's act, an
+// assignment is the teacher's and nobody else's.
+await it('a student CANNOT assign work to THEMSELVES', async () => {
+  await assertFails(setDoc(ASSIGN(student, 'KM7QPD', 'student_1'),
+    extrasDoc('KM7QPD', 'student_1', ['ddc'])));
+});
+await it('a student CANNOT assign work to a CLASSMATE', async () => {
+  await assertFails(setDoc(ASSIGN(student, 'KM7QPD', 'member_1'), extrasDoc('KM7QPD', 'member_1')));
+});
+await it('a guest CANNOT assign work to anyone', async () => {
+  await assertFails(setDoc(ASSIGN(guest, 'KM7QPD', 'student_1'), extrasDoc('KM7QPD', 'student_1')));
+});
+await it('a teacher of ANOTHER classroom cannot assign into this one, or read its extras', async () => {
+  const other = env.authenticatedContext('teacher_2', { email: 'o@school.org' }).firestore();
+  await assertFails(setDoc(ASSIGN(other, 'KM7QPD', 'student_1'), extrasDoc('KM7QPD', 'student_1')));
+  await assertFails(getDoc(ASSIGN(other, 'KM7QPD', 'student_1')));
+  await assertFails(assignmentsFor(other, 'KM7QPD'));
+});
+
+// Shape constraints. The doc ID is pinned so a teacher cannot file one student's extras
+// under another's ID, and the field list is closed so this document can never grow a field
+// something else authorizes on.
+await it('the document ID must match the classroomCode + uid it claims', async () => {
+  await assertFails(setDoc(doc(teacher, 'artifacts', APP, 'classroom_assignments', 'KM7QPD_wrong'),
+    extrasDoc('KM7QPD', 'student_1')));
+});
+await it('a field outside the allowed set is DENIED', async () => {
+  await assertFails(setDoc(ASSIGN(teacher, 'KM7QPD', 'student_1'),
+    { ...extrasDoc('KM7QPD', 'student_1'), role: 'teacher' }));
+});
+await it('modules and games must both be lists', async () => {
+  await assertFails(setDoc(ASSIGN(teacher, 'KM7QPD', 'student_1'),
+    { classroomCode: 'KM7QPD', uid: 'student_1', modules: 'money-as-a-skill', games: [], updatedAt: 1 }));
+});
+await it('an unbounded module list is DENIED', async () => {
+  await assertFails(setDoc(ASSIGN(teacher, 'KM7QPD', 'student_1'),
+    extrasDoc('KM7QPD', 'student_1', Array.from({ length: 101 }, (_, i) => `m${i}`))));
+});
+await it('a teacher CAN clear a student\'s extras by deleting the row', async () => {
+  await assertSucceeds(deleteDoc(ASSIGN(teacher, 'KM7QPD', 'member_1')));
+});
+await it('a student CANNOT delete their own extras to unassign themselves', async () => {
+  await assertFails(deleteDoc(ASSIGN(student, 'KM7QPD', 'student_1')));
 });
 
 console.log('\nMISSION CONTROL — a teacher reads their own students\' telemetry sessions, nobody else\'s');

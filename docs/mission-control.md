@@ -26,10 +26,51 @@ app shell and then comes here.
 
 | Target | Written by |
 | --- | --- |
-| `classrooms/{code}.assignedModules` | the Assign tab (rule #5 — only that classroom's own teacher) |
-| `classrooms/{code}.assignedGames` | the Assign tab — see below |
+| `classrooms/{code}.assignedModules` | the Assign tab, class scope (rule #5 — only that classroom's own teacher) |
+| `classrooms/{code}.assignedGames` | the Assign tab, class scope — see below |
+| `classroom_assignments/{code}_{uid}` | the Assign tab, per-student scope (rule #6c) |
 
 Nothing else. It never writes to a student's records.
+
+### Per-student extras
+
+A teacher can give **one named student** work on top of the class-wide set — the "Jamal also
+gets Money as a Skill because he's stuck" case. Reached from that student's Agent Detail page,
+or from the triage list's **Assign more** (which is about the one agent who finished
+everything, so it opens *their* extras, not the whole class's).
+
+**Additive, never a replacement**, and that is load-bearing. If each student's set were wholly
+their own: the roster grid would lose its shared columns (every row a different shape),
+`classAverage` would be averaging students who were set different work, and changing what the
+class does would mean rewriting N documents instead of one. Extras keep the class set as the
+spine. The picker shows class work ticked and **disabled** — removing class work from one
+individual would be an *exemption*, which is a different feature with different consequences.
+
+**Why it is not a field on the classroom document.** The obvious design is
+`classrooms/{code}.assignedByStudent = { uid: [...] }`, and it is a privacy bug: rule #5 grants
+`get` on a classroom document to **any signed-in user**, deliberately, so a student can
+validate a code before joining — and the code is read out loud in class. Per-student
+assignments there would be readable by every classmate. Hence its own collection with a narrow
+read grant (the student it is about, or that classroom's teacher).
+
+The document stores **only the delta**, never the merged set. Storing the merge would fossilise
+the class assignment at the moment the extra was given, so changing what the Task Force does
+next week would silently leave that student on last week's list. The merge happens at read time
+in `assignmentFor()`.
+
+**How the aggregates cope with ragged sets:**
+
+| Reads | Which list | Why |
+| --- | --- | --- |
+| `buildStudent` | that student's own | an extra is real work for them and invisible to everyone else |
+| `stallPoints`, `attentionList` | the **union** | self-filtering — `s.modules` only holds a student's own assignment, so nobody is judged on work that was never theirs |
+| `classAverage` | the **class set** | an average is a comparison; averaging in work only some students were given compares them on different assignments |
+| roster grid columns | the **class set** | shared columns are what make a roster scannable; a student with extras gets a `+N just for them` marker instead |
+| CSV columns | the **union** | a module only one student has still belongs in an export |
+
+The CSV therefore has three non-progress states, and the distinction matters to anyone reading
+it as a compliance record: `not_assigned` (never given it), `assigned_no_progress_data`
+(assigned, but see the limitation below), and `not_started` (given it, hasn't opened it).
 
 ### Why games are a separate field
 
@@ -60,6 +101,13 @@ only (see its generator's `LAB_IDS`), so the other seven labs are assignable but
 step-by-step data for the roster to render. Extending the generator needs its
 `CASE_CHOICES.length === stepsTotal` invariant loosened — those labs have `CASE_TITLES` and
 `stepsTotal` but no `CASE_CHOICES` — so it is its own change, not a side effect of this one.
+
+Because of that gap, `assignmentFor()` returns **two** views of the same assignment: the
+trackable set (`modules`, filtered through `MODULE_DATA`, which is what `buildStudent` gets)
+and the full set (`allModules`). Counts, badges, the CSV and the "can't chart this yet" note
+all read the *full* view. Filtering to the trackable set and stopping there is what made an
+extra from another Lab Pack vanish silently — it saved, and the teacher saw nothing change,
+which is indistinguishable from a failed write.
 
 ## What it reads
 

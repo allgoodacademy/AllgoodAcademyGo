@@ -300,6 +300,67 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
+    // 6c. NEW — PER-STUDENT EXTRA ASSIGNMENTS. What one named student was given ON TOP OF
+    //     the Task Force's class-wide set (classrooms/{code}.assignedModules / .assignedGames).
+    //     Same deterministic-ID join-table shape as #6b: `{classroomCode}_{uid}`, so a
+    //     teacher writes or clears one student's extras without a query, and a student reads
+    //     their own with a single get.
+    //
+    //     WHY THIS IS NOT A FIELD ON THE CLASSROOM DOCUMENT. The obvious design is
+    //     classrooms/{code}.assignedByStudent = { uid: [...] }, and it is a privacy bug: rule
+    //     #5 grants `get` on a classroom document to ANY signed-in user, deliberately, so a
+    //     student can validate a code before joining. The code itself is shared out loud in
+    //     class. Per-student assignments on that document would therefore be readable by
+    //     every classmate — and by anyone who has ever heard the code — which is a
+    //     behavioural record about a named minor. It lives in its own collection precisely so
+    //     the read grant can be narrow.
+    //
+    //     WRITE IS THE MIRROR IMAGE OF #6b. A membership is created by the STUDENT (joining
+    //     is their act, and knowing the code is the trust model). An assignment is created by
+    //     the TEACHER and by nobody else — a student must not be able to hand themselves, or
+    //     a classmate, extra work. So the write condition pivots on classroomOwnedBy, the
+    //     same classroom-document proof rules #4/#5/#6 use, never on a self-written field.
+    match /artifacts/{appId}/classroom_assignments/{assignmentId} {
+      //    READ: the student it is about, or that classroom's teacher. Written against
+      //    `resource.data` and never against the {assignmentId} wildcard — the wildcard is
+      //    null during a LIST, which is exactly the null-value evaluation error that took
+      //    rule #4 (and with it the whole of Mission Control) down. A teacher lists their
+      //    classroom's assignments with where('classroomCode','==',code), and because every
+      //    returned document resolves classroomOwnedBy against the SAME classroom path,
+      //    document access stays O(1) rather than O(students).
+      allow read: if request.auth != null
+        && (resource.data.uid == request.auth.uid
+            || classroomOwnedBy(appId, resource.data.get('classroomCode', NONE()), request.auth.uid));
+
+      //    CREATE and UPDATE share one condition, as in #6b: re-saving a student's extras is
+      //    an ordinary idempotent setDoc({merge:true}), which Firestore evaluates as an
+      //    update once the document exists, and there is no reason for the second door to be
+      //    looser than the first. The doc ID is pinned to the code+uid pair so a teacher
+      //    cannot file one student's extras under another student's ID, and the field list is
+      //    closed so this document can never grow a field that something else authorizes on.
+      allow create, update: if request.auth != null
+        && classroomOwnedBy(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid)
+        && request.resource.data.keys().hasOnly(['classroomCode', 'uid', 'modules', 'games', 'updatedAt'])
+        && request.resource.data.classroomCode is string
+        && request.resource.data.classroomCode.matches('^[A-Za-z0-9_-]{1,64}$')
+        && request.resource.data.uid is string
+        && request.resource.data.uid.matches('^[A-Za-z0-9_-]{1,128}$')
+        && assignmentId == (request.resource.data.classroomCode + '_' + request.resource.data.uid)
+        //  Both lists are required and bounded. The cap is not a security boundary — the only
+        //  writer is already the classroom's own teacher — it is a guard against a client bug
+        //  writing an unbounded array into a document every roster read then pays for.
+        && request.resource.data.modules is list
+        && request.resource.data.modules.size() <= 100
+        && request.resource.data.games is list
+        && request.resource.data.games.size() <= 100;
+
+      //    DELETE: the teacher, so "clear this student's extras" is a real delete rather than
+      //    an empty document left behind. The student cannot delete their own — unassigning
+      //    yourself is not a thing.
+      allow delete: if request.auth != null
+        && classroomOwnedBy(appId, resource.data.get('classroomCode', NONE()), request.auth.uid);
+    }
+
     // 7. NEW — Message HQ. Flat top-level collection (not nested per-user) so any portal —
     //    dashboard, DDC, or any future module — writes here directly and Insider reads it
     //    with a plain query, no collectionGroup gymnastics or per-module rule changes needed.
