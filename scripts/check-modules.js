@@ -387,6 +387,54 @@ for (const c of courses) {
 }
 for (const r of rows) if (!courses.find(c => c.name === r.name)) fail(`docs/insider-analytics.md: row "${r.name}" has no Insider COURSES entry`);
 
+// --- Challenge teacher sheets: an answer key is only useful while it is still true
+// Each sheet reproduces every option of every scenario in its Challenge. If somebody edits
+// a scenario's wording or rescores an option, the printed key a substitute is holding goes
+// silently wrong — the worst failure mode this artifact has. So every option line in a
+// sheet must still appear verbatim in its Challenge source, and the scoring figures in the
+// header must still be that Challenge's MAX_SCORE / BADGE_THRESHOLD.
+const TEACHER_SHEETS = {
+  'digital-decisions': { sheet: 'public/for-teachers/digital-decisions-teacher-sheet/index.html', scenarios: 28 },
+  'real-world-ready':  { sheet: 'public/for-teachers/real-world-ready-teacher-sheet/index.html',  scenarios: 24 },
+  'room-to-think':     { sheet: 'public/for-teachers/room-to-think-teacher-sheet/index.html',     scenarios: 24 },
+};
+const unescapeHtml = (t) => t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&mdash;/g, '—').replace(/&rsquo;/g, '’').replace(/&ldquo;/g, '“').replace(/&rdquo;/g, '”')
+  .replace(/&middot;/g, '·').replace(/&nbsp;/g, ' ');
+for (const [pack, cfg] of Object.entries(TEACHER_SHEETS)) {
+  if (!fs.existsSync(path.join(root, cfg.sheet))) { fail(`${cfg.sheet}: missing — pack "${pack}" has no teacher sheet`); continue; }
+  const sheet = unescapeHtml(read(cfg.sheet));
+  const chPath = (PACKS[pack] && PACKS[pack].challenge) || `public${(registry.find(r => r.category === 'challenge' && r.pack === pack) || {}).url || ''}index.html`;
+  if (!fs.existsSync(path.join(root, chPath))) { fail(`${cfg.sheet}: cannot locate the Challenge source for pack "${pack}"`); continue; }
+  const ch = read(chPath);
+  const max = Number((ch.match(/const MAX_SCORE\s*=\s*(\d+)/) || [])[1]);
+  const badge = Number((ch.match(/const BADGE_THRESHOLD\s*=\s*(\d+)/) || [])[1]);
+  const hdr = sheet.match(/<strong>(\d+) scenarios \u00b7 (\d+) points \u00b7 (\d+) to certify/);
+  if (!hdr) fail(`${cfg.sheet}: header line does not state "N scenarios · N points · N to certify"`);
+  else {
+    if (Number(hdr[1]) !== cfg.scenarios) fail(`${cfg.sheet}: header says ${hdr[1]} scenarios, expected ${cfg.scenarios}`);
+    if (Number(hdr[2]) !== max) fail(`${cfg.sheet}: header says ${hdr[2]} points but ${chPath} MAX_SCORE is ${max}`);
+    if (Number(hdr[3]) !== badge) fail(`${cfg.sheet}: header says ${hdr[3]} to certify but ${chPath} BADGE_THRESHOLD is ${badge}`);
+  }
+  const blocks = [...sheet.matchAll(/<h3>([A-Z]{1,2}-\d+) \u2014[\s\S]*?<table class="key">([\s\S]*?)<\/table>/g)];
+  if (blocks.length !== cfg.scenarios) fail(`${cfg.sheet}: ${blocks.length} scenario blocks in the answer key, expected ${cfg.scenarios}`);
+  let drifted = 0;
+  for (const b of blocks) {
+    for (const row of b[2].matchAll(/<td class="score-(\d)">\d<\/td><td>([\s\S]*?)<\/td>/g)) {
+      const text = row[2].trim();
+      // The Challenge stores option text in a JS string literal, so an apostrophe may be
+      // backslash-escaped there. Compare on a form that is neutral to that.
+      const needle = text.replace(/\\/g, '');
+      const hay = ch.replace(/\\'/g, "'").replace(/\\"/g, '"');
+      if (!hay.includes(needle)) {
+        if (drifted < 3) fail(`${cfg.sheet}: ${b[1]} option "${text.slice(0, 58)}" is not in ${chPath} — the key has drifted from the Challenge`);
+        drifted++;
+      }
+    }
+  }
+  if (drifted > 3) fail(`${cfg.sheet}: ${drifted - 3} further option(s) also no longer match ${chPath}`);
+}
+
 // --- public copy: hand-typed lab counts and the grade band
 // The For Teachers hero shipped reading "Seven interactive GoodBlocks" three lines above a
 // stats box reading "11, across 3 Lab Packs" — two numbers, same screen, neither derived
