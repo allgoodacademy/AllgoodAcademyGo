@@ -733,6 +733,79 @@
   <div class="p-foot">Enter it once. It stays linked after that.</div>
 </div>
 
+<!-- LOAD WATCHDOG. A CLASSIC script, deliberately not a module: it must survive exactly the
+     failure it exists to report, and a module cannot report its own failure to link.
+
+     Placed before the module scripts so its listeners are registered when they evaluate.
+
+     Why this exists: this page is one <script type="module"> whose import graph includes
+     ./derive.js, ./module-data.js and /js/skill-routing.js. If ANY of them fails to load or
+     link — a stale cached copy missing an export the new HTML imports, a 404, a blocked
+     CDN — the module never evaluates, not one statement of it runs, and the loading screen
+     below sits there spinning forever with its initial text. There is nothing to catch it
+     from the inside. That happened: index.html is served no-store while derive.js was not
+     covered by any Cache-Control rule, so a browser could pair fresh HTML with an hour-old
+     module and get "does not provide an export named …". The cache headers in firebase.json
+     are the fix for that specific cause; this is the fix for the whole class of them, because
+     a spinner that never resolves tells a teacher nothing and tells us nothing either. -->
+<script>
+(function () {
+  var reported = false;
+
+  function showFailure(title, detail) {
+    if (reported) return;
+    var gate = document.getElementById('screen-gate');
+    var loading = document.getElementById('screen-loading');
+    // If the app already got far enough to show its own gate, it is handling things.
+    if (!gate || !loading || loading.hidden) return;
+    reported = true;
+    loading.hidden = true;
+    document.getElementById('gate-title').textContent = title;
+    document.getElementById('gate-body').textContent = detail;
+    var link = document.getElementById('gate-link');
+    // Reload rather than navigate away: the overwhelmingly likely fix is picking up a fresh
+    // copy of whatever failed to load.
+    link.textContent = 'Reload Mission Control';
+    link.href = window.location.pathname + '?r=' + Date.now();
+    gate.hidden = false;
+  }
+
+  // A module that fails to parse, resolve an import, or link raises this before any of its
+  // own code runs, so nothing inside the module could ever have caught it.
+  window.addEventListener('error', function (e) {
+    var msg = (e && e.message) || 'unknown error';
+    if (/does not provide an export|Failed to fetch dynamically imported|Importing a module script failed|Unexpected token/i.test(msg)) {
+      showFailure(
+        'Mission Control needs a refresh',
+        'This page loaded a newer version of itself than the copy of its code your browser had '
+          + 'cached, so it could not start. Reloading should fix it — if it does not, a hard '
+          + 'refresh (Ctrl/Cmd + Shift + R) will. Technical detail: ' + msg,
+      );
+      return;
+    }
+    showFailure('Mission Control could not start', 'Something failed while loading the page: ' + msg);
+  });
+
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    showFailure('Mission Control could not start',
+      'Something failed while loading your Task Force: ' + ((r && (r.message || r.code)) || 'unknown error'));
+  });
+
+  // Belt and braces: an error event is not guaranteed for every way a module graph can fail,
+  // and a request that never settles raises nothing at all. Longer than auth-core's own 8s
+  // auth timeout so a slow-but-working sign-in is never interrupted by this.
+  setTimeout(function () {
+    showFailure(
+      'Mission Control is taking too long',
+      'The page started loading but never finished. That is usually a connection problem or a '
+        + 'stale cached file. Reloading should fix it — if it does not, a hard refresh '
+        + '(Ctrl/Cmd + Shift + R) will.',
+    );
+  }, 15000);
+})();
+</script>
+
 <!-- Identity/init lives in auth-core.js, as on every other Allgood Academy page. -->
 <script type="module" src="/js/auth-core.js"></script>
 <script type="module">
