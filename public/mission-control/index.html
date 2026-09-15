@@ -622,6 +622,9 @@
     </div>
   </div>
   <div class="topbar-time" id="clock">—</div>
+  <!-- EXIT still returns to /dashboard/, which remains correct: the dashboard is the
+       student/app shell every account uses, including a teacher's own learner view. It is
+       no longer where any teacher function lives. -->
   <button class="topbar-exit" onclick="window.location.href='/dashboard/'">EXIT</button>
 </div>
 
@@ -873,6 +876,8 @@ function showGate(title, body, linkText, linkHref) {
 async function load() {
     const user = await waitForAuthReady();
     if (!user) {
+        // Still points at /dashboard/, and that is correct after the teacher functions
+        // moved here: sign-in lives in the app shell, and always did.
         showGate('Sign in first', 'Mission Control reads your Task Force roster, so it needs to know who you are.', 'Go to the dashboard', '/dashboard/');
         return;
     }
@@ -880,10 +885,15 @@ async function load() {
     const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
     const me = meSnap.exists() ? meSnap.data() : {};
     if (me.role !== 'teacher' || !me.classroomCode) {
+        // Reworded now that assignment, the code and the roster export live HERE: the
+        // dashboard is no longer "where the teacher tools are", it is the app shell, and
+        // creating a Task Force is the one teacher action that still starts there. Saying
+        // "from the dashboard" without that distinction now reads as "the teacher page is
+        // somewhere else", which is the opposite of true.
         showGate(
             'Teachers only',
-            'Mission Control shows a Task Force roster and every agent’s progress in it. Your account isn’t set up as a teacher with a Task Force yet — you can create one from the dashboard.',
-            'Go to the dashboard', '/dashboard/',
+            'Mission Control is the teacher home — your roster, your Task Force code, and what you assign. Your account isn’t a Task Force Leader yet. Creating a Task Force is a one-time step in the app itself: open the System Menu there and choose “Set Up Mission Control”, and this page is where you land afterwards.',
+            'Set up a Task Force', '/dashboard/',
         );
         return;
     }
