@@ -387,6 +387,67 @@ for (const c of courses) {
 }
 for (const r of rows) if (!courses.find(c => c.name === r.name)) fail(`docs/insider-analytics.md: row "${r.name}" has no Insider COURSES entry`);
 
+// --- public copy: hand-typed lab counts and the grade band
+// The For Teachers hero shipped reading "Seven interactive GoodBlocks" three lines above a
+// stats box reading "11, across 3 Lab Packs" — two numbers, same screen, neither derived
+// from anything. These pages deliberately fetch nothing at runtime (zero third-party
+// requests, and a number that pops in after paint is worse than one that is simply right),
+// so the copy stays static and the registry checks it here instead.
+const NUM_WORD = ['zero','one','two','three','four','five','six','seven','eight','nine','ten',
+  'eleven','twelve','thirteen','fourteen','fifteen'];
+const labCount = dashLabs.length;
+const packCount = Object.keys(PACKS).length;
+const labsPerPack = Object.fromEntries(Object.keys(PACKS).map(k => [k, dashLabs.filter(l => l.pack === k).length]));
+// Written as a word ("Eleven lessons") or a numeral ("11, in 3 Lab Packs"); both must agree.
+// The number must sit directly on the noun it counts ("Eleven interactive lessons"), with
+// only adjectives between, so "24 scenarios across all four lessons" reads as "four lessons".
+// Plural only: "A GoodBlock is one lab" defines the unit, it does not count the catalogue.
+const countRe = /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|\d+)\s+(?:(?:free|interactive|more|other|twenty-minute)\s+){0,3}(lessons|labs|GoodBlocks)\b(?!\s*Pack)/gi;
+const teachers = read('public/for-teachers/index.html');
+for (const m of teachers.matchAll(countRe)) {
+  const raw = m[1].toLowerCase();
+  const n = /^\d+$/.test(raw) ? Number(raw) : NUM_WORD.indexOf(raw);
+  if (n < 0) continue;
+  // Per-pack figures ("4 labs + Challenge") are counted against their own pack below.
+  if (Object.values(labsPerPack).includes(n) && n !== labCount) continue;
+  if (n !== labCount) fail(`public/for-teachers/index.html: copy says "${m[0].trim()}" but the registry has ${labCount} live labs`);
+}
+for (const [pack, cfg] of Object.entries(PACKS)) {
+  const head = (teachers.match(new RegExp(`<h3>${cfg.displayName || ''}</h3>\\s*<span class="pack-meta">([^<]*)<`)) || [])[1];
+  if (head === undefined) continue;
+  const n = Number((head.match(/(\d+)\s*(?:labs|GoodBlocks)/) || [])[1]);
+  if (n && n !== labsPerPack[pack]) fail(`public/for-teachers/index.html: "${cfg.displayName}" pack meta says ${n} labs but the registry has ${labsPerPack[pack]}`);
+}
+if (!new RegExp(`\\b${packCount}\\b[^.<]{0,24}Lab Packs`).test(teachers)) {
+  fail(`public/for-teachers/index.html: no "${packCount} Lab Packs" figure found — the registry has ${packCount} packs`);
+}
+// The hero stats box: "Lessons live | 11, in 3 Lab Packs". This is the figure the hero lede
+// contradicted, so it is asserted directly rather than left to the prose scan above.
+const glance = (teachers.match(/<dt>Lessons live<\/dt><dd>([^<]*)<\/dd>/) || [])[1];
+if (glance === undefined) fail('public/for-teachers/index.html: the "Lessons live" glance row is gone — the hero lab count is no longer checkable');
+else {
+  const g = glance.match(/(\d+),\s*in\s*(\d+)\s*Lab Packs/);
+  if (!g) fail(`public/for-teachers/index.html: "Lessons live" reads "${glance}" — expected "N, in M Lab Packs"`);
+  else if (Number(g[1]) !== labCount || Number(g[2]) !== packCount) {
+    fail(`public/for-teachers/index.html: "Lessons live" says ${g[1]} in ${g[2]} packs, registry has ${labCount} in ${packCount}`);
+  }
+}
+// One grade band, everywhere. The site said 6–9 while the running ad and the TPT facilitator
+// guide both said 6–12, so a high school teacher who clicked the ad was told on the first
+// screen that this was not for them. Any other band in public copy is a build failure.
+const GRADE_BAND = '6–12';
+// The glance row is where the contradiction actually shipped, and it was phrased
+// "Middle school (6–9)" — no "grades" anywhere in it, so the prose scan below cannot see it.
+const bandRow = (teachers.match(/<dt>Grade band<\/dt><dd>([^<]*)<\/dd>/) || [])[1];
+if (bandRow === undefined) fail('public/for-teachers/index.html: the "Grade band" glance row is gone');
+else if (bandRow.trim() !== `Grades ${GRADE_BAND}`) fail(`public/for-teachers/index.html: "Grade band" reads "${bandRow}" — expected "Grades ${GRADE_BAND}"`);
+for (const page of ['public/index.html', 'public/404.html', 'public/about/index.html', 'public/for-teachers/index.html']) {
+  const src = read(page);
+  for (const m of src.matchAll(/grades?\s*(\d{1,2})\s*(?:[–—-]|through|to)\s*(\d{1,2})/gi)) {
+    if (`${m[1]}–${m[2]}` !== GRADE_BAND) fail(`${page}: states grade band "${m[0]}" — the ad and the facilitator guide say ${GRADE_BAND}`);
+  }
+}
+
 // --- Message HQ: loading message-hq.js with no navbar button wired to it is a silent no-op
 // (Privacy & Security shipped this way once already, and Professional Brand repeated it —
 // the checklist item existed but nothing enforced it). A module that never loads the script
