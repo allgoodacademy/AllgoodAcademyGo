@@ -18,6 +18,7 @@ const APP = 'allgood-academy';
 const U = (db, uid) => doc(db, 'artifacts', APP, 'users', uid);
 const CLASS = (db, code) => doc(db, 'artifacts', APP, 'classrooms', code);
 const PROGRESS = (db, uid, slug) => doc(db, 'artifacts', APP, 'users', uid, 'module_progress', slug);
+const MEMBER = (db, code, uid) => doc(db, 'artifacts', APP, 'classroom_members', `${code}_${uid}`);
 
 let passed = 0, failed = 0;
 async function it(name, fn) {
@@ -49,6 +50,24 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, 'artifacts', APP, 'users', 'student_1', 'launches', 'l1'), { courseName: 'Digital Decisions' });
   await setDoc(doc(db, 'artifacts', APP, 'users', 'student_1', 'game_scores', 'g1'), { gameName: 'Social Intelligence', completed: true });
   await setDoc(doc(db, 'artifacts', APP, 'users', 'student_1', 'game_scores', 'g1', 'scenario_attempts', '0'), { score: 3 });
+
+  // student_1 above is the LEGACY membership shape: a classroomCode on the profile and no
+  // join-table document, because they joined before classroom_members existed. The two below
+  // are the shapes joinClassroom() actually produces today, and the sessions grant has to
+  // reach all three or time-on-task silently disappears for whoever is in the missing one.
+  //
+  //   member_1 — a normal modern join: classroom_members doc AND the mirrored classroomCode.
+  //   multi_1  — the shape ONLY the join table can express: their profile classroomCode
+  //              points at a second teacher's classroom (they joined that one later), so the
+  //              legacy fallback cannot authorize teacher_1 and the join table must.
+  await setDoc(CLASS(db, 'ZZ9XYZ'), { teacherUid: 'teacher_2', teacherName: 'Mr Other', createdAt: 1 });
+  await setDoc(U(db, 'teacher_2'), { role: 'teacher', classroomCode: 'ZZ9XYZ', displayName: 'Mr Other', email: 'o@school.org' });
+  await setDoc(U(db, 'member_1'), { role: 'student', classroomCode: 'KM7QPD', displayName: 'Nimble Otter Dash' });
+  await setDoc(MEMBER(db, 'KM7QPD', 'member_1'), { classroomCode: 'KM7QPD', uid: 'member_1', joinedAt: 1 });
+  await setDoc(doc(db, 'artifacts', APP, 'sessions', 's_member'), { uid: 'member_1', module: 'privacy-security', startedAt: 1, activeMs: 4000 });
+  await setDoc(U(db, 'multi_1'), { role: 'student', classroomCode: 'ZZ9XYZ', displayName: 'Copper Heron Wave' });
+  await setDoc(MEMBER(db, 'KM7QPD', 'multi_1'), { classroomCode: 'KM7QPD', uid: 'multi_1', joinedAt: 1 });
+  await setDoc(doc(db, 'artifacts', APP, 'sessions', 's_multi'), { uid: 'multi_1', module: 'social-intelligence', startedAt: 1, activeMs: 7000 });
 });
 
 const guest = env.authenticatedContext('guest_1', { provider_id: 'anonymous' }).firestore();
@@ -140,6 +159,27 @@ await it('teacher CAN read a session belonging to a student in their own classro
 await it('...and that read actually returns the row, not an empty allowed result', async () => {
   const snap = await sessionsFor(teacher, 'student_1');
   if (snap.empty) throw new Error('query allowed but returned nothing — the grant is not matching');
+});
+await it('teacher CAN read the sessions of a student who joined via classroom_members', async () => {
+  // The legacy classroomCode fallback would also authorize this one, so it is the weaker of
+  // the two modern cases — but it is the shape almost every real member has, and nothing
+  // covered it before.
+  const snap = await sessionsFor(teacher, 'member_1');
+  if (snap.empty) throw new Error('query allowed but returned nothing — the join-table grant is not matching');
+});
+await it('teacher CAN read sessions of a member whose OWN classroomCode points elsewhere', async () => {
+  // The case that isolates the join table: multi_1's profile says classroom ZZ9XYZ, which
+  // teacher_1 does not own, so isLegacySingleClassroomStudent() must fail and the read can
+  // only succeed through classroom_members. If this denies, a teacher loses time-on-task for
+  // every agent who belongs to more than one Task Force.
+  const snap = await sessionsFor(teacher, 'multi_1');
+  if (snap.empty) throw new Error('query allowed but returned nothing — the join-table grant is not matching');
+});
+await it('the OTHER classroom\'s teacher CANNOT read those sessions without a membership', async () => {
+  // teacher_2 owns ZZ9XYZ and multi_1's profile names that code, but multi_1 has no
+  // classroom_members doc for it — so the join table denies and the legacy fallback is the
+  // only thing that could allow it. Pins the blast radius of the fallback staying in place.
+  await assertFails(sessionsFor(env.authenticatedContext('teacher_2', { email: 'o@school.org' }).firestore(), 'member_1'));
 });
 await it('teacher CAN still read a session with many documents for one student', async () => {
   // Guards the document-access budget: the rule must not re-resolve its lookups per row.
