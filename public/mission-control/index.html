@@ -619,13 +619,28 @@ async function load() {
     //     roster; it stays until those members are migrated or naturally rejoin.
     // Excludes this classroom's own teacher explicitly: a Task Force Leader joining their OWN
     // classroom by mistake shouldn't list themselves as a member of it.
+    // Each source is read independently and a failure in one does not take the page down.
+    // That is a deliberate change: these two queries used to sit in a bare Promise.all, so
+    // when rule #4's list grant was denying every teacher (it errored on a null path
+    // wildcard — see firestore.rules #4), the rejected legacy query propagated out of load()
+    // and Mission Control rendered a full-page "Something went wrong reading your Task Force"
+    // error instead of a roster. The roster is a UNION of two independent sources; losing one
+    // of them should cost the members only that source can see, not the entire page.
     const [memberSnap, legacySnap] = await Promise.all([
-        getDocs(query(collection(db, 'artifacts', appId, 'classroom_members'), where('classroomCode', '==', state.code))),
-        getDocs(query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', state.code), where('role', '==', 'student'))),
+        getDocs(query(collection(db, 'artifacts', appId, 'classroom_members'), where('classroomCode', '==', state.code)))
+            .catch((e) => { console.warn('[Mission Control] classroom_members query failed', e); return null; }),
+        getDocs(query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', state.code), where('role', '==', 'student')))
+            .catch((e) => { console.warn('[Mission Control] legacy roster query failed', e); return null; }),
     ]);
+    // Both failing at once is the one case worth surfacing: there is no roster to show and no
+    // way to tell an empty Task Force from an unreadable one, so say so rather than render a
+    // convincing "0 agents" that is really a permission error.
+    if (!memberSnap && !legacySnap) {
+        throw new Error('Your roster could not be read. This is a permissions problem, not an empty Task Force — the code is fine to keep sharing.');
+    }
     const memberUids = [...new Set([
-        ...memberSnap.docs.map((d) => d.data().uid),
-        ...legacySnap.docs.map((d) => d.id),
+        ...(memberSnap ? memberSnap.docs.map((d) => d.data().uid) : []),
+        ...(legacySnap ? legacySnap.docs.map((d) => d.id) : []),
     ])].filter((uid) => uid !== state.classroom.teacherUid);
 
     const rows = (await Promise.all(memberUids.map(async (uid) => {

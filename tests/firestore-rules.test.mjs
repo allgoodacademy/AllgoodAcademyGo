@@ -146,6 +146,121 @@ await it('teacher_1 CANNOT read a student in a classroom they do not own', async
   await assertFails(getDoc(U(teacher, 'student_2')));
 });
 
+console.log('\nROSTER LIST — the query Mission Control actually loads with (rule #4 list path)');
+// Why this section exists: `list` and `get` used to share one condition on rule #4, and that
+// condition takes the `{userId}` path wildcard. On a LIST the rule is matched against the
+// COLLECTION, so `{userId}` is unbound — null — and every branch raised a null-value error
+// before returning a verdict. `list` was therefore denied for every teacher, Mission Control
+// loads by listing the roster, and the page died with a full-page permission error in
+// production. The suite did not catch it because it only ever tested per-document `get`,
+// which was never broken. Everything below tests the QUERY.
+const rosterQuery = (db, code) => getDocs(query(collection(db, 'artifacts', APP, 'users'),
+  where('classroomCode', '==', code), where('role', '==', 'student')));
+
+// A brand-new teacher with a freshly created classroom and ZERO students — the exact state
+// the production failure was reported from. An empty result must come back as an empty
+// result, not as a denial: there is no document for the rule to pass or fail on, so this is
+// the one case a per-document condition can never be rescued by seeding data.
+await it('a brand-new teacher with an EMPTY classroom CAN list their roster', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(CLASS(db, 'EMPTY1'), { teacherUid: 'teacher_empty', teacherName: 'Ms New', createdAt: 1 });
+    await setDoc(U(db, 'teacher_empty'), { role: 'teacher', classroomCode: 'EMPTY1', displayName: 'Ms New' });
+  });
+  const newTeacher = env.authenticatedContext('teacher_empty', { email: 'new@school.org' }).firestore();
+  const snap = await assertSucceeds(rosterQuery(newTeacher, 'EMPTY1'));
+  if (snap.docs.length !== 0) throw new Error(`expected an empty roster, got ${snap.docs.length}`);
+});
+
+await it('a teacher WITH students lists them, and gets every member back', async () => {
+  const snap = await assertSucceeds(rosterQuery(teacher, 'KM7QPD'));
+  const uids = snap.docs.map((d) => d.id).sort();
+  // student_1 (legacy: classroomCode only) and member_1 (modern: mirrored code + join doc)
+  // both carry classroomCode KM7QPD on their profile, so both are reachable by this query.
+  // multi_1 is deliberately NOT here — their profile code points at ZZ9XYZ — and is covered
+  // by the join-table case below.
+  for (const want of ['member_1', 'student_1']) {
+    if (!uids.includes(want)) throw new Error(`roster missing ${want}: got ${uids.join(',')}`);
+  }
+});
+
+// The list path reaches legacy/mirrored members only. Anyone the join table alone can
+// express is discovered from classroom_members and read with a per-document get, where the
+// wildcard IS bound — so the two paths together have to cover the whole roster, and this
+// asserts the half the query cannot see is still reachable the other way.
+await it('a join-table-only member is NOT in the query but IS readable by get', async () => {
+  const snap = await assertSucceeds(rosterQuery(teacher, 'KM7QPD'));
+  if (snap.docs.map((d) => d.id).includes('multi_1')) {
+    throw new Error('multi_1 should not match a query on their own classroomCode');
+  }
+  await assertSucceeds(getDocs(query(collection(teacher, 'artifacts', APP, 'classroom_members'),
+    where('classroomCode', '==', 'KM7QPD'))));
+  await assertSucceeds(getDoc(U(teacher, 'multi_1')));
+});
+
+// The negative case, proven by a real denied query rather than asserted in a comment.
+await it('a teacher CANNOT list the roster of a classroom they do not teach', async () => {
+  await assertFails(rosterQuery(teacher, 'ZZ9XYZ'));
+});
+await it('the other classroom\'s teacher CANNOT list THIS roster either', async () => {
+  const other = env.authenticatedContext('teacher_2', { email: 'o@school.org' }).firestore();
+  await assertSucceeds(rosterQuery(other, 'ZZ9XYZ'));
+  await assertFails(rosterQuery(other, 'KM7QPD'));
+});
+await it('a guest CANNOT list any roster, including one that exists', async () => {
+  await assertFails(rosterQuery(guest, 'KM7QPD'));
+});
+await it('a student CANNOT list the roster of their own classroom', async () => {
+  await assertFails(rosterQuery(student, 'KM7QPD'));
+});
+
+// "Rules are not filters": the grant is per returned document, so a query that widens past
+// what the rule allows must fail outright rather than quietly returning the allowed subset.
+await it('a teacher CANNOT drop the classroomCode filter and enumerate all students', async () => {
+  await assertFails(getDocs(query(collection(teacher, 'artifacts', APP, 'users'),
+    where('role', '==', 'student'))));
+});
+await it('a teacher CANNOT drop the role filter (their own teacher profile would come back)', async () => {
+  await assertFails(getDocs(query(collection(teacher, 'artifacts', APP, 'users'),
+    where('classroomCode', '==', 'KM7QPD'))));
+});
+await it('a teacher CANNOT list the users collection unfiltered', async () => {
+  await assertFails(getDocs(collection(teacher, 'artifacts', APP, 'users')));
+});
+
+// Document-access budget. The rule resolves classroomOwnedBy against the SAME classroom path
+// for every document the query returns, and rules cache lookups per path within a request,
+// so this is O(1) accesses however wide the roster is. A rule doing a get() per returned
+// document would pass at 1 student and start failing somewhere past a handful — quietly, and
+// only in the classrooms big enough to hit it, which is the failure mode rule #10b describes.
+await it('a WIDE roster still lists — the grant is O(1) document accesses, not O(students)', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(CLASS(db, 'BIG001'), { teacherUid: 'teacher_big', teacherName: 'Mr Big', createdAt: 1 });
+    await setDoc(U(db, 'teacher_big'), { role: 'teacher', classroomCode: 'BIG001', displayName: 'Mr Big' });
+    for (let i = 0; i < 30; i++) {
+      await setDoc(U(db, `big_${i}`), { role: 'student', classroomCode: 'BIG001', displayName: `Agent ${i}` });
+    }
+  });
+  const bigTeacher = env.authenticatedContext('teacher_big', { email: 'big@school.org' }).firestore();
+  const snap = await assertSucceeds(rosterQuery(bigTeacher, 'BIG001'));
+  if (snap.docs.length !== 30) throw new Error(`expected 30 students, got ${snap.docs.length}`);
+});
+
+// The self-assertion that rule #2's hardening was about. A guest can put a classroomCode on
+// their OWN profile (that is join-by-code), which lands them on that roster — and must still
+// buy them nothing: they cannot read the roster, and they cannot read a classmate.
+// Runs as its own uid rather than reusing guest_1: joining KM7QPD by code genuinely makes
+// this account a member of that roster, and the shared guest context is asserted against
+// elsewhere in this file.
+await it('a student writing a classroomCode onto their own profile gains no read access', async () => {
+  const joiner = env.authenticatedContext('joiner_1', { provider_id: 'anonymous' }).firestore();
+  await assertSucceeds(setDoc(U(joiner, 'joiner_1'),
+    { role: 'student', classroomCode: 'KM7QPD', displayName: 'Keen Lynx Turn' }, { merge: true }));
+  await assertFails(rosterQuery(joiner, 'KM7QPD'));
+  await assertFails(getDoc(U(joiner, 'student_1')));
+});
+
 console.log('\nMISSION CONTROL — a teacher reads their own students\' telemetry sessions, nobody else\'s');
 const SESSIONS = (db) => collection(db, 'artifacts', APP, 'sessions');
 // The page queries one uid at a time on purpose: pinned to a single uid the rule's user and
