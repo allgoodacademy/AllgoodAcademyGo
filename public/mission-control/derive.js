@@ -155,6 +155,14 @@ export function buildStudent({ row, assigned, moduleData, scores = [], attempts 
             score: bestScore(mScores),
             attempts: attemptsByStep(meta, attempts.filter((a) => meta.gameNames.includes(a.gameName))),
             pct: meta.stepsTotal ? Math.round((maxStep / meta.stepsTotal) * 100) : 0,
+            // How many separate visits this student made. "Opened it three times and never
+            // got past Case 4" is a different problem from "opened it once and stopped", and
+            // only the visit count can tell them apart. One telemetry session is one visit.
+            opens: mSessions.length,
+            // Kept so per-step timing can be derived (see perStepTiming): a step's elapsed
+            // time is only defensible inside a single visit, so the visit windows are needed
+            // alongside the attempt timestamps.
+            sessions: mSessions,
         };
     }
 
@@ -366,4 +374,412 @@ export function choiceTextFor(step, attempt) {
     if (options && typeof idx === 'number' && options[idx]) return options[idx].text;
     if (typeof idx === 'number') return `Option ${idx + 1} — no longer in this module`;
     return 'No choice recorded';
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   THE ASSIGNMENT CATALOG — what a teacher can put on the roster.
+
+   Sourced entirely from /data/modules-registry.json. Nothing here enumerates
+   modules: adding a GoodBlock, Challenge or game to the registry makes it
+   appear in the picker with no change to this file or to index.html. That is
+   the point — the dashboard's old picker held its own MODULE_REGISTRY copy, so
+   every new GoodBlock needed a code edit in a second place to become
+   assignable.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* Class-time estimates. A teacher assigning work is budgeting minutes of a period, not
+   counting rows, so the save bar totals time. The registry carries durationMinutes for
+   Challenges and labs and these are only the fallback when it does not; games never carry
+   one, so GAME_MINUTES is always what they cost. Games really are about a third of a lab —
+   one randomized round, no Case sequence — and averaging the two together would make "about
+   88 minutes" wrong in the direction that matters (a teacher planning a 50-minute period). */
+export const MODULE_MINUTES = 20;
+export const GAME_MINUTES = 8;
+
+// Display names for the registry's pack slugs. The registry stores the slug and nothing
+// else, so the human name has to live somewhere; an unknown slug falls back to a
+// title-cased version of itself rather than being dropped, so a NEW Lab Pack appears in the
+// picker (as "Some New Pack") the moment its modules are registered, without a code change
+// here. Adding it to this map only improves the label.
+export const PACK_NAMES = {
+    'digital-decisions': 'Digital Decisions',
+    'real-world-ready': 'Real World Ready',
+    'room-to-think': 'Room to Think',
+};
+export const UNPACKED_LABEL = 'Standalone';
+
+export function packLabel(slug) {
+    if (!slug) return UNPACKED_LABEL;
+    return PACK_NAMES[slug] || String(slug).replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/* A game's pack is not on its registry entry — games are pack-less by design, since a guest
+   can play one without ever meeting a Lab Pack. What a game DOES carry is
+   defaultDestination, the lab it routes a weak player into, so the pack a game belongs to
+   for a teacher's purposes is the pack of that lab. Resolved by looking the destination up
+   in the registry rather than parsing the URL, so a lab that moves house keeps its game
+   grouped with it. */
+export function packForGame(entry, allModules) {
+    if (entry.pack) return entry.pack;
+    const dest = (allModules || []).find((m) => m.url && m.url === entry.defaultDestination);
+    return (dest && dest.pack) || null;
+}
+
+/* Every lab in the registry that claims one of this game's own skill codes — i.e. every
+   place the shared resolver in /js/skill-routing.js could actually send a student who
+   played it. Rendered as "routes to Privacy & Security or Social Intelligence", which is
+   the honest answer: a game has several categories and routes per-category, so naming only
+   its defaultDestination would understate where it leads.
+
+   Derived from skillTags and the registry, never hardcoded. Alias tags are skipped so a
+   code and its alias do not double-count the same skill. */
+export function routingTargetsFor(entry, allModules, { normalize: norm = defaultNormalize } = {}) {
+    const codes = new Set(
+        (entry.skillTags || [])
+            .filter((t) => t && t.framework === 'internal' && !t.alias_of)
+            .map((t) => norm(t.code)),
+    );
+    if (!codes.size) return [];
+    const names = [];
+    for (const m of allModules || []) {
+        if (m.type !== 'lab' || !m.url) continue;
+        const mine = (m.skillTags || [])
+            .filter((t) => t && t.framework === 'internal')
+            .some((t) => codes.has(norm(t.code)));
+        if (mine && !names.includes(m.name)) names.push(m.name);
+    }
+    return names;
+}
+
+// Same normalization the resolver uses, duplicated only so this module keeps its no-imports
+// property (derive.js is loaded by tests directly and by the page as a module). Callers that
+// already have the resolver's own normalize can pass it in.
+function defaultNormalize(s) {
+    return String(s == null ? '' : s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+export function formatList(names) {
+    if (!names.length) return '';
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} or ${names[1]}`;
+    return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+}
+
+/* Turns the flat registry into the two grouped lists the Assign page renders.
+
+   `retired` entries are excluded: Jolene's Lemonade is still in the registry so old
+   telemetry can be attributed to a name, and putting it back in front of a teacher as
+   assignable work would be a bug, not a feature.
+
+   Challenges sit inside their own pack alongside its GoodBlocks and are marked
+   isCapstone — a Challenge is the thing you assign AFTER the labs, and pulling them into a
+   separate "Challenges" group would hide that relationship. `trackable` says whether
+   Mission Control can show step-by-step progress for it (see module-data.js, whose
+   generator covers the Digital Decisions lab only today); the picker still offers the rest,
+   because a teacher assigning them is legitimate and the roster says plainly what it cannot
+   yet show. */
+export function buildCatalog(registryModules = []) {
+    const live = registryModules.filter((m) => m && m.id && !m.retired);
+    const packOrder = [];
+    const byPack = new Map();
+
+    const push = (slug, item) => {
+        const key = slug || '';
+        if (!byPack.has(key)) { byPack.set(key, []); packOrder.push(key); }
+        byPack.get(key).push(item);
+    };
+
+    for (const m of live) {
+        if (m.type !== 'lab' && m.type !== 'challenge') continue;
+        push(m.pack, {
+            id: m.id,
+            name: m.name,
+            type: m.type,
+            url: m.url || null,
+            blurb: m.blurb || (m.type === 'challenge' ? 'Capstone — pulls from the whole pack' : ''),
+            minutes: Number(m.durationMinutes) > 0 ? Number(m.durationMinutes) : MODULE_MINUTES,
+            isCapstone: m.type === 'challenge',
+        });
+    }
+
+    const gamePackOrder = [];
+    const gamesByPack = new Map();
+    for (const m of live) {
+        if (m.type !== 'game') continue;
+        const slug = packForGame(m, live) || '';
+        if (!gamesByPack.has(slug)) { gamesByPack.set(slug, []); gamePackOrder.push(slug); }
+        gamesByPack.get(slug).push({
+            id: m.id,
+            name: m.name,
+            type: 'game',
+            url: m.url || null,
+            minutes: GAME_MINUTES,
+            routesTo: routingTargetsFor(m, live),
+        });
+    }
+
+    return {
+        // A capstone always renders last within its pack, whatever order the registry
+        // happens to list it in — the registry orders rwr-challenge before the Room to
+        // Think labs, and a Challenge floating above the lessons it tests reads as an error.
+        packs: packOrder.map((slug) => ({
+            slug: slug || null,
+            name: packLabel(slug),
+            items: byPack.get(slug).slice().sort((a, b) => (a.isCapstone ? 1 : 0) - (b.isCapstone ? 1 : 0)),
+        })),
+        gamePacks: gamePackOrder.map((slug) => ({
+            slug: slug || null,
+            name: slug ? `${packLabel(slug)} games` : 'Other games',
+            items: gamesByPack.get(slug),
+        })),
+        moduleIds: live.filter((m) => m.type === 'lab' || m.type === 'challenge').map((m) => m.id),
+        gameIds: live.filter((m) => m.type === 'game').map((m) => m.id),
+        byId: new Map(live.map((m) => [m.id, m])),
+    };
+}
+
+/* The live count on the save bar. Modules and games are counted separately and the minutes
+   are the sum of each item's own estimate, so a 30-minute Challenge is not billed as a
+   20-minute lab. */
+export function assignmentSummary({ modules = [], games = [], catalog }) {
+    const flat = new Map();
+    for (const p of catalog.packs) for (const it of p.items) flat.set(it.id, it);
+    for (const p of catalog.gamePacks) for (const it of p.items) flat.set(it.id, it);
+
+    const picked = [...modules, ...games].map((id) => flat.get(id)).filter(Boolean);
+    const mods = picked.filter((it) => it.type !== 'game');
+    const gms = picked.filter((it) => it.type === 'game');
+    const minutes = picked.reduce((n, it) => n + it.minutes, 0);
+
+    const parts = [];
+    if (mods.length) parts.push(`${mods.length} module${mods.length === 1 ? '' : 's'}`);
+    if (gms.length) parts.push(`${gms.length} game${gms.length === 1 ? '' : 's'}`);
+    return {
+        moduleCount: mods.length,
+        gameCount: gms.length,
+        minutes,
+        label: parts.length
+            ? `${parts.join(' + ')} assigned · about ${minutes} minute${minutes === 1 ? '' : 's'} of class time`
+            : 'Nothing assigned yet',
+    };
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   CLASS-WIDE GAME RESULTS (the roster's game strip)
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* How many students must have played a game before its class-wide weakest skill is stated
+   as a fact rather than withheld.
+
+   Five, and the reason is what the number is used for: a teacher reads "weakest across
+   class: permissions" as a reteach signal for the whole room. Off two players that is one
+   student's bad round wearing the class's name. Five is the smallest count where a single
+   outlier cannot own the answer on its own, and it is still reachable in a normal period —
+   a higher bar would mean the line a teacher most wants almost never appears. Below it the
+   strip says "not enough plays to call it yet", which is information, not a blank. */
+export const WEAK_SKILL_MIN_PLAYERS = 5;
+
+/* Per-game, class-wide roll-up computed from real telemetry — every student's own
+   per-category played/correct totals, summed across the class.
+
+   `players` counts STUDENTS who played, not sessions: three rounds by one student is one
+   player, and the threshold above is about how many different people the claim rests on.
+   Accuracy is pooled (total correct / total played) rather than averaged per student, so a
+   student who played 40 scenarios is not weighted the same as one who played 4. */
+export function classGameStats(students = [], { minPlayers = WEAK_SKILL_MIN_PLAYERS } = {}) {
+    const byGame = new Map();
+    for (const s of students) {
+        for (const g of (s.games || [])) {
+            const row = byGame.get(g.id) || {
+                id: g.id, meta: g.meta, players: 0, plays: 0,
+                correct: 0, played: 0, categoryTotals: {},
+            };
+            row.players += 1;
+            row.plays += g.plays || 0;
+            for (const [name, stat] of Object.entries(g.categoryTotals || {})) {
+                if (!stat || typeof stat.played !== 'number' || stat.played <= 0) continue;
+                const t = row.categoryTotals[name] || { played: 0, correct: 0 };
+                t.played += stat.played;
+                t.correct += (typeof stat.correct === 'number') ? stat.correct : 0;
+                row.categoryTotals[name] = t;
+            }
+            byGame.set(g.id, row);
+        }
+    }
+    // Pooled totals are summed from the finished category map in one pass rather than
+    // accumulated inside the loop above, where a category seen twice for the same student
+    // would double-count it.
+    for (const row of byGame.values()) {
+        row.played = 0; row.correct = 0;
+        for (const stat of Object.values(row.categoryTotals)) {
+            row.played += stat.played;
+            row.correct += stat.correct;
+        }
+        row.avgPct = row.played > 0 ? Math.round((row.correct / row.played) * 100) : null;
+        row.enoughPlayers = row.players >= minPlayers;
+        const ranked = Object.entries(row.categoryTotals)
+            .filter(([, st]) => st.played > 0)
+            .map(([name, st]) => ({ name, played: st.played, correct: st.correct, accuracy: Math.round((st.correct / st.played) * 100) }))
+            .sort((a, b) => a.accuracy - b.accuracy || b.played - a.played);
+        // Withheld, not guessed at, below the threshold — the strip renders the honest
+        // "not enough plays to call it yet" instead.
+        row.weakestCategory = row.enoughPlayers ? (ranked[0] || null) : null;
+    }
+    return byGame;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   NEEDS YOUR ATTENTION (roster triage) and the reteach signal
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* Where each student is stalled, per module: not completed, past the start, and therefore
+   sitting on a specific step. Keyed moduleId -> stepIndex -> [uid].
+
+   This is what turns one student's problem into a class signal. "Two other students stalled
+   at the same point" is the single most useful line on the student page, and it is only
+   computable across the whole roster, so it is derived once here rather than per student.
+
+   stepIndex is maxStep - 1: maxStep is a 1-based "furthest step reached", so a student on
+   maxStep 4 is sitting on step index 3. Students with maxStep 0 are not stalled at a step,
+   they have not started — a different problem, and lumping them in would report a phantom
+   cohort at step 0. */
+export function stallPoints(students = [], assigned = []) {
+    const byModule = {};
+    for (const id of assigned) {
+        const steps = {};
+        for (const s of students) {
+            const m = s.modules && s.modules[id];
+            if (!m || m.completed || !(m.maxStep > 0)) continue;
+            const step = m.maxStep - 1;
+            (steps[step] = steps[step] || []).push(s.uid);
+        }
+        byModule[id] = steps;
+    }
+    return byModule;
+}
+
+/* How many OTHER students are stalled on the same step as `uid`. Zero means the signal is
+   not shown at all — "nobody else is stuck here" is not a reteach cue, and the mockup's
+   promise is that the line appears only when it is true. */
+export function othersStalledAt(stalls, moduleId, step, uid) {
+    const at = (stalls[moduleId] || {})[step] || [];
+    return at.filter((u) => u !== uid).length;
+}
+
+/* The module a student is most plausibly stuck on: the assigned one they have started and
+   not finished, furthest along first (that is the one they were last working in), and among
+   equals the one they have opened most. Returns null when nothing is started-but-unfinished
+   — a student who has opened nothing is not "stuck on" anything in particular. */
+export function stuckModule(student, assigned = []) {
+    const candidates = assigned
+        .map((id) => student.modules && student.modules[id])
+        .filter((m) => m && !m.completed && m.maxStep > 0);
+    if (!candidates.length) return null;
+    return candidates.sort((a, b) => (b.maxStep - a.maxStep) || ((b.opens || 0) - (a.opens || 0)))[0];
+}
+
+/* The Needs-your-attention rows, ordered by urgency.
+
+   Deliberately built on the SAME signals the detail banner already used — deriveStatus's
+   at-risk / needs-attention and allDone — rather than a second set of thresholds. There is
+   exactly one definition of "at risk" in this file and both surfaces read it, so the roster
+   and the student page can never disagree about who needs a check-in.
+
+   Each row carries the specific FACT and the ACTION, per the mockup: a bare severity is what
+   the old top-bar tile already gave, and a teacher cannot do anything with "3 need
+   attention". `action` is a hint for the UI, never copy.
+
+   Students who are fine produce no row at all — this list is meant to be short, and
+   frequently empty. */
+export function attentionList(students = [], assigned = [], now = Date.now()) {
+    const rows = [];
+    for (const s of students) {
+        const stuck = stuckModule(s, assigned);
+        if (s.status === 'at-risk') {
+            rows.push({
+                uid: s.uid, name: s.name, severity: 'at-risk', action: 'open',
+                fact: s.lastActive
+                    ? { kind: 'silent', days: Math.floor((now - s.lastActive) / DAY), started: !!stuck, moduleName: stuck ? stuck.meta.name : null }
+                    : { kind: 'never-started' },
+            });
+        } else if (s.status === 'needs-attention') {
+            rows.push({
+                uid: s.uid, name: s.name, severity: 'needs-attention', action: 'open',
+                fact: stuck
+                    ? { kind: 'stalled', moduleName: stuck.meta.name, step: stuck.maxStep, stepsTotal: stuck.meta.stepsTotal, opens: stuck.opens || 0 }
+                    : { kind: 'slowing', days: s.lastActive ? Math.floor((now - s.lastActive) / DAY) : null },
+            });
+        } else if (s.allDone) {
+            // Not a problem, but it IS an action: a student with nothing left to do is a
+            // student who stops showing up. Ranked last because it can wait until the two
+            // above are handled.
+            rows.push({
+                uid: s.uid, name: s.name, severity: 'all-done', action: 'assign-more',
+                fact: { kind: 'all-complete', count: assigned.filter((id) => s.modules[id]).length },
+            });
+        }
+    }
+    const rank = { 'at-risk': 0, 'needs-attention': 1, 'all-done': 2 };
+    return rows.sort((a, b) => rank[a.severity] - rank[b.severity] || a.name.localeCompare(b.name));
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PER-STEP TIMING
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* A visit longer than this is treated as having ended: nothing is claimed about the gap that
+   spans it. Telemetry records activeMs and lastSeenAt per visit but never a per-step
+   duration, so the only honest source for "how long did this step take" is the gap between
+   consecutive graded answers — and that gap is only a duration if the student was actually
+   at the screen for it. Half an hour between two answers is far more likely a closed laptop
+   than thirty minutes of thinking. */
+export const STEP_GAP_CEILING_MS = 30 * 60 * 1000;
+
+/* Per-step elapsed time for one module, keyed by step index.
+
+   A step's time is the interval from the previous graded answer to this one; the first
+   answered step is measured from the start of the visit it happened in. A step is reported
+   ONLY when both ends of that interval fall inside the same visit and the gap is under the
+   ceiling above. Anything else is omitted rather than estimated, which is why the return is
+   sparse: a missing key means "not knowable", and the UI shows nothing rather than a number
+   it cannot stand behind.
+
+   This is an approximation and the UI must label it as one ("between answers"), not as time
+   on task. It is still worth showing: the step a student spent eleven minutes on is the step
+   that lost them, and no other field in the data says so. */
+export function perStepTiming(module) {
+    const out = {};
+    if (!module || !module.attempts) return out;
+
+    // Visit windows, from the module's own sessions. startedAt..lastSeenAt bounds one visit.
+    const visits = (module.sessions || [])
+        .map((s) => ({ from: toMillis(s.startedAt), to: Math.max(toMillis(s.lastSeenAt), toMillis(s.startedAt)) }))
+        .filter((v) => v.from > 0)
+        .sort((a, b) => a.from - b.from);
+    const visitOf = (ms) => visits.find((v) => ms >= v.from && ms <= v.to) || null;
+
+    // Every graded answer, in the order it was actually given.
+    const answered = Object.keys(module.attempts)
+        .map((k) => Number(k))
+        .map((step) => {
+            const rows = module.attempts[step] || [];
+            // The LAST attempt at a step is when the student left it — a revised answer means
+            // they were still working on that step until the revision.
+            const ts = Math.max(0, ...rows.map((a) => toMillis(a.timestamp)));
+            return { step, ts };
+        })
+        .filter((a) => a.ts > 0)
+        .sort((a, b) => a.ts - b.ts);
+
+    let prev = null;
+    for (const a of answered) {
+        const visit = visitOf(a.ts);
+        const from = prev && visitOf(prev.ts) === visit ? prev.ts : (visit ? visit.from : 0);
+        prev = a;
+        if (!visit || !from || a.ts <= from) continue;
+        const gap = a.ts - from;
+        if (gap > STEP_GAP_CEILING_MS) continue;
+        out[a.step] = gap;
+    }
+    return out;
 }

@@ -1,16 +1,33 @@
-# Deploys firestore.rules whenever it (or firebase.json) changes on main. Hosting
+# Tests the Firestore security rules, and deploys them when they change on main. Hosting
 # deploys automatically on every push (see firebase-hosting-merge.yml), but Firestore
 # security rules do NOT — they need this separate step, using the same service
 # account already set up for Hosting deploys.
+#
+# WHY THE TEST TRIGGER IS WIDE
+# This workflow used to run only on pushes to `main` that touched firestore.rules or
+# firebase.json. That is narrower than the set of things that can break the rules, and the
+# gap was not theoretical: a teacher-facing roster query was denied in production for every
+# teacher, and CI never ran on the change that would have caught it. Three ways a rules
+# regression arrives without touching either of those two files:
+#   - A CLIENT change starts issuing a query the rules never allowed (the roster list bug:
+#     the rule was broken all along, and only a test of the query could show it).
+#   - A DEPENDENCY change moves the rules engine itself — the emulator JAR is what evaluates
+#     the rules, and it used to float (see scripts/run-rules-tests.sh).
+#   - NOTHING in the repo changes at all and an unpinned dependency drifts underneath it.
+# So the test job now runs on every pull request and every push to main with no path filter,
+# plus a weekly cron for the third case, which no commit-triggered run can ever catch.
+# DEPLOY is still main-only and still path-filtered — see the `if` on that job.
 name: Deploy Firestore Rules
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'firestore.rules'
-      - 'firebase.json'
+  pull_request:
+  schedule:
+    # Mondays 06:00 UTC. Catches drift that arrives with no commit behind it.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 jobs:
   test_rules:
@@ -33,11 +50,27 @@ jobs:
   deploy_rules:
     needs: test_rules
     runs-on: ubuntu-latest
+    # The test job above is deliberately unfiltered, so this guard is what stops a widened
+    # trigger from turning every pull request and every cron tick into a production rules
+    # deploy. There is deliberately NO path filter here any more: `firebase deploy --only
+    # firestore:rules` is idempotent and takes seconds, so a redundant deploy costs nothing,
+    # while a rules change that silently does NOT deploy is the expensive failure — and a
+    # path filter is exactly how you get one (a rules edit buried in a large push, or reached
+    # by a lockfile bump). Deploying every main push cannot have that failure mode.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # The same exact-pinned firebase-tools the tests ran against, rather than whatever
+      # `npx firebase-tools` resolves to at deploy time. The CLI that validated the rules
+      # should be the CLI that ships them.
+      - name: Install dependencies
+        run: npm ci
       - name: Write service account credentials
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}' > "${{ runner.temp }}/firebase-service-account.json"
       - name: Deploy Firestore rules
-        run: npx firebase-tools deploy --only firestore:rules --project allgood-academy
+        run: node_modules/.bin/firebase deploy --only firestore:rules --project allgood-academy
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json

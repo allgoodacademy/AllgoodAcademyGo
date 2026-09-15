@@ -13,7 +13,13 @@ import {
     DAY, toMillis, relativeTime, initialsOf, stepFromProgress, bestScore,
     attemptsByStep, deriveStatus, buildStudent, classAverage, countActiveThisWeek, choiceTextFor,
     gameSessionsFromTelemetry, summarizeGameSessions,
+    buildCatalog, assignmentSummary, packLabel, packForGame, routingTargetsFor, formatList,
+    classGameStats, WEAK_SKILL_MIN_PLAYERS,
+    stallPoints, othersStalledAt, stuckModule, attentionList,
+    perStepTiming, STEP_GAP_CEILING_MS,
+    MODULE_MINUTES, GAME_MINUTES,
 } from '../public/mission-control/derive.js';
+import { readFileSync } from 'node:fs';
 import { MODULE_DATA } from '../public/mission-control/module-data.js';
 
 const NOW = Date.parse('2026-03-10T12:00:00Z');
@@ -73,11 +79,18 @@ test('attemptsByStep normalises the Challenge (1-based) and labs (0-based) to th
     assert.equal(ddc.indexBase, 1);
     assert.equal(si.indexBase, 0);
 
-    // Challenge scenario 1 is step index 0.
-    const a = attemptsByStep(ddc, [{ scenarioIndex: 1, choiceIndex: 2 }, { scenarioIndex: 30, choiceIndex: 0 }]);
+    // Challenge scenario 1 is step index 0, and its LAST scenario is step index
+    // stepsTotal - 1. Read off the module's own step count rather than written as a literal:
+    // this assertion used to hardcode scenario 30 / step 29, and went stale — and started
+    // throwing rather than failing cleanly — when the Challenge was cut to 28 scenarios.
+    const lastScenario = ddc.stepsTotal;            // 1-based, so the last index IS the total
+    const a = attemptsByStep(ddc, [{ scenarioIndex: 1, choiceIndex: 2 }, { scenarioIndex: lastScenario, choiceIndex: 0 }]);
     assert.equal(a[0].length, 1);
-    assert.equal(a[29].length, 1);
+    assert.equal(a[ddc.stepsTotal - 1].length, 1);
     assert.equal(a[1], undefined);
+
+    // One past the end is dropped, not folded onto the last step.
+    assert.deepEqual(attemptsByStep(ddc, [{ scenarioIndex: lastScenario + 1 }]), {});
 
     // Lab Case 2 is written as scenarioIndex 1 and is step index 1.
     const b = attemptsByStep(si, [{ scenarioIndex: 1, choiceIndex: 2 }]);
@@ -353,4 +366,418 @@ test('two rounds in one tab are two plays, and the best one is the best score', 
     assert.equal(rows[0].bestPct, 90);
     assert.equal(rows[0].lastPlayed, 900);
     assert.equal(rows[0].weakestCategory.name, 'phishing', 'summed across both rounds: 5 of 10');
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   THE ASSIGNMENT CATALOG — Mission Control's picker is registry-driven
+
+   The point of these: adding a GoodBlock to /data/modules-registry.json must make it
+   assignable with no code change anywhere. The tests below run against the REAL registry
+   file, not a fixture, so a registry entry that the catalog silently drops fails here.
+   ═════════════════════════════════════════════════════════════════════════════ */
+const REGISTRY = JSON.parse(readFileSync(new URL('../public/data/modules-registry.json', import.meta.url), 'utf8'));
+
+test('buildCatalog groups every live lab and Challenge in the real registry by pack', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const fromCatalog = cat.packs.flatMap((p) => p.items.map((i) => i.id)).sort();
+    const expected = REGISTRY.modules
+        .filter((m) => !m.retired && (m.type === 'lab' || m.type === 'challenge'))
+        .map((m) => m.id).sort();
+    assert.deepEqual(fromCatalog, expected, 'every live lab/Challenge must reach the picker');
+    // Three real Lab Packs today, named — not slugs in front of a teacher.
+    const names = cat.packs.map((p) => p.name);
+    assert.ok(names.includes('Digital Decisions'));
+    assert.ok(names.includes('Real World Ready'));
+    assert.ok(names.includes('Room to Think'));
+});
+
+test('a retired module stays out of the picker but keeps its registry entry', () => {
+    const retired = REGISTRY.modules.filter((m) => m.retired).map((m) => m.id);
+    assert.ok(retired.length > 0, 'fixture assumption: the registry still carries a retired entry');
+    const cat = buildCatalog(REGISTRY.modules);
+    const offered = [...cat.packs, ...cat.gamePacks].flatMap((p) => p.items.map((i) => i.id));
+    for (const id of retired) assert.ok(!offered.includes(id), `${id} is retired and must not be assignable`);
+});
+
+test('a brand-new GoodBlock in the registry appears with NO change to the catalog code', () => {
+    // This is the acceptance criterion for Ticket 2, asserted rather than demonstrated by
+    // hand: the module below exists nowhere in this repo.
+    const withNew = REGISTRY.modules.concat([{
+        id: 'the-invented-block', name: 'The Invented Block', type: 'lab',
+        pack: 'room-to-think', url: '/jsh/room-to-think-lab/the-invented-block/',
+        blurb: 'A lesson that does not exist', durationMinutes: 25, skillTags: [], status: 'draft',
+    }]);
+    const cat = buildCatalog(withNew);
+    const rtt = cat.packs.find((p) => p.slug === 'room-to-think');
+    const found = rtt.items.find((i) => i.id === 'the-invented-block');
+    assert.ok(found, 'a new registry entry must appear in its pack unprompted');
+    assert.equal(found.name, 'The Invented Block');
+    assert.equal(found.blurb, 'A lesson that does not exist');
+    assert.equal(found.minutes, 25, "the registry's own durationMinutes wins over the fallback");
+});
+
+test('a module in an UNKNOWN pack still appears, under a readable name', () => {
+    // A new Lab Pack must not need an edit to PACK_NAMES before its modules are assignable.
+    const cat = buildCatalog(REGISTRY.modules.concat([{
+        id: 'x1', name: 'X One', type: 'lab', pack: 'future-proof-lab', url: '/x/', skillTags: [],
+    }]));
+    const pack = cat.packs.find((p) => p.slug === 'future-proof-lab');
+    assert.ok(pack, 'an unrecognised pack slug must still produce a group');
+    assert.equal(pack.name, 'Future Proof Lab');
+});
+
+test('a Challenge renders inside its pack, last, marked as a capstone', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    for (const pack of cat.packs) {
+        const caps = pack.items.filter((i) => i.isCapstone);
+        for (const c of caps) {
+            assert.equal(c.type, 'challenge');
+            const idx = pack.items.indexOf(c);
+            // Everything after a capstone must also be a capstone — i.e. capstones are last.
+            assert.ok(pack.items.slice(idx).every((i) => i.isCapstone),
+                `${c.id} must sort after the GoodBlocks it tests, in pack ${pack.slug}`);
+        }
+    }
+    // The registry lists rwr-challenge BEFORE the Room to Think labs, so this ordering is
+    // genuinely doing work and is not an accident of registry order.
+    const rwr = cat.packs.find((p) => p.slug === 'real-world-ready');
+    assert.equal(rwr.items[rwr.items.length - 1].id, 'rwr-challenge');
+});
+
+test('packLabel falls back to a title-cased slug and never shows a raw slug', () => {
+    assert.equal(packLabel('digital-decisions'), 'Digital Decisions');
+    assert.equal(packLabel('some_new-pack'), 'Some New Pack');
+    assert.equal(packLabel(null), 'Standalone');
+});
+
+test('a game is grouped by the pack of the lab it routes into, not by a hardcoded map', () => {
+    const live = REGISTRY.modules.filter((m) => !m.retired);
+    const rts = live.find((m) => m.id === 'read-the-signal');
+    assert.equal(rts.pack, null, 'fixture assumption: games carry no pack of their own');
+    // Its defaultDestination is a Digital Decisions lab, so that is its pack for a teacher.
+    assert.equal(packForGame(rts, live), 'digital-decisions');
+    const mm = live.find((m) => m.id === 'money-moves');
+    assert.equal(packForGame(mm, live), 'real-world-ready');
+
+    const cat = buildCatalog(REGISTRY.modules);
+    const gameIds = cat.gamePacks.flatMap((p) => p.items.map((i) => i.id)).sort();
+    assert.deepEqual(gameIds, live.filter((m) => m.type === 'game').map((m) => m.id).sort());
+});
+
+test("a game's routing targets come from skillTags and the registry, not a hardcoded string", () => {
+    const live = REGISTRY.modules.filter((m) => !m.retired);
+    const rts = live.find((m) => m.id === 'read-the-signal');
+    const targets = routingTargetsFor(rts, live);
+    // Read the Signal's own categories are tagged onto real labs; those labs are the answer.
+    assert.ok(targets.length >= 2, `expected several routing targets, got ${JSON.stringify(targets)}`);
+    assert.ok(targets.includes('Privacy & Security'));
+    // And the phrasing the Assign tab uses reads as a sentence.
+    assert.match(formatList(targets), / or /);
+
+    // Prove it is derived: retag a game and the targets move with it.
+    const invented = { id: 'g9', name: 'G Nine', type: 'game', pack: null, url: '/g9/', skillTags: [{ framework: 'internal', code: 'money-decisions' }] };
+    const moved = routingTargetsFor(invented, live);
+    assert.notDeepEqual(moved, targets);
+});
+
+test('formatList joins one, two and many names the way a sentence would', () => {
+    assert.equal(formatList([]), '');
+    assert.equal(formatList(['A']), 'A');
+    assert.equal(formatList(['A', 'B']), 'A or B');
+    assert.equal(formatList(['A', 'B', 'C']), 'A, B or C');
+});
+
+test('assignmentSummary counts modules and games separately and totals real minutes', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const empty = assignmentSummary({ modules: [], games: [], catalog: cat });
+    assert.equal(empty.label, 'Nothing assigned yet');
+    assert.equal(empty.minutes, 0);
+
+    const four = ['social-intelligence', 'privacy-security', 'digital-citizenship', 'money-as-a-skill'];
+    const s = assignmentSummary({ modules: four, games: ['read-the-signal'], catalog: cat });
+    assert.equal(s.moduleCount, 4);
+    assert.equal(s.gameCount, 1);
+    // A game is ~8 minutes, not ~20 — the whole reason the two are counted apart.
+    const expected = four.reduce((n, id) => {
+        const e = REGISTRY.modules.find((m) => m.id === id);
+        return n + (Number(e.durationMinutes) > 0 ? Number(e.durationMinutes) : MODULE_MINUTES);
+    }, 0) + GAME_MINUTES;
+    assert.equal(s.minutes, expected);
+    assert.match(s.label, /^4 modules \+ 1 game assigned · about \d+ minutes of class time$/);
+});
+
+test('assignmentSummary ignores an assigned id that is no longer in the registry', () => {
+    // A module removed from the registry must not crash the save bar or inflate its count.
+    const cat = buildCatalog(REGISTRY.modules);
+    const s = assignmentSummary({ modules: ['social-intelligence', 'a-module-that-was-deleted'], games: [], catalog: cat });
+    assert.equal(s.moduleCount, 1);
+});
+
+test('one module reads "1 module", not "1 modules"', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const s = assignmentSummary({ modules: ['privacy-security'], games: [], catalog: cat });
+    assert.match(s.label, /^1 module assigned/);
+    const g = assignmentSummary({ modules: [], games: ['money-moves'], catalog: cat });
+    assert.match(g.label, /^1 game assigned · about 8 minutes/);
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   CLASS-WIDE GAME RESULTS — the threshold is the point
+   ═════════════════════════════════════════════════════════════════════════════ */
+const gameRow = (id, cats, plays = 1) => ({
+    id, meta: { name: id }, plays, bestPct: null, lastPlayed: 0,
+    categoryTotals: cats, deeperLinkClicks: 0, sessions: [],
+});
+
+test('classGameStats pools accuracy across the class rather than averaging students', () => {
+    const students = [
+        { uid: 'a', games: [gameRow('read-the-signal', { permissions: { played: 40, correct: 20 } })] },
+        { uid: 'b', games: [gameRow('read-the-signal', { permissions: { played: 4, correct: 4 } })] },
+    ];
+    const stats = classGameStats(students, { minPlayers: 1 });
+    const g = stats.get('read-the-signal');
+    assert.equal(g.players, 2);
+    // Pooled: 24/44 = 55%. A per-student mean would be (50 + 100) / 2 = 75%, which would let
+    // one four-scenario round outweigh a forty-scenario one.
+    assert.equal(g.avgPct, 55);
+});
+
+test('a weakest-skill claim is WITHHELD below the player threshold, not guessed at', () => {
+    const two = [
+        { uid: 'a', games: [gameRow('money-moves', { 'long-term': { played: 5, correct: 1 } })] },
+        { uid: 'b', games: [gameRow('money-moves', { 'long-term': { played: 5, correct: 1 } })] },
+    ];
+    const g = classGameStats(two).get('money-moves');
+    assert.equal(g.players, 2);
+    assert.equal(g.enoughPlayers, false);
+    assert.equal(g.weakestCategory, null, 'two players must not name the class\'s weakest skill');
+    // The number that IS supportable — how many played — is still reported.
+    assert.equal(g.avgPct, 20);
+});
+
+test('...and is stated once enough different students have played', () => {
+    const many = Array.from({ length: WEAK_SKILL_MIN_PLAYERS }, (_, i) => ({
+        uid: `s${i}`,
+        games: [gameRow('money-moves', {
+            'long-term': { played: 4, correct: 1 },
+            budgeting: { played: 4, correct: 4 },
+        })],
+    }));
+    const g = classGameStats(many).get('money-moves');
+    assert.equal(g.enoughPlayers, true);
+    assert.equal(g.weakestCategory.name, 'long-term');
+    assert.equal(g.weakestCategory.accuracy, 25);
+});
+
+test('players counts STUDENTS, not sessions — three rounds by one student is one player', () => {
+    const one = [{ uid: 'a', games: [gameRow('the-rumor-mill', { accuracy: { played: 30, correct: 10 } }, 3)] }];
+    const g = classGameStats(one, { minPlayers: 2 }).get('the-rumor-mill');
+    assert.equal(g.players, 1);
+    assert.equal(g.plays, 3);
+    assert.equal(g.enoughPlayers, false, 'replaying alone must not clear a threshold about people');
+});
+
+test('a game nobody played is simply absent from the stats', () => {
+    assert.equal(classGameStats([{ uid: 'a', games: [] }]).size, 0);
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   STALL COHORTS and NEEDS-YOUR-ATTENTION
+   ═════════════════════════════════════════════════════════════════════════════ */
+const stu = (uid, name, mods, extra = {}) => ({
+    uid, name, modules: mods, status: 'on-track', allDone: false, lastActive: NOW, games: [], ...extra,
+});
+const mod = (id, maxStep, completed = false, opens = 1, stepsTotal = 7) => ({
+    id, meta: { name: id, stepsTotal }, maxStep, completed, opens, activeMs: 0, attempts: {}, sessions: [],
+});
+
+test('stallPoints groups students by the exact step they are sitting on', () => {
+    const students = [
+        stu('a', 'A', { 'money-as-a-skill': mod('money-as-a-skill', 4) }),
+        stu('b', 'B', { 'money-as-a-skill': mod('money-as-a-skill', 4) }),
+        stu('c', 'C', { 'money-as-a-skill': mod('money-as-a-skill', 6) }),
+        stu('d', 'D', { 'money-as-a-skill': mod('money-as-a-skill', 7, true) }),
+        stu('e', 'E', { 'money-as-a-skill': mod('money-as-a-skill', 0) }),
+    ];
+    const stalls = stallPoints(students, ['money-as-a-skill']);
+    // maxStep 4 means sitting on step INDEX 3.
+    assert.deepEqual(stalls['money-as-a-skill'][3], ['a', 'b']);
+    assert.deepEqual(stalls['money-as-a-skill'][5], ['c']);
+    // A finished student is not stalled, and a student who never started is not "stalled at
+    // step 0" — that would report a phantom cohort.
+    assert.equal(stalls['money-as-a-skill'][6], undefined);
+    assert.equal(stalls['money-as-a-skill'][-1], undefined);
+    assert.ok(!Object.values(stalls['money-as-a-skill']).some((l) => l.includes('d') || l.includes('e')));
+});
+
+test('othersStalledAt excludes the student being viewed, and returns 0 when alone', () => {
+    const students = [
+        stu('a', 'A', { m: mod('m', 4) }),
+        stu('b', 'B', { m: mod('m', 4) }),
+        stu('c', 'C', { m: mod('m', 4) }),
+        stu('z', 'Z', { m: mod('m', 2) }),
+    ];
+    const stalls = stallPoints(students, ['m']);
+    assert.equal(othersStalledAt(stalls, 'm', 3, 'a'), 2, 'the mockup\'s "two other students" line');
+    assert.equal(othersStalledAt(stalls, 'm', 1, 'z'), 0, 'alone at a step means no reteach signal');
+    // Never true for a module or step nobody is on.
+    assert.equal(othersStalledAt(stalls, 'nope', 3, 'a'), 0);
+    assert.equal(othersStalledAt(stalls, 'm', 99, 'a'), 0);
+});
+
+test('stuckModule picks the started-and-unfinished module they got furthest into', () => {
+    const s = stu('a', 'A', {
+        one: mod('one', 2, false, 1),
+        two: mod('two', 5, false, 1),
+        three: mod('three', 7, true),
+        four: mod('four', 0),
+    });
+    assert.equal(stuckModule(s, ['one', 'two', 'three', 'four']).id, 'two');
+    // Nothing started means nothing to be stuck on.
+    assert.equal(stuckModule(stu('b', 'B', { four: mod('four', 0) }), ['four']), null);
+});
+
+test('...and breaks a tie toward the module they have opened most', () => {
+    const s = stu('a', 'A', { one: mod('one', 4, false, 1), two: mod('two', 4, false, 3) });
+    assert.equal(stuckModule(s, ['one', 'two']).id, 'two');
+});
+
+test('attentionList is EMPTY when nobody needs anything', () => {
+    const fine = [stu('a', 'A', { m: mod('m', 3) })];
+    assert.deepEqual(attentionList(fine, ['m'], NOW), []);
+});
+
+test('attentionList orders at-risk above needs-attention above ready-for-more', () => {
+    const students = [
+        stu('c', 'Cleared', { m: mod('m', 7, true) }, { allDone: true }),
+        stu('b', 'Behind', { m: mod('m', 4, false, 3) }, { status: 'needs-attention', lastActive: daysAgo(5) }),
+        stu('a', 'Absent', { m: mod('m', 0) }, { status: 'at-risk', lastActive: daysAgo(9) }),
+    ];
+    const rows = attentionList(students, ['m'], NOW);
+    assert.deepEqual(rows.map((r) => r.severity), ['at-risk', 'needs-attention', 'all-done']);
+});
+
+test('an at-risk row states the specific fact — days silent, or never started at all', () => {
+    const never = attentionList([stu('a', 'A', { m: mod('m', 0) }, { status: 'at-risk', lastActive: 0 })], ['m'], NOW);
+    assert.equal(never[0].fact.kind, 'never-started');
+
+    const silent = attentionList([stu('b', 'B', { m: mod('m', 3) }, { status: 'at-risk', lastActive: daysAgo(9) })], ['m'], NOW);
+    assert.equal(silent[0].fact.kind, 'silent');
+    assert.equal(silent[0].fact.days, 9);
+    assert.equal(silent[0].fact.moduleName, 'm');
+});
+
+test('a needs-attention row names the module AND the step, per the mockup', () => {
+    const rows = attentionList(
+        [stu('b', 'B', { 'money-as-a-skill': mod('money-as-a-skill', 4, false, 3) }, { status: 'needs-attention', lastActive: daysAgo(5) })],
+        ['money-as-a-skill'], NOW,
+    );
+    assert.equal(rows[0].fact.kind, 'stalled');
+    assert.equal(rows[0].fact.moduleName, 'money-as-a-skill');
+    assert.equal(rows[0].fact.step, 4);
+    assert.equal(rows[0].fact.opens, 3, 'the "opened it 3 times" half of the sentence');
+});
+
+test('an all-done row offers assigning more, not a check-in', () => {
+    const rows = attentionList([stu('c', 'C', { m: mod('m', 7, true) }, { allDone: true })], ['m'], NOW);
+    assert.equal(rows[0].action, 'assign-more');
+    assert.equal(rows[0].fact.count, 1);
+});
+
+test('attentionList reuses deriveStatus rather than inventing its own idle thresholds', () => {
+    // A student exactly at the at-risk boundary must be triaged by the same constant the
+    // roster dots and top-bar tiles use, so the two surfaces can never disagree.
+    const built = buildStudent({
+        row: { uid: 'x', displayName: 'Edge Case' },
+        assigned: ['privacy-security'], moduleData: MODULE_DATA,
+        progress: { 'privacy-security': { highestUnlocked: 2, lastUpdated: daysAgo(8) } },
+    }, NOW);
+    assert.equal(built.status, 'at-risk');
+    const rows = attentionList([{ ...built, games: [] }], ['privacy-security'], NOW);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].severity, 'at-risk');
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PER-STEP TIMING — sparse on purpose
+   ═════════════════════════════════════════════════════════════════════════════ */
+const MIN = 60 * 1000;
+
+test('perStepTiming measures each answer from the previous one inside the same visit', () => {
+    const start = NOW;
+    const m = {
+        sessions: [{ startedAt: start, lastSeenAt: start + 20 * MIN }],
+        attempts: {
+            0: [{ timestamp: start + 2 * MIN }],
+            1: [{ timestamp: start + 5 * MIN }],
+            2: [{ timestamp: start + 6 * MIN }],
+        },
+    };
+    const t = perStepTiming(m);
+    assert.equal(t[0], 2 * MIN, 'the first answer is measured from the start of the visit');
+    assert.equal(t[1], 3 * MIN);
+    assert.equal(t[2], 1 * MIN);
+});
+
+test('a gap that spans two visits is OMITTED, not reported as thinking time', () => {
+    const d1 = NOW;
+    const d2 = NOW + 3 * DAY;
+    const m = {
+        sessions: [
+            { startedAt: d1, lastSeenAt: d1 + 5 * MIN },
+            { startedAt: d2, lastSeenAt: d2 + 5 * MIN },
+        ],
+        attempts: {
+            0: [{ timestamp: d1 + 1 * MIN }],
+            1: [{ timestamp: d2 + 2 * MIN }],
+        },
+    };
+    const t = perStepTiming(m);
+    assert.equal(t[0], 1 * MIN);
+    // Step 1 is measured from its OWN visit's start, never from three days earlier.
+    assert.equal(t[1], 2 * MIN);
+});
+
+test('a gap over the ceiling is omitted — a closed laptop is not 40 minutes of work', () => {
+    const start = NOW;
+    const m = {
+        sessions: [{ startedAt: start, lastSeenAt: start + 3 * 60 * MIN }],
+        attempts: {
+            0: [{ timestamp: start + 1 * MIN }],
+            1: [{ timestamp: start + 1 * MIN + STEP_GAP_CEILING_MS + MIN }],
+        },
+    };
+    const t = perStepTiming(m);
+    assert.equal(t[0], 1 * MIN);
+    assert.equal(t[1], undefined, 'not knowable is absent, not estimated');
+});
+
+test('a revised answer extends its own step rather than starting the next one early', () => {
+    const start = NOW;
+    const m = {
+        sessions: [{ startedAt: start, lastSeenAt: start + 20 * MIN }],
+        attempts: {
+            0: [{ timestamp: start + 1 * MIN }, { timestamp: start + 4 * MIN, replay: true }],
+            1: [{ timestamp: start + 6 * MIN }],
+        },
+    };
+    const t = perStepTiming(m);
+    assert.equal(t[0], 4 * MIN, 'the student was still on step 0 until the revision');
+    assert.equal(t[1], 2 * MIN);
+});
+
+test('perStepTiming returns nothing rather than guessing when there are no sessions', () => {
+    assert.deepEqual(perStepTiming({ attempts: { 0: [{ timestamp: NOW }] }, sessions: [] }), {});
+    assert.deepEqual(perStepTiming(null), {});
+    assert.deepEqual(perStepTiming({}), {});
+});
+
+test('an attempt with no usable timestamp contributes no timing', () => {
+    const m = {
+        sessions: [{ startedAt: NOW, lastSeenAt: NOW + 10 * MIN }],
+        attempts: { 0: [{ timestamp: null }], 1: [{ timestamp: NOW + 2 * MIN }] },
+    };
+    const t = perStepTiming(m);
+    assert.equal(t[0], undefined);
+    assert.equal(t[1], 2 * MIN);
 });

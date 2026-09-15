@@ -123,6 +123,10 @@
     border-right: 1px solid var(--navy-border);
     display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; min-height: 0;
   }
+  /* An explicit `display` on an element beats the UA stylesheet's `[hidden]{display:none}`,
+     so setting .hidden on this flex container would otherwise do nothing at all. The Assign
+     view hides the agent sidebar (see paintViewChrome) and needs this to mean it. */
+  .sidebar[hidden] { display: none; }
   .sidebar-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--navy-border); }
   .sidebar-title {
     font-family: 'Space Grotesk', sans-serif;
@@ -395,6 +399,178 @@
     .topbar-stats { margin-left: 0; width: 100%; justify-content: space-between; gap: 12px; }
     .topbar-time { border-left: none; padding-left: 0; }
   }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     TEACHER-HOME ADDITIONS — the code strip, the triage list, the class game
+     strip, the Assign page, and the print view.
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  /* ── Task Force code strip (top of the roster view) ── */
+  .codestrip {
+    background: var(--navy-surface); border: 1px solid var(--navy-border);
+    border-radius: 10px; padding: 16px 20px;
+    display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  }
+  .codestrip-label {
+    font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted);
+    font-weight: 600; margin-bottom: 5px;
+  }
+  .codestrip-code {
+    font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 500;
+    letter-spacing: 0.14em; color: var(--teal); line-height: 1;
+  }
+  .codestrip-rule { width: 1px; align-self: stretch; min-height: 42px; background: var(--navy-border); }
+  .codestrip-hint { font-size: 11.5px; color: var(--text-secondary); max-width: 340px; line-height: 1.5; }
+  .codestrip-acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .mc-btn {
+    background: var(--navy-raised); border: 1px solid var(--navy-border); color: var(--text-primary);
+    font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600;
+    padding: 7px 13px; border-radius: 6px; cursor: pointer;
+  }
+  .mc-btn:hover { border-color: var(--text-muted); }
+  .mc-btn.primary { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+  .mc-btn.primary:hover { filter: brightness(1.08); }
+  .mc-btn:disabled { opacity: 0.45; cursor: default; }
+
+  /* ── Needs your attention ── */
+  .sec-head {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.08em; color: var(--text-secondary);
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  .sec-head .sec-note { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--text-muted); }
+  .attn-list { display: flex; flex-direction: column; gap: 8px; }
+  .attn-row {
+    background: var(--navy-surface); border: 1px solid var(--navy-border);
+    border-left-width: 3px; border-radius: 8px; padding: 11px 15px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .attn-row.sev-at-risk { border-left-color: var(--rose); }
+  .attn-row.sev-needs-attention { border-left-color: var(--amber); }
+  .attn-row.sev-all-done { border-left-color: var(--green); }
+  .attn-who {
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600;
+    width: 170px; flex-shrink: 0;
+  }
+  .attn-what { font-size: 12px; color: var(--text-secondary); flex: 1; min-width: 200px; line-height: 1.5; }
+  .attn-what strong { color: var(--text-primary); font-weight: 600; }
+  .attn-act { margin-left: auto; }
+
+  /* ── Class game strip ── */
+  .game-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
+  .game-tile {
+    background: var(--navy-surface); border: 1px solid var(--navy-border);
+    border-radius: 10px; padding: 13px 15px;
+  }
+  .game-tile.assigned { border-left: 3px solid var(--teal); }
+  .game-tile-name { font-family: 'Space Grotesk', sans-serif; font-size: 12.5px; font-weight: 600; }
+  .game-tile-name .assigned-tag { color: var(--teal); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+  .game-tile-plays { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-primary); margin-top: 7px; }
+  .game-tile-weak { font-size: 10.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.45; }
+  .game-tile-weak strong { color: var(--text-secondary); }
+
+  /* ── Assign page ── */
+  .assign-panel { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 0; flex-direction: column; gap: 16px; }
+  .assign-panel.visible { display: flex; }
+  .assign-panel::-webkit-scrollbar { width: 4px; }
+  .assign-panel::-webkit-scrollbar-thumb { background: var(--navy-border); border-radius: 2px; }
+  .assign-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 13px; align-items: start; }
+  .pack {
+    background: var(--navy-surface); border: 1px solid var(--navy-border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .pack-head {
+    background: var(--navy-raised); padding: 10px 14px; border-bottom: 1px solid var(--navy-border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .pack-name { font-family: 'Space Grotesk', sans-serif; font-size: 12.5px; font-weight: 700; }
+  .pack-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }
+  .pack-body { padding: 4px 14px 10px; }
+  .mrow {
+    display: flex; align-items: flex-start; gap: 10px; padding: 9px 0;
+    border-bottom: 1px dashed var(--navy-border); cursor: pointer;
+  }
+  .pack-body .mrow:last-child { border-bottom: none; }
+  .mrow input { margin-top: 2px; width: 15px; height: 15px; accent-color: var(--teal); cursor: pointer; flex-shrink: 0; }
+  .mrow-info { flex: 1; min-width: 0; }
+  .mrow-name { font-size: 12.5px; color: var(--text-primary); }
+  .mrow-name .capstone-tag {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: var(--amber);
+    border: 1px solid var(--amber); border-radius: 3px; padding: 1px 4px; margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .mrow-sub { font-size: 10.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
+  .mrow-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+  .mc-note {
+    background: var(--navy-surface); border: 1px solid var(--navy-border);
+    border-radius: 8px; padding: 12px 15px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.55;
+  }
+  .mc-note strong { color: var(--text-primary); }
+  .savebar {
+    position: sticky; bottom: 0; background: var(--navy-mid);
+    border-top: 1px solid var(--navy-border); margin: 8px -24px 0; padding: 13px 24px;
+    display: flex; align-items: center; gap: 13px; flex-wrap: wrap; z-index: 5;
+  }
+  .savebar-count { font-size: 11.5px; color: var(--text-secondary); }
+  .savebar-count.dirty { color: var(--amber); }
+
+  /* ── Student detail additions ── */
+  .step-time {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .step-time.slow { color: var(--amber); }
+  .cohort-line {
+    font-size: 10.5px; color: var(--amber); margin-top: 4px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     PRINT — the Task Force code, for the wall.
+
+     A teacher projecting or taping the join code up is a real classroom habit, and
+     printing this page without a print path produces a dark-navy dashboard: unreadable
+     on paper, and several pages of roster nobody asked for. So printing hides the entire
+     app and emits ONE page that is just the code, the join instruction, and the class
+     name — at a size that reads from across a room.
+     ══════════════════════════════════════════════════════════════════════════ */
+  .print-sheet { display: none; }
+
+  @media print {
+    /* Force light-on-white regardless of the screen theme: printers do not reliably
+       honour background colours, so a light-text-on-dark design prints as white on white. */
+    html, body {
+      background: #fff !important; color: #000 !important;
+      height: auto !important; overflow: visible !important; display: block !important;
+    }
+    .topbar, .layout, .screen, .savebar { display: none !important; }
+    .print-sheet {
+      display: block !important;
+      text-align: center;
+      padding: 8% 6%;
+      font-family: 'Inter', sans-serif;
+      color: #000;
+    }
+    .print-sheet .p-kicker {
+      font-size: 13pt; letter-spacing: 0.22em; text-transform: uppercase;
+      color: #333; margin-bottom: 10mm;
+    }
+    .print-sheet .p-class { font-size: 20pt; font-weight: 600; margin-bottom: 4mm; }
+    /* Sized to be legible from the back of a classroom, and monospaced so an O and a 0
+       cannot be confused by a student typing it in. */
+    .print-sheet .p-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 96pt; font-weight: 500; letter-spacing: 0.1em;
+      line-height: 1.05; margin: 6mm 0 10mm;
+      /* A thin rule rather than a filled box: a black background would print as a solid
+         block of toner and the code inside it as nothing at all. */
+      border-top: 2px solid #000; border-bottom: 2px solid #000;
+      padding: 8mm 0;
+    }
+    .print-sheet .p-how { font-size: 14pt; line-height: 1.6; max-width: 150mm; margin: 0 auto; }
+    .print-sheet .p-how strong { font-weight: 600; }
+    .print-sheet .p-foot { margin-top: 14mm; font-size: 10pt; color: #555; }
+    @page { margin: 12mm; }
+  }
 </style>
 </head>
 <body>
@@ -446,6 +622,9 @@
     </div>
   </div>
   <div class="topbar-time" id="clock">—</div>
+  <!-- EXIT still returns to /dashboard/, which remains correct: the dashboard is the
+       student/app shell every account uses, including a teacher's own learner view. It is
+       no longer where any teacher function lives. -->
   <button class="topbar-exit" onclick="window.location.href='/dashboard/'">EXIT</button>
 </div>
 
@@ -464,14 +643,72 @@
     <div class="main-toolbar">
       <div class="toolbar-title" id="toolbar-title"><span>Class overview</span></div>
       <div class="view-tabs">
-        <button class="view-tab active" id="tab-overview" type="button">Class Overview</button>
+        <button class="view-tab active" id="tab-overview" type="button">Roster</button>
         <button class="view-tab" id="tab-detail" type="button">Agent Detail</button>
+        <button class="view-tab" id="tab-assign" type="button">Assign</button>
       </div>
     </div>
 
     <div class="overview-panel visible" id="overview-panel">
       <div id="overview-note"></div>
+
+      <!-- Ticket 4: the Task Force code, with copy, print and CSV export. The hint line is
+           here because teachers ask what the code is for constantly: it links a student's
+           work to them and nothing else — it is not a key that unlocks the lessons. -->
+      <div class="codestrip">
+        <div>
+          <div class="codestrip-label">TASK FORCE CODE</div>
+          <div class="codestrip-code" id="code-value">—</div>
+        </div>
+        <div class="codestrip-rule"></div>
+        <div class="codestrip-hint">
+          Students enter this once to join. They can start any lesson without it — the code
+          is only what links their work to you.
+        </div>
+        <div class="codestrip-acts">
+          <button class="mc-btn" id="btn-copy-code" type="button">Copy</button>
+          <button class="mc-btn" id="btn-print-code" type="button">Print for the wall</button>
+          <button class="mc-btn" id="btn-export-csv" type="button">Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Ticket 5: what to do Monday, not who finished. Rendered empty and says so. -->
+      <div class="sec-head">NEEDS YOUR ATTENTION <span class="sec-note" id="attn-note"></span></div>
+      <div class="attn-list" id="attn-list"></div>
+
+      <div class="sec-head">ROSTER</div>
       <div class="overview-grid" id="overview-grid"></div>
+
+      <!-- Ticket 3: games on the roster, with per-game play counts and the class's weakest
+           skill where there are enough players to support the claim. -->
+      <div class="sec-head" id="games-head">GAMES <span class="sec-note" id="games-note"></span></div>
+      <div class="game-strip" id="game-strip"></div>
+    </div>
+
+    <!-- Ticket 2/3: assignment as a full page, not a modal. -->
+    <div class="assign-panel" id="assign-panel">
+      <div class="mc-note">
+        Nothing here is locked. Assigning a module puts it on your roster and on each
+        student's list — it doesn't stop them opening others, and it doesn't stop them
+        finishing on their own time.
+      </div>
+      <div class="assign-grid" id="assign-modules"></div>
+
+      <div class="sec-head">GAMES <span class="sec-note">Assign as a warm-up or a diagnostic — see the note below on tracking</span></div>
+      <div class="mc-note">
+        <strong>Games work differently.</strong> A student can play any of these with no
+        account and no Task Force code — that's deliberate, it's how they find you.
+        Assigning one puts it on your roster and theirs, but if a student plays signed-out,
+        that play won't show up under their name. Every count below assumes they're signed in,
+        so treat it as a floor, not a total.
+      </div>
+      <div class="assign-grid" id="assign-games"></div>
+
+      <div class="savebar">
+        <button class="mc-btn primary" id="btn-save-assign" type="button">Save assignments</button>
+        <button class="mc-btn" id="btn-cancel-assign" type="button">Cancel</button>
+        <span class="savebar-count" id="assign-count">—</span>
+      </div>
     </div>
 
     <div class="detail" id="detail-panel">
@@ -482,18 +719,114 @@
   </div>
 </div>
 
+<!-- Ticket 4's print path. Hidden on screen; the ONLY thing that prints (see @media
+     print). Populated alongside the code strip so it can never show a stale code. -->
+<div class="print-sheet" id="print-sheet">
+  <div class="p-kicker">Allgood Academy</div>
+  <div class="p-class" id="p-class"></div>
+  <div class="p-code" id="p-code"></div>
+  <div class="p-how">
+    Go to <strong>allgoodacademy.com</strong>, start any lesson, and enter this code once
+    when it asks for a Task Force.<br>
+    You don't need the code to start — it's what links your work to your teacher.
+  </div>
+  <div class="p-foot">Enter it once. It stays linked after that.</div>
+</div>
+
+<!-- LOAD WATCHDOG. A CLASSIC script, deliberately not a module: it must survive exactly the
+     failure it exists to report, and a module cannot report its own failure to link.
+
+     Placed before the module scripts so its listeners are registered when they evaluate.
+
+     Why this exists: this page is one <script type="module"> whose import graph includes
+     ./derive.js, ./module-data.js and /js/skill-routing.js. If ANY of them fails to load or
+     link — a stale cached copy missing an export the new HTML imports, a 404, a blocked
+     CDN — the module never evaluates, not one statement of it runs, and the loading screen
+     below sits there spinning forever with its initial text. There is nothing to catch it
+     from the inside. That happened: index.html is served no-store while derive.js was not
+     covered by any Cache-Control rule, so a browser could pair fresh HTML with an hour-old
+     module and get "does not provide an export named …". The cache headers in firebase.json
+     are the fix for that specific cause; this is the fix for the whole class of them, because
+     a spinner that never resolves tells a teacher nothing and tells us nothing either. -->
+<script>
+(function () {
+  var reported = false;
+
+  function showFailure(title, detail) {
+    if (reported) return;
+    var gate = document.getElementById('screen-gate');
+    var loading = document.getElementById('screen-loading');
+    // If the app already got far enough to show its own gate, it is handling things.
+    if (!gate || !loading || loading.hidden) return;
+    reported = true;
+    loading.hidden = true;
+    document.getElementById('gate-title').textContent = title;
+    document.getElementById('gate-body').textContent = detail;
+    var link = document.getElementById('gate-link');
+    // Reload rather than navigate away: the overwhelmingly likely fix is picking up a fresh
+    // copy of whatever failed to load.
+    link.textContent = 'Reload Mission Control';
+    link.href = window.location.pathname + '?r=' + Date.now();
+    gate.hidden = false;
+  }
+
+  // A module that fails to parse, resolve an import, or link raises this before any of its
+  // own code runs, so nothing inside the module could ever have caught it.
+  window.addEventListener('error', function (e) {
+    var msg = (e && e.message) || 'unknown error';
+    if (/does not provide an export|Failed to fetch dynamically imported|Importing a module script failed|Unexpected token/i.test(msg)) {
+      showFailure(
+        'Mission Control needs a refresh',
+        'This page loaded a newer version of itself than the copy of its code your browser had '
+          + 'cached, so it could not start. Reloading should fix it — if it does not, a hard '
+          + 'refresh (Ctrl/Cmd + Shift + R) will. Technical detail: ' + msg,
+      );
+      return;
+    }
+    showFailure('Mission Control could not start', 'Something failed while loading the page: ' + msg);
+  });
+
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    showFailure('Mission Control could not start',
+      'Something failed while loading your Task Force: ' + ((r && (r.message || r.code)) || 'unknown error'));
+  });
+
+  // Belt and braces: an error event is not guaranteed for every way a module graph can fail,
+  // and a request that never settles raises nothing at all. Longer than auth-core's own 8s
+  // auth timeout so a slow-but-working sign-in is never interrupted by this.
+  setTimeout(function () {
+    showFailure(
+      'Mission Control is taking too long',
+      'The page started loading but never finished. That is usually a connection problem or a '
+        + 'stale cached file. Reloading should fix it — if it does not, a hard refresh '
+        + '(Ctrl/Cmd + Shift + R) will.',
+    );
+  }, 15000);
+})();
+</script>
+
 <!-- Identity/init lives in auth-core.js, as on every other Allgood Academy page. -->
 <script type="module" src="/js/auth-core.js"></script>
 <script type="module">
 import {
-    doc, getDoc, getDocs, collection, query, where,
+    doc, getDoc, getDocs, setDoc, collection, query, where,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 import { MODULE_DATA } from './module-data.js';
 import {
     relativeTime, buildStudent, classAverage, countActiveThisWeek, choiceTextFor,
     summarizeGameSessions,
     gameSessionsFromTelemetry,
+    buildCatalog, assignmentSummary, formatList, GAME_MINUTES,
+    classGameStats, WEAK_SKILL_MIN_PLAYERS,
+    stallPoints, othersStalledAt, stuckModule, attentionList,
+    perStepTiming,
 } from './derive.js';
+// The registry loader the four games already share, reused rather than re-fetched: one
+// cached fetch of /data/modules-registry.json, and the same parse every other consumer
+// gets. Ticket 3's routing targets are computed from the same source this resolver uses,
+// so the Assign page can never claim a destination the games would not actually pick.
+import { loadRegistry } from '/js/skill-routing.js';
 
 const { db, appId, auth, waitForAuthReady } = window.AuthCore;
 
@@ -523,6 +856,35 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
 
 const isToday = (ms) => !!ms && new Date(ms).toDateString() === new Date().toDateString();
 
+// The Assign page's copy quotes the same per-game estimate the save bar's arithmetic uses,
+// so the sentence and the total can never drift apart.
+const GAME_MINUTES_LABEL = GAME_MINUTES;
+
+/* A brief, non-blocking confirmation. Mission Control had no status channel of its own —
+   the dashboard used showStatusMessage(), which does not exist here — and a save that
+   reports nothing is indistinguishable from one that failed. Errors stay on screen until
+   dismissed; successes clear themselves. */
+let toastTimer = null;
+function toast(message, isError = false) {
+    let el = document.getElementById('mc-toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'mc-toast';
+        el.setAttribute('role', 'status');
+        el.setAttribute('aria-live', 'polite');
+        el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:60;'
+            + 'padding:10px 16px;border-radius:7px;font-size:12px;font-family:Inter,sans-serif;'
+            + 'border:1px solid var(--navy-border);background:var(--navy-raised);color:var(--text-primary);'
+            + 'box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:min(460px,90vw);line-height:1.45';
+        document.body.appendChild(el);
+    }
+    el.textContent = message;
+    el.style.borderColor = isError ? 'var(--rose)' : 'var(--teal)';
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    if (!isError) toastTimer = setTimeout(() => { el.hidden = true; }, 3200);
+}
+
 function colorForUid(uid) {
     let h = 0;
     for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
@@ -549,6 +911,10 @@ const state = {
     filter: '',
     sessionsReadable: true,   // rules may deny a teacher the sessions collection — see load()
     expanded: {},             // moduleId -> bool, so a card stays open across re-renders
+    assignedGames: [],        // classroom.assignedGames — see the schema note on saveAssignments
+    catalog: null,            // built from /data/modules-registry.json; null until it loads
+    draft: null,              // { modules:Set, games:Set } while the Assign page is open
+    stalls: {},               // moduleId -> stepIndex -> [uid], for the reteach signal
 };
 
 /* ── clock ─────────────────────────────────────────────────────────────────── */
@@ -583,6 +949,8 @@ function showGate(title, body, linkText, linkHref) {
 async function load() {
     const user = await waitForAuthReady();
     if (!user) {
+        // Still points at /dashboard/, and that is correct after the teacher functions
+        // moved here: sign-in lives in the app shell, and always did.
         showGate('Sign in first', 'Mission Control reads your Task Force roster, so it needs to know who you are.', 'Go to the dashboard', '/dashboard/');
         return;
     }
@@ -590,10 +958,15 @@ async function load() {
     const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
     const me = meSnap.exists() ? meSnap.data() : {};
     if (me.role !== 'teacher' || !me.classroomCode) {
+        // Reworded now that assignment, the code and the roster export live HERE: the
+        // dashboard is no longer "where the teacher tools are", it is the app shell, and
+        // creating a Task Force is the one teacher action that still starts there. Saying
+        // "from the dashboard" without that distinction now reads as "the teacher page is
+        // somewhere else", which is the opposite of true.
         showGate(
             'Teachers only',
-            'Mission Control shows a Task Force roster and every agent’s progress in it. Your account isn’t set up as a teacher with a Task Force yet — you can create one from the dashboard.',
-            'Go to the dashboard', '/dashboard/',
+            'Mission Control is the teacher home — your roster, your Task Force code, and what you assign. Your account isn’t a Task Force Leader yet. Creating a Task Force is a one-time step in the app itself: open the System Menu there and choose “Set Up Mission Control”, and this page is where you land afterwards.',
+            'Set up a Task Force', '/dashboard/',
         );
         return;
     }
@@ -602,11 +975,28 @@ async function load() {
     const classSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', state.code));
     state.classroom = classSnap.exists() ? classSnap.data() : {};
     state.assigned = (state.classroom.assignedModules || []).filter((id) => MODULE_DATA[id]);
+    // Games live in their OWN array, not in assignedModules. See saveAssignments() for why.
+    state.assignedGames = Array.isArray(state.classroom.assignedGames) ? state.classroom.assignedGames : [];
 
-    document.getElementById('classroom-name').textContent = state.classroom.teacherName
+    // The assignment catalog. A registry that fails to load costs the Assign page and
+    // nothing else — the roster, which is what a teacher came for, still renders — so this
+    // is caught rather than allowed to reject load().
+    state.catalog = buildCatalog(await loadRegistry().catch((e) => {
+        console.warn('[Mission Control] module registry unavailable — the Assign page will say so', e);
+        return [];
+    }));
+
+    // Everything Ticket 4 ported from the dashboard reads the code from here, including the
+    // print sheet, so a stale code cannot end up taped to a wall.
+    document.getElementById('code-value').textContent = state.code;
+    document.getElementById('p-code').textContent = state.code;
+
+    const className = state.classroom.teacherName
         ? `${state.classroom.teacherName} — Task Force`
         : 'Task Force';
+    document.getElementById('classroom-name').textContent = className;
     document.getElementById('classroom-code').textContent = state.code;
+    document.getElementById('p-class').textContent = className;
 
     document.getElementById('loading-note').textContent = 'Loading your roster…';
     // Roster membership is the UNION of two sources, deliberately — not a replacement:
@@ -619,13 +1009,28 @@ async function load() {
     //     roster; it stays until those members are migrated or naturally rejoin.
     // Excludes this classroom's own teacher explicitly: a Task Force Leader joining their OWN
     // classroom by mistake shouldn't list themselves as a member of it.
+    // Each source is read independently and a failure in one does not take the page down.
+    // That is a deliberate change: these two queries used to sit in a bare Promise.all, so
+    // when rule #4's list grant was denying every teacher (it errored on a null path
+    // wildcard — see firestore.rules #4), the rejected legacy query propagated out of load()
+    // and Mission Control rendered a full-page "Something went wrong reading your Task Force"
+    // error instead of a roster. The roster is a UNION of two independent sources; losing one
+    // of them should cost the members only that source can see, not the entire page.
     const [memberSnap, legacySnap] = await Promise.all([
-        getDocs(query(collection(db, 'artifacts', appId, 'classroom_members'), where('classroomCode', '==', state.code))),
-        getDocs(query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', state.code), where('role', '==', 'student'))),
+        getDocs(query(collection(db, 'artifacts', appId, 'classroom_members'), where('classroomCode', '==', state.code)))
+            .catch((e) => { console.warn('[Mission Control] classroom_members query failed', e); return null; }),
+        getDocs(query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', state.code), where('role', '==', 'student')))
+            .catch((e) => { console.warn('[Mission Control] legacy roster query failed', e); return null; }),
     ]);
+    // Both failing at once is the one case worth surfacing: there is no roster to show and no
+    // way to tell an empty Task Force from an unreadable one, so say so rather than render a
+    // convincing "0 agents" that is really a permission error.
+    if (!memberSnap && !legacySnap) {
+        throw new Error('Your roster could not be read. This is a permissions problem, not an empty Task Force — the code is fine to keep sharing.');
+    }
     const memberUids = [...new Set([
-        ...memberSnap.docs.map((d) => d.data().uid),
-        ...legacySnap.docs.map((d) => d.id),
+        ...(memberSnap ? memberSnap.docs.map((d) => d.data().uid) : []),
+        ...(legacySnap ? legacySnap.docs.map((d) => d.id) : []),
     ])].filter((uid) => uid !== state.classroom.teacherUid);
 
     const rows = (await Promise.all(memberUids.map(async (uid) => {
@@ -686,7 +1091,31 @@ async function loadStudent(row) {
     // Presentation the shaping layer deliberately has no opinion about.
     s.color = colorForUid(row.uid);
     s.bg = tint(s.color, 0.2);
+    // Kept so an assignment change can be re-derived in place — see rebuildStudent().
+    s.raw = { row, scores, attempts, progress, sessions, gameSessions };
     return s;
+}
+
+/* Recomputes one already-loaded student against the current state.assigned.
+ *
+ * Saving an assignment change must make the roster reflect the new set immediately, and
+ * buildStudent() is a pure function of documents we already hold — so the raw inputs are
+ * kept on each student at load time and replayed here rather than re-reading Firestore.
+ * A full reload would be correct too, and far more expensive: one read per student per
+ * subcollection, to recompute something that needs no new data at all. */
+function rebuildStudent(s) {
+    const raw = s.raw;
+    if (!raw) return s;
+    const next = buildStudent({
+        row: raw.row, assigned: state.assigned, moduleData: MODULE_DATA,
+        scores: raw.scores, attempts: raw.attempts, progress: raw.progress,
+        sessions: raw.sessions, gameSessions: raw.gameSessions,
+    });
+    next.games = s.games;   // game results do not depend on the assignment set
+    next.color = s.color;
+    next.bg = s.bg;
+    next.raw = raw;
+    return next;
 }
 
 async function readSessions(uid) {
@@ -718,8 +1147,14 @@ function renderAll() {
     document.getElementById('toolbar-title').innerHTML =
         `Class overview — <span>${state.students.length} agent${state.students.length === 1 ? '' : 's'}</span>`;
     renderStats();
+    // Computed once per render for the whole roster, because "two other students stalled at
+    // the same point" is a class fact and cannot be derived from one student's documents.
+    state.stalls = stallPoints(state.students, state.assigned);
     renderRoster();
     renderOverview();
+    renderAttention();
+    renderGameStrip();
+    renderAssign();
     if (state.activeUid) renderDetail(state.activeUid);
 }
 
@@ -774,7 +1209,7 @@ function renderRoster() {
 function renderOverview() {
     const note = document.getElementById('overview-note');
     note.innerHTML = !state.assigned.length
-        ? '<div class="degraded">No modules are assigned to this Task Force yet, so there is no progress to show. Assign modules from the dashboard and they will appear here.</div>'
+        ? '<div class="degraded">No modules are assigned to this Task Force yet, so there is no progress to show. Open the <strong>Assign</strong> tab to pick what this class works through.</div>'
         : (state.sessionsReadable ? '' : degradedNote());
 
     const grid = document.getElementById('overview-grid');
@@ -801,6 +1236,280 @@ function renderOverview() {
         </div>
         <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">Last active: ${esc(relativeTime(s.lastActive))}</div>
       </button>`).join('');
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   NEEDS YOUR ATTENTION (Ticket 5)
+
+   Mission Control's top bar already answered "how many need attention". A count is not an
+   action, so this turns each one into the specific fact and the specific thing to do.
+   The rows, their severities and their ordering all come from attentionList() in derive.js,
+   which reads the SAME deriveStatus/allDone signals the detail banner already used — there
+   is no second definition of "at risk" anywhere in this page.
+   ═════════════════════════════════════════════════════════════════════════════ */
+function renderAttention() {
+    const list = document.getElementById('attn-list');
+    const note = document.getElementById('attn-note');
+    const rows = attentionList(state.students, state.assigned);
+
+    if (!state.students.length) {
+        note.textContent = '';
+        list.innerHTML = '<div class="empty-note">Nobody has joined this Task Force yet, so there is nothing to triage.</div>';
+        return;
+    }
+    // An empty list is the good outcome and says so, rather than rendering a bare gap that
+    // reads like something failed to load.
+    if (!rows.length) {
+        note.textContent = '';
+        list.innerHTML = `<div class="empty-note">Nothing needs you right now — every agent is inside the pace you'd expect.${
+            state.assigned.length ? '' : '<br>Nothing is assigned yet, so there is also nothing anyone can fall behind on.'
+        }</div>`;
+        return;
+    }
+    note.textContent = `${rows.length} of ${state.students.length} agent${state.students.length === 1 ? '' : 's'}, most urgent first`;
+    list.innerHTML = rows.map(attentionRow).join('');
+}
+
+// The sentence for one row. Each severity states a DIFFERENT fact — the mockup's point is
+// that "9 days silent" and "opened it 3 times, never past Case 4" call for different moves.
+function attentionFactHtml(row) {
+    const f = row.fact;
+    switch (f.kind) {
+        case 'never-started':
+            return 'Nothing recorded at all. Has never opened an assigned module.';
+        case 'silent':
+            return `Nothing since <strong>${esc(f.days === 1 ? 'yesterday' : `${f.days} days ago`)}</strong>.${
+                f.moduleName ? ` Left off part-way through ${esc(f.moduleName)}.` : ' Has never opened an assigned module.'
+            }`;
+        case 'stalled':
+            return `Stuck on <strong>${esc(f.moduleName)}</strong> — ${
+                f.opens > 1 ? `opened it ${f.opens} times, never` : 'never'
+            } past step ${f.step} of ${f.stepsTotal}.`;
+        case 'slowing':
+            return `Falling behind the class pace${f.days != null ? ` — quiet for ${f.days} day${f.days === 1 ? '' : 's'}` : ''}, with nothing started to pick back up.`;
+        case 'all-complete':
+            return `All ${f.count} assigned module${f.count === 1 ? '' : 's'} complete. Ready for a Challenge, or something new.`;
+        default:
+            return '';
+    }
+}
+
+function attentionRow(row) {
+    const label = row.action === 'assign-more' ? 'Assign more' : 'Open';
+    const act = row.action === 'assign-more'
+        ? `<button class="mc-btn" type="button" data-attn-assign="1">${label}</button>`
+        : `<button class="mc-btn" type="button" data-attn-uid="${esc(row.uid)}">${label}</button>`;
+    return `<div class="attn-row sev-${esc(row.severity)}">
+      <div class="attn-who">${esc(row.name)}</div>
+      <div class="attn-what">${attentionFactHtml(row)}</div>
+      <div class="attn-act">${act}</div>
+    </div>`;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   THE CLASS GAME STRIP (Ticket 3)
+
+   Per-game play counts and the class's weakest skill, computed from real telemetry by
+   classGameStats(). Below WEAK_SKILL_MIN_PLAYERS different players the weakest-skill line
+   is withheld and says so — a reteach signal off two rounds is one student's bad afternoon
+   wearing the whole class's name.
+   ═════════════════════════════════════════════════════════════════════════════ */
+function renderGameStrip() {
+    const strip = document.getElementById('game-strip');
+    const note = document.getElementById('games-note');
+    const head = document.getElementById('games-head');
+
+    // With no registry there is no list of games to show at all; the roster above is
+    // unaffected, so this hides rather than erroring.
+    const games = state.catalog ? state.catalog.gamePacks.flatMap((p) => p.items) : [];
+    if (!games.length) { head.hidden = true; strip.hidden = true; return; }
+    head.hidden = false; strip.hidden = false;
+
+    const stats = classGameStats(state.students);
+    const total = state.students.length;
+    const assignedCount = state.assignedGames.length;
+    note.textContent = `${assignedCount} assigned · students can play any of these without a code or account`;
+
+    strip.innerHTML = games.map((g) => {
+        const st = stats.get(g.id);
+        const isAssigned = state.assignedGames.includes(g.id);
+        const played = st ? st.players : 0;
+
+        const playLine = !st
+            ? 'No signed-in plays yet'
+            : `${played} of ${total} played${st.avgPct == null ? '' : ` · avg ${st.avgPct}%`}`;
+
+        // Three distinct states, and the middle one is the honest refusal the ticket asks
+        // for: enough plays to state a weakness, some plays but not enough, or none.
+        let weakLine;
+        if (st && st.weakestCategory) {
+            weakLine = `Weakest across class: <strong>${esc(catLabel(st.weakestCategory.name))}</strong>`;
+        } else if (st) {
+            weakLine = `Not enough plays to call it yet — ${played} of the ${WEAK_SKILL_MIN_PLAYERS} players needed`;
+        } else {
+            weakLine = 'Nothing to report until someone plays it signed in';
+        }
+
+        return `<div class="game-tile${isAssigned ? ' assigned' : ''}">
+          <div class="game-tile-name">${esc(g.name)}${isAssigned ? ' <span class="assigned-tag">· ASSIGNED</span>' : ''}</div>
+          <div class="game-tile-plays">${esc(playLine)}</div>
+          <div class="game-tile-weak">${weakLine}</div>
+        </div>`;
+    }).join('');
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   THE ASSIGN PAGE (Tickets 2 and 3)
+
+   Every row comes from /data/modules-registry.json via buildCatalog(). Nothing on this page
+   enumerates a module, so adding a GoodBlock to the registry makes it appear here with no
+   change to this file — which is exactly what the dashboard's picker could not do, since it
+   carried its own MODULE_REGISTRY copy.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+// The draft is separate from state.assigned so Cancel is a real cancel and the save bar can
+// tell a teacher whether anything is actually pending.
+function resetDraft() {
+    state.draft = {
+        modules: new Set(state.classroom && Array.isArray(state.classroom.assignedModules) ? state.classroom.assignedModules : []),
+        games: new Set(state.assignedGames),
+    };
+}
+
+function renderAssign() {
+    if (!state.draft) resetDraft();
+    const modulesEl = document.getElementById('assign-modules');
+    const gamesEl = document.getElementById('assign-games');
+
+    if (!state.catalog || !state.catalog.packs.length) {
+        modulesEl.innerHTML = '<div class="empty-note">The module list could not be loaded, so there is nothing to assign from right now. Reload the page to try again — your current assignments are untouched.</div>';
+        gamesEl.innerHTML = '';
+        document.getElementById('assign-count').textContent = '';
+        document.getElementById('btn-save-assign').disabled = true;
+        return;
+    }
+    document.getElementById('btn-save-assign').disabled = false;
+
+    modulesEl.innerHTML = state.catalog.packs.map((pack) => packHtml(pack, state.draft.modules)).join('');
+    gamesEl.innerHTML = state.catalog.gamePacks.map((pack) => packHtml(pack, state.draft.games)).join('')
+        + whyAssignAGameHtml();
+    renderAssignCount();
+}
+
+function packHtml(pack, picked) {
+    const on = pack.items.filter((i) => picked.has(i.id)).length;
+    return `<div class="pack">
+      <div class="pack-head">
+        <span class="pack-name">${esc(pack.name)}</span>
+        <span class="pack-count">${on} of ${pack.items.length}</span>
+      </div>
+      <div class="pack-body">${pack.items.map((i) => assignRowHtml(i, picked.has(i.id))).join('')}</div>
+    </div>`;
+}
+
+function assignRowHtml(item, checked) {
+    // A game's subtitle names where it actually routes a weak player, derived from its
+    // skillTags and every lab that claims them (routingTargetsFor) — not a hardcoded string,
+    // so retagging a lab moves the sentence with it.
+    const sub = item.type === 'game'
+        ? [item.routesTo && item.routesTo.length ? `routes to ${formatList(item.routesTo)}` : 'no routing target tagged yet']
+            .filter(Boolean).join(' · ')
+        : item.blurb;
+    return `<label class="mrow">
+      <input type="checkbox" data-assign-id="${esc(item.id)}" data-assign-kind="${item.type === 'game' ? 'game' : 'module'}"${checked ? ' checked' : ''}>
+      <div class="mrow-info">
+        <div class="mrow-name">${esc(item.name)}${item.isCapstone ? '<span class="capstone-tag">CAPSTONE</span>' : ''}</div>
+        ${sub ? `<div class="mrow-sub">${esc(sub)}</div>` : ''}
+      </div>
+      <div class="mrow-time">~${item.minutes}m</div>
+    </label>`;
+}
+
+function whyAssignAGameHtml() {
+    return `<div class="pack" style="border-style:dashed">
+      <div class="pack-head" style="background:none"><span class="pack-name" style="color:var(--text-muted)">Why assign a game?</span></div>
+      <div class="pack-body" style="font-size:11.5px;color:var(--text-secondary);line-height:1.55;padding-top:8px">
+        A game takes about ${GAME_MINUTES_LABEL} minutes and tells you which skill each student is
+        weakest in — then points them at the GoodBlock that teaches it. Good as a Monday
+        warm-up before you assign the lesson, or as a quick check after.
+      </div>
+    </div>`;
+}
+
+// The live count. Class time, not just a module count: minutes are what a teacher is
+// actually budgeting against a period.
+function renderAssignCount() {
+    const el = document.getElementById('assign-count');
+    const summary = assignmentSummary({
+        modules: [...state.draft.modules], games: [...state.draft.games], catalog: state.catalog,
+    });
+    const dirty = isAssignDirty();
+    el.textContent = summary.label + (dirty ? ' · unsaved' : '');
+    el.classList.toggle('dirty', dirty);
+}
+
+function isAssignDirty() {
+    const same = (set, arr) => set.size === arr.length && arr.every((id) => set.has(id));
+    return !(same(state.draft.modules, (state.classroom && state.classroom.assignedModules) || [])
+        && same(state.draft.games, state.assignedGames));
+}
+
+/* Writes both arrays back to the classroom document.
+ *
+ * SCHEMA DECISION (Ticket 3): games go in their own `assignedGames` array rather than into
+ * `assignedModules` alongside the labs and Challenges. The deciding factor is what
+ * assignedModules already means to the code that reads it:
+ *
+ *   - state.assigned feeds buildStudent(), whose per-module shape is (stepsTotal, maxStep,
+ *     pct, attemptsByStep) — a fixed Case sequence. A game has a RANDOMIZED bank and no
+ *     fixed sequence, which is exactly why derive.js kept games out of s.modules in the
+ *     first place, so a game can never have a meaningful pct.
+ *   - A student's overall completion is the MEAN of each assigned module's pct. A game
+ *     folded in would sit at 0% forever and drag every student's headline number down —
+ *     a wrong figure on the roster, which is the failure mode this ticket's acceptance
+ *     criteria name.
+ *   - Option (a) would not even have been inert: state.assigned filters on MODULE_DATA, so
+ *     a game id in assignedModules is silently dropped today. Invisible-until-something-
+ *     changes is the worst of the two failure modes.
+ *   - Games also mean something different to a TEACHER — guest-playable (so counts
+ *     undercount), ~8 minutes rather than ~20, diagnostic rather than instructional. A
+ *     separate field lets the roster show played/not-played honestly instead of forcing a
+ *     completion model onto something that has none.
+ *
+ * Both arrays are fields on the same document, so this costs no extra read or write, and
+ * assignedModules keeps meaning precisely what every existing consumer already believes.
+ */
+async function saveAssignments() {
+    const btn = document.getElementById('btn-save-assign');
+    btn.disabled = true;
+    const modules = [...state.draft.modules];
+    const games = [...state.draft.games];
+    try {
+        await setDoc(
+            doc(db, 'artifacts', appId, 'classrooms', state.code),
+            { assignedModules: modules, assignedGames: games },
+            { merge: true },
+        );
+        // Mirror locally so the roster reflects the new set without a reload, the same way
+        // load() derived it — including the MODULE_DATA filter, since a module Mission
+        // Control has no step data for is assignable but not yet renderable step-by-step.
+        state.classroom = { ...state.classroom, assignedModules: modules, assignedGames: games };
+        state.assigned = modules.filter((id) => MODULE_DATA[id]);
+        state.assignedGames = games;
+        // Recompute every student against the new assignment set. Cheap: no re-read, the raw
+        // documents are already in memory.
+        state.students = state.students.map((s) => rebuildStudent(s));
+        state.students.sort((a, b) => a.name.localeCompare(b.name));
+        resetDraft();
+        renderAll();
+        switchView('overview');
+        toast('Assignments saved.');
+    } catch (e) {
+        console.error('[Mission Control] saving assignments failed', e);
+        toast('That did not save. Your changes are still here — try again.', true);
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 /* Shown only when a session read actually came back denied (see readSessions). The teacher
@@ -849,19 +1558,39 @@ function renderDetail(uid) {
     body.innerHTML =
         (state.assigned.length
             ? (state.sessionsReadable ? '' : degradedNote()) + state.assigned.map((id) => moduleCard(s, s.modules[id])).join('')
-            : '<div class="empty-note">No modules are assigned to this Task Force yet.</div>')
+            : '<div class="empty-note">No modules are assigned to this Task Force yet — pick some on the Assign tab.</div>')
         + gamesSection(s);
 }
 
-/* The four standalone games are never "assigned" — they're guest-first, so a teacher sees
-   whatever a student has actually played, same spirit as the games hub itself needing no
-   login to try something. Shown below the assigned modules (or the empty-modules note),
-   never gating on state.assigned since a student can play these with zero modules set up. */
+/* The games a student has played, plus — since Ticket 3 — any game that is ASSIGNED and
+   they have not.
+   
+   Games stay guest-first: playable with no account and no Task Force code, which is
+   unchanged and is how students find the site at all. What changed is that a teacher can
+   now put one on the roster, so "assigned and not played" became a real state with
+   something to say. It is reported with the tracking caveat attached, because a signed-out
+   play genuinely does not attribute to the student and a teacher reading a zero deserves to
+   know that is one of the two explanations.
+   
+   Never gated on state.assigned: a student can play these with zero modules set up. */
 function gamesSection(s) {
     if (!state.sessionsReadable) return '';
-    if (!s.games.length) return '';
-    return `<div class="steps-label" style="margin-top:20px">GAMES PLAYED</div>`
-        + s.games.map(gameCard).join('');
+    const played = new Set(s.games.map((g) => g.id));
+    const catalogGames = state.catalog ? state.catalog.gamePacks.flatMap((p) => p.items) : [];
+    const assignedUnplayed = catalogGames.filter((g) => state.assignedGames.includes(g.id) && !played.has(g.id));
+
+    if (!s.games.length && !assignedUnplayed.length) return '';
+
+    const unplayedNote = assignedUnplayed.length
+        ? `<div class="empty-note" style="text-align:left">No signed-in play recorded for
+             <strong>${assignedUnplayed.map((g) => esc(g.name)).join('</strong>, <strong>')}</strong>.
+             ${assignedUnplayed.length === 1 ? 'It is' : 'They are'} assigned, so this either hasn't
+             happened yet or happened signed-out — a signed-out round doesn't attribute to anyone.</div>`
+        : '';
+
+    return '<div class="steps-label" style="margin-top:20px">GAMES</div>'
+        + s.games.map(gameCard).join('')
+        + unplayedNote;
 }
 
 function gameCard(g) {
@@ -942,22 +1671,45 @@ function gameSessionRow(sess) {
     </div>`;
 }
 
+/* The banner at the top of a student's page.
+
+   Now rendered from the SAME attentionList() row the roster's triage list shows for this
+   student, so the two can never say different things about the same person — they used to be
+   two separate reads of s.status with their own wording and their own idea of which module
+   the student was stuck on. The banner adds the one thing the roster list cannot: how many
+   OTHER students are stalled at this exact step, which is what turns one student's problem
+   into a reteach decision. */
 function alertFor(s) {
-    if (s.status === 'at-risk') {
-        return `<div class="alert-banner alert-rose">⚠ At risk — ${esc(s.lastActive ? `nothing since ${relativeTime(s.lastActive)}` : 'has never opened an assigned module')}. Worth a direct check-in.</div>`;
-    }
-    if (s.status === 'needs-attention') {
-        const stuck = state.assigned.map((id) => s.modules[id]).find((m) => !m.completed);
-        return `<div class="alert-banner alert-amber">⚡ Falling behind the class pace. ${esc(s.name.split(' ')[0])} may need a nudge on ${esc(stuck ? stuck.meta.name : 'their current module')}.</div>`;
-    }
-    if (s.allDone) {
-        return '<div class="alert-banner alert-green">✓ All assigned modules complete. Consider assigning additional content.</div>';
-    }
-    return '';
+    const row = attentionList([s], state.assigned)[0];
+    if (!row) return '';
+    const cls = { 'at-risk': 'alert-rose', 'needs-attention': 'alert-amber', 'all-done': 'alert-green' }[row.severity];
+    const icon = { 'at-risk': '⚠', 'needs-attention': '⚡', 'all-done': '✓' }[row.severity];
+    const tail = row.severity === 'at-risk' ? ' Worth a direct check-in.' : '';
+    return `<div class="alert-banner ${cls}">${icon} ${attentionFactHtml(row)}${tail}${cohortSentence(s)}</div>`;
+}
+
+/* "Two other students stalled at the same point."
+ *
+ * Appended only when it is literally true: the student is sitting on a specific step of a
+ * specific module and at least one OTHER student is sitting on that same step. Zero others
+ * produces nothing at all rather than "0 other students", which would read as a claim. */
+function cohortSentence(s) {
+    const stuck = stuckModule(s, state.assigned);
+    if (!stuck) return '';
+    const others = othersStalledAt(state.stalls, stuck.id, stuck.maxStep - 1, s.uid);
+    if (others < 1) return '';
+    return others === 1
+        ? ' <strong>One other student is stalled at the same point</strong> — worth covering with both of them.'
+        : ` <strong>${others} other students stalled at the same point</strong> — that is a reteach signal, not one student's problem.`;
 }
 
 function moduleCard(s, m) {
     const st = styleFor(m.id);
+    const byStep = state.sessionsReadable ? perStepTiming(m) : {};
+    const timing = { byStep, any: Object.keys(byStep).length > 0 };
+    // Only the step this student is actually sitting on carries the cohort line; a finished
+    // module has no stall point, so it gets none.
+    const cohortStep = (!m.completed && m.maxStep > 0) ? m.maxStep - 1 : null;
     const barColor = m.completed ? '#10B981' : st.color;
     const pill = m.completed
         ? { cls: 'pill-done', txt: 'Complete' }
@@ -986,8 +1738,8 @@ function moduleCard(s, m) {
         <div class="module-progress-txt">${m.pct}%</div>
       </div>
       <div class="module-steps">
-        <div class="steps-label">STEP-BY-STEP BREAKDOWN</div>
-        ${m.meta.steps.map((step, i) => stepRow(m, step, i)).join('')}
+        <div class="steps-label">STEP-BY-STEP BREAKDOWN${timing.any ? ' <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--text-muted)">· times are between answers, within one visit</span>' : ''}</div>
+        ${m.meta.steps.map((step, i) => stepRow(m, step, i, timing.byStep, cohortStep, s.uid)).join('')}
         <div class="time-on-task">
           <span aria-hidden="true">⏱</span>
           <span>Time in module:</span>
@@ -998,10 +1750,37 @@ function moduleCard(s, m) {
     </div>`;
 }
 
-function stepRow(m, step, i) {
+/* mm:ss for a per-step gap. Kept short because it sits in a dense list; a step over five
+   minutes is tinted, because THAT is the signal a teacher is scanning for. */
+function stepGapLabel(ms) {
+    const total = Math.round(ms / 1000);
+    const mins = Math.floor(total / 60);
+    const secs = String(total % 60).padStart(2, '0');
+    return `${mins}m ${secs}s`;
+}
+
+function stepRow(m, step, i, timing = {}, cohortStep = null, uid = null) {
     const num = String(i + 1).padStart(2, '0');
     const reached = i < m.maxStep;
     const rows = m.attempts[i] || [];
+
+    // Per-step timing is the gap between consecutive answers inside one visit (see
+    // perStepTiming) — an approximation, so it is labelled "between answers" in the column
+    // header rather than presented as time on task, and it is simply absent for any step
+    // where that gap is not knowable rather than estimated.
+    const gap = timing[i];
+    const timeCell = typeof gap === 'number'
+        ? `<div class="step-time${gap >= 5 * 60 * 1000 ? ' slow' : ''}" title="Between this answer and the previous one, within one visit">${stepGapLabel(gap)}</div>`
+        : '';
+
+    // The reteach signal, on the exact row it applies to.
+    const cohort = (cohortStep === i && uid)
+        ? (() => {
+            const others = othersStalledAt(state.stalls, m.id, i, uid);
+            if (others < 1) return '';
+            return `<div class="cohort-line">${others === 1 ? 'One other student' : `${others} other students`} stalled here too.</div>`;
+        })()
+        : '';
 
     if (!reached && !rows.length) {
         return `<div class="step-row step-not-reached">
@@ -1050,7 +1829,9 @@ function stepRow(m, step, i) {
       <div class="step-content">
         <div class="step-title">${esc(step.title)}${isCurrent ? ' <span class="current-marker">← current</span>' : ''}</div>
         ${choiceHtml}
+        ${cohort}
       </div>
+      ${timeCell}
       ${score == null ? '' : `<div class="step-score" style="color:${color}">${SCORE_LABEL[score] || ''}</div>`}
       <div class="step-indicator" style="background:${color}"></div>
     </div>`;
@@ -1065,17 +1846,31 @@ function scoreLabel(a) {
 }
 
 /* ── interaction ───────────────────────────────────────────────────────────── */
+const VIEWS = ['overview', 'detail', 'assign'];
+
+function paintViewChrome(view) {
+    for (const v of VIEWS) {
+        document.getElementById(`tab-${v}`).classList.toggle('active', v === view);
+        document.getElementById(`${v}-panel`).classList.toggle('visible', v === view);
+    }
+    // The agent sidebar is a roster navigator; on the Assign page there is nothing to
+    // navigate to, and the mockup's Assign tab is a full page. Hidden rather than left
+    // beside it, so the pack columns get the width they need.
+    document.querySelector('.sidebar').hidden = (view === 'assign');
+}
+
 function switchView(view) {
     state.view = view;
-    document.getElementById('tab-overview').classList.toggle('active', view === 'overview');
-    document.getElementById('tab-detail').classList.toggle('active', view === 'detail');
-    document.getElementById('overview-panel').classList.toggle('visible', view === 'overview');
-    document.getElementById('detail-panel').classList.toggle('visible', view === 'detail');
+    paintViewChrome(view);
     if (view === 'overview') {
         document.getElementById('toolbar-title').innerHTML = `Class overview — <span>${state.students.length} agent${state.students.length === 1 ? '' : 's'}</span>`;
         state.activeUid = null;
         renderRoster();
         renderOverview();
+    } else if (view === 'assign') {
+        document.getElementById('toolbar-title').innerHTML =
+            'Assign — <span>pick what this class works through</span>';
+        renderAssign();
     } else if (!state.activeUid && state.students.length) {
         selectStudent(visibleStudents()[0] ? visibleStudents()[0].uid : state.students[0].uid);
     }
@@ -1091,14 +1886,113 @@ function selectStudent(uid) {
 
 function switchViewTabsOnly(view) {
     state.view = view;
-    document.getElementById('tab-overview').classList.toggle('active', view === 'overview');
-    document.getElementById('tab-detail').classList.toggle('active', view === 'detail');
-    document.getElementById('overview-panel').classList.toggle('visible', view === 'overview');
-    document.getElementById('detail-panel').classList.toggle('visible', view === 'detail');
+    paintViewChrome(view);
 }
 
-document.getElementById('tab-overview').addEventListener('click', () => switchView('overview'));
-document.getElementById('tab-detail').addEventListener('click', () => switchView('detail'));
+for (const v of VIEWS) {
+    document.getElementById(`tab-${v}`).addEventListener('click', () => switchView(v));
+}
+
+/* ── Ticket 4: the Task Force code — copy, print, CSV ──────────────────────── */
+
+// Ported from the dashboard's window.copyClassroomCode, with the sentinel-string guard
+// dropped: that guard compared against a placeholder the dashboard's markup happened to
+// carry, and here the code comes from the classroom document or the page never loaded.
+document.getElementById('btn-copy-code').addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText(state.code);
+        toast(`Task Force code ${state.code} copied.`);
+    } catch (e) {
+        // Clipboard access is refused outright in some browsers without a user-gesture
+        // heuristic they agree with, so say the code out loud rather than failing silently.
+        console.warn('[Mission Control] clipboard write refused', e);
+        toast(`Couldn't copy automatically — your code is ${state.code}.`, true);
+    }
+});
+
+// The print sheet is already populated (see load()); printing is just the browser's own
+// dialog against the @media print rules, which hide the app and emit one wall-sized page.
+document.getElementById('btn-print-code').addEventListener('click', () => window.print());
+
+/* Ported from the dashboard's window.exportRosterCSV, producing the same columns it does
+   today — name, email, last active, then one column per assigned module — so a teacher's
+   existing spreadsheet keeps working.
+   
+   Two differences, both forced by where the data comes from here. The dashboard read
+   pre-formatted strings off its own roster rows; Mission Control holds the derived student
+   objects, so the status per module is reconstructed from the same (completed / maxStep)
+   pair the roster pills use, and lastActive is a timestamp formatted on the way out. And
+   every field is quote-escaped: a displayName is free text a student chose, and a quote or
+   comma in one would otherwise shift every column after it. */
+function rosterCsv() {
+    const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const statusOf = (m) => {
+        if (!m) return 'not_started';
+        if (m.completed) return 'completed';
+        return m.maxStep > 0 ? `in_progress_step_${m.maxStep}_of_${m.meta.stepsTotal}` : 'not_started';
+    };
+    const header = ['Name', 'Email', 'Last Active']
+        .concat(state.assigned.map((id) => (MODULE_DATA[id] ? MODULE_DATA[id].name : id)))
+        .map(q).join(',');
+    const rows = state.students.map((s) => [
+        q(s.name),
+        q((s.raw && s.raw.row && s.raw.row.email) || ''),
+        q(s.lastActive ? new Date(s.lastActive).toISOString() : 'never'),
+    ].concat(state.assigned.map((id) => q(statusOf(s.modules[id])))).join(','));
+    return [header, ...rows].join('\n') + '\n';
+}
+
+document.getElementById('btn-export-csv').addEventListener('click', () => {
+    if (!state.students.length) { toast('No agents have joined yet, so there is nothing to export.', true); return; }
+    const blob = new Blob([rosterCsv()], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `task-force-${state.code}-roster.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(`Exported ${state.students.length} agent${state.students.length === 1 ? '' : 's'}.`);
+});
+
+/* ── Ticket 5: the triage list's actions ──────────────────────────────────── */
+document.getElementById('attn-list').addEventListener('click', (e) => {
+    const open = e.target.closest('[data-attn-uid]');
+    if (open) { selectStudent(open.dataset.attnUid); return; }
+    if (e.target.closest('[data-attn-assign]')) switchView('assign');
+});
+
+/* ── Tickets 2 and 3: the Assign page ─────────────────────────────────────── */
+// Delegated, and keyed on the row's own kind, so a game and a module land in the right set
+// without this listener knowing which ids are which.
+document.getElementById('assign-panel').addEventListener('change', (e) => {
+    const cb = e.target.closest('[data-assign-id]');
+    if (!cb) return;
+    const set = cb.dataset.assignKind === 'game' ? state.draft.games : state.draft.modules;
+    if (cb.checked) set.add(cb.dataset.assignId); else set.delete(cb.dataset.assignId);
+    // Only the counts are repainted, never the whole grid: re-rendering on every tick would
+    // throw away scroll position and the checkbox focus mid-selection.
+    refreshPackCounts();
+    renderAssignCount();
+});
+
+function refreshPackCounts() {
+    for (const pack of document.querySelectorAll('#assign-panel .pack')) {
+        const boxes = [...pack.querySelectorAll('[data-assign-id]')];
+        if (!boxes.length) continue;
+        const on = boxes.filter((b) => b.checked).length;
+        const label = pack.querySelector('.pack-count');
+        if (label) label.textContent = `${on} of ${boxes.length}`;
+    }
+}
+
+document.getElementById('btn-save-assign').addEventListener('click', saveAssignments);
+document.getElementById('btn-cancel-assign').addEventListener('click', () => {
+    resetDraft();
+    renderAssign();
+    switchView('overview');
+});
 
 document.getElementById('roster').addEventListener('click', (e) => {
     const btn = e.target.closest('.roster-item');

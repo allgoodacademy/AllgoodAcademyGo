@@ -472,6 +472,11 @@
         window.applyRoleUI = (role) => {
             const label = document.getElementById('menu-classroom-label');
             if (label) label.textContent = role === 'teacher' ? 'Mission Control' : 'Set Up Mission Control';
+            // The visible banner on the dashboard itself, not just the menu label — see the
+            // markup for why a teacher needs to be able to find Mission Control without
+            // having been told where it is.
+            const banner = document.getElementById('teacher-banner');
+            if (banner) banner.style.display = role === 'teacher' ? '' : 'none';
         };
 
         // Smart entry point: teachers land in their existing classroom, everyone else is
@@ -590,14 +595,6 @@
             } catch (e) {
                 console.error("Failed to create classroom:", e);
                 showStatusMessage("Couldn't create your Task Force — please try again.", 'error');
-            }
-        };
-
-        window.copyClassroomCode = () => {
-            const code = document.getElementById('admin-stat-code')?.textContent;
-            if (code && code !== 'allgood.ac/tf/8821') {
-                navigator.clipboard.writeText(code);
-                showStatusMessage("Task Force code copied!", 'info');
             }
         };
 
@@ -798,13 +795,6 @@
             // Hide Navbar
             document.querySelector('.navbar-content').classList.add('opacity-0');
             
-            // Hide Admin Panel if open
-            const adminPanel = document.getElementById('page-admin');
-            if(adminPanel) {
-                adminPanel.classList.remove('active');
-                adminPanel.style.display = 'none';
-            }
-            
             window.updateUI('Agent'); 
             window.updateBadges(); 
 
@@ -852,12 +842,11 @@
                 menu.classList.remove('visible-modal');
             }
 
-            // Full-page swap, same mechanism as #page-admin (see applyIdentityToUI /
-            // closeTeacherDashboard) — not a modal overlay anymore, so the Profile can hold
-            // real content (tabs, accordions) without fighting a fixed-height dialog.
+            // Full-page swap rather than a modal overlay, so the Profile can hold real
+            // content (tabs, accordions) without fighting a fixed-height dialog. Profile is
+            // the only page this dashboard swaps to now — the teacher page it used to share
+            // the mechanism with moved to Mission Control.
             document.getElementById('page-dashboard').style.display = 'none';
-            const adminPage = document.getElementById('page-admin');
-            if (adminPage) { adminPage.style.display = 'none'; adminPage.classList.remove('active'); }
             const profilePage = document.getElementById('page-profile');
             profilePage.style.display = 'block';
             profilePage.classList.add('active');
@@ -2069,20 +2058,19 @@
             }
         }
 
-        window.closeTeacherDashboard = () => {
-            sfx.nav();
-            const adminPage = document.getElementById('page-admin');
-            adminPage.style.display = 'none';
-            adminPage.classList.remove('active');
-            
-            // Restore standard dashboard
-            document.getElementById('page-dashboard').style.display = 'block';
-        };
-
-        // --- REAL TEACHER DASHBOARD (reuses the admin page's UI, real data instead of demo rows) ---
-        let _currentRosterFull = [];
-        let _currentAssignedModuleIds = [];
-        let _studentStatusCache = {};
+        // Everything a teacher does now lives in Mission Control (public/mission-control/).
+        // What used to be here — the inline Task Force page (#page-admin), its roster
+        // renderer and status filter, the student drill-down, the assignment picker, the
+        // Task Force code copy and the roster CSV export — is gone rather than kept as a
+        // second copy. Two places to assign a module is two places for the answer to be
+        // different, and the dashboard's picker read its own MODULE_REGISTRY copy, so a new
+        // GoodBlock had to be added twice to become assignable.
+        //
+        // What deliberately STAYS in this file is the student/app shell (profile, badges,
+        // launchCourse, joinClassroom, leaveClassroom), sign-in, and the become-a-teacher
+        // flow below (beginClassroomSetup / upgradeToTeacher / confirmTeacherConsent). A
+        // user becomes a teacher from the app shell and then goes to Mission Control —
+        // that order is correct and openTeacherDashboard() is the door.
 
         // The teacher's Task Force view is Mission Control (public/mission-control/) now.
         // It re-checks role and classroom ownership against Firestore on its own and shows
@@ -2093,332 +2081,6 @@
             if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
             sfx.confirm();
             window.location.href = '/mission-control/';
-        };
-
-        // The previous inline Task Force page, still wired to #page-admin and still
-        // working. Nothing in the normal teacher flow reaches it now that the menu goes to
-        // Mission Control, but it is the roster renderer saveAssignments() re-runs after a
-        // change, and #page-admin is deliberately left in the document rather than removed.
-        window.renderTaskForcePage = async () => {
-            const menu = document.getElementById('menu-modal');
-            if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
-
-            const uid = localStorage.getItem('aa_uid');
-            if (!uid) return;
-
-            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
-            const userData = userSnap.exists() ? userSnap.data() : null;
-            const code = userData ? userData.classroomCode : null;
-
-            if (!code) {
-                showStatusMessage("No Task Force code on file for this account yet.", 'error');
-                return;
-            }
-
-            sfx.confirm();
-            document.getElementById('page-dashboard').style.display = 'none';
-            const adminPage = document.getElementById('page-admin');
-            adminPage.style.display = 'block';
-            adminPage.classList.add('active');
-
-            document.getElementById('admin-page-title').textContent = 'My Task Force';
-            document.getElementById('admin-page-subtitle').innerHTML = `Task Force Code: <span class="text-allgood-secondary font-mono">${code}</span>`;
-            document.getElementById('admin-stat1-label').textContent = 'Total Students';
-            document.getElementById('admin-stat2-label').textContent = 'Avg. Assigned Completion';
-            document.getElementById('admin-stat3-label').textContent = 'Task Force Code';
-            document.getElementById('admin-stat-code').textContent = code;
-            document.getElementById('admin-roster-title').textContent = 'Student Roster';
-
-            const rosterBody = document.getElementById('admin-roster-body');
-            rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">Loading roster...</p>';
-            lucide.createIcons();
-
-            try {
-                const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
-                const assignedModuleIds = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
-                _currentAssignedModuleIds = assignedModuleIds;
-
-                const assignedLabel = document.getElementById('admin-assigned-summary');
-                if (assignedLabel) {
-                    assignedLabel.textContent = assignedModuleIds.length
-                        ? `${assignedModuleIds.length} module${assignedModuleIds.length === 1 ? '' : 's'} assigned: ${assignedModuleIds.map(id => getModuleById(id)?.name || id).join(', ')}`
-                        : 'No modules assigned yet.';
-                }
-
-                if (assignedModuleIds.length === 0) {
-                    rosterBody.innerHTML = '<div class="p-6 text-center"><p class="text-xs text-gray-400 italic mb-3">No modules assigned yet — students won\'t have anything to work toward until you assign at least one.</p><button onclick="window.openAssignmentPicker()" class="bg-allgood-primary text-white text-[10px] font-bold uppercase px-4 py-2 rounded-full">Assign Modules</button></div>';
-                    document.getElementById('admin-stat-total').textContent = '—';
-                    document.getElementById('admin-stat-completion').textContent = '—';
-                    _currentRosterFull = [];
-                    lucide.createIcons();
-                    return;
-                }
-
-                const studentsQuery = query(collection(db, 'artifacts', appId, 'users'), where('classroomCode', '==', code), where('role', '==', 'student'));
-                const studentsSnap = await getDocs(studentsQuery);
-
-                document.getElementById('admin-stat-total').textContent = studentsSnap.size;
-
-                if (studentsSnap.empty) {
-                    rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">No students have joined this classroom yet. Share your code to get started.</p>';
-                    document.getElementById('admin-stat-completion').textContent = '—';
-                    _currentRosterFull = [];
-                    lucide.createIcons();
-                    return;
-                }
-
-                const rosterFull = [];
-                let totalCompletionPairs = 0;
-                let completedPairs = 0;
-
-                for (const sDoc of studentsSnap.docs) {
-                    const sData = sDoc.data();
-                    let scoreDocs = [];
-                    try {
-                        const scoresSnap = await getDocs(collection(db, 'artifacts', appId, 'users', sDoc.id, 'game_scores'));
-                        scoreDocs = scoresSnap.docs.map(d => d.data());
-                    } catch (e) {
-                        console.error("Couldn't read a student's scores (permissions?) — showing their assigned modules as Not Started.", e);
-                    }
-
-                    // The GoodBlock labs only write to game_scores on completion (see
-                    // logModuleCompletion) — a student mid-lab has no game_scores doc at
-                    // all yet. Their in-progress signal is module_progress, written by
-                    // advanceFromPage() every time they clear a Case, starting at Case 2.
-                    // Without reading this, "in_progress" can never fire for a lab.
-                    let startedModuleIds = new Set();
-                    try {
-                        const progressSnap = await getDocs(collection(db, 'artifacts', appId, 'users', sDoc.id, 'module_progress'));
-                        startedModuleIds = new Set(progressSnap.docs.map(d => d.id));
-                    } catch (e) {
-                        console.error("Couldn't read a student's module_progress (permissions?) — in-progress labs may show as Not Started.", e);
-                    }
-
-                    const moduleStatuses = {};
-                    assignedModuleIds.forEach(moduleId => {
-                        const result = computeModuleStatus(moduleId, scoreDocs, startedModuleIds);
-                        moduleStatuses[moduleId] = result;
-                        totalCompletionPairs++;
-                        if (result.status === 'completed') completedPairs++;
-                    });
-
-                    const lastActive = sData.lastLogin && sData.lastLogin.toDate ? sData.lastLogin.toDate().toLocaleDateString() : '—';
-
-                    // DDC attempt history: every retake writes its own game_scores doc (see
-                    // performHardReset() in the Challenge itself), so this is just every
-                    // scored doc for that game, newest first — what a teacher needs to see
-                    // that a student isn't stuck at one attempt.
-                    const ddcAttempts = scoreDocs
-                        .filter(d => d.gameName === 'Digital Decisions Challenge' && typeof d.finalScore === 'number')
-                        .map(d => ({
-                            finalScore: d.finalScore,
-                            completed: d.completed === true,
-                            when: d.lastUpdated && d.lastUpdated.toDate ? d.lastUpdated.toDate() : null,
-                        }))
-                        .sort((a, b) => (b.when?.getTime() || 0) - (a.when?.getTime() || 0));
-
-                    rosterFull.push({
-                        uid: sDoc.id,
-                        name: sData.displayName || 'Student',
-                        email: sData.email || '',
-                        lastActive,
-                        moduleStatuses,
-                        ddcAttempts
-                    });
-                }
-
-                document.getElementById('admin-stat-completion').textContent = totalCompletionPairs
-                    ? Math.round((completedPairs / totalCompletionPairs) * 100) + '%'
-                    : '—';
-
-                _currentRosterFull = rosterFull;
-                _studentStatusCache = {};
-                rosterFull.forEach(r => { _studentStatusCache[r.uid] = r; });
-
-                window.renderRosterRows('all');
-            } catch (e) {
-                console.error("Roster fetch failed — check that firestore.rules has been deployed with the teacher-classroom rules.", e);
-                rosterBody.innerHTML = '<p class="text-xs text-red-400 italic p-4">Couldn\'t load roster — this usually means the security rules update hasn\'t been deployed yet.</p>';
-                // A failed fetch must never leave a fabricated or stale number on the stat
-                // tiles — show empty state, not a confident-looking placeholder.
-                document.getElementById('admin-stat-total').textContent = '—';
-                document.getElementById('admin-stat-completion').textContent = '—';
-            }
-        };
-
-        // Renders roster rows from the already-fetched _currentRosterFull cache — no refetching,
-        // so the status filter dropdown can re-render instantly.
-        window.renderRosterRows = (filter) => {
-            const rosterBody = document.getElementById('admin-roster-body');
-            const assignedCount = _currentAssignedModuleIds.length;
-
-            const filtered = _currentRosterFull.filter(r => {
-                if (filter === 'all') return true;
-                const statuses = Object.values(r.moduleStatuses).map(m => m.status);
-                if (filter === 'completed_all') return statuses.length > 0 && statuses.every(s => s === 'completed');
-                if (filter === 'in_progress') return statuses.some(s => s === 'in_progress' || s === 'completed') && !statuses.every(s => s === 'completed');
-                if (filter === 'not_started') return statuses.every(s => s === 'not_started');
-                return true;
-            });
-
-            if (filtered.length === 0) {
-                rosterBody.innerHTML = '<p class="text-xs text-gray-400 italic p-4">No students match this filter.</p>';
-                return;
-            }
-
-            rosterBody.innerHTML = '';
-            filtered.forEach(r => {
-                const completedCount = Object.values(r.moduleStatuses).filter(m => m.status === 'completed').length;
-                const hasAnyBadge = Object.values(r.moduleStatuses).some(m => m.status === 'completed');
-                const initials = (r.name || 'St').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-                const progressLabel = `${completedCount}/${assignedCount} Complete`;
-                const progressClass = completedCount === assignedCount ? 'bg-emerald-100 text-emerald-700' : (completedCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500');
-
-                const row = document.createElement('div');
-                row.className = 'grid grid-cols-12 gap-4 px-4 py-3 items-center rounded-lg hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100 cursor-pointer';
-                row.onclick = () => window.openStudentProfile(r.uid);
-                row.innerHTML = `
-                    <div class="col-span-4 flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">${initials}</div>
-                        <div class="min-w-0">
-                            <p class="text-xs font-bold text-slate-700 truncate">${r.name}</p>
-                            <p class="text-[10px] text-slate-400 truncate">${r.email}</p>
-                        </div>
-                    </div>
-                    <div class="col-span-2"><span class="${progressClass} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${progressLabel}</span></div>
-                    <div class="col-span-2 flex justify-center">${hasAnyBadge ? '<i data-lucide="shield" class="w-4 h-4 text-allgood-primary"></i>' : '<span class="text-[9px] text-slate-300">—</span>'}</div>
-                    <div class="col-span-2 text-center text-[10px] text-slate-500 font-mono">${r.lastActive}</div>
-                    <div class="col-span-2 flex justify-end"><span class="text-slate-400 text-[9px] font-bold uppercase hover:text-allgood-secondary">View Profile</span></div>
-                `;
-                rosterBody.appendChild(row);
-            });
-            lucide.createIcons();
-        };
-
-        // --- STUDENT PROFILE DRILL-DOWN ---
-        window.openStudentProfile = (studentUid) => {
-            const student = _studentStatusCache[studentUid];
-            if (!student) return;
-
-            document.getElementById('profile-student-name').textContent = student.name;
-            document.getElementById('profile-student-email').textContent = student.email;
-
-            const list = document.getElementById('profile-module-list');
-            const entries = Object.entries(student.moduleStatuses);
-            if (entries.length === 0) {
-                list.innerHTML = '<p class="text-xs text-gray-400 italic">No modules assigned.</p>';
-            } else {
-                list.innerHTML = entries.map(([moduleId, result]) => {
-                    const mod = getModuleById(moduleId);
-                    const { status, badgeSvg } = result;
-                    const statusClass = status === 'completed' ? 'bg-emerald-100 text-emerald-700' : status === 'in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500';
-                    const statusLabel = status === 'completed' ? 'Completed' : status === 'in_progress' ? 'In Progress' : 'Not Started';
-                    // Real earned badge: render the module's own certificate SVG when available,
-                    // rather than a generic icon standing in for it.
-                    const badgeHtml = badgeSvg
-                        ? `<div class="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white p-1"><div class="w-full aspect-[3/2] overflow-hidden">${badgeSvg}</div></div>`
-                        : '';
-
-                    // DDC attempt history: every retake is its own scored doc, so a teacher
-                    // can see the full retake trail, not just the single latest number.
-                    let attemptsHtml = '';
-                    if (moduleId === 'ddc' && student.ddcAttempts && student.ddcAttempts.length > 0) {
-                        const highest = Math.max(...student.ddcAttempts.filter(a => a.completed).map(a => a.finalScore), -1);
-                        attemptsHtml = `<div class="mt-2 border border-slate-200 rounded-lg bg-white divide-y divide-slate-100">
-                            ${student.ddcAttempts.map(a => {
-                                const dateLabel = a.when ? a.when.toLocaleDateString() + ' ' + a.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-                                const isHighest = a.completed && a.finalScore === highest;
-                                return `<div class="flex items-center justify-between px-2 py-1.5 text-[10px]">
-                                    <span class="text-slate-400 font-mono">${dateLabel}</span>
-                                    <span class="flex items-center gap-1">
-                                        ${!a.completed ? '<span class="text-slate-400 italic">In progress</span>' : `<span class="font-bold ${isHighest ? 'text-emerald-600' : 'text-slate-600'}">${a.finalScore}/90${isHighest ? ' (highest)' : ''}</span>`}
-                                    </span>
-                                </div>`;
-                            }).join('')}
-                        </div>`;
-                    }
-
-                    return `<div class="p-3 bg-slate-50 rounded-lg mb-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-700">${mod ? mod.name : moduleId}</span>
-                            <span class="${statusClass} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${statusLabel}</span>
-                        </div>
-                        ${badgeHtml}
-                        ${attemptsHtml}
-                    </div>`;
-                }).join('');
-            }
-
-            document.getElementById('student-profile-modal').classList.remove('hidden-modal');
-            document.getElementById('student-profile-modal').classList.add('visible-modal');
-            lucide.createIcons();
-        };
-
-        window.closeStudentProfile = () => {
-            document.getElementById('student-profile-modal').classList.add('hidden-modal');
-            document.getElementById('student-profile-modal').classList.remove('visible-modal');
-        };
-
-        // --- ASSIGNMENT MANAGEMENT ---
-        window.openAssignmentPicker = async () => {
-            const uid = localStorage.getItem('aa_uid');
-            if (!uid) return;
-            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
-            const code = userSnap.exists() ? userSnap.data().classroomCode : null;
-            if (!code) return;
-
-            const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
-            const assigned = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
-
-            const list = document.getElementById('assignment-picker-list');
-            list.innerHTML = MODULE_REGISTRY.map(m => `
-                <label class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-100">
-                    <input type="checkbox" value="${m.id}" ${assigned.includes(m.id) ? 'checked' : ''} class="assignment-checkbox w-4 h-4 accent-allgood-primary">
-                    <span class="text-xs font-bold text-slate-700">${m.name}</span>
-                    <span class="text-[9px] uppercase text-slate-400 ml-auto">${m.category}</span>
-                </label>
-            `).join('');
-
-            document.getElementById('assignment-picker-modal').classList.remove('hidden-modal');
-            document.getElementById('assignment-picker-modal').classList.add('visible-modal');
-        };
-
-        window.closeAssignmentPicker = () => {
-            document.getElementById('assignment-picker-modal').classList.add('hidden-modal');
-            document.getElementById('assignment-picker-modal').classList.remove('visible-modal');
-        };
-
-        window.saveAssignments = async () => {
-            const uid = localStorage.getItem('aa_uid');
-            if (!uid) return;
-            const userSnap = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
-            const code = userSnap.exists() ? userSnap.data().classroomCode : null;
-            if (!code) return;
-
-            const checked = Array.from(document.querySelectorAll('.assignment-checkbox:checked')).map(cb => cb.value);
-            await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), { assignedModules: checked }, { merge: true });
-            showStatusMessage("Assignments updated.", 'info');
-            window.closeAssignmentPicker();
-            window.renderTaskForcePage(); // refresh roster against the new assignment set
-        };
-
-        window.exportRosterCSV = () => {
-            if (!_currentRosterFull.length) { showStatusMessage("No roster data to export yet.", 'info'); return; }
-            const moduleIds = _currentAssignedModuleIds;
-            let csv = 'Name,Email,Last Active,' + moduleIds.map(id => `"${(getModuleById(id)?.name || id)}"`).join(',') + '\n';
-            _currentRosterFull.forEach(r => {
-                const statusCols = moduleIds.map(id => `"${(r.moduleStatuses[id] && r.moduleStatuses[id].status) || 'not_started'}"`).join(',');
-                csv += `"${r.name}","${r.email}","${r.lastActive}",${statusCols}\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'classroom-roster.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         };
 
         const startupScreen = document.getElementById('startup-screen');
@@ -2974,30 +2636,6 @@
                     </div>
                 </div>
 
-                <!-- ASSIGNMENT PICKER MODAL: teacher chooses which modules apply to their classroom -->
-                <div id="assignment-picker-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeAssignmentPicker()">
-                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
-                        <button onclick="window.closeAssignmentPicker()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
-                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Manage Assignments</h3>
-                        <p class="text-xs text-gray-500 mb-4">Choose which modules apply to your classroom. Students will see these as their assigned work.</p>
-                        <div id="assignment-picker-list" class="max-h-72 overflow-y-auto space-y-1 mb-4 border border-slate-100 rounded-lg p-2"></div>
-                        <button onclick="window.saveAssignments()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide">Save Assignments</button>
-                    </div>
-                </div>
-
-                <!-- STUDENT PROFILE MODAL: per-module status breakdown for one student -->
-                <div id="student-profile-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeStudentProfile()">
-                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">
-                        <button onclick="window.closeStudentProfile()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
-                        <div class="mb-4">
-                            <h3 id="profile-student-name" class="text-lg font-heading font-bold text-allgood-dark">Student</h3>
-                            <p id="profile-student-email" class="text-xs text-gray-400"></p>
-                        </div>
-                        <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-2">Assigned Modules</p>
-                        <div id="profile-module-list" class="max-h-72 overflow-y-auto"></div>
-                    </div>
-                </div>
-
                 <!-- 3. TOP NAVBAR (GLASS) -->
                 <header class="navbar-content flex items-center justify-between px-6 shadow-md relative z-30 opacity-0">
                     <div class="flex items-center overflow-hidden">
@@ -3074,7 +2712,23 @@
 
                 <!-- 4. DASHBOARD CONTENT -->
                 <div class="page" id="page-dashboard">
-                    
+
+                    <!-- TEACHER ENTRY POINT. Hidden for everyone else (see applyRoleUI).
+                         The System Menu's "Mission Control" item is the other way in, but a
+                         teacher who signs in lands here, and a menu behind a hamburger is not
+                         somewhere you find a page you didn't already know about. Every teacher
+                         function used to live on this page; this is what replaced them, so it
+                         sits where they were rather than only in a menu. -->
+                    <div id="teacher-banner" style="display:none;" class="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-allgood-dark/90 text-white p-4 rounded-lg shadow-sm mb-6">
+                        <div class="flex-1">
+                            <div class="font-heading font-bold uppercase text-sm">You're a Task Force Leader</div>
+                            <p class="text-xs text-white/70 mt-1">Your roster, your Task Force code, and what to assign all live in Mission Control. This dashboard is your own learner view.</p>
+                        </div>
+                        <button onclick="window.openTeacherDashboard()" class="shrink-0 bg-allgood-primary hover:bg-allgood-hover text-white font-bold text-xs uppercase tracking-wide px-4 py-2.5 rounded shadow-md flex items-center gap-2">
+                            <i data-lucide="radio" class="w-4 h-4"></i>Open Mission Control
+                        </button>
+                    </div>
+
                     <!-- Status Bar (Refactored for Mobile Stacking) -->
                     <div class="flex flex-col md:flex-row items-center justify-between bg-white/60 backdrop-blur-md p-4 rounded-lg shadow-sm border border-white/50 mb-6 text-allgood-dark text-center md:text-left">
                         <div class="mb-4 md:mb-0 w-full md:w-auto">
@@ -3405,102 +3059,11 @@
 
                 </div> <!-- End Dashboard Page -->
 
-                <!-- 5. MY CLASSROOM (TEACHER VIEW) -->
-                <div class="page" id="page-admin" style="display:none;">
-
-                    <!-- ADMIN TOP BAR -->
-                    <div class="flex items-center justify-between mb-8">
-                        <div>
-                            <div class="flex items-center gap-3">
-                                <h1 id="admin-page-title" class="text-2xl font-heading font-bold text-allgood-dark uppercase">My Task Force</h1>
-                                <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide border border-emerald-200">Active</span>
-                            </div>
-                            <p id="admin-page-subtitle" class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Loading Task Force...</p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                             <button onclick="window.closeTeacherDashboard()" class="text-slate-500 hover:text-allgood-primary px-4 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2">
-                                <i data-lucide="log-out" class="w-4 h-4"></i> Return to OS
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- STATS ROW -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                        <!-- Stat 1 -->
-                        <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
-                            <div>
-                                <span id="admin-stat1-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Total Agents</span>
-                                <span id="admin-stat-total" class="block text-3xl font-heading font-bold text-slate-700">—</span>
-                            </div>
-                            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                                <i data-lucide="users" class="w-5 h-5"></i>
-                            </div>
-                        </div>
-                        <!-- Stat 2 -->
-                        <div class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all">
-                            <div>
-                                <span id="admin-stat2-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Completion Rate</span>
-                                <span id="admin-stat-completion" class="block text-3xl font-heading font-bold text-emerald-600">—</span>
-                            </div>
-                            <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-                            </div>
-                        </div>
-                        <!-- Stat 3 -->
-                        <div id="admin-stat3-card" onclick="window.copyClassroomCode()" class="bg-white/60 backdrop-blur-md p-4 rounded-xl border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white/80 transition-all cursor-pointer">
-                            <div>
-                                <span id="admin-stat3-label" class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Invite Link</span>
-                                <span id="admin-stat-code" class="block text-sm font-bold text-allgood-secondary mt-1 underline decoration-dotted">—</span>
-                            </div>
-                            <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-allgood-primary">
-                                <i data-lucide="copy" class="w-5 h-5"></i>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ASSIGNED MODULES SUMMARY -->
-                    <div class="flex items-center justify-between mb-4 px-1">
-                        <p id="admin-assigned-summary" class="text-xs text-slate-500 font-bold">No modules assigned yet.</p>
-                        <button onclick="window.openAssignmentPicker()" class="px-3 py-1.5 rounded bg-allgood-secondary text-white text-[10px] font-bold uppercase hover:bg-allgood-accent transition-colors shadow-sm flex items-center gap-1">
-                            <i data-lucide="clipboard-list" class="w-3 h-3"></i> Manage Assignments
-                        </button>
-                    </div>
-
-                    <!-- ROSTER TABLE (GLASS) -->
-                    <div class="bg-white/80 backdrop-blur-md rounded-xl shadow-sm border border-white/60 overflow-hidden flex flex-col h-[60vh]">
-                        <!-- Toolbar -->
-                        <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-white/50">
-                            <h3 class="font-bold text-slate-700 uppercase text-sm tracking-wide flex items-center gap-2">
-                                <i data-lucide="list" class="w-4 h-4 text-slate-400"></i> <span id="admin-roster-title">Agent Roster</span>
-                            </h3>
-                            <div class="flex gap-2 items-center">
-                                <select id="roster-filter-select" onchange="window.renderRosterRows(this.value)" class="px-2 py-1.5 rounded bg-white border border-gray-200 text-[10px] font-bold uppercase text-slate-500" style="font-size:16px;">
-                                    <option value="all">All Students</option>
-                                    <option value="completed_all">All Assigned Complete</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="not_started">Not Started</option>
-                                </select>
-                                <button id="admin-export-btn" onclick="window.exportRosterCSV()" class="px-3 py-1.5 rounded bg-white border border-gray-200 text-[10px] font-bold uppercase text-slate-500 hover:text-allgood-secondary hover:border-allgood-secondary transition-colors">
-                                    Export CSV
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Table Headers -->
-                        <div class="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/50 border-b border-gray-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            <div class="col-span-4">Student Name</div>
-                            <div class="col-span-2">Assigned Progress</div>
-                            <div class="col-span-2 text-center">Badges</div>
-                            <div class="col-span-2 text-center">Last Active</div>
-                            <div class="col-span-2 text-right">Actions</div>
-                        </div>
-
-                        <!-- Table Body (Scrollable) -->
-                        <div id="admin-roster-body" class="overflow-y-auto custom-scrollbar flex-grow p-2 space-y-1">
-                        </div>
-                    </div>
-
-                </div>
+                <!-- The inline Task Force page (#page-admin) that used to sit here is gone.
+                     Mission Control (/mission-control/) is the teacher home now, and
+                     openTeacherDashboard() sends a teacher there — from the menu, and
+                     automatically on sign-in for an account whose role is already teacher.
+                     Nothing student-facing referenced this page. -->
 
             <!-- 6. PROFILE PAGE (Dossier + Identity Editor + My Progress / Assigned to Me / Service Record) -->
             <div class="page" id="page-profile" style="display:none;">
@@ -3766,9 +3329,10 @@
             // Home returns you one level toward the dashboard, and only exits to the
             // public site once you're already there — it just didn't account for the
             // dashboard itself gaining a second screen (Profile) when that shipped.
-            // On page-admin or page-profile, Home steps back to page-dashboard, same
-            // as their own "Back"/"Return to OS" controls. Only once page-dashboard is
-            // the one actually showing does Home mean allgoodacademy.com.
+            // On page-profile, Home steps back to page-dashboard, same as that page's own
+            // "Back" control. Only once page-dashboard is the one actually showing does Home
+            // mean allgoodacademy.com. (The teacher page was the other such screen; it lives
+            // in Mission Control now, which is a separate document with its own EXIT.)
             //
             // ?home=1 is required, not decoration. public/index.html sends an account
             // holder (ag_account + ag_signed_in) straight back to /dashboard/, so a bare
@@ -3780,11 +3344,8 @@
             if(homeBtn) {
                 homeBtn.addEventListener('click', () => {
                     sfx.tick();
-                    const adminPage = document.getElementById('page-admin');
                     const profilePage = document.getElementById('page-profile');
-                    if (adminPage && adminPage.classList.contains('active')) {
-                        window.closeTeacherDashboard();
-                    } else if (profilePage && profilePage.classList.contains('active')) {
+                    if (profilePage && profilePage.classList.contains('active')) {
                         window.closeProfileModal();
                     } else {
                         window.location.href = '/?home=1';

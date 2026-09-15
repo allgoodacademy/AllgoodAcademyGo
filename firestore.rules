@@ -185,18 +185,62 @@ service cloud.firestore {
     //    This does NOT expose a member's subcollections (launches/scores) — only the fields
     //    on their main user doc (name, email, classroomCode, role) that the roster view needs.
     //
-    //    No role check: membership is proven by the classroom_members join table, so a Task
-    //    Force Leader who has also joined another teacher's classroom is visible in that
-    //    roster the same as anyone else — being a teacher of your own classroom elsewhere
-    //    doesn't exempt you from being a member here.
+    //    No role check on the GET path: membership is proven by the classroom_members join
+    //    table, so a Task Force Leader who has also joined another teacher's classroom is
+    //    visible in that roster the same as anyone else — being a teacher of your own
+    //    classroom elsewhere doesn't exempt you from being a member here.
+    //
+    //    GET and LIST are two separate grants below, and that split is forced by Firestore,
+    //    not a preference. `list` and `get` were originally one grant sharing one condition;
+    //    that condition takes `userId`, and on a LIST the rule is matched against the
+    //    COLLECTION path, so the trailing `{userId}` wildcard is unbound — null. Every
+    //    branch then raised a null-value error before any of them could return a verdict
+    //    (`userId is string` errors on null too, so guarding it doesn't help), so the whole
+    //    grant errored, `list` was denied for everyone, and Mission Control — which loads by
+    //    listing the roster — failed with a full-page permission error for every teacher,
+    //    including one with an empty brand-new classroom. Per-document `get` was unaffected,
+    //    which is why the original test suite passed: it only ever tested `get`.
     match /artifacts/{appId}/users/{userId} {
       //    Authorization comes from the CLASSROOM document (via myClassroomCode + the
       //    classroom_members join table, OR the legacy single-field fallback), not from
       //    role/classroomCode asserted some other way on the requester's own profile — those
       //    are self-written and were trivially forgeable (see rule #2).
-      allow list, get: if request.auth != null
+      allow get: if request.auth != null
         && (isMemberOfClassroom(appId, userId, myClassroomCode(appId, request.auth.uid))
             || isLegacySingleClassroomStudent(appId, userId, request.auth.uid));
+
+      //    The LIST grant is written against `resource`, never `userId`. `resource.data` IS
+      //    populated on a list (it is evaluated per document the query returns — that is the
+      //    whole reason "rules are not filters": the query fails unless EVERY returned
+      //    document passes), so the target profile's own role and classroomCode are readable
+      //    here, and reading them needs no document access call at all.
+      //
+      //    The security pivot is unchanged: `classroomOwnedBy` proves, from the CLASSROOM
+      //    document, that the requester is that classroom's teacher. The role/classroomCode
+      //    read here are on the TARGET student's profile, which is exactly what the legacy
+      //    fallback already did via get() on the get path — not on the requester's own
+      //    profile, which is the self-assertable document the #2 hardening was about. A
+      //    student writing someone else's classroomCode onto their own profile only puts
+      //    THEMSELVES on that roster (which is what joining by code does anyway, see
+      //    classroomCodeOk) and buys them no read access to anyone.
+      //
+      //    Consequences worth knowing before editing this:
+      //      - A query must filter on BOTH role == 'student' AND the classroom code, or it
+      //        returns a document this rule denies and the whole query fails. Mission
+      //        Control's roster query does exactly that.
+      //      - Document access stays O(1), not O(students): every document the query returns
+      //        resolves classroomOwnedBy against the SAME classroom path, and rules cache
+      //        document lookups per path within a request. A rule that did a get() per
+      //        returned document instead would blow Firestore's access budget as soon as a
+      //        classroom grew past a handful of students — the hazard rule #10b documents.
+      //      - This path reaches legacy members only (a mirrored classroomCode on the
+      //        profile). A join-table-only member, and anyone whose own classroomCode points
+      //        at a DIFFERENT classroom they also joined, is discovered from
+      //        classroom_members (#6b) and read with a per-document get above — the wildcard
+      //        is bound there, so the join-table branch still authorizes them.
+      allow list: if request.auth != null
+        && resource.data.get('role', NONE()) == 'student'
+        && classroomOwnedBy(appId, resource.data.get('classroomCode', NONE()), request.auth.uid);
     }
 
     // 5. NEW — Classrooms: holds each teacher's join code.
