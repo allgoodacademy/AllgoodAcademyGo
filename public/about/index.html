@@ -43,8 +43,13 @@ h1,h2,h3{font-family:Georgia,'Times New Roman',serif;font-weight:700;margin:0;li
 .nav-link{font-family:Verdana,Geneva,sans-serif;font-size:13px;color:var(--ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;white-space:nowrap}
 .nav-link:hover{background:var(--teal-wash);color:var(--teal-deep)}
 .nav-link.here{background:var(--teal-wash);color:var(--teal-deep);font-weight:700}
-.nav-signin{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:none;border:1.5px solid var(--hairline);color:var(--ink);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;white-space:nowrap}
-.nav-signin:hover{border-color:var(--teal);color:var(--teal-deep)}
+/* The one button in the nav. It points at a real lesson, because the product needs no
+   account to start — the hero's "I'm a student" CTA and this go to the same GoodBlock. */
+.nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--orange);border:1.5px solid var(--orange);color:#fff;padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;white-space:nowrap;text-decoration:none;display:inline-block}
+.nav-cta:hover{background:var(--orange-deep);border-color:var(--orange-deep);color:#fff}
+/* Sign in is a plain text link now — available, not advertised. The class stays as the hook
+   the session-aware relabel and the click handler below query; it carries no button styling. */
+.nav-signin{font-weight:700;color:var(--ink)}
 
 .btn{font-family:Verdana,Geneva,sans-serif;font-size:15px;font-weight:700;padding:18px 34px;border-radius:999px;border:2px solid transparent;text-decoration:none;cursor:pointer;display:inline-block;letter-spacing:-.01em}
 .btn-primary{background:var(--orange);color:#fff;box-shadow:0 4px 0 var(--orange-deep)}
@@ -152,15 +157,22 @@ footer{background:var(--surface);padding:0 0 44px}
   .mission{border-radius:32px 32px 0 0}
   .closing{padding:54px 0 64px}
   .closing-card{padding:40px 30px}
-  .nav-link:not(.here){display:none}
+  .nav-link:not(.here):not(.nav-signin){display:none}
   .ccard{padding:28px 24px 26px}
   .foot{grid-template-columns:1fr;gap:28px}
 }
-/* The current-page nav link stays visible on tablet, but at phone width
-   "For teachers" plus the Sign in pill overflows the viewport (measured: 32px of
-   horizontal scroll at 390px). Drop it here too - the wordmark and Sign in are
-   what a phone needs from this bar. CSS only; no copy changed. */
-@media(max-width:440px){.nav-link{display:none}}
+/* The current-page nav link stays visible on tablet, but at phone width it plus the
+   "Try a lesson" pill overflows the viewport (measured: 32px of horizontal scroll at
+   390px, back when the pill said "Sign in"). Drop it here too - the wordmark, Sign in
+   and the lesson pill are what a phone needs from this bar. CSS only; no copy changed. */
+@media(max-width:440px){
+  .nav-link:not(.nav-signin){display:none}
+  /* The bar now carries two controls, not one. Tighten the pill and its gutters so
+     "Sign in" + "Try a lesson" fit a 390px viewport with no horizontal scroll. */
+  .nav{padding:9px 9px 9px 16px;gap:6px}
+  .nav-signin{padding:10px 9px}
+  .nav-cta{padding:10px 15px;margin-left:0}
+}
 </style>
 </head>
 <body>
@@ -173,7 +185,8 @@ footer{background:var(--surface);padding:0 0 44px}
         <a class="nav-link" href="/for-teachers/">For teachers</a>
         <a class="nav-link here" href="/about/">About</a>
         <a class="nav-link" href="#contact">Contact</a>
-        <button class="nav-signin">Sign in</button>
+        <a class="nav-link nav-signin" href="/dashboard/?signin=1">Sign in</a>
+        <a class="nav-cta" href="/jsh/digital-decisions-lab/social-intelligence/">Try a lesson</a>
       </div>
     </nav>
   </div>
@@ -186,7 +199,7 @@ footer{background:var(--surface);padding:0 0 44px}
     if(localStorage.getItem('ag_signed_in')!=='1')return;
     var b=document.querySelector('.nav-signin');
     if(b)b.textContent='Your dashboard';
-  }catch(e){/* storage blocked - button stays "Sign in", which is the safe default */}
+  }catch(e){/* storage blocked - link stays "Sign in", which is the safe default */}
 })();
 </script>
 
@@ -378,10 +391,15 @@ footer{background:var(--surface);padding:0 0 44px}
 (function(){
   var btn=document.querySelector('.nav-signin');
   if(!btn)return;
-  btn.addEventListener('click',function(){
+  btn.addEventListener('click',function(e){
+    /* Same flag the relabel above reads, so the label and the destination can never
+       disagree. A visitor with a session goes straight in; everyone else follows the
+       href to the identity gate, which lives on the dashboard with the styles it was
+       built against, and which returns them here if they dismiss it. The href means
+       that fallback survives even with JS off — it is no longer a button that needs us. */
     var signedIn=false;
     try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    location.href = signedIn ? '/dashboard/' : '/dashboard/?signin=1';
+    if(signedIn){e.preventDefault();location.href='/dashboard/';}
   });
 })();
 </script>
