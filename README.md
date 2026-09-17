@@ -1,7 +1,9 @@
 # Allgood Academy — Go
 
 Static site for [allgoodacademy.com](https://www.allgoodacademy.com), deployed via Firebase Hosting.
-Each page is a standalone HTML file (Tailwind + vanilla JS + Firebase Auth/Firestore), no build step required.
+Each page is a standalone HTML file (Tailwind + vanilla JS + Firebase Auth/Firestore). Pages are
+served exactly as committed — the two generators in `scripts/` (`build:css`, `build:nav`) write
+their output into the repo, so there is no build step between a commit and the deploy.
 
 Mirrors the local `Allgood_OS_Host` Firebase Hosting folder, plus `insider/` (not part of the
 original local folder, added separately).
@@ -30,6 +32,28 @@ Firebase Hosting project: `allgood-academy` (see `.firebaserc`) — this is the 
 already serving `allgoodacademy.com` and `www.allgoodacademy.com`, currently updated by manual
 `firebase deploy` runs. Connecting this repo's GitHub integration to it replaces those manual
 deploys with auto-deploy on push to `main`.
+
+## The site nav
+
+The top bar on `/`, `/about/`, `/for-teachers/`, `/educational-games/`, `/privacy.html` and
+`/terms.html` is generated from one definition:
+
+```
+nav/nav.js            # the link set, the CTA, the session script, and the two skins
+scripts/build-nav.js  # writes it into each page; --check fails CI when a page drifts
+```
+
+**Edit `nav/nav.js`, then run `npm run build:nav`.** Never hand-edit the nav inside a page —
+it sits between `<!-- BEGIN GENERATED NAV -->` and `<!-- END GENERATED NAV -->`, the next build
+overwrites it, and `npm run check:nav` (wired into the Module registry check workflow) fails the
+build when the committed markup no longer matches.
+
+This exists because the six navs used to be hand-maintained copies and they drifted: a "Games"
+link added to the homepage reached none of the other five, so a visitor on `/about/` had no route
+to the games hub at all, and the legal pages had no route to a lesson or to sign in.
+
+Two skins are deliberately kept separate — the light pill bar and the games hub's dark bar. They
+share the link set and the markup shape, not the CSS; each page still owns its own styling.
 
 ## Connecting GitHub to Firebase Hosting (one-time, no terminal needed)
 

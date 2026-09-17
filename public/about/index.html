@@ -177,11 +177,16 @@ footer{background:var(--surface);padding:0 0 44px}
 </head>
 <body>
 
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
 <div class="nav-shell">
   <div class="wrap">
     <nav class="nav">
       <a class="wordmark" href="/">Allgood<em>Academy</em></a>
       <div class="nav-right">
+        <a class="nav-link" href="/educational-games/">Games</a>
         <a class="nav-link" href="/for-teachers/">For teachers</a>
         <a class="nav-link here" href="/about/">About</a>
         <a class="nav-link" href="#contact">Contact</a>
@@ -192,16 +197,20 @@ footer{background:var(--surface);padding:0 0 44px}
   </div>
 </div>
 <script>
-/* Same relabel pattern as public/index.html's .nav-signin — a visitor with an existing
-   session should never be told to sign in again. */
 (function(){
-  try{
-    if(localStorage.getItem('ag_signed_in')!=='1')return;
-    var b=document.querySelector('.nav-signin');
-    if(b)b.textContent='Your dashboard';
-  }catch(e){/* storage blocked - link stays "Sign in", which is the safe default */}
+  var a=document.querySelector('.nav-signin');
+  if(!a)return;
+  var signedIn=false;
+  try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){/* storage blocked - stays "Sign in", the safe default */}
+  if(signedIn)a.textContent='Your dashboard';
+  a.addEventListener('click',function(e){
+    var now=false;
+    try{now=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
+    if(now){e.preventDefault();location.href='/dashboard/';}
+  });
 })();
 </script>
+<!-- END GENERATED NAV -->
 
 <section class="hero">
   <div class="wrap">
@@ -382,26 +391,5 @@ footer{background:var(--surface);padding:0 0 44px}
   </div>
 </footer>
 
-<script>
-/* Sign in hands off to the real identity gate (/js/identity-gate.js), which lives on
-   the dashboard with the styles it was built against. Loading auth-core.js here
-   instead would pull Firebase from gstatic.com on first paint, and these three pages
-   ship with zero third-party requests by design. /dashboard/?signin=1 opens that gate
-   and returns here if it is dismissed. */
-(function(){
-  var btn=document.querySelector('.nav-signin');
-  if(!btn)return;
-  btn.addEventListener('click',function(e){
-    /* Same flag the relabel above reads, so the label and the destination can never
-       disagree. A visitor with a session goes straight in; everyone else follows the
-       href to the identity gate, which lives on the dashboard with the styles it was
-       built against, and which returns them here if they dismiss it. The href means
-       that fallback survives even with JS off — it is no longer a button that needs us. */
-    var signedIn=false;
-    try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    if(signedIn){e.preventDefault();location.href='/dashboard/';}
-  });
-})();
-</script>
 </body>
 </html>

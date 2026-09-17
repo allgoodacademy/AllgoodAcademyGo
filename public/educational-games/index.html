@@ -382,11 +382,17 @@ footer{
 </head>
 <body>
 
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
 <nav>
   <a href="/" class="nav-logo">Allgood<span>Academy</span></a>
   <div class="nav-links">
     <a href="/educational-games/" class="nav-link active">Games</a>
     <a href="/for-teachers/" class="nav-link">For teachers</a>
+    <a href="/about/" class="nav-link">About</a>
+    <a href="/about/#contact" class="nav-link">Contact</a>
   </div>
   <div class="nav-right">
     <a href="/dashboard/?signin=1" class="nav-link nav-signin">Sign in</a>
@@ -394,30 +400,20 @@ footer{
   </div>
 </nav>
 <script>
-/* Same relabel/redirect pattern as public/index.html's .nav-signin — a visitor with an
-   existing session should never be told to sign in again. Follows .nav-signin, not
-   .nav-cta: the button in this nav is now the lesson CTA, and this logic belongs to
-   whichever element represents signing in. */
 (function(){
-  try{
-    if(localStorage.getItem('ag_signed_in')!=='1')return;
-    var b=document.querySelector('.nav-signin');
-    if(b)b.textContent='Your dashboard';
-  }catch(e){/* storage blocked - link stays "Sign in", which is the safe default */}
-})();
-(function(){
-  var btn=document.querySelector('.nav-signin');
-  if(!btn)return;
-  btn.addEventListener('click',function(e){
-    var signedIn=false;
-    try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    if(signedIn){
-      e.preventDefault();
-      location.href='/dashboard/';
-    }
+  var a=document.querySelector('.nav-signin');
+  if(!a)return;
+  var signedIn=false;
+  try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){/* storage blocked - stays "Sign in", the safe default */}
+  if(signedIn)a.textContent='Your dashboard';
+  a.addEventListener('click',function(e){
+    var now=false;
+    try{now=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
+    if(now){e.preventDefault();location.href='/dashboard/';}
   });
 })();
 </script>
+<!-- END GENERATED NAV -->
 
 <section class="hero">
   <div class="radar" aria-hidden="true">
