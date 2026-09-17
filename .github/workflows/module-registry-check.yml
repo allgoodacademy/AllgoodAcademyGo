@@ -11,6 +11,11 @@
 # two files feed different consumers (utility classes vs. hand-written CSS in a page's
 # <style> block) and neither can import the other, so nothing but this check stops them
 # drifting into rendering two different oranges.
+#
+# And the nav check, which fails when a page's generated nav region no longer matches
+# nav/nav.js. Six public pages carry that bar; when each one was hand-written, a "Games"
+# link added to the homepage reached none of the other five and nobody noticed for days.
+# Edit nav/nav.js and run `npm run build:nav` — never hand-edit the region in a page.
 name: Module registry check
 
 on:
@@ -28,3 +33,4 @@ jobs:
       - run: node scripts/check-modules.js
       - run: node scripts/check-challenge-copy.js
       - run: node scripts/check-tokens.js
+      - run: node scripts/build-nav.js --check

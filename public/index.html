@@ -301,6 +301,10 @@ footer{background:var(--surface);padding:0 0 44px}
 </head>
 <body>
 
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
 <div class="nav-shell">
   <div class="wrap">
     <nav class="nav">
@@ -317,38 +321,20 @@ footer{background:var(--surface);padding:0 0 44px}
   </div>
 </div>
 <script>
-/* One control, two states. A visitor who already has a session should never be told to
-   sign in — they press Home on their dashboard, land here, and the top-right still said
-   "Sign in", which reads as "your session is gone".
-
-   Deliberately synchronous and deliberately HERE, immediately after the button rather
-   than with the click handler at the end of the body: this runs during parse, before
-   first paint, so a slow Chromebook never shows a beat of the wrong label.
-
-   Keyed on ag_signed_in (any session, guests included) and NOT ag_account, because a
-   guest mid-way through a Lab Pack is exactly who needs the way back. This replaces the
-   separately injected "Your dashboard" nav-link that used to sit beside the button: that
-   link was a .nav-link, which is display:none below 960px, so it never existed on a
-   phone at all. Sign in is now a .nav-link too, but it is explicitly exempted from that
-   rule (.nav-link:not(.nav-signin)), so it survives on a phone and relabelling still
-   reaches every viewport. Do not drop that exemption.
-
-   The flag only ever changes a WORD. It grants no access and reveals nothing — the
-   dashboard enforces its own entry either way — so reading the looser of the two flags
-   is safe here in a way it would not be for a gate.
-
-   Known, accepted: on a shared Chromebook a stale flag can offer "Your dashboard" to the
-   next student, pointing at someone else's progress. It costs one tap and self-corrects;
-   it is not a disclosure, since nothing is shown until /dashboard/ resolves a real
-   session. Do not "fix" this by naming the student here. */
 (function(){
-  try{
-    if(localStorage.getItem('ag_signed_in')!=='1')return;
-    var b=document.querySelector('.nav-signin');
-    if(b)b.textContent='Your dashboard';
-  }catch(e){/* storage blocked - link stays "Sign in", which is the safe default */}
+  var a=document.querySelector('.nav-signin');
+  if(!a)return;
+  var signedIn=false;
+  try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){/* storage blocked - stays "Sign in", the safe default */}
+  if(signedIn)a.textContent='Your dashboard';
+  a.addEventListener('click',function(e){
+    var now=false;
+    try{now=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
+    if(now){e.preventDefault();location.href='/dashboard/';}
+  });
 })();
 </script>
+<!-- END GENERATED NAV -->
 
 <section class="hero">
   <div class="wrap">
@@ -528,27 +514,6 @@ document.getElementById('sig-choices').querySelectorAll('.sig-btn').forEach(func
   b.addEventListener('click',function(){sigPick(b.dataset.pick)});
 });
 sigRender();
-</script>
-<script>
-/* Sign in hands off to the real identity gate (/js/identity-gate.js), which lives on
-   the dashboard with the styles it was built against. Loading auth-core.js here
-   instead would pull Firebase from gstatic.com on first paint, and these three pages
-   ship with zero third-party requests by design. /dashboard/?signin=1 opens that gate
-   and returns here if it is dismissed. */
-(function(){
-  var btn=document.querySelector('.nav-signin');
-  if(!btn)return;
-  btn.addEventListener('click',function(e){
-    /* Same flag the relabel above reads, so the label and the destination can never
-       disagree. A visitor with a session goes straight in; everyone else follows the
-       href to the identity gate, which lives on the dashboard with the styles it was
-       built against, and which returns them here if they dismiss it. The href means
-       that fallback survives even with JS off — it is no longer a button that needs us. */
-    var signedIn=false;
-    try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    if(signedIn){e.preventDefault();location.href='/dashboard/';}
-  });
-})();
 </script>
 </body>
 </html>
