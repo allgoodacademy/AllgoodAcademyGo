@@ -376,16 +376,23 @@ function isScheduled(file) {
       `     Make them the same text. A half-disclaimed page is the one that gets screenshotted.`);
   }
 
-  // Above the fold on the landing page: before any <section>, i.e. inside the hero, not in
-  // a footer. A trademark disclaimer nobody scrolls to is a disclaimer nobody reads.
+  /* Above the fold on the landing page. The rule is "in the hero, where it is read
+     without scrolling" — NOT "before the first <section>", which is how this was first
+     written and which broke the moment the page was restyled in the games hub's language,
+     where the hero IS a <section>. Anchored on the two things that actually express the
+     rule and survive a restyle: the disclaimer comes before the page body (<main>), and it
+     is not in the footer. A trademark disclaimer nobody scrolls to is one nobody reads. */
   const landing = exists(PAGES[0]) ? read(PAGES[0]) : '';
   if (landing) {
-    const discIdx = landing.indexOf(`id="${DISCLAIMER_ID}"`);
-    const firstSection = landing.indexOf('<section');
-    if (discIdx !== -1 && firstSection !== -1 && discIdx > firstSection) {
-      fail('cogat', `${PAGES[0]}: the disclaimer has moved below the first <section>. It must sit in the hero, visible without scrolling.`);
-    }
-    if (landing.toLowerCase().indexOf('<footer') !== -1 && discIdx > landing.toLowerCase().indexOf('<footer')) {
+    const lower = landing.toLowerCase();
+    const discIdx = lower.indexOf(`id="${DISCLAIMER_ID}"`);
+    const mainIdx = lower.indexOf('<main');
+    const footIdx = lower.indexOf('<footer');
+    if (discIdx === -1) {
+      // already reported above; nothing more to say here
+    } else if (mainIdx !== -1 && discIdx > mainIdx) {
+      fail('cogat', `${PAGES[0]}: the disclaimer has moved into the page body (below <main>). It belongs in the hero, read without scrolling.`);
+    } else if (footIdx !== -1 && discIdx > footIdx) {
       fail('cogat', `${PAGES[0]}: the disclaimer is in the footer. It belongs above the fold.`);
     }
   }

@@ -157,6 +157,13 @@ const PAGES = [
     { file: 'public/privacy.html',                 slug: 'privacy',      skin: 'light' },
     { file: 'public/terms.html',                   slug: 'terms',        skin: 'light' },
     { file: 'public/educational-games/index.html', slug: 'games',        skin: 'dark'  },
+    // Pattern Lab's landing page. The LINKING IS ONE-WAY and that is the whole point:
+    // this page carries the site nav so a visitor who arrived from a search result has a
+    // route into allgoodacademy.com, while the site itself links nowhere near Pattern Lab
+    // (it is \`hidden: true\` in the module registry, and check-modules.js asserts its
+    // absence from every surface). Listing a page here only generates the bar INTO it —
+    // it adds nothing to LINKS, so no other page gains a Pattern Lab link.
+    { file: 'public/pattern-lab/index.html',       slug: 'pattern-lab',  skin: 'dark'  },
 ];
 
 const BEGIN = '<!-- BEGIN GENERATED NAV -->';
