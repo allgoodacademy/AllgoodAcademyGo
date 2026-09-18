@@ -462,7 +462,39 @@ test('a game is grouped by the pack of the lab it routes into, not by a hardcode
 
     const cat = buildCatalog(REGISTRY.modules);
     const gameIds = cat.gamePacks.flatMap((p) => p.items.map((i) => i.id)).sort();
-    assert.deepEqual(gameIds, live.filter((m) => m.type === 'game').map((m) => m.id).sort());
+    // `hidden` modules are dropped alongside `retired` — see buildCatalog(). They are live
+    // and registered, but a teacher must not be able to assign them.
+    assert.deepEqual(gameIds, live.filter((m) => m.type === 'game' && !m.hidden).map((m) => m.id).sort());
+});
+
+test('a hidden module is registered but appears nowhere a teacher can assign it', () => {
+    // Pattern Lab is registered deliberately (so check-modules.js can validate it, and so a
+    // future session does not read an unregistered live module as a bug and "fix" it by
+    // surfacing it) and is equally deliberately absent from the Assign page. Absence by
+    // omission would be untestable; absence by flag is this.
+    const hidden = REGISTRY.modules.filter((m) => m.hidden && !m.retired);
+    assert.ok(hidden.length, 'fixture assumption: the registry has at least one hidden module');
+
+    const cat = buildCatalog(REGISTRY.modules);
+    const assignableIds = new Set([
+        ...cat.packs.flatMap((p) => p.items.map((i) => i.id)),
+        ...cat.gamePacks.flatMap((p) => p.items.map((i) => i.id)),
+    ]);
+    for (const m of hidden) {
+        assert.ok(!assignableIds.has(m.id), `hidden module "${m.id}" is assignable from Mission Control`);
+    }
+
+    // And it is the flag doing the work, not the entry happening to be malformed: clear the
+    // flag on a copy and the same module becomes assignable again.
+    const unhidden = REGISTRY.modules.map((m) => (m.hidden ? { ...m, hidden: false } : m));
+    const catB = buildCatalog(unhidden);
+    const idsB = new Set([
+        ...catB.packs.flatMap((p) => p.items.map((i) => i.id)),
+        ...catB.gamePacks.flatMap((p) => p.items.map((i) => i.id)),
+    ]);
+    for (const m of hidden) {
+        assert.ok(idsB.has(m.id), `"${m.id}" stays out of the catalog with hidden:false — something other than the flag is excluding it, so the flag is not what is being tested`);
+    }
 });
 
 test("a game's routing targets come from skillTags and the registry, not a hardcoded string", () => {

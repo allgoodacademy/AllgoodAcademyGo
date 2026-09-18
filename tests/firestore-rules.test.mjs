@@ -464,6 +464,24 @@ await it('...and a choice event carrying a skill tag is accepted by the events r
   }));
 });
 
+await it('a Pattern Lab session and event are accepted, carrying the `stream` tag', async () => {
+  // Ticket 5: Pattern Lab writes through the SAME pipe, tagged so Insider can exclude it.
+  // Rule #11's hasOnly() allowlist is what decides whether a new top-level field is
+  // writable at all — a `stream` missing from that list would be denied in production
+  // with nothing but a console warning, and the calibration data would silently be zero.
+  await assertSucceeds(setDoc(doc(student, 'artifacts', APP, 'sessions', 'pl_s1'), {
+    uid: 'student_1', module: 'pattern-lab', gameName: 'Pattern Lab', stream: 'pattern-lab',
+    startedAt: 1, stepsTotal: 9,
+    summary: { stream: 'pattern-lab', grade: 6, itemsAnswered: 9, bySubtest: { 'number-series': { served: 1, correct: 1 } } },
+  }));
+  await assertSucceeds(setDoc(doc(student, 'artifacts', APP, 'events', 'pl_e1'), {
+    uid: 'student_1', module: 'pattern-lab', gameName: 'Pattern Lab', stream: 'pattern-lab',
+    sessionId: 'pl_s1', event: 'choice', step: 3,
+    meta: { itemId: 'ns-04', subtest: 'number-series', level: 13, correct: false, chosen: 2, answer: 1 },
+    ts: 1, clientTs: 1,
+  }));
+});
+
 await it('teacher CAN read a classroom student\'s scenario_attempts (the drill-down)', async () => {
   // Rule #6 already covers this; asserted here because Mission Control's step-by-step
   // breakdown is unreadable without it, and #6 is the rule a future roster change is most

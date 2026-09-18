@@ -479,7 +479,12 @@ export function formatList(names) {
    because a teacher assigning them is legitimate and the roster says plainly what it cannot
    yet show. */
 export function buildCatalog(registryModules = []) {
-    const live = registryModules.filter((m) => m && m.id && !m.retired);
+    // `hidden` is dropped alongside `retired`, and for the same reason the dashboard drops
+    // games: a module a teacher must not be able to assign has no row on the Assign page.
+    // Pattern Lab is the one today — free CogAT-style practice published for parents
+    // arriving from search, with no classroom use and no GoodBlock it routes into. See the
+    // `hidden` contract in public/data/modules-registry.json.
+    const live = registryModules.filter((m) => m && m.id && !m.retired && !m.hidden);
     const packOrder = [];
     const byPack = new Map();
 

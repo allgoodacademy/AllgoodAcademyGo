@@ -183,6 +183,29 @@ async function recordContinuityEntry(moduleSlug, key, value) {
     }
 }
 
+// --- SESSION WITHOUT AN IDENTITY: a Firebase uid and nothing else.
+//
+// firestore.rules #10 and #11 only accept a telemetry write that names request.auth.uid,
+// so a page that records anything at all needs a session. Every other path in this file
+// gives one AND a person: silentSignIn() and guestStart() both write a users/{uid}
+// profile with a display name and raise the ag_signed_in routing flag.
+//
+// Pattern Lab (public/educational-games/pattern-lab/) must not do either. It is a free
+// practice diagnostic for parents arriving from search: it promises no account, it has no
+// dashboard, nobody is ever named, and a users/{uid} document per visitor would put a
+// phantom learner into Insider's user counts — the exact contamination the separate
+// telemetry stream exists to prevent. So: sign in anonymously, write nothing, mark
+// nothing, return the user.
+//
+// Deliberately non-destructive, like guestStart(): a browser that already has a session
+// (a student who used the site earlier on this device) keeps it, name and all. This
+// never creates a second identity and never renames one.
+async function anonymousSessionOnly() {
+    const existing = await waitForAuthReady();
+    if (existing) return existing;
+    return (await signInAnonymously(auth)).user;
+}
+
 // --- SILENT POWER-UP SIGN-IN: an anonymous identity with a random nickname, created
 // invisibly the instant someone powers up with no existing session — before any age or
 // identify question. This is the ONE remaining anonymous-with-no-real-identify path;
@@ -1017,7 +1040,7 @@ async function signOutAndClear() {
 
 window.AuthCore = {
     auth, db, appId,
-    silentSignIn, recruitSignIn, redeemRecruitCode,
+    silentSignIn, recruitSignIn, redeemRecruitCode, anonymousSessionOnly,
     guestStart, guestDisplayName, claimRecruitCode, claimGuestCode,
     codeToDisplayName, normalizeRecruitCode,
     markSignedIn, markAccount, clearSignedIn, signOutAndClear, waitForAuthReady,

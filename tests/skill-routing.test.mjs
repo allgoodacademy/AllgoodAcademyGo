@@ -22,7 +22,7 @@ globalThis.fetch = async (url) => {
     return { ok: true, status: 200, json: async () => REGISTRY };
 };
 
-const { resolve, normalize } = await import('../public/js/skill-routing.js');
+const { resolve, normalize, NON_ROUTING_CATEGORIES } = await import('../public/js/skill-routing.js');
 
 const RTS = { defaultUrl: '/jsh/digital-decisions-lab/privacy-security/', defaultName: 'Privacy & Security' };
 const MM = { defaultUrl: '/jsh/real-world-ready-lab/money-as-a-skill/', defaultName: 'Money as a Skill' };
@@ -308,4 +308,50 @@ test('Social Intelligence is still a REACHABLE match for the skills it teaches',
     const dest = await resolve('social', RTS);
     assert.equal(dest.matchedId, 'social-intelligence');
     assert.equal(dest.matched, true);
+});
+
+/* --- Pattern Lab must never resolve to a GoodBlock (Ticket 5) -----------------------
+   Pattern Lab's nine subtests are not in the internal routing vocabulary. Nothing in the
+   repo calls resolve() with one — the page does not even load skill-routing.js, and
+   scripts/check-modules.js fails if it ever does. This pins the resolver's own behaviour
+   as the second line of that defence: if a subtest reaches it anyway, it must refuse,
+   loudly, rather than quietly handing back whatever GoodBlock the caller defaulted to. */
+const PATTERN_LAB_SUBTESTS = [
+    'verbal-analogies', 'verbal-classification', 'sentence-completion',
+    'number-series', 'number-analogies', 'number-puzzles',
+    'figure-matrices', 'figure-classification', 'paper-folding',
+];
+
+test('every Pattern Lab subtest is on the resolver\'s non-routing list', () => {
+    for (const subtest of PATTERN_LAB_SUBTESTS) {
+        assert.ok(NON_ROUTING_CATEGORIES.has(subtest), `"${subtest}" is missing from NON_ROUTING_CATEGORIES`);
+    }
+    // The registry must agree: a subtest that became a real internal tag on a lab would be
+    // routable and non-routable at once, and this test would be pinning a contradiction.
+    const labTags = new Set(REGISTRY.modules
+        .filter((m) => m.type === 'lab' && !m.retired)
+        .flatMap((m) => (m.skillTags || []).filter((t) => t.framework === 'internal').map((t) => normalize(t.code))));
+    for (const subtest of PATTERN_LAB_SUBTESTS) {
+        assert.ok(!labTags.has(subtest), `"${subtest}" is now an internal skill tag on a lab — Pattern Lab's vocabulary and the routing vocabulary have collided`);
+    }
+});
+
+for (const subtest of PATTERN_LAB_SUBTESTS) {
+    test(`Pattern Lab: "${subtest}" refuses to resolve and returns the caller's default`, async () => {
+        const dest = await resolve(subtest, RTS);
+        assert.equal(dest.matched, false);
+        assert.equal(dest.reason, 'not-routable');
+        assert.equal(dest.url, RTS.defaultUrl);
+        assert.equal(dest.matchedId, null);
+    });
+}
+
+test('Pattern Lab is registered, hidden, and carries no internal skill tag', () => {
+    const entry = REGISTRY.modules.find((m) => m.id === 'pattern-lab');
+    assert.ok(entry, 'pattern-lab is not in the registry — it must be registered, not omitted');
+    assert.equal(entry.hidden, true);
+    assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(entry.hiddenSince || ''), 'pattern-lab needs a hiddenSince date');
+    assert.ok((entry.hiddenReason || '').length > 30, 'pattern-lab needs a hiddenReason');
+    assert.equal((entry.skillTags || []).filter((t) => t.framework === 'internal').length, 0,
+        'pattern-lab must carry no internal skill tag — an internal tag IS a routing decision');
 });

@@ -64,6 +64,27 @@ share the link set and the markup shape, not the CSS; each page still owns its o
 
 After that, every push to `main` auto-deploys to allgoodacademy.com — no CLI required.
 
+## Hidden modules
+
+One module is live, registered, and deliberately absent from every surface of this site:
+**Pattern Lab** (`/pattern-lab/` and `/educational-games/pattern-lab/`), a free CogAT-style
+practice diagnostic published for parents arriving from search. It is in no navigation, on
+no games-hub card, in no dashboard or Lab Pack hub, and it is not assignable in Mission
+Control. That absence is the design, not an oversight.
+
+It is registered anyway, with **`"hidden": true`** in `public/data/modules-registry.json`
+(plus a required `hiddenSince` and `hiddenReason`). Leaving it out of the registry would
+mean `check-modules.js` could verify nothing about it, and the next person finding an
+unregistered live module would reasonably read it as a bug and "fix" it by surfacing it.
+
+`hidden` exempts a module from the *must appear on a surface* checks and from nothing else.
+`scripts/check-modules.js` still validates its id, url, fields and `Telemetry.init` call, and
+additionally **asserts it is absent** from the nav, the games hub, the dashboard, Mission
+Control, Insider and every Lab Pack hub. Remove the flag and the check fails by name.
+
+Its telemetry is on a separate stream (`stream: 'pattern-lab'`) that Insider holds out of the
+funnel — see `docs/insider-analytics.md`.
+
 ## Adding a new module
 
 Drop a new folder with an `index.html` under `public/`, matching the URL path you want it served at, then push to `main`.

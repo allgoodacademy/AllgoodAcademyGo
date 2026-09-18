@@ -473,11 +473,17 @@ service cloud.firestore {
     // 11. NEW — Telemetry events (append-only stream: module_open, step, choice,
     //     module_complete, ...). Nobody but the admin allowlist can read them back,
     //     and nothing can edit one after the fact.
+    //
+    //     `stream` is the reporting population the visit belongs to ('core' for the site's
+    //     own funnel, 'pattern-lab' for the free CogAT-style practice diagnostic) — see the
+    //     STREAMS note in /js/telemetry.js. It is a top-level field, not a `meta` key, so
+    //     an excluded stream can be filtered without unpacking every event's meta map, and
+    //     so this allowlist is the one place that records which streams exist.
     match /artifacts/{appId}/events/{eventId} {
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly([
-             'uid', 'role', 'ageTier', 'isGuest', 'module', 'gameName',
+             'uid', 'role', 'ageTier', 'isGuest', 'module', 'gameName', 'stream',
              'sessionId', 'event', 'step', 'meta', 'device', 'entry', 'ts', 'clientTs'
            ]);
       allow read, delete: if isAllowlistedAdmin();

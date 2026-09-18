@@ -60,6 +60,25 @@ function normalize(category) {
         .replace(/^-+|-+$/g, '');
 }
 
+/* Categories that must never reach this resolver.
+ *
+ * Pattern Lab (/educational-games/pattern-lab/) measures nine CogAT-style reasoning
+ * subtests. None of them is in the internal routing vocabulary, and none of them should
+ * be: a learner who is weak in Paper Folding is not weak in anything a GoodBlock teaches,
+ * and "Number Analogies → Money as a Skill" is the kind of destination that looks
+ * plausible in a diff and is nonsense to the student who lands on it.
+ *
+ * Without this, passing one of them here would simply return the caller's fallback
+ * destination — a GoodBlock, silently, with `matched: false` and nothing to say a
+ * non-routable vocabulary had been used at all. The guard turns a silent wrong answer
+ * into a loud one, and gives tests/skill-routing.test.mjs something to assert.
+ */
+const NON_ROUTING_CATEGORIES = new Set([
+    'verbal-analogies', 'verbal-classification', 'sentence-completion',
+    'number-series', 'number-analogies', 'number-puzzles',
+    'figure-matrices', 'figure-classification', 'paper-folding',
+]);
+
 function internalCodes(entry) {
     return (entry.skillTags || [])
         .filter((t) => t && t.framework === 'internal')
@@ -84,6 +103,9 @@ function internalCodes(entry) {
  *   'category-match'   — a lab in the registry carries this category
  *   'no-match'         — the category resolved to nothing; caller's default used
  *   'no-category'      — no category was passed (nothing weak enough to act on)
+ *   'not-routable'     — the category is from a vocabulary that must not route at all
+ *                        (see NON_ROUTING_CATEGORIES); the caller's default is used and
+ *                        the call is reported as a bug on the console
  */
 async function resolve(category, opts = {}) {
     const code = normalize(category);
@@ -98,6 +120,12 @@ async function resolve(category, opts = {}) {
         tagStatus: null,
     };
     if (!code || !opts.defaultUrl) return fallback;
+    if (NON_ROUTING_CATEGORIES.has(code)) {
+        console.error(`[SkillRouting] "${category}" is not a routing category and must never be `
+            + 'resolved to a GoodBlock. Nothing in this repo should call resolve() with a Pattern '
+            + 'Lab subtest — see NON_ROUTING_CATEGORIES in /js/skill-routing.js.');
+        return { ...fallback, reason: 'not-routable' };
+    }
 
     const modules = await loadRegistry();
     const matches = modules.filter((m) => m.type === 'lab' && m.url && internalCodes(m).includes(code));
@@ -153,7 +181,7 @@ async function resolve(category, opts = {}) {
 // tests/skill-routing.test.mjs, which imports this file directly in Node with a
 // filesystem-backed fetch so the regression checks below run without a browser.
 if (typeof window !== 'undefined') {
-    window.SkillRouting = { resolve, loadRegistry, normalize, REGISTRY_URL };
+    window.SkillRouting = { resolve, loadRegistry, normalize, REGISTRY_URL, NON_ROUTING_CATEGORIES };
 }
 
-export { resolve, loadRegistry, normalize, REGISTRY_URL };
+export { resolve, loadRegistry, normalize, REGISTRY_URL, NON_ROUTING_CATEGORIES };
