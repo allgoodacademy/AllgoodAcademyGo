@@ -23,7 +23,8 @@
 <!-- DELIBERATELY NOT LOADED: /js/skill-routing.js. Pattern Lab's nine subtests are not in
      the routing vocabulary and must never resolve to a GoodBlock. scripts/check-modules.js
      asserts the absence of this script on a hidden module, and resolve() in
-     skill-routing.js refuses a Pattern Lab subtest outright. -->
+     skill-routing.js refuses a Pattern Lab subtest outright. This is about SKILL ROUTING,
+     not about navigation: the nav below does link back into the site (see the note there). -->
 <style>
 :root{
   /* Brand values come from /assets/css/design-tokens.css. The short names below are kept
@@ -45,11 +46,13 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--dark);color:var(--dark);font-family:var(--font-ui);min-height:100vh;}
 
-/* NAV CHROME — the four standalone games' dark navbar, minus every link that leads back
-   into the main site. Those games offer "Return to dashboard", "Browse games" and
-   "Sign in"; Pattern Lab offers none of them. Its audience arrived from a search result,
-   not from allgoodacademy.com, and a full site nav would drop a parent into a page
-   written for teachers. The only exits are a restart and the Pattern Lab landing page.
+/* NAV CHROME — the same bar the four standalone games use, with the same home popover and
+   the same routes back into the site: dashboard, games hub, sign in. The LINKING IS
+   ONE-WAY, which is the whole design — Pattern Lab links into allgoodacademy.com, and
+   allgoodacademy.com links nowhere near Pattern Lab (it is `hidden: true` in the module
+   registry, and check-modules.js asserts its absence from every site surface). A visitor
+   who arrived from a search result should be able to find the rest of the product; what
+   must not happen is a teacher browsing the site stumbling into this.
    Values (height, tint, hairline) are the game chassis's own, so the two read as siblings. */
 .nav{background:var(--navbar-bg);color:#fff;padding:0 20px;min-height:60px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20;border-bottom:1px solid rgba(255,255,255,.1);backdrop-filter:blur(5px);}
 .nav .brand{font-family:var(--font-display);font-size:14px;letter-spacing:.01em;white-space:nowrap;}
@@ -59,12 +62,37 @@ body{background:var(--dark);color:var(--dark);font-family:var(--font-ui);min-hei
 .nav .navlinks{display:flex;align-items:center;gap:4px;margin-left:14px;}
 .nav .navlinks a,.nav .navlinks button{color:#e5e7eb;background:none;border:none;font-family:var(--font-ui);font-size:11px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;padding:7px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;}
 .nav .navlinks a:hover,.nav .navlinks button:hover{color:#fff;background:rgba(255,255,255,.1);}
+/* Long label by default, short one on a phone. The full row — brand, two links, More and
+   the progress counter — measures 362px, so at 360 and 320 it pushed the whole PAGE into
+   a horizontal scroll, not just the bar. Swapping the labels is what keeps every control
+   reachable; hiding one would have cost the way back to the landing page on a phone. */
+.nav .navlinks .s{display:none;}
+
+/* The home popover, copied from the four games' chassis so the control behaves the same
+   way here as it does there. */
+.home-popover-wrap{position:relative;}
+.home-popover{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border-radius:10px;box-shadow:0 10px 25px rgba(0,0,0,.25);padding:6px;min-width:200px;z-index:50;text-align:left;}
+.home-popover.show{display:block;}
+/* Scoped through .nav .navlinks deliberately: the bar's own `a` rule above is
+   (0,2,1) and sets uppercase light-grey-on-dark, which on a white popover renders as
+   unreadable grey caps. This has to outrank it, not sit beside it. */
+.nav .navlinks .home-popover a,.nav .navlinks .home-popover button{display:block;width:100%;text-align:left;background:none;border:none;padding:10px 12px;border-radius:6px;font-family:var(--font-ui);font-size:12px;font-weight:bold;color:var(--dark);cursor:pointer;text-decoration:none;text-transform:none;letter-spacing:0;white-space:nowrap;}
+.nav .navlinks .home-popover a:hover,.nav .navlinks .home-popover button:hover{background:#f0f0f0;color:var(--dark);}
+/* THE BAR'S BREAKPOINTS, measured rather than guessed. The full row — "ALLGOOD ACADEMY |
+   Pattern Lab", two long labels, More and the progress counter — measures 362px of content
+   and stops fitting somewhere under 768px, where it pushed the whole PAGE into a horizontal
+   scroll rather than just crowding the bar. So the bar sheds width in two steps, and never
+   sheds a CONTROL: every route stays reachable at 320px. */
+@media (max-width:719px){
+  /* The company name goes first. The product name is what a visitor needs here; "Allgood
+     Academy" is on the landing page they came from, in this page's More menu, and in the
+     landing page's footer. */
+  .nav .brand .brand-full{display:none;}
+  .nav .navlinks .l{display:none;}
+  .nav .navlinks .s{display:inline;}
+}
 @media (max-width:520px){
   .nav{padding:0 12px;gap:8px;}
-  /* "ALLGOOD ACADEMY | Pattern Lab" wraps to three lines at 360px and drags the whole bar
-     down with it. The product name is what a visitor needs here; the company name is on
-     the landing page they came from and in its footer. */
-  .nav .brand .brand-full{display:none;}
   .nav .brand{font-size:13px;}
   .nav .navlinks{margin-left:8px;}
   .nav .navlinks a,.nav .navlinks button{padding:6px 7px;font-size:10px;}
@@ -236,8 +264,16 @@ p.lede{font-size:14px;line-height:1.6;margin-bottom:16px;}
 <div class="nav">
   <div class="brand"><span class="brand-full">ALLGOOD ACADEMY </span><b>Pattern Lab</b></div>
   <div class="navlinks">
-    <button type="button" id="nav-restart">Start over</button>
-    <a href="/pattern-lab/">About Pattern Lab</a>
+    <button type="button" id="nav-restart"><span class="l">Start over</span><span class="s">Restart</span></button>
+    <a href="/pattern-lab/"><span class="l">About Pattern Lab</span><span class="s">About</span></a>
+    <div class="home-popover-wrap">
+      <button type="button" id="nav-more" aria-haspopup="true" aria-expanded="false">More &#9662;</button>
+      <div class="home-popover" id="home-popover">
+        <a href="/">Allgood Academy home</a>
+        <a href="/educational-games/">Browse games</a>
+        <a href="/dashboard/?signin=1">Sign in</a>
+      </div>
+    </div>
   </div>
   <div class="prog" id="prog"></div>
 </div>
@@ -717,6 +753,21 @@ function report(){
 }
 
 document.getElementById('nav-restart').onclick=()=>{ tele('restart'); start(); };
+
+// Home popover, same behaviour as the four games': toggle on the button, close on any
+// click outside it.
+const moreBtn=document.getElementById('nav-more'), morePop=document.getElementById('home-popover');
+moreBtn.onclick=e=>{
+  e.stopPropagation();
+  const open=morePop.classList.toggle('show');
+  moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.home-popover-wrap')){
+    morePop.classList.remove('show');
+    moreBtn.setAttribute('aria-expanded','false');
+  }
+});
 
 start();
 </script>
