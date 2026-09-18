@@ -20,6 +20,10 @@
 //     /js/skill-routing.js can never resolve to nothing), AND every such tag cites the
 //     evidence its placement rests on (so a placement can be reviewed rather than trusted)
 //   - public/mission-control/module-data.js is in sync with the arrays it is generated from
+//   - HIDDEN modules (registry `hidden: true`): a module that is live but deliberately off
+//     every one of this site's own surfaces. Pattern Lab is the one today. Being hidden
+//     exempts it from the must-appear-on-a-surface checks and from nothing else, and the
+//     absence is ASSERTED rather than assumed — see the `hidden` section further down.
 // No dependencies; run with `node scripts/check-modules.js`. Exits 1 on any mismatch.
 const fs = require('fs');
 const path = require('path');
@@ -97,6 +101,17 @@ for (const m of REGISTRY) {
   // to none. This is load-bearing, not cosmetic: skill-routing.js uses the calling game's
   // default destination for its pack tie-break precisely because the game has no pack.
   if (m.type === 'game' && m.pack !== null) fail(`registry: game "${m.id}" must have pack: null (got ${JSON.stringify(m.pack)})`);
+  // A hidden module is an exemption someone decided on, so it must say when and why — the
+  // same standard `orphanedSkills` and `evidence` are held to. A bare `hidden: true` would
+  // be an ignore flag, and the next person would have no way to tell a deliberate omission
+  // from a module that fell off the site by accident.
+  if (m.hidden !== undefined) {
+    if (typeof m.hidden !== 'boolean') fail(`registry: "${m.id}" \`hidden\` must be true or false, got ${JSON.stringify(m.hidden)}`);
+    if (m.hidden === true) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(m.hiddenSince || ''))) fail(`registry: hidden module "${m.id}" needs a \`hiddenSince\` date (YYYY-MM-DD)`);
+      if (!(m.hiddenReason && String(m.hiddenReason).trim().length > 30)) fail(`registry: hidden module "${m.id}" needs a \`hiddenReason\` saying why it is off every site surface`);
+    }
+  }
   if (m.type !== 'game' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
   if (m.pack && !PACKS[m.pack]) fail(`registry: "${m.id}" has unknown pack "${m.pack}"`);
   if (m.retired) {
@@ -127,7 +142,13 @@ const registry = REGISTRY.filter(m => !m.retired && (m.type === 'lab' || m.type 
   .map(m => ({ id: m.id, name: m.name, category: m.type, pack: m.pack, url: m.url, gameNames: m.gameNames || [] }));
 const dashLabs = registry.filter(r => r.category === 'lab');
 const games = REGISTRY.filter(m => m.type === 'game');
-if (games.length !== 4) fail(`registry: expected the four standalone games, found ${games.length}`);
+// Hidden modules are live and registered but off every surface of this site — see the
+// `hidden` contract in the registry's own _comment block. They are held apart HERE, once,
+// so every check below states which population it means rather than quietly covering both.
+const HIDDEN = REGISTRY.filter(m => m.hidden === true && !m.retired);
+const hiddenIds = new Set(HIDDEN.map(m => m.id));
+const visibleGames = games.filter(g => !hiddenIds.has(g.id));
+if (visibleGames.length !== 4) fail(`registry: expected the four standalone games, found ${visibleGames.length}`);
 
 // --- internal skill tags: a game must never route to nothing.
 // skill-routing.js falls back to the game's own default when a category matches no lab, so
@@ -157,7 +178,7 @@ for (const o of ORPHANED) {
   if (labTagIndex[code]) fail(`registry: \`orphanedSkills\` lists "${o.tag}" but ${labTagIndex[code].join(', ')} now carries that tag — remove the orphan entry, the gap is closed`);
 }
 const diagnosedCodes = new Set();
-for (const g of games) {
+for (const g of visibleGames) {
   for (const t of g.skillTags || []) {
     if (t.framework !== 'internal') continue;
     const code = norm(t.code);
@@ -186,7 +207,7 @@ for (const o of ORPHANED) {
 // a category invented in the bank and never registered routes nowhere, which is the exact
 // shape of the Before You Send bug (30 scenarios, one flat `social`).
 const GAME_PAGES = Object.fromEntries(games.map(g => [g.id, path.join('public', g.url, 'index.html')]));
-for (const g of games) {
+for (const g of visibleGames) {
   const src = read(GAME_PAGES[g.id]);
   const declared = new Set((g.skillTags || []).filter(t => t.framework === 'internal').map(t => norm(t.code)));
   const used = new Set([...src.matchAll(/\bcategory:\s*["']([^"']+)["']/g)].map(m => norm(m[1])));
@@ -279,6 +300,7 @@ for (const c of courses) {
 for (const g of games) {
   const page = GAME_PAGES[g.id];
   const src = read(page);
+  const isHidden = hiddenIds.has(g.id);
   // Unlike a GoodBlock, a game's stepsTotal is its round size, which some games hold in a
   // named constant — accept either and resolve the constant, rather than forcing a magic
   // number into the call just to satisfy a regex.
@@ -289,11 +311,77 @@ for (const g of games) {
   const steps = /^\d+$/.test(m[3]) ? Number(m[3]) : Number((src.match(new RegExp(`const ${m[3]} = (\\d+);`)) || [])[1]);
   if (!steps) fail(`${page}: Telemetry stepsTotal "${m[3]}" is not a number and no \`const ${m[3]} = N;\` was found`);
   if (!/src="\/js\/telemetry\.js"/.test(src)) fail(`${page}: calls Telemetry.init but never loads /js/telemetry.js`);
-  if (!/src="\/js\/skill-routing\.js"/.test(src)) fail(`${page}: does not load /js/skill-routing.js — its end-screen destination would stay hardcoded`);
+  // Routing is the one game-page requirement that INVERTS for a hidden module. A visible
+  // game without the resolver has a hardcoded end-screen destination; a hidden one that
+  // loads it at all is one line away from routing a student into a GoodBlock from a
+  // product that is not part of the funnel.
+  if (!isHidden && !/src="\/js\/skill-routing\.js"/.test(src)) fail(`${page}: does not load /js/skill-routing.js — its end-screen destination would stay hardcoded`);
+  if (isHidden && /<script[^>]+src="\/js\/skill-routing\.js"/.test(src)) fail(`${page}: hidden module "${g.id}" loads /js/skill-routing.js. A hidden module is outside the routing vocabulary and must never resolve to a GoodBlock — see its hiddenReason in the registry.`);
+  if (isHidden && /SkillRouting\s*\./.test(src)) fail(`${page}: hidden module "${g.id}" calls SkillRouting — a hidden module must never resolve to a GoodBlock.`);
   // The retired collection must not come back, in a game or anywhere else.
   if (/'game_sessions'/.test(src)) fail(`${page}: still writes to the retired root-level game_sessions collection`);
 }
 if (/match \/game_sessions\//.test(read('firestore.rules'))) fail('firestore.rules: a game_sessions match block is back — that collection is retired');
+
+// --- the games hub: every VISIBLE game has a card, every HIDDEN one has none
+// The first half is a gap this script had: four games were registered and telemetered, and
+// nothing checked that a visitor could actually reach them. The second half is what makes
+// `hidden` a real exemption rather than an absence of validation — remove the flag from a
+// hidden module and this fails, naming it, instead of silently passing.
+const gamesHubPath = 'public/educational-games/index.html';
+const gamesHub = read(gamesHubPath);
+for (const g of games) {
+  const linked = gamesHub.includes(`href="${g.url}"`);
+  if (hiddenIds.has(g.id)) {
+    if (linked) fail(`${gamesHubPath}: hidden module "${g.id}" has a card linking "${g.url}". Its absence from the games hub IS the design — see its hiddenReason in the registry. If it should be surfaced, remove \`hidden\` from the registry entry rather than adding a card beside it.`);
+  } else if (!linked) {
+    fail(`${gamesHubPath}: game "${g.id}" is live and registered but nothing on the games hub links "${g.url}" — a visitor cannot reach it. (If it is deliberately off-site-surface, register it with \`hidden: true\`, a \`hiddenSince\` and a \`hiddenReason\`.)`);
+  }
+}
+
+// --- HIDDEN MODULES: the absence is asserted, on every surface, by url
+// A hidden module is exempted from "must appear" and from nothing else. Everything above
+// this point — id uniqueness, type, status, url resolving and existing, skillTag shape,
+// Telemetry.init — has already run against it unchanged. What is left is to prove the
+// exemption is doing what it claims: that the module is on NO surface a visitor, a student
+// or a teacher browses. Checked by url, so a rename cannot slip a link past it.
+const HIDDEN_SURFACES = [
+  ['nav/nav.js', 'the generated site nav (every page that carries it)'],
+  ['public/index.html', 'the homepage'],
+  ['public/for-teachers/index.html', 'the For Teachers page'],
+  ['public/about/index.html', 'the About page'],
+  ['public/dashboard/index.html', 'the dashboard'],
+  ['public/mission-control/index.html', 'Mission Control'],
+  ['public/insider/index.html', "Insider's COURSES"],
+  ...Object.values(PACKS).map(cfg => [cfg.hub, 'a Lab Pack hub']),
+];
+for (const h of HIDDEN) {
+  if (!h.url) continue;
+  for (const [file, what] of HIDDEN_SURFACES) {
+    if (!fs.existsSync(path.join(root, file))) continue;
+    // Insider's own off-funnel note names the URL in prose; a link is what matters.
+    const src = read(file).replace(/<!--[\s\S]*?-->/g, '');
+    if (new RegExp(`(href|url)\\s*[=:]\\s*["']${h.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`).test(src)) {
+      fail(`${file}: links hidden module "${h.id}" (${h.url}) from ${what}. ${h.hiddenReason ? String(h.hiddenReason).split('.')[0] + '.' : ''} If that decision has changed, remove \`hidden\` from the registry entry — do not leave the flag set and the link in place.`);
+    }
+  }
+  // Mission Control renders the Assign page from buildCatalog(); a hidden module reaching
+  // that list is a module a teacher can assign.
+  const derive = read('public/mission-control/derive.js');
+  if (!/const live = registryModules\.filter\([\s\S]{0,120}?!m\.hidden/.test(derive)) {
+    fail(`public/mission-control/derive.js: buildCatalog() no longer filters out \`hidden\` modules — "${h.id}" would become assignable from the Assign page.`);
+  }
+  // A hidden module has no Insider course, so nothing above checks its Telemetry stream.
+  // Say out loud that it writes to a separate reporting population, and that Insider knows.
+  const page = read(path.join('public', h.url, 'index.html'));
+  const streamed = page.match(/Telemetry\.init\(\{[^)]*stream:\s*'([^']+)'/);
+  if (!streamed) {
+    fail(`public${h.url}index.html: hidden module "${h.id}" calls Telemetry.init without a \`stream\`, so its sessions land in the 'core' funnel population alongside the four games — the one thing hiding it is meant to prevent. Pass a stream (see the STREAMS note in public/js/telemetry.js).`);
+  } else if (!new RegExp(`FUNNEL_STREAMS = \\[[^\\]]*\\]`).test(read('public/insider/index.html'))
+    || new RegExp(`FUNNEL_STREAMS = \\[[^\\]]*'${streamed[1]}'`).test(read('public/insider/index.html'))) {
+    fail(`public/insider/index.html: FUNNEL_STREAMS is missing, or still counts '${streamed[1]}' — hidden module "${h.id}" would be inside the funnel metrics it is registered to stay out of.`);
+  }
+}
 
 // --- hubs (one per pack)
 // Each hub renders its live lab cards and its "Jump to a Lab" entries from the registry
@@ -538,4 +626,10 @@ if (problems.length) {
   process.exit(1);
 }
 const internalTags = new Set(Object.keys(labTagIndex));
-console.log(`check-modules: ${warnings.length ? `OK with ${warnings.length} warning(s) above` : 'OK'} — ${REGISTRY.length} registry entries (${games.length} games, ${dashLabs.length} live labs across ${Object.keys(PACKS).length} packs, ${registry.filter(r => r.category === 'challenge').length} Challenges), ${internalTags.size} internal skill tags routable, ${courses.length} Insider courses and ${rows.length} doc rows all agree with the registry.`);
+// The hidden count is printed, never implied. A module that is live and deliberately off
+// every surface should be visible in the one place that knows about it — this line — so it
+// is a decision somebody can see rather than something only the JSON remembers.
+const hiddenNote = HIDDEN.length
+  ? ` ${HIDDEN.length} hidden module(s) — ${HIDDEN.map(h => `${h.id} (hidden ${h.hiddenSince})`).join(', ')} — validated in full and asserted absent from the nav, the games hub, the dashboard, Mission Control, Insider and every Lab Pack hub.`
+  : '';
+console.log(`check-modules: ${warnings.length ? `OK with ${warnings.length} warning(s) above` : 'OK'} — ${REGISTRY.length} registry entries (${visibleGames.length} games, ${dashLabs.length} live labs across ${Object.keys(PACKS).length} packs, ${registry.filter(r => r.category === 'challenge').length} Challenges), ${internalTags.size} internal skill tags routable, ${courses.length} Insider courses and ${rows.length} doc rows all agree with the registry.${hiddenNote}`);

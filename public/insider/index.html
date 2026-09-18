@@ -282,8 +282,18 @@
         const D = {                 // raw data
             users: [], classrooms: [], messages: [], feedback: [],
             launches: [], scores: [], attempts: [], progress: [], sessions: [], events: [],
+            // Telemetry from products that are deliberately NOT part of this funnel —
+            // today just Pattern Lab. Held separately rather than dropped, so the data is
+            // still exportable for item calibration, and separately rather than filtered
+            // at each call site, so a metric added later cannot pick it up by default.
+            // See offFunnel() and the STREAMS note in /js/telemetry.js.
+            offFunnel: { sessions: [], events: [] },
             errors: {}, loadedAt: null,
         };
+        // Which telemetry streams this dashboard's numbers are computed from. A session or
+        // event with no `stream` predates streams entirely and is core by definition.
+        const FUNNEL_STREAMS = ['core'];
+        const inFunnel = (d) => FUNNEL_STREAMS.includes(d.stream || 'core');
         let userIndex = {};         // uid -> computed user record
         let rangeDays = 30;
         let usersView = { filter: 'all', sort: 'lastActive', dir: 'desc', search: '' };
@@ -485,7 +495,29 @@
                 safe('events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), orderBy('ts', 'desc'), limit(3000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
             ]);
 
-            Object.assign(D, { users, classrooms, messages, feedback, launches, scores, attempts, progress, sessions, events, loadedAt: Date.now() });
+            /* THE EXCLUSION, DONE ONCE.
+               Pattern Lab (/educational-games/pattern-lab/) writes to the same two
+               collections as everything else, tagged stream: 'pattern-lab'. Its sessions
+               must not reach module visits, completion counts, time-on-task, the activity
+               chart, the per-course funnel, the user index or any Lab Pack figure — they
+               would inflate "game sessions" and deflate the game→GoodBlock conversion rate,
+               which is the metric the whole funnel thesis rests on.
+               Split here, at the one place the data enters the page, instead of filtering
+               in each of the ~20 places sessions are read. A filter added per call site is
+               a filter somebody forgets on the twenty-first. */
+            const funnelSessions = sessions.filter(inFunnel);
+            const funnelEvents = events.filter(inFunnel);
+            const offFunnel = {
+                sessions: sessions.filter(s => !inFunnel(s)),
+                events: events.filter(e => !inFunnel(e)),
+            };
+
+            Object.assign(D, {
+                users, classrooms, messages, feedback, launches, scores, attempts, progress,
+                sessions: funnelSessions, events: funnelEvents, offFunnel, loadedAt: Date.now(),
+            });
+            D.offFunnel.sessions.forEach(s => { s.startMs = toMs(s.startedAt); s.lastMs = toMs(s.lastSeenAt); });
+            D.offFunnel.events.forEach(e => { e.ms = toMs(e.ts) || e.clientTs || 0; });
 
             // Normalise timestamps once.
             D.users.forEach(u => { u.lastLoginMs = toMs(u.lastLogin); u.name = u.displayName || '—'; u.isGeneric = !u.displayName || GENERIC_NAMES.includes(u.displayName); });
@@ -1000,10 +1032,10 @@
                     ${card('Export to your BI tool', `
                         <p class="text-xs text-slate-500 mb-3">Each button downloads a CSV you can drop into Google Sheets, Looker Studio, Excel or any BI tool. Column names match the Firestore fields.</p>
                         <div class="flex flex-wrap gap-2">
-                            ${[['users', 'Users (with rollups)'], ['sessions', 'Sessions (time on task)'], ['events', 'Events (raw stream)'], ['scores', 'Scores'], ['attempts', 'Scenario attempts'], ['launches', 'Launches'], ['feedback', 'Course feedback'], ['messages', 'Messages']].map(([k, l]) => `<button data-export="${k}" class="text-[10px] font-bold uppercase tracking-wide border border-slate-200 rounded px-3 py-1.5 hover:border-[#357889] hover:text-[#357889]">${l}</button>`).join('')}
+                            ${[['users', 'Users (with rollups)'], ['sessions', 'Sessions (time on task)'], ['events', 'Events (raw stream)'], ['scores', 'Scores'], ['attempts', 'Scenario attempts'], ['launches', 'Launches'], ['feedback', 'Course feedback'], ['messages', 'Messages'], ['pattern-lab-items', 'Pattern Lab items (levelling)']].map(([k, l]) => `<button data-export="${k}" class="text-[10px] font-bold uppercase tracking-wide border border-slate-200 rounded px-3 py-1.5 hover:border-[#357889] hover:text-[#357889]">${l}</button>`).join('')}
                         </div>
                         <p class="text-[10px] text-slate-400 mt-3">For live, always-on dashboards instead of exports, see <span class="font-mono">docs/insider-analytics.md</span> in the repo — it walks through the Firestore → BigQuery → Looker Studio path.</p>`)}
-                    ${card('Data sources loaded', `${src('users', D.users.length)}${src('classrooms', D.classrooms.length)}${src('launches', D.launches.length)}${src('game_scores', D.scores.length)}${src('scenario_attempts', D.attempts.length)}${src('module_progress', D.progress.length)}${src('sessions', D.sessions.length)}${src('events', D.events.length)}${src('messages', D.messages.length)}${src('course_feedback', D.feedback.length)}<p class="text-[10px] text-slate-400 mt-3">Loaded ${D.loadedAt ? new Date(D.loadedAt).toLocaleString() : '—'}. Sessions and events are capped at the most recent 5,000 / 3,000.</p>`)}
+                    ${card('Data sources loaded', `${src('users', D.users.length)}${src('classrooms', D.classrooms.length)}${src('launches', D.launches.length)}${src('game_scores', D.scores.length)}${src('scenario_attempts', D.attempts.length)}${src('module_progress', D.progress.length)}${src('sessions', D.sessions.length)}${src('events', D.events.length)}${src('pattern-lab (off-funnel)', D.offFunnel.sessions.length)}${src('messages', D.messages.length)}${src('course_feedback', D.feedback.length)}<p class="text-[10px] text-slate-400 mt-3">Loaded ${D.loadedAt ? new Date(D.loadedAt).toLocaleString() : '—'}. Sessions and events are capped at the most recent 5,000 / 3,000. Pattern Lab (${D.offFunnel.sessions.length} session${D.offFunnel.sessions.length === 1 ? '' : 's'}, ${D.offFunnel.events.length} event${D.offFunnel.events.length === 1 ? '' : 's'}) is held off-funnel and is in none of the figures on this dashboard — it is free practice for search traffic, not a step toward a GoodBlock. Export it with <strong>Pattern Lab items</strong> above.</p>`)}
                 </div>
                 <div class="mt-4">${card('Delete a user\'s data', `
                     <p class="text-[11px] text-slate-500 mb-3">Permanently deletes a user's profile, scores, launches, progress, continuity bank, telemetry sessions/events, messages, feedback and recruit code. Use only to fulfil a deletion request — this cannot be undone. You can also do this from any user's profile drawer.</p>
@@ -1040,6 +1072,26 @@
             switch (kind) {
                 case 'users': rows = usersCSVRows(Object.values(userIndex).filter(u => !u.orphan)); cols = Object.keys(rows[0] || { uid: 1 }); break;
                 case 'sessions': rows = D.sessions.map(s => ({ sessionId: s.sessionId || s.id, uid: s.uid, module: s.module, gameName: s.gameName, role: s.role, ageTier: s.ageTier, isGuest: s.isGuest, startedAt: iso(s.startMs), lastSeenAt: iso(s.lastMs), activeMinutes: Math.round((s.activeMs || 0) / 60000 * 10) / 10, maxStep: s.maxStep, stepsTotal: s.stepsTotal, completed: s.completed, device: s.device, entry: s.entry })); cols = ['sessionId', 'uid', 'module', 'gameName', 'role', 'ageTier', 'isGuest', 'startedAt', 'lastSeenAt', 'activeMinutes', 'maxStep', 'stepsTotal', 'completed', 'device', 'entry']; break;
+                /* PATTERN LAB ITEM-LEVEL EXPORT (off-funnel, so it is in none of the rows above).
+                   One row per answered item: which subtest, which level the item was
+                   labelled, whether it was cleared, and which distractor was chosen when it
+                   was not. The L11/L12/L13 labels were assigned by design judgment and have
+                   never been normed against real students — if a subtest's "L13" items clear
+                   at the same rate as its "L11" items, that subtest's levelling is wrong and
+                   the bank needs recalibrating. This export is how that gets checked. */
+                case 'pattern-lab-items':
+                    rows = D.offFunnel.events
+                        .filter(e => e.event === 'choice' && e.meta && e.meta.subtest)
+                        .map(e => ({
+                            ts: iso(e.ms), sessionId: e.sessionId, stream: e.stream || '',
+                            itemId: e.meta.itemId || '', subtest: e.meta.subtest,
+                            level: e.meta.level, itemType: e.meta.itemType || '',
+                            grade: e.meta.grade, servedAt: e.meta.servedAt,
+                            correct: e.meta.correct, chosen: e.meta.chosen, answer: e.meta.answer,
+                            device: e.device,
+                        }));
+                    cols = ['ts', 'sessionId', 'stream', 'itemId', 'subtest', 'level', 'itemType', 'grade', 'servedAt', 'correct', 'chosen', 'answer', 'device'];
+                    break;
                 case 'events': rows = D.events.map(e => ({ ts: iso(e.ms), uid: e.uid, module: e.module, gameName: e.gameName, sessionId: e.sessionId, event: e.event, step: e.step, meta: e.meta, device: e.device, entry: e.entry })); cols = ['ts', 'uid', 'module', 'gameName', 'sessionId', 'event', 'step', 'meta', 'device', 'entry']; break;
                 case 'scores': rows = D.scores.map(s => ({ uid: s.uid, sessionId: s.sessionId, gameName: s.gameName, finalScore: s.finalScore, maxScore: s.maxScore, percentage: s.percentage, rank: s.rank, completed: s.completed || s.complete || '', isCertified: s.isCertified || '', lastUpdated: iso(s.ms) })); cols = ['uid', 'sessionId', 'gameName', 'finalScore', 'maxScore', 'percentage', 'rank', 'completed', 'isCertified', 'lastUpdated']; break;
                 case 'attempts': rows = D.attempts.map(a => ({ uid: a.uid, sessionId: a.sessionId, gameName: a.course ? a.course.name : '', scenarioIndex: a.scenarioIndex, question: a.question, choiceIndex: a.choiceIndex, score: a.score, effectiveness: a.effectiveness, cashImpact: a.cashImpact, timestamp: iso(a.ms) })); cols = ['uid', 'sessionId', 'gameName', 'scenarioIndex', 'question', 'choiceIndex', 'score', 'effectiveness', 'cashImpact', 'timestamp']; break;

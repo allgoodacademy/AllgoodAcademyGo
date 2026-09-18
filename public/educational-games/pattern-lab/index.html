@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pattern Lab — Allgood Academy</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<meta name="description" content="Free CogAT-style practice for grades 5–8. Nine reasoning skills, adaptive difficulty, and the pattern behind every question explained.">
+
+<!-- Shared brand values. Everything design-tokens.css already defines is read from it
+     below rather than restated here; see scripts/check-tokens.js, which fails the build
+     on a brand literal reappearing inside a <style> block. -->
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+
+<!-- Shared identity module. Pattern Lab never asks anyone to sign in and never opens the
+     identify gate — it loads AuthCore only so the telemetry pipe below has a Firebase
+     session to write under. See the anonymousSessionOnly() note in /js/auth-core.js. -->
+<script type="module" src="/js/auth-core.js"></script>
+<!-- Shared telemetry pipe, tagged stream: 'pattern-lab' so these sessions are excludable
+     from Insider's funnel and conversion metrics. See TICKET 5 in the block below and the
+     `stream` note in /js/telemetry.js. -->
+<script type="module" src="/js/telemetry.js"></script>
+<!-- DELIBERATELY NOT LOADED: /js/skill-routing.js. Pattern Lab's nine subtests are not in
+     the routing vocabulary and must never resolve to a GoodBlock. scripts/check-modules.js
+     asserts the absence of this script on a hidden module, and resolve() in
+     skill-routing.js refuses a Pattern Lab subtest outright. -->
+<style>
+:root{
+  /* Brand values come from /assets/css/design-tokens.css. The short names below are kept
+     because every rule in this file already references them. */
+  /* --font-display and --font-ui are NOT restated here: design-tokens.css defines those
+     exact names on :root, and it is loaded above, so every var(--font-display) below
+     already resolves to the shared stack. */
+  --teal:var(--color-teal);
+  --teal-deep:var(--color-teal-deep);
+  --orange:var(--color-orange);
+  --cream:var(--color-cream);
+  --dark:var(--color-dark);
+  /* Pattern-Lab-specific. No token defines these: the sage is the "above your grade"
+     meter fill, --line is a warmer hairline than --color-cream-border, and --muted is a
+     warm grey that reads against the cream card (--color-muted is the cool grey the dark
+     game chassis uses). */
+  --sage:#5E8A6B; --line:#E4DDCE; --muted:#6b6558;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--dark);color:var(--dark);font-family:var(--font-ui);min-height:100vh;}
+
+/* NAV CHROME — the four standalone games' dark navbar, minus every link that leads back
+   into the main site. Those games offer "Return to dashboard", "Browse games" and
+   "Sign in"; Pattern Lab offers none of them. Its audience arrived from a search result,
+   not from allgoodacademy.com, and a full site nav would drop a parent into a page
+   written for teachers. The only exits are a restart and the Pattern Lab landing page.
+   Values (height, tint, hairline) are the game chassis's own, so the two read as siblings. */
+.nav{background:var(--navbar-bg);color:#fff;padding:0 20px;min-height:60px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20;border-bottom:1px solid rgba(255,255,255,.1);backdrop-filter:blur(5px);}
+.nav .brand{font-family:var(--font-display);font-size:14px;letter-spacing:.01em;white-space:nowrap;}
+.nav .brand b{color:var(--orange);font-weight:normal;}
+.nav .brand .brand-full::after{content:"|";padding:0 6px 0 4px;opacity:.5;}
+.nav .prog{margin-left:auto;font-size:11px;opacity:.7;}
+.nav .navlinks{display:flex;align-items:center;gap:4px;margin-left:14px;}
+.nav .navlinks a,.nav .navlinks button{color:#e5e7eb;background:none;border:none;font-family:var(--font-ui);font-size:11px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;padding:7px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;}
+.nav .navlinks a:hover,.nav .navlinks button:hover{color:#fff;background:rgba(255,255,255,.1);}
+@media (max-width:520px){
+  .nav{padding:0 12px;gap:8px;}
+  /* "ALLGOOD ACADEMY | Pattern Lab" wraps to three lines at 360px and drags the whole bar
+     down with it. The product name is what a visitor needs here; the company name is on
+     the landing page they came from and in its footer. */
+  .nav .brand .brand-full{display:none;}
+  .nav .brand{font-size:13px;}
+  .nav .navlinks{margin-left:8px;}
+  .nav .navlinks a,.nav .navlinks button{padding:6px 7px;font-size:10px;}
+}
+
+.stage{max-width:760px;margin:0 auto;padding:26px 20px 60px;}
+.card{background:var(--cream);border-radius:12px;padding:30px 32px;box-shadow:0 6px 28px rgba(0,0,0,.28);}
+
+h1{font-family:var(--font-display);font-size:30px;font-weight:bold;margin-bottom:10px;line-height:1.15;}
+.rule{width:56px;height:4px;background:var(--orange);margin:14px 0 18px;}
+p.lede{font-size:14px;line-height:1.6;margin-bottom:16px;}
+.muted{color:var(--muted);font-size:12.5px;line-height:1.55;}
+
+.eyebrow{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);font-weight:bold;margin-bottom:12px;}
+
+.btn{background:var(--teal);color:#fff;border:none;padding:13px 24px;border-radius:7px;font-family:var(--font-ui);font-size:13px;font-weight:bold;cursor:pointer;transition:background .15s;}
+.btn:hover{background:var(--teal-deep);}
+.btn.orange{background:var(--orange);}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--muted);font-weight:normal;}
+.btn:disabled{opacity:.4;cursor:default;}
+
+.grades{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 24px;}
+.lens{display:flex;flex-direction:column;gap:9px;margin:18px 0 24px;}
+.len{background:#fff;border:2px solid var(--line);border-radius:9px;padding:15px 18px;cursor:pointer;display:flex;align-items:flex-start;gap:16px;transition:all .15s;text-align:left;width:100%;font-family:var(--font-ui);}
+.len:hover{border-color:var(--teal);}
+.len.sel{border-color:var(--teal);background:#eef5f7;}
+.len .n{font-family:var(--font-display);font-size:26px;font-weight:bold;width:44px;text-align:center;flex-shrink:0;color:var(--teal-deep);line-height:1.25;}
+.len .w{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.len .t{display:block;font-family:var(--font-display);font-size:16px;line-height:1.3;}
+.len .d{display:block;font-size:11.5px;color:var(--muted);line-height:1.5;}
+.conf{font-size:9px;letter-spacing:.07em;text-transform:uppercase;font-weight:bold;padding:3px 8px;border-radius:12px;margin-left:8px;vertical-align:2px;}
+.conf.hi{background:#e7f0e9;color:var(--sage);}
+.conf.md{background:#f2ece0;color:#8a6a2a;}
+.conf.lo{background:#f0ebe0;color:var(--muted);}
+.grade{flex:1;min-width:76px;background:#fff;border:2px solid var(--line);border-radius:9px;padding:16px 8px;text-align:center;cursor:pointer;transition:all .15s;}
+.grade:hover{border-color:var(--teal);}
+.grade.sel{border-color:var(--teal);background:#eef5f7;}
+.grade .g{font-family:var(--font-display);font-size:21px;font-weight:bold;}
+.grade .l{font-size:10px;color:var(--muted);margin-top:3px;}
+
+.qmeta{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.chip{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:bold;padding:5px 11px;border-radius:20px;background:#e4eef0;color:var(--teal-deep);}
+.chip.lv{background:#f2ece0;color:#8a6a2a;}
+
+.stem{font-family:var(--font-display);font-size:23px;line-height:1.5;margin:10px 0 24px;}
+.stem .hl{color:var(--orange);font-weight:bold;}
+.series{font-family:var(--font-display);font-size:30px;letter-spacing:.08em;text-align:center;padding:22px;background:#fff;border-radius:9px;border:1px solid var(--line);margin:10px 0 24px;overflow-wrap:anywhere;}
+.series .q{color:var(--orange);}
+
+.opts{display:flex;flex-direction:column;gap:9px;}
+.opt{background:#fff;border:2px solid var(--line);border-radius:9px;padding:14px 18px;text-align:left;cursor:pointer;font-family:var(--font-display);font-size:16px;transition:all .12s;display:flex;align-items:center;gap:13px;}
+.opt:hover:not(:disabled){border-color:var(--teal);}
+.opt:disabled{cursor:default;}
+.opt .k{font-family:var(--font-ui);font-size:10.5px;font-weight:bold;width:21px;height:21px;border-radius:50%;background:#eee6d8;color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.opt.right{border-color:var(--sage);background:#f0f6f1;}
+.opt.right .k{background:var(--sage);color:#fff;}
+.opt.wrong{border-color:var(--orange);background:#fdf1ec;}
+.opt.wrong .k{background:var(--orange);color:#fff;}
+
+.numin{display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;}
+/* min-width:0 is load-bearing, not tidying. A flex item's default min-width:auto is its
+   intrinsic content width, and this input's is set by a 26px placeholder — so on a phone it
+   refused to shrink and pushed the Check button ~140px off the right edge of the page. */
+.numin input{flex:1 1 130px;min-width:0;font-family:var(--font-display);font-size:26px;text-align:center;padding:15px;border:2px solid var(--line);border-radius:9px;background:#fff;color:var(--dark);}
+.numin input:focus{outline:none;border-color:var(--teal);}
+
+.mech{margin-top:20px;padding:16px 20px;border-radius:9px;background:#fff;border-left:4px solid var(--teal);}
+.mech .vt{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:bold;margin-bottom:7px;}
+.mech.ok .vt{color:var(--sage);}
+.mech.no .vt{color:var(--orange);}
+.mech p{font-size:13.5px;line-height:1.6;}
+.mech .ans{font-family:var(--font-display);font-size:15px;margin-bottom:6px;}
+
+.foot{display:flex;gap:10px;margin-top:20px;align-items:center;}
+.foot .skip{margin-left:auto;font-size:11.5px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;}
+
+
+/* figures */
+.figgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--line);border:1px solid var(--line);border-radius:9px;overflow:hidden;margin:10px auto 24px;max-width:340px;}
+.figcell{background:#fff;aspect-ratio:1;display:flex;align-items:center;justify-content:center;padding:10px;}
+.figcell.qm{background:#fdf1ec;}
+.figcell.qm span{font-family:var(--font-display);font-size:34px;color:var(--orange);}
+.figrow{display:flex;gap:9px;justify-content:center;align-items:center;flex-wrap:wrap;margin:10px 0 24px;}
+.figrow .fb{background:#fff;border:1px solid var(--line);border-radius:9px;width:84px;height:84px;display:flex;align-items:center;justify-content:center;padding:9px;}
+.figrow .sep{font-size:20px;color:var(--muted);}
+.figopts{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+.figopt{background:#fff;border:2px solid var(--line);border-radius:9px;padding:9px 6px 7px;cursor:pointer;transition:all .12s;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.figopt:hover:not(:disabled){border-color:var(--teal);}
+.figopt:disabled{cursor:default;}
+.figopt svg{width:100%;height:auto;max-height:62px;}
+.figopt .k{font-family:var(--font-ui);font-size:10px;font-weight:bold;width:19px;height:19px;border-radius:50%;background:#eee6d8;color:var(--muted);display:flex;align-items:center;justify-content:center;}
+.figopt.right{border-color:var(--sage);background:#f0f6f1;}
+.figopt.right .k{background:var(--sage);color:#fff;}
+.figopt.wrong{border-color:var(--orange);background:#fdf1ec;}
+.figopt.wrong .k{background:var(--orange);color:#fff;}
+.fold{display:flex;gap:7px;align-items:center;justify-content:center;flex-wrap:wrap;margin:10px 0 24px;}
+.fold .fs{background:#fff;border:1px solid var(--line);border-radius:8px;width:76px;height:76px;display:flex;align-items:center;justify-content:center;padding:7px;}
+.fold .ar{font-size:17px;color:var(--muted);}
+.fold .cap{width:100%;text-align:center;font-size:10.5px;color:var(--muted);margin-top:2px;}
+
+
+/* skill meters */
+.sk{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:8px;}
+.sk .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:9px;}
+.sk .nm{font-family:var(--font-display);font-size:15px;}
+.sk .vb{font-size:11px;font-weight:bold;letter-spacing:.03em;}
+.vb.up{color:var(--sage);} .vb.on{color:var(--teal);} .vb.dn{color:var(--orange);} .vb.nd{color:var(--muted);font-weight:normal;}
+.meter{display:flex;gap:4px;}
+.seg{flex:1;height:26px;border-radius:5px;background:#f0ebe0;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:bold;color:#bdb5a5;letter-spacing:.04em;position:relative;overflow:hidden;}
+.seg.cl{background:var(--teal);border-color:var(--teal);color:#fff;}
+.seg.cl.above{background:var(--sage);border-color:var(--sage);}
+.seg.try{background:#fdf1ec;border-color:var(--orange);color:var(--orange);}
+.seg .st{position:relative;z-index:1;}
+.sk .sub{font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.5;}
+.startmark{position:absolute;top:0;bottom:0;left:0;width:3px;background:var(--dark);opacity:.35;}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin:14px 0 22px;}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+.summary{background:var(--dark);color:#fff;border-radius:10px;padding:18px 22px;margin-bottom:20px;}
+.summary .sh{font-family:var(--font-display);font-size:17px;margin-bottom:8px;}
+.summary p{font-size:12.5px;line-height:1.6;color:#c9d6d2;}
+.summary b{color:#fff;}
+
+/* skill meters end */
+/* report */
+.rrow{background:#fff;border:1px solid var(--line);border-radius:9px;padding:15px 18px;margin-bottom:9px;}
+.rrow .rt{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}
+.rrow .rn{font-family:var(--font-display);font-size:16px;}
+.rrow .rv{font-size:12px;font-weight:bold;}
+.rv.up{color:var(--sage);} .rv.on{color:var(--teal);} .rv.nd{color:var(--muted);font-weight:normal;}
+.rrow .rd{font-size:11.5px;color:var(--muted);margin-top:5px;}
+.bt{font-family:var(--font-display);font-size:13px;color:var(--teal-deep);margin:20px 0 9px;letter-spacing:.03em;}
+.disc{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);font-size:10.5px;color:var(--muted);line-height:1.6;}
+
+/* NARROW WIDTHS
+   The SVG figures are the part most likely to break here: four figure options on one row at
+   320px leaves ~55px each, and the grid is fixed at three columns because a 3x3 matrix
+   reordered into two columns is no longer the puzzle. So the card gives back its padding
+   instead, and the option keys shrink rather than the figures. */
+@media (max-width:560px){
+  .stage{padding:16px 12px 48px;}
+  .card{padding:22px 18px;border-radius:10px;}
+  h1{font-size:25px;}
+  .stem{font-size:19px;margin:10px 0 20px;}
+  .series{font-size:24px;padding:16px 12px;}
+  .figgrid{max-width:100%;gap:6px;}
+  .figcell{padding:6px;}
+  .figrow .fb{width:68px;height:68px;padding:7px;}
+  .fold .fs{width:62px;height:62px;padding:5px;}
+  .figopts{gap:6px;}
+  .figopt{padding:7px 3px 5px;}
+  .figopt svg{max-height:52px;}
+  .figopt .k{width:16px;height:16px;font-size:9px;}
+  .opt{font-size:15px;padding:12px 14px;gap:10px;}
+  .qmeta{gap:8px;flex-wrap:wrap;}
+  .foot{flex-wrap:wrap;gap:8px;}
+  .foot .skip{margin-left:0;}
+  .foot #stop{margin-left:0 !important;}
+  .seg{font-size:9px;}
+}
+@media (max-width:360px){
+  .figrow .fb{width:58px;height:58px;}
+  .fold .fs{width:54px;height:54px;}
+  .figopt svg{max-height:44px;}
+}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="brand"><span class="brand-full">ALLGOOD ACADEMY </span><b>Pattern Lab</b></div>
+  <div class="navlinks">
+    <button type="button" id="nav-restart">Start over</button>
+    <a href="/pattern-lab/">About Pattern Lab</a>
+  </div>
+  <div class="prog" id="prog"></div>
+</div>
+
+<div class="stage"><div class="card" id="card"></div></div>
+
+<script>
+
+// ---------- SVG FIGURE PRIMITIVES ----------
+// Every figure is a pure function -> SVG string. Deterministic, no assets.
+// Figure ink. Read from design-tokens.css rather than restated, so a brand change reaches
+// the SVG figures too; the literals are the fallback for the one case a var cannot cover
+// (stylesheet blocked or not yet applied), never a second source of truth.
+const _tok = (name, fallback) => {
+  try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; }
+  catch (e) { return fallback; }
+};
+const T=_tok('--color-teal','#357889'), O=_tok('--color-orange','#D34716'),
+      G='#5E8A6B', D=_tok('--color-dark','#0F1923'), N='none';
+const svg=b=>`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">${b}</svg>`;
+
+const F={
+  // shapes: fill or outline, optional rotation
+  sq:(c,f=1,r=0)=>svg(`<rect x="24" y="24" width="52" height="52" fill="${f?c:N}" stroke="${c}" stroke-width="4" transform="rotate(${r} 50 50)"/>`),
+  tri:(c,f=1,r=0)=>svg(`<polygon points="50,20 80,76 20,76" fill="${f?c:N}" stroke="${c}" stroke-width="4" transform="rotate(${r} 50 50)"/>`),
+  cir:(c,f=1)=>svg(`<circle cx="50" cy="50" r="27" fill="${f?c:N}" stroke="${c}" stroke-width="4"/>`),
+  dia:(c,f=1)=>svg(`<polygon points="50,18 82,50 50,82 18,50" fill="${f?c:N}" stroke="${c}" stroke-width="4"/>`),
+  pent:(c,f=1,r=0)=>svg(`<polygon points="50,18 80,40 69,75 31,75 20,40" fill="${f?c:N}" stroke="${c}" stroke-width="4" transform="rotate(${r} 50 50)"/>`),
+  hex:(c,f=1)=>svg(`<polygon points="50,18 78,34 78,66 50,82 22,66 22,34" fill="${f?c:N}" stroke="${c}" stroke-width="4"/>`),
+  // arrow at rotation r
+  arr:(c,r=0)=>svg(`<g transform="rotate(${r} 50 50)"><line x1="50" y1="78" x2="50" y2="26" stroke="${c}" stroke-width="6" stroke-linecap="round"/><polygon points="50,16 38,34 62,34" fill="${c}"/></g>`),
+  // n dots in a row
+  dots:(c,n)=>{const gap=Math.min(20,76/Math.max(n,1)),r=Math.min(8,gap*0.40);
+    return svg(Array.from({length:n},(_,i)=>`<circle cx="${(50+(i-(n-1)/2)*gap).toFixed(2)}" cy="50" r="${r.toFixed(2)}" fill="${c}"/>`).join(''));},
+  // square with n dots inside
+  sqdots:(c,n)=>{const gap=Math.min(17,52/Math.max(n,1)),r=Math.min(6,gap*0.38);
+    return svg(`<rect x="18" y="18" width="64" height="64" fill="${N}" stroke="${c}" stroke-width="4"/>`+
+    Array.from({length:n},(_,i)=>`<circle cx="${(50+(i-(n-1)/2)*gap).toFixed(2)}" cy="50" r="${r.toFixed(2)}" fill="${c}"/>`).join(''));},
+  // L-shape, rotatable
+  ell:(c,r=0)=>svg(`<polygon points="26,22 46,22 46,58 76,58 76,78 26,78" fill="${c}" transform="rotate(${r} 50 50)"/>`),
+  // shape with a slice removed (rotatable)
+  pac:(c,r=0)=>svg(`<path d="M50,50 L50,20 A30,30 0 1,1 20,50 Z" fill="${c}" transform="rotate(${r} 50 50)"/>`),
+  // striped square
+  stripe:(c,r=0)=>svg(`<g transform="rotate(${r} 50 50)"><rect x="24" y="24" width="52" height="52" fill="${N}" stroke="${c}" stroke-width="4"/>`+
+    [34,44,54,64].map(y=>`<line x1="26" y1="${y}" x2="74" y2="${y}" stroke="${c}" stroke-width="3"/>`).join('')+`</g>`),
+  // paper-folding: sheet with fold line + punched holes
+  sheet:(holes=[],fold=null)=>svg(`<rect x="14" y="14" width="72" height="72" fill="#fff" stroke="${D}" stroke-width="3"/>`+
+    (fold==='v'?`<line x1="50" y1="14" x2="50" y2="86" stroke="${T}" stroke-width="2.5" stroke-dasharray="5,4"/>`:
+     fold==='h'?`<line x1="14" y1="50" x2="86" y2="50" stroke="${T}" stroke-width="2.5" stroke-dasharray="5,4"/>`:'')+
+    holes.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6" fill="${O}"/>`).join('')),
+  // folded half-sheet (left half shown folded over)
+  half:(holes=[],dir='v')=>svg(
+    (dir==='v'?`<rect x="14" y="14" width="36" height="72" fill="#fff" stroke="${D}" stroke-width="3"/><line x1="50" y1="14" x2="50" y2="86" stroke="${T}" stroke-width="3"/>`
+              :`<rect x="14" y="14" width="72" height="36" fill="#fff" stroke="${D}" stroke-width="3"/><line x1="14" y1="50" x2="86" y2="50" stroke="${T}" stroke-width="3"/>`)+
+    holes.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6" fill="${O}"/>`).join(''))
+};
+
+// ---------- ITEM BANK (12 seed items; scales to ~110) ----------
+// sub: verbal-analogies | verbal-classification | sentence-completion
+//      number-series | number-analogies | number-puzzles
+// lvl: 11 | 12 | 13  (13 = combined 13/14)
+const BANK = [{"id":"N-S-01","sub":"number-series","lvl":11,"type":"num","series":["3","9","27","81","?"],"ans":"243","mech":"Each term is the one before it times 3. Gaps that grow fast usually mean multiplication, not addition."},{"id":"N-S-02","sub":"number-series","lvl":11,"type":"num","series":["74","67","60","53","46","?"],"ans":"39","mech":"A constant step of −7. A falling series still has one rule — check the gap before assuming it's complicated."},{"id":"N-S-03","sub":"number-series","lvl":11,"type":"num","series":["9","16","23","30","37","?"],"ans":"44","mech":"A constant step of +7 between every term. When each gap is the same, the rule is a single addition."},{"id":"N-S-04","sub":"number-series","lvl":11,"type":"num","series":["77","72","67","62","57","?"],"ans":"52","mech":"A constant step of −5. A falling series still has one rule — check the gap before assuming it's complicated."},{"id":"N-S-05","sub":"number-series","lvl":11,"type":"num","series":["49","42","35","28","21","?"],"ans":"14","mech":"A constant step of −7. A falling series still has one rule — check the gap before assuming it's complicated."},{"id":"N-S-06","sub":"number-series","lvl":11,"type":"num","series":["3","11","19","27","35","?"],"ans":"43","mech":"A constant step of +8 between every term. When each gap is the same, the rule is a single addition."},{"id":"N-S-07","sub":"number-series","lvl":11,"type":"num","series":["83","80","77","74","71","?"],"ans":"68","mech":"A constant step of −3. A falling series still has one rule — check the gap before assuming it's complicated."},{"id":"N-S-08","sub":"number-series","lvl":11,"type":"num","series":["4","8","16","32","?"],"ans":"64","mech":"Each term is the one before it times 2. Gaps that grow fast usually mean multiplication, not addition."},{"id":"N-S-09","sub":"number-series","lvl":11,"type":"num","series":["4","13","22","31","40","?"],"ans":"49","mech":"A constant step of +9 between every term. When each gap is the same, the rule is a single addition."},{"id":"N-S-10","sub":"number-series","lvl":11,"type":"num","series":["61","55","49","43","37","?"],"ans":"31","mech":"A constant step of −6. A falling series still has one rule — check the gap before assuming it's complicated."},{"id":"N-S-11","sub":"number-series","lvl":11,"type":"num","series":["48","44","40","36","32","?"],"ans":"28","mech":"A constant step of −4. A falling series still has one rule — check the gap before assuming it's complicated."},{"id":"N-S-12","sub":"number-series","lvl":12,"type":"num","series":["5","10","7","14","11","?"],"ans":"22","mech":"Two operations taking turns: ×2, then −3. When single-step differences don't work, check if two rules alternate."},{"id":"N-S-13","sub":"number-series","lvl":12,"type":"num","series":["3","9","11","33","35","?"],"ans":"105","mech":"×3 then +2, repeating. Mixed operations are common at this level — test the first two gaps separately."},{"id":"N-S-14","sub":"number-series","lvl":12,"type":"num","series":["2","6","8","24","26","?"],"ans":"78","mech":"×3 then +2, repeating. Mixed operations are common at this level — test the first two gaps separately."},{"id":"N-S-15","sub":"number-series","lvl":12,"type":"num","series":["6","15","13","22","20","?"],"ans":"29","mech":"Alternating +9 and −2. The series moves forward overall, but in two different sized steps."},{"id":"N-S-16","sub":"number-series","lvl":12,"type":"num","series":["6","14","12","20","18","?"],"ans":"26","mech":"Alternating +8 and −2. The series moves forward overall, but in two different sized steps."},{"id":"N-S-17","sub":"number-series","lvl":12,"type":"num","series":["2","10","7","15","12","?"],"ans":"20","mech":"Alternating +8 and −3. The series moves forward overall, but in two different sized steps."},{"id":"N-S-18","sub":"number-series","lvl":12,"type":"num","series":["4","11","7","14","10","?"],"ans":"17","mech":"Alternating +7 and −4. The series moves forward overall, but in two different sized steps."},{"id":"N-S-19","sub":"number-series","lvl":12,"type":"num","series":["2","8","6","12","10","?"],"ans":"16","mech":"Alternating +6 and −2. The series moves forward overall, but in two different sized steps."},{"id":"N-S-20","sub":"number-series","lvl":12,"type":"num","series":["4","8","6","12","10","?"],"ans":"20","mech":"Two operations taking turns: ×2, then −2. When single-step differences don't work, check if two rules alternate."},{"id":"N-S-21","sub":"number-series","lvl":12,"type":"num","series":["7","14","12","24","22","?"],"ans":"44","mech":"Two operations taking turns: ×2, then −2. When single-step differences don't work, check if two rules alternate."},{"id":"N-S-22","sub":"number-series","lvl":12,"type":"num","series":["6","14","10","18","14","?"],"ans":"22","mech":"Alternating +8 and −4. The series moves forward overall, but in two different sized steps."},{"id":"N-S-23","sub":"number-series","lvl":13,"type":"num","series":["3","6","12","21","33","?"],"ans":"48","mech":"The gaps themselves grow by 3 each time. When differences aren't constant, look at the gaps between the gaps."},{"id":"N-S-24","sub":"number-series","lvl":13,"type":"num","series":["2","5","11","23","47","?"],"ans":"95","mech":"Double, then add 1 — a compound rule applied every step. Test ×2 first, then see what's left over."},{"id":"N-S-25","sub":"number-series","lvl":13,"type":"num","series":["3","2","5","7","12","?"],"ans":"19","mech":"Each term is the sum of the two before it. When a series grows faster than addition but slower than doubling, test the sum rule."},{"id":"N-S-26","sub":"number-series","lvl":13,"type":"num","series":["4","9","19","39","79","?"],"ans":"159","mech":"Double, then add 1 — a compound rule applied every step. Test ×2 first, then see what's left over."},{"id":"N-S-27","sub":"number-series","lvl":13,"type":"num","series":["3","7","15","31","63","?"],"ans":"127","mech":"Double, then add 1 — a compound rule applied every step. Test ×2 first, then see what's left over."},{"id":"N-S-28","sub":"number-series","lvl":13,"type":"num","series":["3","4","7","11","18","?"],"ans":"29","mech":"Each term is the sum of the two before it. When a series grows faster than addition but slower than doubling, test the sum rule."},{"id":"N-S-29","sub":"number-series","lvl":13,"type":"num","series":["3","5","8","13","21","?"],"ans":"34","mech":"Each term is the sum of the two before it. When a series grows faster than addition but slower than doubling, test the sum rule."},{"id":"N-S-30","sub":"number-series","lvl":13,"type":"num","series":["1","4","5","9","14","?"],"ans":"23","mech":"Each term is the sum of the two before it. When a series grows faster than addition but slower than doubling, test the sum rule."},{"id":"N-S-31","sub":"number-series","lvl":13,"type":"num","series":["4","6","10","16","24","?"],"ans":"34","mech":"The gaps themselves grow by 2 each time. When differences aren't constant, look at the gaps between the gaps."},{"id":"N-S-32","sub":"number-series","lvl":13,"type":"num","series":["3","3","6","9","15","?"],"ans":"24","mech":"Each term is the sum of the two before it. When a series grows faster than addition but slower than doubling, test the sum rule."},{"id":"N-S-33","sub":"number-series","lvl":13,"type":"num","series":["2","3","6","11","18","?"],"ans":"27","mech":"The gaps are 1, 3, 5, 7 — consecutive odd numbers, which means square numbers are being added."},{"id":"N-A-01","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[7 → 2]</span> &nbsp;and&nbsp; <span class=\"hl\">[6 → 1]</span><br>so &nbsp;<span class=\"hl\">[11 → ?]</span>","opts":["6","1","11","22"],"ans":0,"mech":"−5 in both pairs. A shrinking pair still follows one consistent rule."},{"id":"N-A-02","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[5 → 10]</span> &nbsp;and&nbsp; <span class=\"hl\">[8 → 16]</span><br>so &nbsp;<span class=\"hl\">[10 → ?]</span>","opts":["20","16","15","24"],"ans":0,"mech":"×2 in both pairs. Test multiplication before addition — a difference that fits one pair often fails the other."},{"id":"N-A-03","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[9 → 6]</span> &nbsp;and&nbsp; <span class=\"hl\">[4 → 1]</span><br>so &nbsp;<span class=\"hl\">[10 → ?]</span>","opts":["20","7","10","4"],"ans":1,"mech":"−3 in both pairs. A shrinking pair still follows one consistent rule."},{"id":"N-A-04","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[3 → 9]</span> &nbsp;and&nbsp; <span class=\"hl\">[9 → 27]</span><br>so &nbsp;<span class=\"hl\">[14 → ?]</span>","opts":["46","42","38","28"],"ans":1,"mech":"×3 in both pairs. Test multiplication before addition — a difference that fits one pair often fails the other."},{"id":"N-A-05","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[3 → 12]</span> &nbsp;and&nbsp; <span class=\"hl\">[13 → 22]</span><br>so &nbsp;<span class=\"hl\">[6 → ?]</span>","opts":["12","11","15","17"],"ans":2,"mech":"+9 in both pairs. Check the gap in the first pair, then confirm it holds in the second."},{"id":"N-A-06","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[8 → 14]</span> &nbsp;and&nbsp; <span class=\"hl\">[14 → 20]</span><br>so &nbsp;<span class=\"hl\">[6 → ?]</span>","opts":["18","12","7","14"],"ans":1,"mech":"+6 in both pairs. Check the gap in the first pair, then confirm it holds in the second."},{"id":"N-A-07","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[14 → 56]</span> &nbsp;and&nbsp; <span class=\"hl\">[5 → 20]</span><br>so &nbsp;<span class=\"hl\">[11 → ?]</span>","opts":["44","39","22","47"],"ans":0,"mech":"×4 in both pairs. Test multiplication before addition — a difference that fits one pair often fails the other."},{"id":"N-A-08","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[10 → 22]</span> &nbsp;and&nbsp; <span class=\"hl\">[5 → 17]</span><br>so &nbsp;<span class=\"hl\">[3 → ?]</span>","opts":["13","6","20","15"],"ans":3,"mech":"+12 in both pairs. Check the gap in the first pair, then confirm it holds in the second."},{"id":"N-A-09","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[10 → 22]</span> &nbsp;and&nbsp; <span class=\"hl\">[9 → 21]</span><br>so &nbsp;<span class=\"hl\">[6 → ?]</span>","opts":["12","21","18","15"],"ans":2,"mech":"+12 in both pairs. Check the gap in the first pair, then confirm it holds in the second."},{"id":"N-A-10","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[6 → 18]</span> &nbsp;and&nbsp; <span class=\"hl\">[4 → 12]</span><br>so &nbsp;<span class=\"hl\">[13 → ?]</span>","opts":["39","42","26","34"],"ans":0,"mech":"×3 in both pairs. Test multiplication before addition — a difference that fits one pair often fails the other."},{"id":"N-A-11","sub":"number-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">[13 → 25]</span> &nbsp;and&nbsp; <span class=\"hl\">[5 → 17]</span><br>so &nbsp;<span class=\"hl\">[12 → ?]</span>","opts":["36","28","24","20"],"ans":2,"mech":"+12 in both pairs. Check the gap in the first pair, then confirm it holds in the second."},{"id":"N-A-12","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[10 → 28]</span> &nbsp;and&nbsp; <span class=\"hl\">[5 → 13]</span><br>so &nbsp;<span class=\"hl\">[12 → ?]</span>","opts":["38","34","24","29"],"ans":1,"mech":"Triple, then subtract 2. When ×3 overshoots consistently, look for a subtraction after it."},{"id":"N-A-13","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[4 → 9]</span> &nbsp;and&nbsp; <span class=\"hl\">[3 → 6]</span><br>so &nbsp;<span class=\"hl\">[5 → ?]</span>","opts":["10","9","12","15"],"ans":2,"mech":"Triple, then subtract 3. When ×3 overshoots consistently, look for a subtraction after it."},{"id":"N-A-14","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[4 → 13]</span> &nbsp;and&nbsp; <span class=\"hl\">[2 → 9]</span><br>so &nbsp;<span class=\"hl\">[5 → ?]</span>","opts":["10","15","20","12"],"ans":1,"mech":"Double, then add 5. Test doubling first and see what's left over."},{"id":"N-A-15","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[4 → 9]</span> &nbsp;and&nbsp; <span class=\"hl\">[10 → 27]</span><br>so &nbsp;<span class=\"hl\">[14 → ?]</span>","opts":["42","39","36","28"],"ans":1,"mech":"Triple, then subtract 3. When ×3 overshoots consistently, look for a subtraction after it."},{"id":"N-A-16","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[4 → 1]</span> &nbsp;and&nbsp; <span class=\"hl\">[8 → 3]</span><br>so &nbsp;<span class=\"hl\">[6 → ?]</span>","opts":["2","4","12","3"],"ans":0,"mech":"Halve, then subtract 1. Two-step rules are common here — if one operation doesn't fit both pairs, try a pair of them."},{"id":"N-A-17","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[11 → 28]</span> &nbsp;and&nbsp; <span class=\"hl\">[12 → 31]</span><br>so &nbsp;<span class=\"hl\">[14 → ?]</span>","opts":["41","28","33","37"],"ans":3,"mech":"Triple, then subtract 5. When ×3 overshoots consistently, look for a subtraction after it."},{"id":"N-A-18","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[13 → 35]</span> &nbsp;and&nbsp; <span class=\"hl\">[8 → 20]</span><br>so &nbsp;<span class=\"hl\">[2 → ?]</span>","opts":["6","24","4","2"],"ans":3,"mech":"Triple, then subtract 4. When ×3 overshoots consistently, look for a subtraction after it."},{"id":"N-A-19","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[14 → 29]</span> &nbsp;and&nbsp; <span class=\"hl\">[7 → 15]</span><br>so &nbsp;<span class=\"hl\">[10 → ?]</span>","opts":["16","21","26","20"],"ans":1,"mech":"Double, then add 1. Test doubling first and see what's left over."},{"id":"N-A-20","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[2 → 4]</span> &nbsp;and&nbsp; <span class=\"hl\">[12 → 34]</span><br>so &nbsp;<span class=\"hl\">[7 → ?]</span>","opts":["14","15","19","24"],"ans":2,"mech":"Triple, then subtract 2. When ×3 overshoots consistently, look for a subtraction after it."},{"id":"N-A-21","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[10 → 23]</span> &nbsp;and&nbsp; <span class=\"hl\">[3 → 9]</span><br>so &nbsp;<span class=\"hl\">[5 → ?]</span>","opts":["16","11","10","13"],"ans":3,"mech":"Double, then add 3. Test doubling first and see what's left over."},{"id":"N-A-22","sub":"number-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">[8 → 22]</span> &nbsp;and&nbsp; <span class=\"hl\">[13 → 37]</span><br>so &nbsp;<span class=\"hl\">[2 → ?]</span>","opts":["6","16","4","8"],"ans":2,"mech":"Triple, then subtract 2. When ×3 overshoots consistently, look for a subtraction after it."},{"id":"N-A-23","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[11 → 121]</span> &nbsp;and&nbsp; <span class=\"hl\">[12 → 144]</span><br>so &nbsp;<span class=\"hl\">[10 → ?]</span>","opts":["102","20","97","100"],"ans":3,"mech":"Each number is squared. When the second value grows much faster than the first, test squaring."},{"id":"N-A-24","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[2 → 6]</span> &nbsp;and&nbsp; <span class=\"hl\">[13 → 28]</span><br>so &nbsp;<span class=\"hl\">[3 → ?]</span>","opts":["12","3","8","6"],"ans":2,"mech":"Add 1, then double. Order matters — doubling first gives a different result."},{"id":"N-A-25","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[12 → 144]</span> &nbsp;and&nbsp; <span class=\"hl\">[6 → 36]</span><br>so &nbsp;<span class=\"hl\">[5 → ?]</span>","opts":["10","25","27","22"],"ans":1,"mech":"Each number is squared. When the second value grows much faster than the first, test squaring."},{"id":"N-A-26","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[8 → 22]</span> &nbsp;and&nbsp; <span class=\"hl\">[2 → 10]</span><br>so &nbsp;<span class=\"hl\">[9 → ?]</span>","opts":["19","24","29","18"],"ans":1,"mech":"Add 3, then double. Order matters — doubling first gives a different result."},{"id":"N-A-27","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[9 → 81]</span> &nbsp;and&nbsp; <span class=\"hl\">[6 → 36]</span><br>so &nbsp;<span class=\"hl\">[8 → ?]</span>","opts":["64","16","61","69"],"ans":0,"mech":"Each number is squared. When the second value grows much faster than the first, test squaring."},{"id":"N-A-28","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[7 → 18]</span> &nbsp;and&nbsp; <span class=\"hl\">[12 → 28]</span><br>so &nbsp;<span class=\"hl\">[9 → ?]</span>","opts":["17","27","22","18"],"ans":2,"mech":"Add 2, then double. Order matters — doubling first gives a different result."},{"id":"N-A-29","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[8 → 62]</span> &nbsp;and&nbsp; <span class=\"hl\">[3 → 7]</span><br>so &nbsp;<span class=\"hl\">[5 → ?]</span>","opts":["25","21","23","10"],"ans":2,"mech":"Square it, then subtract 2. Two-step rules built on squares appear at this level."},{"id":"N-A-30","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[7 → 16]</span> &nbsp;and&nbsp; <span class=\"hl\">[11 → 24]</span><br>so &nbsp;<span class=\"hl\">[8 → ?]</span>","opts":["18","22","16","14"],"ans":0,"mech":"Add 1, then double. Order matters — doubling first gives a different result."},{"id":"N-A-31","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[11 → 121]</span> &nbsp;and&nbsp; <span class=\"hl\">[3 → 9]</span><br>so &nbsp;<span class=\"hl\">[9 → ?]</span>","opts":["18","84","78","81"],"ans":3,"mech":"Each number is squared. When the second value grows much faster than the first, test squaring."},{"id":"N-A-32","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[7 → 44]</span> &nbsp;and&nbsp; <span class=\"hl\">[9 → 76]</span><br>so &nbsp;<span class=\"hl\">[4 → ?]</span>","opts":["41","8","11","13"],"ans":2,"mech":"Square it, then subtract 5. Two-step rules built on squares appear at this level."},{"id":"N-A-33","sub":"number-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">[12 → 30]</span> &nbsp;and&nbsp; <span class=\"hl\">[8 → 22]</span><br>so &nbsp;<span class=\"hl\">[2 → ?]</span>","opts":["15","4","10","8"],"ans":2,"mech":"Add 3, then double. Order matters — doubling first gives a different result."},{"id":"N-P-01","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> + 3 = 6","ans":"3","mech":"A single step: subtract 3 from both sides to leave the box alone."},{"id":"N-P-02","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> − 8 = -3","ans":"5","mech":"The box is larger than the result shown, so add 8 back to recover its original value."},{"id":"N-P-03","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> + 4 = 12","ans":"8","mech":"A single step: subtract 4 from both sides to leave the box alone."},{"id":"N-P-04","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> − 4 = 13","ans":"17","mech":"The box is larger than the result shown, so add 4 back to recover its original value."},{"id":"N-P-05","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> + 7 = 12","ans":"5","mech":"A single step: subtract 7 from both sides to leave the box alone."},{"id":"N-P-06","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> + 2 = 12","ans":"10","mech":"A single step: subtract 2 from both sides to leave the box alone."},{"id":"N-P-07","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> + 8 = 21","ans":"13","mech":"A single step: subtract 8 from both sides to leave the box alone."},{"id":"N-P-08","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> + 3 = 16","ans":"13","mech":"A single step: subtract 3 from both sides to leave the box alone."},{"id":"N-P-09","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> − 7 = -2","ans":"5","mech":"The box is larger than the result shown, so add 7 back to recover its original value."},{"id":"N-P-10","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> − 6 = -1","ans":"5","mech":"The box is larger than the result shown, so add 6 back to recover its original value."},{"id":"N-P-11","sub":"number-puzzles","lvl":11,"type":"num","stem":"<span class=\"hl\">☐</span> + 6 = 20","ans":"14","mech":"A single step: subtract 6 from both sides to leave the box alone."},{"id":"N-P-12","sub":"number-puzzles","lvl":12,"type":"num","stem":"3 × <span class=\"hl\">☐</span> + 9 = 33","ans":"8","mech":"Undo in reverse order: subtract 9 first, then divide by 3."},{"id":"N-P-13","sub":"number-puzzles","lvl":12,"type":"num","stem":"<span class=\"hl\">☐</span> × 5 = 40","ans":"8","mech":"The box is multiplied, so divide to undo it: 40 ÷ 5 gives the answer."},{"id":"N-P-14","sub":"number-puzzles","lvl":12,"type":"num","stem":"5 × <span class=\"hl\">☐</span> + 7 = 52","ans":"9","mech":"Undo in reverse order: subtract 7 first, then divide by 5."},{"id":"N-P-15","sub":"number-puzzles","lvl":12,"type":"num","stem":"2 × <span class=\"hl\">☐</span> + 2 = 8","ans":"3","mech":"Undo in reverse order: subtract 2 first, then divide by 2."},{"id":"N-P-16","sub":"number-puzzles","lvl":12,"type":"num","stem":"<span class=\"hl\">☐</span> × 3 = 27","ans":"9","mech":"The box is multiplied, so divide to undo it: 27 ÷ 3 gives the answer."},{"id":"N-P-17","sub":"number-puzzles","lvl":12,"type":"num","stem":"<span class=\"hl\">☐</span> + 3 = 11 − 4","ans":"4","mech":"Simplify the right-hand side completely before doing anything with the box."},{"id":"N-P-18","sub":"number-puzzles","lvl":12,"type":"num","stem":"<span class=\"hl\">☐</span> × 4 = 20","ans":"5","mech":"The box is multiplied, so divide to undo it: 20 ÷ 4 gives the answer."},{"id":"N-P-19","sub":"number-puzzles","lvl":12,"type":"num","stem":"<span class=\"hl\">☐</span> × 3 = 12","ans":"4","mech":"The box is multiplied, so divide to undo it: 12 ÷ 3 gives the answer."},{"id":"N-P-20","sub":"number-puzzles","lvl":12,"type":"num","stem":"<span class=\"hl\">☐</span> + 3 = 12 − 1","ans":"8","mech":"Simplify the right-hand side completely before doing anything with the box."},{"id":"N-P-21","sub":"number-puzzles","lvl":12,"type":"num","stem":"<span class=\"hl\">☐</span> + 4 = 17 − 4","ans":"9","mech":"Simplify the right-hand side completely before doing anything with the box."},{"id":"N-P-22","sub":"number-puzzles","lvl":12,"type":"num","stem":"3 × <span class=\"hl\">☐</span> + 9 = 21","ans":"4","mech":"Undo in reverse order: subtract 9 first, then divide by 3."},{"id":"N-P-23","sub":"number-puzzles","lvl":13,"type":"num","stem":"2 × (<span class=\"hl\">☐</span> + 5) = 24","ans":"7","mech":"Divide both sides by 2 first, then subtract 5. Brackets come apart from the outside in."},{"id":"N-P-24","sub":"number-puzzles","lvl":13,"type":"num","stem":"If <span class=\"hl\">▲</span> = 3, then &nbsp; <span class=\"hl\">☐</span> + <span class=\"hl\">▲</span> × 4 = 20","ans":"8","mech":"Multiplication happens before addition. 3 × 4 = 12, then solve for the box."},{"id":"N-P-25","sub":"number-puzzles","lvl":13,"type":"num","stem":"4 × (<span class=\"hl\">☐</span> + 2) = 16","ans":"2","mech":"Divide both sides by 4 first, then subtract 2. Brackets come apart from the outside in."},{"id":"N-P-26","sub":"number-puzzles","lvl":13,"type":"num","stem":"If <span class=\"hl\">▲</span> = 5, then &nbsp; <span class=\"hl\">☐</span> + <span class=\"hl\">▲</span> × 3 = 23","ans":"8","mech":"Multiplication happens before addition. 5 × 3 = 15, then solve for the box."},{"id":"N-P-27","sub":"number-puzzles","lvl":13,"type":"num","stem":"If <span class=\"hl\">▲</span> = 3, then &nbsp; <span class=\"hl\">☐</span> + <span class=\"hl\">▲</span> × 3 = 17","ans":"8","mech":"Multiplication happens before addition. 3 × 3 = 9, then solve for the box."},{"id":"N-P-28","sub":"number-puzzles","lvl":13,"type":"num","stem":"2 × (<span class=\"hl\">☐</span> + 3) = 20","ans":"7","mech":"Divide both sides by 2 first, then subtract 3. Brackets come apart from the outside in."},{"id":"N-P-29","sub":"number-puzzles","lvl":13,"type":"num","stem":"3 × (<span class=\"hl\">☐</span> + 3) = 33","ans":"8","mech":"Divide both sides by 3 first, then subtract 3. Brackets come apart from the outside in."},{"id":"N-P-30","sub":"number-puzzles","lvl":13,"type":"num","stem":"If <span class=\"hl\">▲</span> = 5, then &nbsp; <span class=\"hl\">☐</span> + <span class=\"hl\">▲</span> × 4 = 28","ans":"8","mech":"Multiplication happens before addition. 5 × 4 = 20, then solve for the box."},{"id":"N-P-31","sub":"number-puzzles","lvl":13,"type":"num","stem":"If <span class=\"hl\">▲</span> = 2, then &nbsp; <span class=\"hl\">☐</span> + <span class=\"hl\">▲</span> × 3 = 14","ans":"8","mech":"Multiplication happens before addition. 2 × 3 = 6, then solve for the box."},{"id":"N-P-32","sub":"number-puzzles","lvl":13,"type":"num","stem":"If <span class=\"hl\">▲</span> = 3, then &nbsp; <span class=\"hl\">☐</span> + <span class=\"hl\">▲</span> × 4 = 14","ans":"2","mech":"Multiplication happens before addition. 3 × 4 = 12, then solve for the box."},{"id":"N-P-33","sub":"number-puzzles","lvl":13,"type":"num","stem":"2 × (<span class=\"hl\">☐</span> + 5) = 26","ans":"8","mech":"Divide both sides by 2 first, then subtract 5. Brackets come apart from the outside in."},{"id":"F-M-01","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.cir(O,1)","F.cir(G,1)","F.cir(T,1)","F.pent(O,1)","F.pent(G,1)","F.pent(T,1)","F.sq(O,1)","F.sq(G,1)",null],"opts":["F.pent(T,1)","F.sq(T,1)","F.sq(T,0)","F.sq(O,1)"],"ans":1,"mech":"Each row keeps one shape; the color changes in the same order across every row."},{"id":"F-M-02","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.dia(O,1)","F.dia(T,1)","F.dia(G,1)","F.cir(O,1)","F.cir(T,1)","F.cir(G,1)","F.tri(O,1)","F.tri(T,1)",null],"opts":["F.tri(O,1)","F.tri(G,1)","F.cir(G,1)","F.tri(G,0)"],"ans":1,"mech":"Each row keeps one shape; the color changes in the same order across every row."},{"id":"F-M-03","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.tri(G,1)","F.dia(G,1)","F.hex(G,1)","F.tri(T,1)","F.dia(T,1)","F.hex(T,1)","F.tri(O,1)","F.dia(O,1)",null],"opts":["F.hex(O,1)","F.dia(O,1)","F.hex(T,1)","F.hex(O,0)"],"ans":0,"mech":"Color stays the same across each row; the shape changes down the columns. Two rules, one per direction."},{"id":"F-M-04","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.pent(T,1)","F.pent(G,1)","F.pent(O,1)","F.cir(T,1)","F.cir(G,1)","F.cir(O,1)","F.dia(T,1)","F.dia(G,1)",null],"opts":["F.dia(T,1)","F.dia(O,0)","F.cir(O,1)","F.dia(O,1)"],"ans":3,"mech":"Each row keeps one shape; the color changes in the same order across every row."},{"id":"F-M-05","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.hex(T,1)","F.hex(G,1)","F.hex(O,1)","F.sq(T,1)","F.sq(G,1)","F.sq(O,1)","F.pent(T,1)","F.pent(G,1)",null],"opts":["F.pent(O,0)","F.pent(O,1)","F.pent(T,1)","F.sq(O,1)"],"ans":1,"mech":"Each row keeps one shape; the color changes in the same order across every row."},{"id":"F-M-06","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.sq(T,1)","F.tri(T,1)","F.hex(T,1)","F.sq(O,1)","F.tri(O,1)","F.hex(O,1)","F.sq(G,1)","F.tri(G,1)",null],"opts":["F.hex(G,1)","F.hex(G,0)","F.tri(G,1)","F.hex(O,1)"],"ans":0,"mech":"Color stays the same across each row; the shape changes down the columns. Two rules, one per direction."},{"id":"F-M-07","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.cir(T,1)","F.cir(O,1)","F.cir(G,1)","F.pent(T,1)","F.pent(O,1)","F.pent(G,1)","F.dia(T,1)","F.dia(O,1)",null],"opts":["F.dia(T,1)","F.dia(G,0)","F.dia(G,1)","F.pent(G,1)"],"ans":2,"mech":"Each row keeps one shape; the color changes in the same order across every row."},{"id":"F-M-08","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.dia(G,1)","F.dia(O,1)","F.dia(T,1)","F.pent(G,1)","F.pent(O,1)","F.pent(T,1)","F.hex(G,1)","F.hex(O,1)",null],"opts":["F.hex(G,1)","F.hex(T,0)","F.hex(T,1)","F.pent(T,1)"],"ans":2,"mech":"Each row keeps one shape; the color changes in the same order across every row."},{"id":"F-M-09","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.hex(G,1)","F.tri(G,1)","F.dia(G,1)","F.hex(O,1)","F.tri(O,1)","F.dia(O,1)","F.hex(T,1)","F.tri(T,1)",null],"opts":["F.dia(T,0)","F.dia(T,1)","F.tri(T,1)","F.dia(O,1)"],"ans":1,"mech":"Color stays the same across each row; the shape changes down the columns. Two rules, one per direction."},{"id":"F-M-10","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.pent(G,1)","F.tri(G,1)","F.dia(G,1)","F.pent(O,1)","F.tri(O,1)","F.dia(O,1)","F.pent(T,1)","F.tri(T,1)",null],"opts":["F.dia(T,0)","F.tri(T,1)","F.dia(T,1)","F.dia(O,1)"],"ans":2,"mech":"Color stays the same across each row; the shape changes down the columns. Two rules, one per direction."},{"id":"F-M-11","sub":"figure-matrices","lvl":11,"type":"matrix","cells":["F.hex(O,1)","F.cir(O,1)","F.pent(O,1)","F.hex(T,1)","F.cir(T,1)","F.pent(T,1)","F.hex(G,1)","F.cir(G,1)",null],"opts":["F.pent(G,0)","F.cir(G,1)","F.pent(G,1)","F.pent(T,1)"],"ans":2,"mech":"Color stays the same across each row; the shape changes down the columns. Two rules, one per direction."},{"id":"F-M-12","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.dots(G,1)","F.dots(G,2)","F.dots(G,3)","F.dots(O,2)","F.dots(O,3)","F.dots(O,4)","F.dots(T,3)","F.dots(T,4)",null],"opts":["F.dots(T,6)","F.dots(T,4)","F.dots(T,5)","F.dots(O,5)"],"ans":2,"mech":"Count increases by 1 across each row, and each row starts one higher than the last. Two dimensions moving together."},{"id":"F-M-13","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.dots(T,1)","F.dots(T,2)","F.dots(T,3)","F.dots(O,2)","F.dots(O,3)","F.dots(O,4)","F.dots(G,3)","F.dots(G,4)",null],"opts":["F.dots(G,6)","F.dots(G,4)","F.dots(O,5)","F.dots(G,5)"],"ans":3,"mech":"Count increases by 1 across each row, and each row starts one higher than the last. Two dimensions moving together."},{"id":"F-M-14","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.arr(G,0)","F.arr(G,90)","F.arr(G,180)","F.arr(T,0)","F.arr(T,90)","F.arr(T,180)","F.arr(O,0)","F.arr(O,90)",null],"opts":["F.arr(O,270)","F.arr(T,180)","F.arr(O,0)","F.arr(O,180)"],"ans":3,"mech":"Two rules at once: color is constant along each row, rotation advances 90° across it. Track them separately."},{"id":"F-M-15","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.arr(O,0)","F.arr(O,90)","F.arr(O,180)","F.arr(T,0)","F.arr(T,90)","F.arr(T,180)","F.arr(G,0)","F.arr(G,90)",null],"opts":["F.arr(G,270)","F.arr(T,180)","F.arr(G,0)","F.arr(G,180)"],"ans":3,"mech":"Two rules at once: color is constant along each row, rotation advances 90° across it. Track them separately."},{"id":"F-M-16","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.dots(T,1)","F.dots(T,2)","F.dots(T,3)","F.dots(G,2)","F.dots(G,3)","F.dots(G,4)","F.dots(O,3)","F.dots(O,4)",null],"opts":["F.dots(O,5)","F.dots(O,4)","F.dots(O,6)","F.dots(G,5)"],"ans":0,"mech":"Count increases by 1 across each row, and each row starts one higher than the last. Two dimensions moving together."},{"id":"F-M-17","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.arr(G,0)","F.arr(G,90)","F.arr(G,180)","F.arr(O,0)","F.arr(O,90)","F.arr(O,180)","F.arr(T,0)","F.arr(T,90)",null],"opts":["F.arr(T,270)","F.arr(O,180)","F.arr(T,0)","F.arr(T,180)"],"ans":3,"mech":"Two rules at once: color is constant along each row, rotation advances 90° across it. Track them separately."},{"id":"F-M-18","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.dots(O,1)","F.dots(O,2)","F.dots(O,3)","F.dots(T,2)","F.dots(T,3)","F.dots(T,4)","F.dots(G,3)","F.dots(G,4)",null],"opts":["F.dots(G,6)","F.dots(G,4)","F.dots(T,5)","F.dots(G,5)"],"ans":3,"mech":"Count increases by 1 across each row, and each row starts one higher than the last. Two dimensions moving together."},{"id":"F-M-19","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.dots(G,1)","F.dots(G,2)","F.dots(G,3)","F.dots(T,2)","F.dots(T,3)","F.dots(T,4)","F.dots(O,3)","F.dots(O,4)",null],"opts":["F.dots(O,5)","F.dots(O,4)","F.dots(T,5)","F.dots(O,6)"],"ans":0,"mech":"Count increases by 1 across each row, and each row starts one higher than the last. Two dimensions moving together."},{"id":"F-M-20","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.dots(O,1)","F.dots(O,2)","F.dots(O,3)","F.dots(G,2)","F.dots(G,3)","F.dots(G,4)","F.dots(T,3)","F.dots(T,4)",null],"opts":["F.dots(T,4)","F.dots(T,5)","F.dots(G,5)","F.dots(T,6)"],"ans":1,"mech":"Count increases by 1 across each row, and each row starts one higher than the last. Two dimensions moving together."},{"id":"F-M-21","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.arr(T,0)","F.arr(T,90)","F.arr(T,180)","F.arr(G,0)","F.arr(G,90)","F.arr(G,180)","F.arr(O,0)","F.arr(O,90)",null],"opts":["F.arr(O,270)","F.arr(G,180)","F.arr(O,0)","F.arr(O,180)"],"ans":3,"mech":"Two rules at once: color is constant along each row, rotation advances 90° across it. Track them separately."},{"id":"F-M-22","sub":"figure-matrices","lvl":12,"type":"matrix","cells":["F.arr(O,0)","F.arr(O,90)","F.arr(O,180)","F.arr(G,0)","F.arr(G,90)","F.arr(G,180)","F.arr(T,0)","F.arr(T,90)",null],"opts":["F.arr(G,180)","F.arr(T,270)","F.arr(T,180)","F.arr(T,0)"],"ans":2,"mech":"Two rules at once: color is constant along each row, rotation advances 90° across it. Track them separately."},{"id":"F-M-23","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.pac(T,0)","F.pac(T,90)","F.pac(T,180)","F.pac(O,180)","F.pac(O,270)","F.pac(O,0)","F.pac(G,0)","F.pac(G,90)",null],"opts":["F.cir(G,1)","F.pac(G,90)","F.pac(G,180)","F.pac(G,0)"],"ans":2,"mech":"The missing quarter rotates 90° across each row, and each row starts two steps further on than the last."},{"id":"F-M-24","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.ell(O,0)","F.ell(O,90)","F.ell(O,180)","F.ell(G,90)","F.ell(G,180)","F.ell(G,270)","F.ell(T,180)","F.ell(T,270)",null],"opts":["F.ell(G,0)","F.ell(T,0)","F.ell(T,90)","F.ell(T,180)"],"ans":1,"mech":"Rotation advances 90° across each row and each row starts 90° further along. Past 270° it wraps back to 0°."},{"id":"F-M-25","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.pac(O,0)","F.pac(O,90)","F.pac(O,180)","F.pac(G,180)","F.pac(G,270)","F.pac(G,0)","F.pac(T,0)","F.pac(T,90)",null],"opts":["F.pac(T,90)","F.pac(T,180)","F.cir(T,1)","F.pac(T,0)"],"ans":1,"mech":"The missing quarter rotates 90° across each row, and each row starts two steps further on than the last."},{"id":"F-M-26","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.ell(G,0)","F.ell(G,90)","F.ell(G,180)","F.ell(O,90)","F.ell(O,180)","F.ell(O,270)","F.ell(T,180)","F.ell(T,270)",null],"opts":["F.ell(O,0)","F.ell(T,0)","F.ell(T,90)","F.ell(T,180)"],"ans":1,"mech":"Rotation advances 90° across each row and each row starts 90° further along. Past 270° it wraps back to 0°."},{"id":"F-M-27","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.ell(G,0)","F.ell(G,90)","F.ell(G,180)","F.ell(T,90)","F.ell(T,180)","F.ell(T,270)","F.ell(O,180)","F.ell(O,270)",null],"opts":["F.ell(T,0)","F.ell(O,90)","F.ell(O,0)","F.ell(O,180)"],"ans":2,"mech":"Rotation advances 90° across each row and each row starts 90° further along. Past 270° it wraps back to 0°."},{"id":"F-M-28","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.ell(O,0)","F.ell(O,90)","F.ell(O,180)","F.ell(T,90)","F.ell(T,180)","F.ell(T,270)","F.ell(G,180)","F.ell(G,270)",null],"opts":["F.ell(G,0)","F.ell(T,0)","F.ell(G,90)","F.ell(G,180)"],"ans":0,"mech":"Rotation advances 90° across each row and each row starts 90° further along. Past 270° it wraps back to 0°."},{"id":"F-M-29","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.pac(T,0)","F.pac(T,90)","F.pac(T,180)","F.pac(G,180)","F.pac(G,270)","F.pac(G,0)","F.pac(O,0)","F.pac(O,90)",null],"opts":["F.pac(O,180)","F.pac(O,0)","F.cir(O,1)","F.pac(O,90)"],"ans":0,"mech":"The missing quarter rotates 90° across each row, and each row starts two steps further on than the last."},{"id":"F-M-30","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.pac(G,0)","F.pac(G,90)","F.pac(G,180)","F.pac(O,180)","F.pac(O,270)","F.pac(O,0)","F.pac(T,0)","F.pac(T,90)",null],"opts":["F.cir(T,1)","F.pac(T,0)","F.pac(T,90)","F.pac(T,180)"],"ans":3,"mech":"The missing quarter rotates 90° across each row, and each row starts two steps further on than the last."},{"id":"F-M-31","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.pac(G,0)","F.pac(G,90)","F.pac(G,180)","F.pac(T,180)","F.pac(T,270)","F.pac(T,0)","F.pac(O,0)","F.pac(O,90)",null],"opts":["F.pac(O,90)","F.pac(O,180)","F.cir(O,1)","F.pac(O,0)"],"ans":1,"mech":"The missing quarter rotates 90° across each row, and each row starts two steps further on than the last."},{"id":"F-M-32","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.ell(T,0)","F.ell(T,90)","F.ell(T,180)","F.ell(G,90)","F.ell(G,180)","F.ell(G,270)","F.ell(O,180)","F.ell(O,270)",null],"opts":["F.ell(G,0)","F.ell(O,0)","F.ell(O,90)","F.ell(O,180)"],"ans":1,"mech":"Rotation advances 90° across each row and each row starts 90° further along. Past 270° it wraps back to 0°."},{"id":"F-M-33","sub":"figure-matrices","lvl":13,"type":"matrix","cells":["F.pac(O,0)","F.pac(O,90)","F.pac(O,180)","F.pac(T,180)","F.pac(T,270)","F.pac(T,0)","F.pac(G,0)","F.pac(G,90)",null],"opts":["F.pac(G,180)","F.cir(G,1)","F.pac(G,90)","F.pac(G,0)"],"ans":0,"mech":"The missing quarter rotates 90° across each row, and each row starts two steps further on than the last."},{"id":"F-C-01","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.dia(O,1)","F.hex(O,1)","F.cir(O,1)"],"opts":["F.tri(T,1)","F.dia(O,0)","F.pent(O,0)","F.pent(O,1)"],"ans":3,"mech":"All three are solid-filled and the same color. The shape itself varies — so shape isn't the rule."},{"id":"F-C-02","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.pent(G,0)","F.tri(G,0)","F.dia(G,0)"],"opts":["F.sq(G,0)","F.tri(G,1)","F.sq(G,1)","F.cir(T,0)"],"ans":0,"mech":"Every figure is an outline, never filled, and all in one color. Two attributes have to hold at once."},{"id":"F-C-03","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.dia(O,1)","F.sq(O,1)","F.tri(O,1)"],"opts":["F.cir(T,1)","F.hex(O,1)","F.hex(O,0)","F.dia(O,0)"],"ans":1,"mech":"All three are solid-filled and the same color. The shape itself varies — so shape isn't the rule."},{"id":"F-C-04","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.sq(O,0)","F.cir(O,0)","F.pent(O,0)"],"opts":["F.dia(O,0)","F.hex(T,0)","F.cir(O,1)","F.dia(O,1)"],"ans":0,"mech":"Every figure is an outline, never filled, and all in one color. Two attributes have to hold at once."},{"id":"F-C-05","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.tri(G,0)","F.pent(G,0)","F.sq(G,0)"],"opts":["F.pent(G,1)","F.hex(T,0)","F.dia(G,1)","F.dia(G,0)"],"ans":3,"mech":"Every figure is an outline, never filled, and all in one color. Two attributes have to hold at once."},{"id":"F-C-06","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.cir(T,0)","F.dia(T,0)","F.hex(T,0)"],"opts":["F.tri(T,0)","F.tri(T,1)","F.dia(T,1)","F.pent(O,0)"],"ans":0,"mech":"Every figure is an outline, never filled, and all in one color. Two attributes have to hold at once."},{"id":"F-C-07","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.tri(T,1)","F.sq(T,1)","F.hex(T,1)"],"opts":["F.cir(T,0)","F.tri(T,0)","F.pent(O,1)","F.cir(T,1)"],"ans":3,"mech":"All three are solid-filled and the same color. The shape itself varies — so shape isn't the rule."},{"id":"F-C-08","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.cir(G,0)","F.hex(G,0)","F.dia(G,0)"],"opts":["F.hex(G,1)","F.pent(G,0)","F.sq(T,0)","F.pent(G,1)"],"ans":1,"mech":"Every figure is an outline, never filled, and all in one color. Two attributes have to hold at once."},{"id":"F-C-09","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.tri(O,0)","F.dia(O,0)","F.pent(O,0)"],"opts":["F.sq(T,0)","F.hex(O,1)","F.dia(O,1)","F.hex(O,0)"],"ans":3,"mech":"Every figure is an outline, never filled, and all in one color. Two attributes have to hold at once."},{"id":"F-C-10","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.pent(G,0)","F.cir(G,0)","F.hex(G,0)"],"opts":["F.sq(G,0)","F.cir(G,1)","F.dia(T,0)","F.sq(G,1)"],"ans":0,"mech":"Every figure is an outline, never filled, and all in one color. Two attributes have to hold at once."},{"id":"F-C-11","sub":"figure-classification","lvl":11,"type":"figclass","given":["F.dia(O,1)","F.cir(O,1)","F.pent(O,1)"],"opts":["F.hex(T,1)","F.sq(O,0)","F.sq(O,1)","F.dia(O,0)"],"ans":2,"mech":"All three are solid-filled and the same color. The shape itself varies — so shape isn't the rule."},{"id":"F-C-12","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.arr(G,180)","F.arr(G,270)","F.arr(G,0)"],"opts":["F.arr(G,90)","F.cir(G,1)","F.dia(G,1)","F.arr(T,90)"],"ans":0,"mech":"All are the same arrow in the same color, just pointing different ways. Rotation is allowed to vary; everything else isn't."},{"id":"F-C-13","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.arr(G,270)","F.arr(G,180)","F.arr(G,0)"],"opts":["F.dia(G,1)","F.arr(G,90)","F.cir(G,1)","F.arr(T,90)"],"ans":1,"mech":"All are the same arrow in the same color, just pointing different ways. Rotation is allowed to vary; everything else isn't."},{"id":"F-C-14","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.arr(G,180)","F.arr(G,270)","F.arr(G,90)"],"opts":["F.arr(G,0)","F.arr(T,0)","F.cir(G,1)","F.dia(G,1)"],"ans":0,"mech":"All are the same arrow in the same color, just pointing different ways. Rotation is allowed to vary; everything else isn't."},{"id":"F-C-15","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.dots(G,2)","F.dots(T,6)","F.dots(O,8)"],"opts":["F.dots(O,5)","F.dots(G,4)","F.dots(G,3)","F.dots(T,7)"],"ans":1,"mech":"Every group has an even number of dots. Color changes each time, so color can't be what binds them."},{"id":"F-C-16","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.dots(T,6)","F.dots(G,2)","F.dots(O,4)"],"opts":["F.dots(G,3)","F.dots(O,5)","F.dots(T,7)","F.dots(T,8)"],"ans":3,"mech":"Every group has an even number of dots. Color changes each time, so color can't be what binds them."},{"id":"F-C-17","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.arr(G,270)","F.arr(G,180)","F.arr(G,90)"],"opts":["F.cir(G,1)","F.arr(T,0)","F.arr(G,0)","F.dia(G,1)"],"ans":2,"mech":"All are the same arrow in the same color, just pointing different ways. Rotation is allowed to vary; everything else isn't."},{"id":"F-C-18","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.arr(T,180)","F.arr(T,270)","F.arr(T,90)"],"opts":["F.arr(T,0)","F.dia(T,1)","F.cir(T,1)","F.arr(O,0)"],"ans":0,"mech":"All are the same arrow in the same color, just pointing different ways. Rotation is allowed to vary; everything else isn't."},{"id":"F-C-19","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.arr(O,180)","F.arr(O,270)","F.arr(O,90)"],"opts":["F.arr(O,0)","F.arr(T,0)","F.cir(O,1)","F.dia(O,1)"],"ans":0,"mech":"All are the same arrow in the same color, just pointing different ways. Rotation is allowed to vary; everything else isn't."},{"id":"F-C-20","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.arr(T,90)","F.arr(T,180)","F.arr(T,270)"],"opts":["F.dia(T,1)","F.cir(T,1)","F.arr(O,0)","F.arr(T,0)"],"ans":3,"mech":"All are the same arrow in the same color, just pointing different ways. Rotation is allowed to vary; everything else isn't."},{"id":"F-C-21","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.dots(O,2)","F.dots(T,4)","F.dots(G,8)"],"opts":["F.dots(O,3)","F.dots(G,5)","F.dots(O,6)","F.dots(T,5)"],"ans":2,"mech":"Every group has an even number of dots. Color changes each time, so color can't be what binds them."},{"id":"F-C-22","sub":"figure-classification","lvl":12,"type":"figclass","given":["F.dots(T,4)","F.dots(O,6)","F.dots(G,2)"],"opts":["F.dots(G,5)","F.dots(O,7)","F.dots(T,5)","F.dots(T,8)"],"ans":3,"mech":"Every group has an even number of dots. Color changes each time, so color can't be what binds them."},{"id":"F-C-23","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.sqdots(O,4)","F.sqdots(T,2)","F.sqdots(G,5)"],"opts":["F.dots(T,3)","F.sq(G,0)","F.sqdots(O,3)","F.cir(O,0)"],"ans":2,"mech":"Every figure is a square outline with dots inside it. The count and color both vary — the container is what binds them."},{"id":"F-C-24","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.pac(T,270)","F.pac(G,90)","F.pac(O,180)"],"opts":["F.cir(G,0)","F.pac(T,0)","F.dia(O,1)","F.cir(T,1)"],"ans":1,"mech":"Each is a circle with one quarter removed, at a different rotation. A whole circle fails the defining feature."},{"id":"F-C-25","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.pac(G,270)","F.pac(O,180)","F.pac(T,90)"],"opts":["F.pac(G,0)","F.cir(O,0)","F.dia(T,1)","F.cir(G,1)"],"ans":0,"mech":"Each is a circle with one quarter removed, at a different rotation. A whole circle fails the defining feature."},{"id":"F-C-26","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.sqdots(O,2)","F.sqdots(T,5)","F.sqdots(G,3)"],"opts":["F.dots(T,4)","F.cir(O,0)","F.sqdots(O,4)","F.sq(G,0)"],"ans":2,"mech":"Every figure is a square outline with dots inside it. The count and color both vary — the container is what binds them."},{"id":"F-C-27","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.pac(O,0)","F.pac(T,180)","F.pac(G,90)"],"opts":["F.dia(G,1)","F.cir(T,0)","F.pac(O,270)","F.cir(O,1)"],"ans":2,"mech":"Each is a circle with one quarter removed, at a different rotation. A whole circle fails the defining feature."},{"id":"F-C-28","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.sqdots(T,5)","F.sqdots(O,3)","F.sqdots(G,2)"],"opts":["F.cir(T,0)","F.dots(O,4)","F.sq(G,0)","F.sqdots(T,4)"],"ans":3,"mech":"Every figure is a square outline with dots inside it. The count and color both vary — the container is what binds them."},{"id":"F-C-29","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.stripe(G,0)","F.stripe(G,90)","F.stripe(G,45)"],"opts":["F.sq(G,0)","F.stripe(T,135)","F.sq(G,1)","F.stripe(G,135)"],"ans":3,"mech":"Striped squares in one color. A plain square outline has the shape but not the stripes — both matter."},{"id":"F-C-30","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.sqdots(O,3)","F.sqdots(T,5)","F.sqdots(G,2)"],"opts":["F.sq(G,0)","F.dots(T,4)","F.cir(O,0)","F.sqdots(O,4)"],"ans":3,"mech":"Every figure is a square outline with dots inside it. The count and color both vary — the container is what binds them."},{"id":"F-C-31","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.sqdots(T,3)","F.sqdots(O,5)","F.sqdots(G,4)"],"opts":["F.cir(T,0)","F.sq(G,0)","F.dots(O,2)","F.sqdots(T,2)"],"ans":3,"mech":"Every figure is a square outline with dots inside it. The count and color both vary — the container is what binds them."},{"id":"F-C-32","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.pac(G,90)","F.pac(T,180)","F.pac(O,0)"],"opts":["F.cir(T,0)","F.cir(G,1)","F.dia(O,1)","F.pac(G,270)"],"ans":3,"mech":"Each is a circle with one quarter removed, at a different rotation. A whole circle fails the defining feature."},{"id":"F-C-33","sub":"figure-classification","lvl":13,"type":"figclass","given":["F.stripe(G,135)","F.stripe(G,0)","F.stripe(G,45)"],"opts":["F.stripe(T,90)","F.stripe(G,90)","F.sq(G,1)","F.sq(G,0)"],"ans":1,"mech":"Striped squares in one color. A plain square outline has the shape but not the stripes — both matter."},{"id":"P-F-01","sub":"paper-folding","lvl":11,"type":"fold","fold":"v","punched":[[32,42]],"opts":["F.sheet([[32,42]])","F.sheet([[68,42]])","F.sheet([[32,42],[32,58]])","F.sheet([[32,42],[68,42]])"],"ans":3,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-02","sub":"paper-folding","lvl":11,"type":"fold","fold":"v","punched":[[26,49]],"opts":["F.sheet([[26,49],[26,51]])","F.sheet([[26,49]])","F.sheet([[26,49],[74,49]])","F.sheet([[74,49]])"],"ans":2,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-03","sub":"paper-folding","lvl":11,"type":"fold","fold":"v","punched":[[41,77]],"opts":["F.sheet([[41,77]])","F.sheet([[41,77],[41,23]])","F.sheet([[59,77]])","F.sheet([[41,77],[59,77]])"],"ans":3,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-04","sub":"paper-folding","lvl":11,"type":"fold","fold":"h","punched":[[29,22]],"opts":["F.sheet([[29,22],[29,78]])","F.sheet([[29,22]])","F.sheet([[29,78]])","F.sheet([[29,22],[71,22]])"],"ans":0,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-05","sub":"paper-folding","lvl":11,"type":"fold","fold":"h","punched":[[69,31]],"opts":["F.sheet([[69,69]])","F.sheet([[69,31]])","F.sheet([[69,31],[31,31]])","F.sheet([[69,31],[69,69]])"],"ans":3,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-06","sub":"paper-folding","lvl":11,"type":"fold","fold":"h","punched":[[63,23]],"opts":["F.sheet([[63,77]])","F.sheet([[63,23],[63,77]])","F.sheet([[63,23]])","F.sheet([[63,23],[37,23]])"],"ans":1,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-07","sub":"paper-folding","lvl":11,"type":"fold","fold":"h","punched":[[77,38]],"opts":["F.sheet([[77,38],[77,62]])","F.sheet([[77,38]])","F.sheet([[77,62]])","F.sheet([[77,38],[23,38]])"],"ans":0,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-08","sub":"paper-folding","lvl":11,"type":"fold","fold":"v","punched":[[29,76]],"opts":["F.sheet([[71,76]])","F.sheet([[29,76],[29,24]])","F.sheet([[29,76]])","F.sheet([[29,76],[71,76]])"],"ans":3,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-09","sub":"paper-folding","lvl":11,"type":"fold","fold":"v","punched":[[32,38]],"opts":["F.sheet([[32,38],[32,62]])","F.sheet([[32,38]])","F.sheet([[32,38],[68,38]])","F.sheet([[68,38]])"],"ans":2,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-10","sub":"paper-folding","lvl":11,"type":"fold","fold":"v","punched":[[35,45]],"opts":["F.sheet([[65,45]])","F.sheet([[35,45],[35,55]])","F.sheet([[35,45]])","F.sheet([[35,45],[65,45]])"],"ans":3,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-11","sub":"paper-folding","lvl":11,"type":"fold","fold":"h","punched":[[44,24]],"opts":["F.sheet([[44,76]])","F.sheet([[44,24],[56,24]])","F.sheet([[44,24],[44,76]])","F.sheet([[44,24]])"],"ans":2,"mech":"One punch through folded paper makes two holes — the original and its mirror across the fold line."},{"id":"P-F-12","sub":"paper-folding","lvl":12,"type":"fold","fold":"h","punched":[[32,25],[60,33]],"opts":["F.sheet([[32,75],[60,67]])","F.sheet([[32,25],[60,33],[32,75],[60,67]])","F.sheet([[32,25],[60,33]])","F.sheet([[32,25],[60,33],[68,25]])"],"ans":1,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-13","sub":"paper-folding","lvl":12,"type":"fold","fold":"h","punched":[[26,26],[75,26]],"opts":["F.sheet([[26,26],[75,26],[26,74],[75,74]])","F.sheet([[26,26],[75,26],[74,26]])","F.sheet([[26,74],[75,74]])","F.sheet([[26,26],[75,26]])"],"ans":0,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-14","sub":"paper-folding","lvl":12,"type":"fold","fold":"v","punched":[[40,26],[24,56]],"opts":["F.sheet([[40,26],[24,56],[40,74]])","F.sheet([[40,26],[24,56],[60,26],[76,56]])","F.sheet([[40,26],[24,56]])","F.sheet([[60,26],[76,56]])"],"ans":1,"mech":"A vertical fold mirrors left to right. Each of the 2 punches becomes two, giving 4."},{"id":"P-F-15","sub":"paper-folding","lvl":12,"type":"fold","fold":"v","punched":[[44,31],[40,61]],"opts":["F.sheet([[56,31],[60,61]])","F.sheet([[44,31],[40,61],[56,31],[60,61]])","F.sheet([[44,31],[40,61]])","F.sheet([[44,31],[40,61],[44,69]])"],"ans":1,"mech":"A vertical fold mirrors left to right. Each of the 2 punches becomes two, giving 4."},{"id":"P-F-16","sub":"paper-folding","lvl":12,"type":"fold","fold":"v","punched":[[38,35],[40,24]],"opts":["F.sheet([[38,35],[40,24],[62,35],[60,24]])","F.sheet([[38,35],[40,24],[38,65]])","F.sheet([[38,35],[40,24]])","F.sheet([[62,35],[60,24]])"],"ans":0,"mech":"A vertical fold mirrors left to right. Each of the 2 punches becomes two, giving 4."},{"id":"P-F-17","sub":"paper-folding","lvl":12,"type":"fold","fold":"v","punched":[[33,55],[41,72]],"opts":["F.sheet([[33,55],[41,72]])","F.sheet([[33,55],[41,72],[67,55],[59,72]])","F.sheet([[33,55],[41,72],[33,45]])","F.sheet([[67,55],[59,72]])"],"ans":1,"mech":"A vertical fold mirrors left to right. Each of the 2 punches becomes two, giving 4."},{"id":"P-F-18","sub":"paper-folding","lvl":12,"type":"fold","fold":"v","punched":[[38,22],[25,61]],"opts":["F.sheet([[38,22],[25,61],[62,22],[75,61]])","F.sheet([[62,22],[75,61]])","F.sheet([[38,22],[25,61]])","F.sheet([[38,22],[25,61],[38,78]])"],"ans":0,"mech":"A vertical fold mirrors left to right. Each of the 2 punches becomes two, giving 4."},{"id":"P-F-19","sub":"paper-folding","lvl":12,"type":"fold","fold":"h","punched":[[50,32],[41,42]],"opts":["F.sheet([[50,32],[41,42],[50,68],[41,58]])","F.sheet([[50,32],[41,42]])","F.sheet([[50,68],[41,58]])","F.sheet([[50,32],[41,42],[50,32]])"],"ans":0,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-20","sub":"paper-folding","lvl":12,"type":"fold","fold":"v","punched":[[40,64],[40,46]],"opts":["F.sheet([[60,64],[60,46]])","F.sheet([[40,64],[40,46]])","F.sheet([[40,64],[40,46],[40,36]])","F.sheet([[40,64],[40,46],[60,64],[60,46]])"],"ans":3,"mech":"A vertical fold mirrors left to right. Each of the 2 punches becomes two, giving 4."},{"id":"P-F-21","sub":"paper-folding","lvl":12,"type":"fold","fold":"v","punched":[[44,54],[39,23]],"opts":["F.sheet([[44,54],[39,23]])","F.sheet([[44,54],[39,23],[56,54],[61,23]])","F.sheet([[44,54],[39,23],[44,46]])","F.sheet([[56,54],[61,23]])"],"ans":1,"mech":"A vertical fold mirrors left to right. Each of the 2 punches becomes two, giving 4."},{"id":"P-F-22","sub":"paper-folding","lvl":12,"type":"fold","fold":"h","punched":[[25,28],[75,38]],"opts":["F.sheet([[25,28],[75,38],[75,28]])","F.sheet([[25,28],[75,38],[25,72],[75,62]])","F.sheet([[25,72],[75,62]])","F.sheet([[25,28],[75,38]])"],"ans":1,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-23","sub":"paper-folding","lvl":13,"type":"fold","fold":"v","punched":[[22,39],[24,47],[28,36]],"opts":["F.sheet([[22,39],[24,47],[28,36],[78,39],[76,47],[72,36]])","F.sheet([[22,39],[24,47],[28,36]])","F.sheet([[22,39],[24,47],[28,36],[22,61]])","F.sheet([[78,39],[76,47],[72,36]])"],"ans":0,"mech":"A vertical fold mirrors left to right. Each of the 3 punches becomes two, giving 6."},{"id":"P-F-24","sub":"paper-folding","lvl":13,"type":"fold","fold":"h","punched":[[28,33],[78,29],[48,23]],"opts":["F.sheet([[28,33],[78,29],[48,23],[28,67],[78,71],[48,77]])","F.sheet([[28,33],[78,29],[48,23],[72,33]])","F.sheet([[28,33],[78,29],[48,23]])","F.sheet([[28,67],[78,71],[48,77]])"],"ans":0,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-25","sub":"paper-folding","lvl":13,"type":"fold","fold":"v","punched":[[41,73],[44,68],[38,62]],"opts":["F.sheet([[41,73],[44,68],[38,62],[59,73],[56,68],[62,62]])","F.sheet([[41,73],[44,68],[38,62],[41,27]])","F.sheet([[41,73],[44,68],[38,62]])","F.sheet([[59,73],[56,68],[62,62]])"],"ans":0,"mech":"A vertical fold mirrors left to right. Each of the 3 punches becomes two, giving 6."},{"id":"P-F-26","sub":"paper-folding","lvl":13,"type":"fold","fold":"v","punched":[[36,37],[34,60],[35,45]],"opts":["F.sheet([[36,37],[34,60],[35,45],[36,63]])","F.sheet([[36,37],[34,60],[35,45],[64,37],[66,60],[65,45]])","F.sheet([[64,37],[66,60],[65,45]])","F.sheet([[36,37],[34,60],[35,45]])"],"ans":1,"mech":"A vertical fold mirrors left to right. Each of the 3 punches becomes two, giving 6."},{"id":"P-F-27","sub":"paper-folding","lvl":13,"type":"fold","fold":"h","punched":[[67,40],[62,29],[22,22]],"opts":["F.sheet([[67,40],[62,29],[22,22]])","F.sheet([[67,60],[62,71],[22,78]])","F.sheet([[67,40],[62,29],[22,22],[33,40]])","F.sheet([[67,40],[62,29],[22,22],[67,60],[62,71],[22,78]])"],"ans":3,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-28","sub":"paper-folding","lvl":13,"type":"fold","fold":"h","punched":[[40,25],[64,35],[48,27]],"opts":["F.sheet([[40,25],[64,35],[48,27],[60,25]])","F.sheet([[40,25],[64,35],[48,27],[40,75],[64,65],[48,73]])","F.sheet([[40,75],[64,65],[48,73]])","F.sheet([[40,25],[64,35],[48,27]])"],"ans":1,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-29","sub":"paper-folding","lvl":13,"type":"fold","fold":"h","punched":[[52,29],[67,30],[78,22]],"opts":["F.sheet([[52,29],[67,30],[78,22],[52,71],[67,70],[78,78]])","F.sheet([[52,71],[67,70],[78,78]])","F.sheet([[52,29],[67,30],[78,22]])","F.sheet([[52,29],[67,30],[78,22],[48,29]])"],"ans":0,"mech":"A horizontal fold mirrors top to bottom — not left to right. Match the mirror direction to the fold line."},{"id":"P-F-30","sub":"paper-folding","lvl":13,"type":"fold","fold":"v","punched":[[36,44],[27,34],[25,65]],"opts":["F.sheet([[36,44],[27,34],[25,65],[64,44],[73,34],[75,65]])","F.sheet([[64,44],[73,34],[75,65]])","F.sheet([[36,44],[27,34],[25,65],[36,56]])","F.sheet([[36,44],[27,34],[25,65]])"],"ans":0,"mech":"A vertical fold mirrors left to right. Each of the 3 punches becomes two, giving 6."},{"id":"P-F-31","sub":"paper-folding","lvl":13,"type":"fold","fold":"v","punched":[[43,41],[30,60],[27,68]],"opts":["F.sheet([[43,41],[30,60],[27,68],[43,59]])","F.sheet([[57,41],[70,60],[73,68]])","F.sheet([[43,41],[30,60],[27,68],[57,41],[70,60],[73,68]])","F.sheet([[43,41],[30,60],[27,68]])"],"ans":2,"mech":"A vertical fold mirrors left to right. Each of the 3 punches becomes two, giving 6."},{"id":"P-F-32","sub":"paper-folding","lvl":13,"type":"fold","fold":"v","punched":[[30,71],[26,47],[42,40]],"opts":["F.sheet([[70,71],[74,47],[58,40]])","F.sheet([[30,71],[26,47],[42,40]])","F.sheet([[30,71],[26,47],[42,40],[30,29]])","F.sheet([[30,71],[26,47],[42,40],[70,71],[74,47],[58,40]])"],"ans":3,"mech":"A vertical fold mirrors left to right. Each of the 3 punches becomes two, giving 6."},{"id":"P-F-33","sub":"paper-folding","lvl":13,"type":"fold","fold":"v","punched":[[44,71],[29,67],[25,64]],"opts":["F.sheet([[56,71],[71,67],[75,64]])","F.sheet([[44,71],[29,67],[25,64],[56,71],[71,67],[75,64]])","F.sheet([[44,71],[29,67],[25,64],[44,29]])","F.sheet([[44,71],[29,67],[25,64]])"],"ans":1,"mech":"A vertical fold mirrors left to right. Each of the 3 punches becomes two, giving 6."},{"id":"V-A-01","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">hammer</span> → <span class=\"hl\">nail</span> &nbsp;as&nbsp; <span class=\"hl\">wrench</span> → ?","mech":"Tool → the fastener it turns. \"Pipe\" is what you'd turn it on, not what you turn — that's the trap.","opts":["toolbox","bolt","grip","pipe"],"ans":1},{"id":"V-A-02","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">bird</span> → <span class=\"hl\">nest</span> &nbsp;as&nbsp; <span class=\"hl\">bee</span> → ?","mech":"Animal → the home it builds. \"Honey\" is what it makes, not where it lives.","opts":["honey","flower","hive","wing"],"ans":2},{"id":"V-A-03","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">pen</span> → <span class=\"hl\">write</span> &nbsp;as&nbsp; <span class=\"hl\">scissors</span> → ?","mech":"Tool → the action it performs. Two options describe the tool itself, not its use.","opts":["cut","paper","sharp","metal"],"ans":0},{"id":"V-A-04","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">hot</span> → <span class=\"hl\">cold</span> &nbsp;as&nbsp; <span class=\"hl\">wet</span> → ?","mech":"Direct opposites. \"Damp\" is a weaker version of wet, not its opposite.","opts":["dry","water","rain","damp"],"ans":0},{"id":"V-A-05","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">puppy</span> → <span class=\"hl\">dog</span> &nbsp;as&nbsp; <span class=\"hl\">kitten</span> → ?","mech":"Young animal → the adult it becomes.","opts":["pet","cat","fur","mouse"],"ans":1},{"id":"V-A-06","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">shoe</span> → <span class=\"hl\">foot</span> &nbsp;as&nbsp; <span class=\"hl\">glove</span> → ?","mech":"Item of clothing → the body part it covers. \"Finger\" is only part of the hand.","opts":["finger","leather","warm","hand"],"ans":3},{"id":"V-A-07","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">library</span> → <span class=\"hl\">books</span> &nbsp;as&nbsp; <span class=\"hl\">bakery</span> → ?","mech":"Place → what it holds or sells. \"Flour\" is an ingredient, \"oven\" a tool.","opts":["baker","oven","bread","flour"],"ans":2},{"id":"V-A-08","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">fish</span> → <span class=\"hl\">swim</span> &nbsp;as&nbsp; <span class=\"hl\">bird</span> → ?","mech":"Animal → how it moves. Options naming a place or a body part fail the relationship.","opts":["feather","fly","nest","sky"],"ans":1},{"id":"V-A-09","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">teacher</span> → <span class=\"hl\">school</span> &nbsp;as&nbsp; <span class=\"hl\">doctor</span> → ?","mech":"Worker → where they work.","opts":["patient","medicine","nurse","hospital"],"ans":3},{"id":"V-A-10","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">petal</span> → <span class=\"hl\">flower</span> &nbsp;as&nbsp; <span class=\"hl\">leaf</span> → ?","mech":"Part → the whole it belongs to. \"Branch\" and \"root\" are also parts, not wholes.","opts":["tree","branch","green","root"],"ans":0},{"id":"V-A-11","sub":"verbal-analogies","lvl":11,"type":"mc","stem":"<span class=\"hl\">cup</span> → <span class=\"hl\">drink</span> &nbsp;as&nbsp; <span class=\"hl\">plate</span> → ?","mech":"Container → the action it serves.","opts":["dish","food","round","eat"],"ans":3},{"id":"V-A-12","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">author</span> → <span class=\"hl\">novel</span> &nbsp;as&nbsp; <span class=\"hl\">composer</span> → ?","mech":"Creator → what they create. \"Orchestra\" performs it; it doesn't get created by the composer.","opts":["concert","orchestra","piano","symphony"],"ans":3},{"id":"V-A-13","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">drought</span> → <span class=\"hl\">crops</span> &nbsp;as&nbsp; <span class=\"hl\">frost</span> → ?","mech":"Damaging condition → what it destroys. \"Winter\" and \"cold\" are causes, not casualties.","opts":["blossoms","winter","cold","garden"],"ans":0},{"id":"V-A-14","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">whisper</span> → <span class=\"hl\">shout</span> &nbsp;as&nbsp; <span class=\"hl\">stroll</span> → ?","mech":"Mild version → intense version of the same action.","opts":["walk","slow","sprint","run"],"ans":2},{"id":"V-A-15","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">lens</span> → <span class=\"hl\">camera</span> &nbsp;as&nbsp; <span class=\"hl\">engine</span> → ?","mech":"Essential internal component → the device it powers. A wheel is external; a driver isn't a part.","opts":["car","driver","wheel","road"],"ans":0},{"id":"V-A-16","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">apology</span> → <span class=\"hl\">offense</span> &nbsp;as&nbsp; <span class=\"hl\">remedy</span> → ?","mech":"Thing → the problem it responds to. \"Cure\" is a synonym for remedy, not the problem.","opts":["doctor","pain","ailment","cure"],"ans":2},{"id":"V-A-17","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">chapter</span> → <span class=\"hl\">book</span> &nbsp;as&nbsp; <span class=\"hl\">scene</span> → ?","mech":"Subdivision → the work it divides. Options naming people or places break the structure.","opts":["script","actor","play","stage"],"ans":2},{"id":"V-A-18","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">sculptor</span> → <span class=\"hl\">marble</span> &nbsp;as&nbsp; <span class=\"hl\">weaver</span> → ?","mech":"Craftsperson → the raw material they work with. \"Cloth\" is the product, \"loom\" the tool.","opts":["loom","thread","cloth","pattern"],"ans":1},{"id":"V-A-19","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">thermometer</span> → <span class=\"hl\">temperature</span> &nbsp;as&nbsp; <span class=\"hl\">scale</span> → ?","mech":"Instrument → what it measures.","opts":["kitchen","measure","heavy","weight"],"ans":3},{"id":"V-A-20","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">reckless</span> → <span class=\"hl\">cautious</span> &nbsp;as&nbsp; <span class=\"hl\">generous</span> → ?","mech":"Opposites in character. \"Giving\" is a synonym for generous, not its opposite.","opts":["giving","stingy","kind","wealthy"],"ans":1},{"id":"V-A-21","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">seed</span> → <span class=\"hl\">plant</span> &nbsp;as&nbsp; <span class=\"hl\">egg</span> → ?","mech":"Origin → the mature organism. \"Shell\" is part of the egg, not what it becomes.","opts":["feather","nest","shell","bird"],"ans":3},{"id":"V-A-22","sub":"verbal-analogies","lvl":12,"type":"mc","stem":"<span class=\"hl\">oasis</span> → <span class=\"hl\">desert</span> &nbsp;as&nbsp; <span class=\"hl\">island</span> → ?","mech":"A small area of one kind surrounded by a vast area of its opposite.","opts":["water","ocean","sand","beach"],"ans":1},{"id":"V-A-23","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">drought</span> → <span class=\"hl\">famine</span> &nbsp;as&nbsp; <span class=\"hl\">inflation</span> → ?","mech":"Cause → the crisis it produces. \"Shortage\" is a sibling cause, not a consequence.","opts":["shortage","recession","currency","economy"],"ans":1},{"id":"V-A-24","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">prologue</span> → <span class=\"hl\">narrative</span> &nbsp;as&nbsp; <span class=\"hl\">preamble</span> → ?","mech":"Introductory section → the formal document it opens. \"Clause\" is an internal part, not the whole.","opts":["clause","law","court","statute"],"ans":3},{"id":"V-A-25","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">meticulous</span> → <span class=\"hl\">careless</span> &nbsp;as&nbsp; <span class=\"hl\">candid</span> → ?","mech":"Precise opposites. Two options are synonyms of candid, not antonyms.","opts":["honest","direct","blunt","evasive"],"ans":3},{"id":"V-A-26","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">catalyst</span> → <span class=\"hl\">reaction</span> &nbsp;as&nbsp; <span class=\"hl\">spark</span> → ?","mech":"Initiator → the process it triggers. \"Fuel\" enables it; \"fire\" is the visible result, not the process.","opts":["combustion","fire","fuel","heat"],"ans":0},{"id":"V-A-27","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">archipelago</span> → <span class=\"hl\">islands</span> &nbsp;as&nbsp; <span class=\"hl\">constellation</span> → ?","mech":"Collective term → the individual units it groups.","opts":["telescope","stars","sky","planets"],"ans":1},{"id":"V-A-28","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">symptom</span> → <span class=\"hl\">disease</span> &nbsp;as&nbsp; <span class=\"hl\">clue</span> → ?","mech":"Observable sign → the hidden thing it points to. \"Evidence\" is a synonym for clue.","opts":["crime","mystery","detective","evidence"],"ans":0},{"id":"V-A-29","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">abridge</span> → <span class=\"hl\">text</span> &nbsp;as&nbsp; <span class=\"hl\">dilute</span> → ?","mech":"Verb → what it reduces the strength of. \"Concentrate\" is the opposite action.","opts":["concentrate","solution","water","mixture"],"ans":1},{"id":"V-A-30","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">ephemeral</span> → <span class=\"hl\">permanent</span> &nbsp;as&nbsp; <span class=\"hl\">obscure</span> → ?","mech":"Opposites. Two options restate obscure rather than reversing it.","opts":["hidden","vague","unknown","renowned"],"ans":3},{"id":"V-A-31","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">chronicle</span> → <span class=\"hl\">events</span> &nbsp;as&nbsp; <span class=\"hl\">ledger</span> → ?","mech":"Record → what it records. Options naming people or institutions miss the relationship.","opts":["money","bank","transactions","accountant"],"ans":2},{"id":"V-A-32","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">quarantine</span> → <span class=\"hl\">contagion</span> &nbsp;as&nbsp; <span class=\"hl\">embargo</span> → ?","mech":"Restriction → what it is imposed to stop.","opts":["goods","ship","port","trade"],"ans":3},{"id":"V-A-33","sub":"verbal-analogies","lvl":13,"type":"mc","stem":"<span class=\"hl\">sediment</span> → <span class=\"hl\">river</span> &nbsp;as&nbsp; <span class=\"hl\">plaque</span> → ?","mech":"Accumulated deposit → the channel it builds up in. \"Blood\" is what flows, not the channel.","opts":["heart","artery","blood","vessel"],"ans":1},{"id":"V-C-01","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">granite · marble · slate</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All naturally occurring stone. Brick and plaster are manufactured — the group is defined by origin, not use.","opts":["plaster","limestone","glass","brick"],"ans":1},{"id":"V-C-02","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">oak · maple · birch</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are trees. The others are plants but not trees.","opts":["moss","ivy","fern","elm"],"ans":3},{"id":"V-C-03","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">violin · cello · viola</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are bowed string instruments. Flute and trumpet are wind; drum is percussion.","opts":["drum","trumpet","flute","double bass"],"ans":3},{"id":"V-C-04","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">Mercury · Venus · Mars</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are planets. The Moon is a satellite, the Sun a star.","opts":["Jupiter","Sun","Moon","comet"],"ans":0},{"id":"V-C-05","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">triangle · square · hexagon</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are polygons — closed shapes with straight sides. A circle has no sides.","opts":["sphere","circle","pentagon","line"],"ans":2},{"id":"V-C-06","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">copper · silver · iron</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are metals — they conduct heat and electricity. The others are insulating materials.","opts":["zinc","wood","plastic","rubber"],"ans":0},{"id":"V-C-07","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">rain · snow · sleet</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are forms of precipitation — water falling from the sky. Wind and fog are weather but don't fall.","opts":["hail","fog","wind","cloud"],"ans":0},{"id":"V-C-08","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">carrot · potato · radish</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All grow underground. The others grow above ground.","opts":["pepper","tomato","beet","lettuce"],"ans":2},{"id":"V-C-09","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">ankle · wrist · knee</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are joints that bend. The others are bones that don't.","opts":["rib","spine","elbow","skull"],"ans":2},{"id":"V-C-10","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">Atlantic · Pacific · Arctic</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are oceans. The others are seas — smaller and partly enclosed.","opts":["Baltic","Caribbean","Mediterranean","Indian"],"ans":3},{"id":"V-C-11","sub":"verbal-classification","lvl":11,"type":"mc","stem":"<span class=\"hl\">hour · minute · second</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are units of time. The others are devices that measure it.","opts":["watch","calendar","week","clock"],"ans":2},{"id":"V-C-12","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">whisper · murmur · mutter</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All mean speaking quietly AND indistinctly. \"Shout\" fails on volume; \"announce\" fails on clarity.","opts":["mumble","announce","sing","shout"],"ans":0},{"id":"V-C-13","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">novel · biography · encyclopedia</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are book-length prose works.","opts":["song","poem","letter","memoir"],"ans":3},{"id":"V-C-14","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">sprint · dash · bolt</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All mean to move very fast. The others are deliberate but slow.","opts":["wander","march","stroll","dart"],"ans":3},{"id":"V-C-15","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">honesty · courage · patience</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are virtues — chosen traits of character. The others are circumstances or gifts.","opts":["wealth","loyalty","fame","talent"],"ans":1},{"id":"V-C-16","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">drizzle · downpour · shower</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All describe rainfall at different intensities.","opts":["gale","frost","deluge","breeze"],"ans":2},{"id":"V-C-17","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">chisel · plane · lathe</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are tools that shape material by removing it. The others join material together.","opts":["nail","glue","sander","screw"],"ans":2},{"id":"V-C-18","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">peninsula · isthmus · cape</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are land formations extending into water. The others are bodies of water.","opts":["bay","gulf","strait","promontory"],"ans":3},{"id":"V-C-19","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">astonished · amazed · stunned</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All mean overwhelmed by surprise. The others are milder and not surprise-based.","opts":["content","curious","astounded","pleased"],"ans":2},{"id":"V-C-20","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">thesis · hypothesis · premise</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are claims stated before testing. The others come after.","opts":["conclusion","result","evidence","proposition"],"ans":3},{"id":"V-C-21","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">pound · ounce · tonne</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All measure mass. The others measure volume, length, and temperature.","opts":["litre","metre","degree","stone"],"ans":3},{"id":"V-C-22","sub":"verbal-classification","lvl":12,"type":"mc","stem":"<span class=\"hl\">mosaic · collage · montage</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are made by assembling separate pieces into one image.","opts":["mural","portrait","sketch","patchwork"],"ans":3},{"id":"V-C-23","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">lucid · coherent · articulate</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All mean clearly understandable. \"Eloquent\" and \"fluent\" describe skill, not clarity; \"verbose\" is the opposite.","opts":["intelligible","eloquent","verbose","fluent"],"ans":0},{"id":"V-C-24","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">erode · corrode · abrade</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All mean to wear away gradually. The others build up.","opts":["fortify","weather","construct","reinforce"],"ans":1},{"id":"V-C-25","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">sonnet · haiku · limerick</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are poetic forms with fixed structural rules. The others are prose forms.","opts":["villanelle","anecdote","fable","essay"],"ans":0},{"id":"V-C-26","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">tentative · provisional · conditional</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All mean dependent on something else and subject to change.","opts":["absolute","definitive","contingent","permanent"],"ans":2},{"id":"V-C-27","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">famine · drought · blight</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are agricultural catastrophes. The others describe plenty.","opts":["abundance","harvest","pestilence","surplus"],"ans":2},{"id":"V-C-28","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">preamble · prologue · prelude</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All come before the main work. The others come after.","opts":["postscript","overture","epilogue","appendix"],"ans":1},{"id":"V-C-29","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">skeptical · dubious · incredulous</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All express doubt. The others express confidence.","opts":["assured","wary","certain","convinced"],"ans":1},{"id":"V-C-30","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">tributary · estuary · delta</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are river features. The others are landforms of elevation.","opts":["confluence","ridge","plateau","summit"],"ans":0},{"id":"V-C-31","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">anomaly · aberration · deviation</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All describe departures from the expected. The others describe the expectation itself.","opts":["standard","irregularity","norm","convention"],"ans":1},{"id":"V-C-32","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">philanthropy · altruism · benevolence</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All describe generosity toward others. \"Frugality\" is restraint, not selfishness — but still not generosity.","opts":["greed","frugality","avarice","charity"],"ans":3},{"id":"V-C-33","sub":"verbal-classification","lvl":13,"type":"mc","stem":"<span class=\"hl\">stalactite · stalagmite · column</span><br><span style=\"font-size:16px;color:var(--muted)\">Which belongs with them?</span>","mech":"All are cave formations built by mineral deposits. The others are formed by wind, ice, or water outside caves.","opts":["flowstone","moraine","delta","dune"],"ans":0},{"id":"S-C-01","sub":"sentence-completion","lvl":11,"type":"mc","stem":"Although the recipe called for exact measurements, Maya cooked by <span class=\"hl\">______</span>, adding ingredients until the taste seemed right.","mech":"\"Although\" signals contrast — the blank must oppose exact measurements. The second half then defines it.","opts":["schedule","necessity","instinct","accident"],"ans":2},{"id":"S-C-02","sub":"sentence-completion","lvl":11,"type":"mc","stem":"The hallway was so <span class=\"hl\">______</span> that we could hear the clock ticking three rooms away.","mech":"The second half proves the answer: hearing something faint requires silence.","opts":["crowded","narrow","bright","quiet"],"ans":3},{"id":"S-C-03","sub":"sentence-completion","lvl":11,"type":"mc","stem":"Because the bridge was <span class=\"hl\">______</span>, the city closed it until repairs could be made.","mech":"\"Because\" links cause to effect. Only one option explains a closure.","opts":["historic","unsafe","popular","wide"],"ans":1},{"id":"S-C-04","sub":"sentence-completion","lvl":11,"type":"mc","stem":"The puppy was <span class=\"hl\">______</span>, knocking over two lamps before anyone could catch it.","mech":"The example after the comma defines the blank — knocking things over isn't calm behavior.","opts":["energetic","timid","obedient","exhausted"],"ans":0},{"id":"S-C-05","sub":"sentence-completion","lvl":11,"type":"mc","stem":"She spoke with such <span class=\"hl\">______</span> that nobody doubted she had rehearsed her speech many times.","mech":"Rehearsal produces assurance; two options describe its opposite.","opts":["confidence","confusion","hesitation","silence"],"ans":0},{"id":"S-C-06","sub":"sentence-completion","lvl":11,"type":"mc","stem":"The instructions were <span class=\"hl\">______</span>, so even the youngest camper set up her tent without help.","mech":"The result — a young child succeeding alone — tells you what the instructions must have been.","opts":["simple","missing","technical","lengthy"],"ans":0},{"id":"S-C-07","sub":"sentence-completion","lvl":11,"type":"mc","stem":"Despite the <span class=\"hl\">______</span> weather, the team finished the entire game.","mech":"\"Despite\" signals contrast — the weather must work against finishing.","opts":["perfect","warm","miserable","mild"],"ans":2},{"id":"S-C-08","sub":"sentence-completion","lvl":11,"type":"mc","stem":"The museum guard remained <span class=\"hl\">______</span>, watching the same doorway for six straight hours.","mech":"Six hours of watching one spot requires sustained attention, not the opposite.","opts":["cheerful","restless","distracted","alert"],"ans":3},{"id":"S-C-09","sub":"sentence-completion","lvl":11,"type":"mc","stem":"Marcus was <span class=\"hl\">______</span> about the surprise party, refusing to give his sister even one hint.","mech":"The second half defines it: withholding hints is deliberate secrecy, not forgetfulness.","opts":["secretive","careless","forgetful","honest"],"ans":0},{"id":"S-C-10","sub":"sentence-completion","lvl":11,"type":"mc","stem":"The soup needed more <span class=\"hl\">______</span>; it tasted like warm water.","mech":"Tasting like water means something is missing — and it isn't more water.","opts":["heat","volume","flavor","liquid"],"ans":2},{"id":"S-C-11","sub":"sentence-completion","lvl":11,"type":"mc","stem":"After the long hike, everyone was <span class=\"hl\">______</span> and collapsed onto the grass.","mech":"Collapsing defines the state. Two options describe the opposite of tired.","opts":["weary","alert","anxious","eager"],"ans":0},{"id":"S-C-12","sub":"sentence-completion","lvl":12,"type":"mc","stem":"The scientist's conclusions were <span class=\"hl\">______</span>; she had tested her hypothesis across five separate trials.","mech":"Five trials strengthen a conclusion — the semicolon's second half is evidence for the blank.","opts":["disputed","unpublished","premature","robust"],"ans":3},{"id":"S-C-13","sub":"sentence-completion","lvl":12,"type":"mc","stem":"Though normally <span class=\"hl\">______</span>, Dev argued passionately for nearly ten minutes and had to be asked twice to sit down.","mech":"\"Though\" signals contrast — the blank must oppose arguing at length. Two options describe someone who already speaks up.","opts":["impatient","reserved","outspoken","hostile"],"ans":1},{"id":"S-C-14","sub":"sentence-completion","lvl":12,"type":"mc","stem":"The treaty was merely <span class=\"hl\">______</span>; both sides resumed fighting within a month.","mech":"If fighting resumed, the treaty accomplished nothing real. Three options claim it worked.","opts":["binding","permanent","effective","symbolic"],"ans":3},{"id":"S-C-15","sub":"sentence-completion","lvl":12,"type":"mc","stem":"Her explanation was so <span class=\"hl\">______</span> that even students who had missed the lesson understood immediately.","mech":"The result — immediate understanding by the unprepared — requires clarity specifically, not brevity or detail.","opts":["lucid","technical","brief","detailed"],"ans":0},{"id":"S-C-16","sub":"sentence-completion","lvl":12,"type":"mc","stem":"The committee's decision seemed <span class=\"hl\">______</span>, arrived at without consulting anyone affected by it.","mech":"\"Without consulting anyone affected\" defines the blank. Three options describe the opposite process.","opts":["democratic","transparent","arbitrary","considered"],"ans":2},{"id":"S-C-17","sub":"sentence-completion","lvl":12,"type":"mc","stem":"Rainfall this season was <span class=\"hl\">______</span>, less than half the usual amount for the region.","mech":"The measurement after the comma defines the word precisely.","opts":["excessive","abundant","typical","scarce"],"ans":3},{"id":"S-C-18","sub":"sentence-completion","lvl":12,"type":"mc","stem":"The novel's ending felt <span class=\"hl\">______</span>, resolving in two pages what the previous three hundred had built.","mech":"The contrast between two pages and three hundred is the clue — the pacing collapsed.","opts":["gradual","satisfying","inevitable","abrupt"],"ans":3},{"id":"S-C-19","sub":"sentence-completion","lvl":12,"type":"mc","stem":"He was <span class=\"hl\">______</span> in his praise, mentioning every member of the team by name.","mech":"Naming everyone is the definition of unstinting praise.","opts":["vague","reluctant","sparing","generous"],"ans":3},{"id":"S-C-20","sub":"sentence-completion","lvl":12,"type":"mc","stem":"The instructions were deliberately <span class=\"hl\">______</span>, leaving each team free to solve the problem its own way.","mech":"\"Leaving each team free\" defines the blank — and \"deliberately\" tells you it was a choice.","opts":["detailed","rigid","open-ended","mandatory"],"ans":2},{"id":"S-C-21","sub":"sentence-completion","lvl":12,"type":"mc","stem":"Once a <span class=\"hl\">______</span> port, the town now sees perhaps one cargo ship a year.","mech":"\"Once\" plus \"now\" signals a reversal — the blank must contrast with near-emptiness.","opts":["forgotten","modest","quiet","bustling"],"ans":3},{"id":"S-C-22","sub":"sentence-completion","lvl":12,"type":"mc","stem":"The witness's account was <span class=\"hl\">______</span>, changing in three important details between the first and second interviews.","mech":"Changing details is the definition given after the comma.","opts":["thorough","inconsistent","credible","rehearsed"],"ans":1},{"id":"S-C-23","sub":"sentence-completion","lvl":13,"type":"mc","stem":"The senator's argument was <span class=\"hl\">______</span>: it relied on a single statistic that later proved to be outdated.","mech":"The colon means the second half defines the blank. One outdated statistic = weakly supported.","opts":["lengthy","controversial","tenuous","persuasive"],"ans":2},{"id":"S-C-24","sub":"sentence-completion","lvl":13,"type":"mc","stem":"Far from being <span class=\"hl\">______</span>, the policy actually widened the very gap it was designed to close.","mech":"\"Far from\" reverses the blank — the policy did the opposite of what the blank claims.","opts":["remedial","ambitious","expensive","harmful"],"ans":0},{"id":"S-C-25","sub":"sentence-completion","lvl":13,"type":"mc","stem":"Her prose is admirably <span class=\"hl\">______</span>, conveying in a single clause what others require a paragraph to say.","mech":"The comparison defines it: saying more with fewer words.","opts":["exhaustive","economical","ornate","ambiguous"],"ans":1},{"id":"S-C-26","sub":"sentence-completion","lvl":13,"type":"mc","stem":"The evidence, though <span class=\"hl\">______</span>, was enough to justify reopening the investigation.","mech":"\"Though\" signals concession — the evidence must be weak-but-sufficient, not strong.","opts":["conclusive","overwhelming","fabricated","circumstantial"],"ans":3},{"id":"S-C-27","sub":"sentence-completion","lvl":13,"type":"mc","stem":"Critics called the reforms <span class=\"hl\">______</span>, noting that they addressed symptoms while leaving the underlying structure untouched.","mech":"The second half defines the word: surface-level, not structural.","opts":["comprehensive","superficial","overdue","radical"],"ans":1},{"id":"S-C-28","sub":"sentence-completion","lvl":13,"type":"mc","stem":"The two accounts are not contradictory but <span class=\"hl\">______</span> — each supplies detail the other leaves out.","mech":"\"Not contradictory but\" sets up a contrast, and the dash then defines it: they fill each other's gaps.","opts":["conflicting","complementary","redundant","identical"],"ans":1},{"id":"S-C-29","sub":"sentence-completion","lvl":13,"type":"mc","stem":"His optimism proved <span class=\"hl\">______</span>; the conditions he dismissed as temporary persisted for another decade.","mech":"The second half disproves his view — so the blank must mean he was wrong.","opts":["contagious","prescient","unfounded","justified"],"ans":2},{"id":"S-C-30","sub":"sentence-completion","lvl":13,"type":"mc","stem":"The manuscript was <span class=\"hl\">______</span>, with whole chapters missing and several pages out of order.","mech":"Missing chapters and disordered pages define an incomplete, broken-up text.","opts":["pristine","fragmentary","annotated","lengthy"],"ans":1},{"id":"S-C-31","sub":"sentence-completion","lvl":13,"type":"mc","stem":"Rather than <span class=\"hl\">______</span> the dispute, the mediator's intervention hardened both sides' positions.","mech":"\"Rather than\" reverses it — the blank is what was intended, and the opposite happened.","opts":["inflaming","resolving","prolonging","ignoring"],"ans":1},{"id":"S-C-32","sub":"sentence-completion","lvl":13,"type":"mc","stem":"The species is remarkably <span class=\"hl\">______</span>, surviving in habitats ranging from arctic tundra to equatorial swamp.","mech":"The range of habitats defines the trait. \"Specialized\" is precisely the opposite.","opts":["specialized","sedentary","endangered","adaptable"],"ans":3},{"id":"S-C-33","sub":"sentence-completion","lvl":13,"type":"mc","stem":"Although the theory was initially <span class=\"hl\">______</span>, decades of subsequent data have made it the accepted explanation.","mech":"\"Although\" plus \"subsequent acceptance\" means the early reception must have been negative.","opts":["dismissed","confirmed","popular","embraced"],"ans":0}];
+
+const SUBS=[
+ {id:"verbal-analogies",name:"Verbal Analogies",bat:"Verbal"},
+ {id:"verbal-classification",name:"Verbal Classification",bat:"Verbal"},
+ {id:"sentence-completion",name:"Sentence Completion",bat:"Verbal"},
+ {id:"number-series",name:"Number Series",bat:"Quantitative"},
+ {id:"number-analogies",name:"Number Analogies",bat:"Quantitative"},
+ {id:"number-puzzles",name:"Number Puzzles",bat:"Quantitative"},
+ {id:"figure-matrices",name:"Figure Matrices",bat:"Nonverbal"},
+ {id:"figure-classification",name:"Figure Classification",bat:"Nonverbal"},
+ {id:"paper-folding",name:"Paper Folding",bat:"Nonverbal"}
+];
+const GRADE_LVL={5:11,6:12,7:13,8:13};
+// Confidence tiers: a level is always shown, but labelled by how much it rests on.
+// Replaces the old hard 5-item gate, which no session length could ever clear
+// (9 subtests x 3 rounds = 3 items per subtest at most).
+const CONF=n=> n>=5 ? {k:'hi',t:'Solid'} : n>=3 ? {k:'md',t:'Provisional'} : {k:'lo',t:'First impression'};
+
+let S={grade:null,rounds:3,queue:[],idx:0,log:[],lvlBySub:{},answered:false};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TELEMETRY (Ticket 5)
+
+   Pattern Lab writes through the SAME shared pipe every other module uses
+   (/js/telemetry.js → artifacts/{appId}/sessions + /events), tagged
+   `stream: 'pattern-lab'`. Insider partitions that stream out of D.sessions and
+   D.events before it computes anything, so these sessions cannot reach the funnel,
+   the conversion rate, module-visit counts or any Lab Pack report. Nothing here is
+   a second pipe — a second pipe is how a stream ends up being counted twice later.
+
+   WHAT IS CAPTURED, AND WHY
+   The item levels (L11 / L12 / L13) were assigned by design judgment. Nobody has
+   normed them against real students. Every answered item therefore records its
+   subtest, its level, whether it was right, and WHICH distractor was chosen when it
+   was wrong. If learners clear "L13" items in a subtest at the same rate as its
+   "L11" items, that subtest's levelling is wrong and the bank needs recalibrating.
+   That is the entire reason this ships free.
+
+   WHAT IS DELIBERATELY NOT HERE
+   - No `category` field on a choice event. `category` is the ROUTING vocabulary
+     (see /js/skill-routing.js); Pattern Lab's nine subtests are not in it and must
+     never be mistaken for it. The field is called `subtest`.
+   - No skill-routing.js, on the page or in this file. Nothing here resolves to a
+     GoodBlock.
+   - No sign-in prompt, no identity gate, no name. See patternLabSession() below.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+// The longest session a learner can pick. Telemetry.plan() narrows this to the real
+// queue length once they choose, so a 9-item session is never scored out of 27.
+const MAX_ITEMS = 27;
+const SUBTEST_IDS = SUBS.map(s => s.id);
+
+// Telemetry must never be able to break a question. Every call goes through here: if the
+// pipe never loaded, or a write throws, the practice session is unaffected.
+const tele = (fn, ...args) => {
+  try { if (window.Telemetry && typeof window.Telemetry[fn] === 'function') window.Telemetry[fn](...args); }
+  catch (e) { /* ignore */ }
+};
+
+/* A uid, and nothing else.
+ *
+ * firestore.rules #10/#11 only accept a write that names request.auth.uid, so the pipe
+ * needs a Firebase session. Every other module gets one from guestStart()/silentSignIn(),
+ * which also write a users/{uid} profile with a nickname — for Pattern Lab that would
+ * both contradict "no account" and add a phantom learner to Insider's user counts, which
+ * is the exact thing Ticket 5 exists to prevent. anonymousSessionOnly() signs in
+ * anonymously and stops there: no profile document, no display name, no ag_account
+ * routing flag, nothing tied to a person. */
+async function patternLabSession() {
+    try {
+        const core = window.AuthCore;
+        if (core && core.anonymousSessionOnly) await core.anonymousSessionOnly();
+    } catch (e) {
+        // A blocked or failed sign-in costs the calibration data for this visit and
+        // nothing else. The practice session itself does not depend on it.
+        console.warn('[PatternLab] anonymous telemetry session unavailable', e);
+    }
+}
+
+// auth-core.js and telemetry.js are module scripts and have not necessarily run when this
+// classic script does. Poll briefly rather than racing them — the same pattern the four
+// games use; if neither ever arrives, the game plays exactly as it does now with no data.
+function initTelemetry(tries) {
+  if (window.Telemetry && window.AuthCore) {
+    window.Telemetry.init({ module: 'pattern-lab', gameName: 'Pattern Lab', stepsTotal: MAX_ITEMS, stream: 'pattern-lab' });
+    patternLabSession();
+    return;
+  }
+  if ((tries || 0) > 100) return;
+  setTimeout(() => initTelemetry((tries || 0) + 1), 50);
+}
+initTelemetry(0);
+const card=()=>document.getElementById('card');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+// ---------- SCREENS ----------
+function start(){
+  document.getElementById('prog').textContent='';
+  card().innerHTML=`
+    <div class="eyebrow">Allgood Academy \u00b7 Free Practice</div>
+    <h1>Pattern Lab</h1>
+    <div class="rule"></div>
+    <p class="lede">CogAT-style practice across nine reasoning skills. Every question shows you the pattern behind it \u2014 whether you get it right or not.</p>
+    <p class="lede"><strong>What grade are you in?</strong></p>
+    <div class="grades" id="grades">
+      ${[5,6,7,8].map(g=>`<div class="grade" data-g="${g}"><div class="g">${g}</div><div class="l">Level ${GRADE_LVL[g]}${g>=7?'/14':''}</div></div>`).join('')}
+    </div>
+    <div id="lenwrap" style="display:none">
+      <p class="lede"><strong>How long do you have?</strong></p>
+      <div class="lens" id="lens">
+        <button class="len" data-r="1"><span class="n">9</span><span class="w"><span class="t">Quick look</span><span class="d">About 5 minutes \u00b7 one question per skill. A rough first read, not a full profile.</span></span></button>
+        <button class="len" data-r="2"><span class="n">18</span><span class="w"><span class="t">Standard</span><span class="d">About 10 minutes \u00b7 two per skill. Enough to see where you're strongest.</span></span></button>
+        <button class="len" data-r="3"><span class="n">27</span><span class="w"><span class="t">Full profile</span><span class="d">About 15 minutes \u00b7 three per skill. The most reliable version.</span></span></button>
+      </div>
+    </div>
+    <button class="btn" id="go" disabled>Start \u2192</button>
+    <p class="muted" style="margin-top:18px">No account needed. Nothing is saved to your name. You can stop any time \u2014 you'll still get results for what you answered.</p>`;
+  document.getElementById('grades').onclick=e=>{
+    const el=e.target.closest('.grade'); if(!el)return;
+    document.querySelectorAll('.grade').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel'); S.grade=+el.dataset.g;
+    document.getElementById('lenwrap').style.display='block';
+  };
+  document.getElementById('lens').onclick=e=>{
+    const el=e.target.closest('.len'); if(!el)return;
+    document.querySelectorAll('.len').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel'); S.rounds=+el.dataset.r;
+    document.getElementById('go').disabled=false;
+  };
+  document.getElementById('go').onclick=begin;
+}
+
+function begin(){
+  SUBS.forEach(s=>S.lvlBySub[s.id]=GRADE_LVL[S.grade]);
+  S.queue=buildQueue(); S.idx=0; S.log=[];
+  // The learner picks the session length AFTER the page has opened, so the real step
+  // denominator is only knowable here. See the plan() note in /js/telemetry.js.
+  tele('plan', S.queue.length);
+  tele('track','pattern_lab_start',{grade:S.grade,startLevel:GRADE_LVL[S.grade],items:S.queue.length});
+  render();
+}
+
+// Seed bank is small, so build a queue that covers every subtest, nearest-level-first.
+function buildQueue(){
+  // 3 rounds x 9 subtests = 27 items, adaptively levelled, no repeats within a session
+  const used=new Set(); const q=[];
+  for(let round=0;round<(S.rounds||3);round++){
+    SUBS.forEach(sub=>{
+      const want=S.lvlBySub[sub.id];
+      // prefer exact level, then nearest
+      const pool=BANK.filter(b=>b.sub===sub.id&&!used.has(b.id))
+        .sort((a,b)=>Math.abs(a.lvl-want)-Math.abs(b.lvl-want)||(Math.random()-.5));
+      if(pool.length){const pick=pool[Math.floor(Math.random()*Math.min(4,pool.length))];used.add(pick.id);q.push({...pick,_round:round});}
+    });
+  }
+  return q;
+}
+
+// re-pick the remaining queue whenever a subtest's level changes
+function reLevel(){
+  const used=new Set(S.log.map(l=>l.id));
+  for(let i=S.idx+1;i<S.queue.length;i++){
+    const sub=S.queue[i].sub, want=S.lvlBySub[sub];
+    if(S.queue[i].lvl===want) {used.add(S.queue[i].id); continue;}
+    const pool=BANK.filter(b=>b.sub===sub&&b.lvl===want&&!used.has(b.id)&&!S.queue.slice(0,i).some(x=>x.id===b.id));
+    if(pool.length){const pick=pool[Math.floor(Math.random()*pool.length)];S.queue[i]={...pick,_round:S.queue[i]._round};}
+    used.add(S.queue[i].id);
+  }
+}
+
+function render(){
+  if(S.idx>=S.queue.length) return report();
+  const q=S.queue[S.idx]; S.answered=false;
+  const sub=SUBS.find(s=>s.id===q.sub);
+  document.getElementById('prog').textContent=`${S.idx+1} / ${S.queue.length}`;
+
+  const fig = x => x ? eval(x) : '';
+  const figOpts = () => `<div class="figopts">${q.opts.map((o,i)=>
+      `<button class="figopt" data-i="${i}">${fig(o)}<span class="k">${'ABCD'[i]}</span></button>`).join('')}</div>`;
+
+  let body;
+  if(q.type==='matrix'){
+    body = `<div class="figgrid">${q.cells.map(c=>
+        c ? `<div class="figcell">${fig(c)}</div>` : `<div class="figcell qm"><span>?</span></div>`).join('')}</div>`
+      + `<p class="muted" style="text-align:center;margin-bottom:16px">Which figure completes the grid?</p>` + figOpts();
+  } else if(q.type==='figclass'){
+    body = `<div class="figrow">${q.given.map(g=>`<div class="fb">${fig(g)}</div>`).join('')}<span class="sep">+</span><div class="fb" style="background:#fdf1ec"><span style="font-family:var(--font-display);font-size:28px;color:var(--orange)">?</span></div></div>`
+      + `<p class="muted" style="text-align:center;margin-bottom:16px">Which figure belongs with the first three?</p>` + figOpts();
+  } else if(q.type==='fold'){
+    const punchedHalf = eval(`F.half(${JSON.stringify(q.punched)},'${q.fold}')`);
+    const blank = q.fold==='v' ? eval("F.sheet([],'v')") : eval("F.sheet([],'h')");
+    body = `<div class="fold">
+        <div class="fs">${blank}</div><span class="ar">→</span>
+        <div class="fs">${punchedHalf}</div><span class="ar">→</span>
+        <div class="fs" style="background:#fdf1ec"><span style="font-family:var(--font-display);font-size:26px;color:var(--orange)">?</span></div>
+        <div class="cap">folded &nbsp;·&nbsp; punched &nbsp;·&nbsp; unfolded</div>
+      </div>`
+      + `<p class="muted" style="text-align:center;margin-bottom:16px">The paper is folded, punched, then opened. What does it look like?</p>` + figOpts();
+  } else if(q.type==='num'){
+    body = (q.series
+        ? `<div class="series">${q.series.map(n=>n==='?'?'<span class="q">?</span>':esc(n)).join(' &nbsp;·&nbsp; ')}</div>`
+        : `<div class="stem">${q.stem}</div>`)
+      + `<div class="numin"><input id="na" type="text" inputmode="numeric" placeholder="Your answer" autocomplete="off"><button class="btn" id="sub">Check</button></div>`;
+  } else {
+    body = `<div class="stem">${q.stem}</div>
+       <div class="opts">${q.opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="k">${'ABCD'[i]}</span>${esc(o)}</button>`).join('')}</div>`;
+  }
+
+  card().innerHTML=`
+    <div class="qmeta"><span class="chip">${esc(sub.name)}</span><span class="chip lv">Level ${q.lvl}${q.lvl===13?'/14':''}</span></div>
+    ${body}
+    <div id="after"></div>`;
+
+  if(q.type==='num'){
+    const inp=document.getElementById('na');
+    inp.focus();
+    const go=()=>answer(inp.value.trim());
+    document.getElementById('sub').onclick=go;
+    inp.onkeydown=e=>{if(e.key==='Enter')go();};
+  } else if(q.type==='mc'){
+    card().querySelector('.opts').onclick=e=>{
+      const b=e.target.closest('.opt'); if(!b||S.answered)return;
+      answer(+b.dataset.i);
+    };
+  } else {
+    card().querySelector('.figopts').onclick=e=>{
+      const b=e.target.closest('.figopt'); if(!b||S.answered)return;
+      answer(+b.dataset.i);
+    };
+  }
+}
+
+function answer(val){
+  if(S.answered)return; S.answered=true;
+  const q=S.queue[S.idx];
+  const correct = q.type==='num' ? String(val)===String(q.ans) : val===q.ans;
+
+  S.log.push({id:q.id,sub:q.sub,lvl:q.lvl,correct});
+
+  /* The per-item record this whole thing ships free for (Ticket 5).
+     `chosen` is the DISTRACTOR: which wrong option was picked, by index for a
+     multiple-choice or figure item and by the typed string for a numeric one. Without it
+     a wrong answer says only "L13 Number Analogies was missed", which cannot tell a badly
+     levelled item from a badly written distractor that every learner falls for.
+     Deliberately `subtest`, not `category` — see the TELEMETRY note above. */
+  tele('step', S.idx + 1);
+  tele('choice', {
+    itemId: q.id,
+    subtest: q.sub,
+    level: q.lvl,
+    itemType: q.type,
+    correct,
+    chosen: q.type === 'num' ? String(val).slice(0, 24) : (typeof val === 'number' ? val : null),
+    answer: q.type === 'num' ? String(q.ans) : q.ans,
+    // The level this subtest was sitting at when the item was served, so an adaptive
+    // path can be reconstructed rather than inferred from the item's own level.
+    servedAt: S.lvlBySub[q.sub],
+    grade: S.grade,
+  });
+
+  // adaptive: step the subtest's working level
+  const before=S.lvlBySub[q.sub];
+  if(correct && S.lvlBySub[q.sub]<13) S.lvlBySub[q.sub]++;
+  else if(!correct && S.lvlBySub[q.sub]>11) S.lvlBySub[q.sub]--;
+  if(S.lvlBySub[q.sub]!==before) reLevel();
+
+  const visual = q.type==='matrix'||q.type==='figclass'||q.type==='fold';
+  if(q.type==='mc'){
+    card().querySelectorAll('.opt').forEach((b,i)=>{
+      b.disabled=true;
+      if(i===q.ans)b.classList.add('right');
+      else if(i===val)b.classList.add('wrong');
+    });
+  } else if(visual){
+    card().querySelectorAll('.figopt').forEach((b,i)=>{
+      b.disabled=true;
+      if(i===q.ans)b.classList.add('right');
+      else if(i===val)b.classList.add('wrong');
+    });
+  } else {
+    document.getElementById('na').disabled=true;
+    document.getElementById('sub').disabled=true;
+  }
+
+  const ansTxt = q.type==='num' ? esc(q.ans) : visual ? 'option '+'ABCD'[q.ans] : esc(q.opts[q.ans]);
+  document.getElementById('after').innerHTML=`
+    <div class="mech ${correct?'ok':'no'}">
+      <div class="vt">${correct?'Correct':'The answer was '+ansTxt}</div>
+      ${!correct&&q.type==='num'?'':''}
+      <p>${q.mech}</p>
+    </div>
+    <div class="foot">
+      <button class="btn" id="nx">${S.idx+1>=S.queue.length?'See your results →':'Next →'}</button>
+      <button class="skip" id="sk">Skip explanation</button>
+      <button class="skip" id="stop" style="margin-left:14px">Stop &amp; see results</button>
+    </div>`;
+  document.getElementById('nx').onclick=()=>{S.idx++;render();};
+  document.getElementById('sk').onclick=()=>{S.idx++;render();};
+  document.getElementById('stop').onclick=()=>{S.idx=S.queue.length;render();};
+}
+
+function report(){
+  document.getElementById('prog').textContent='';
+  const base=GRADE_LVL[S.grade];
+  const LV=[11,12,13];
+  const lvName=l=>l===13?'13/14':String(l);
+
+  const rows=SUBS.map(s=>{
+    const mine=S.log.filter(l=>l.sub===s.id);
+    const per={};
+    LV.forEach(l=>{
+      const at=mine.filter(m=>m.lvl===l);
+      per[l]={n:at.length, ok:at.filter(m=>m.correct).length};
+    });
+    const cleared=LV.filter(l=>per[l].ok>0);
+    const top=cleared.length?Math.max(...cleared):null;
+    return {s,mine,per,top,n:mine.length,conf:CONF(mine.length),answered:mine.length>0};
+  });
+
+  // headline: strongest vs weakest among cells with enough data
+  const solid=rows.filter(r=>r.answered&&r.top);
+  let head='';
+  if(solid.length>=2){
+    const hi=solid.reduce((a,b)=>b.top>a.top?b:a);
+    const lo=solid.reduce((a,b)=>b.top<a.top?b:a);
+    head = hi.top===lo.top
+      ? `<div class="summary"><div class="sh">Even across the board</div><p>You landed at <b>Level ${lvName(hi.top)}</b> in every skill with enough data. That's a consistent profile \u2014 no single area pulling ahead or lagging.</p></div>`
+      : `<div class="summary"><div class="sh">Your strongest and weakest</div><p>You reached <b>Level ${lvName(hi.top)}</b> in <b>${esc(hi.s.name)}</b> and <b>Level ${lvName(lo.top)}</b> in <b>${esc(lo.s.name)}</b>. Being stronger in one kind of reasoning than another is normal and common \u2014 it's the most useful thing this shows you.</p></div>`;
+  }
+
+  let html=`<div class="eyebrow">Your results</div>
+    <h1>Nine skills, measured separately</h1><div class="rule"></div>
+    ${head}
+    <div class="legend">
+      <span><i style="background:var(--teal)"></i>Cleared</span>
+      <span><i style="background:var(--sage)"></i>Above your grade</span>
+      <span><i style="background:#fdf1ec;border:1px solid var(--orange)"></i>Tried, not cleared</span>
+      <span><i style="background:#f0ebe0;border:1px solid var(--line)"></i>Not reached</span>
+      <span><i style="background:var(--dark);opacity:.35"></i>Your grade's start</span>
+    </div>
+    <p class="muted" style="margin:-8px 0 20px">Each skill is labelled by how much it rests on: <strong>First impression</strong> (1\u20132 questions), <strong>Provisional</strong> (3\u20134), <strong>Solid</strong> (5+). A longer session moves these up.</p>`;
+
+  const bats=['Verbal','Quantitative','Nonverbal'];
+  bats.forEach(bat=>{
+    const inBat=rows.filter(r=>r.s.bat===bat);
+    if(!inBat.length)return;
+    html+=`<div class="bt">${esc(bat)}</div>`;
+    inBat.forEach(r=>{
+      let vb,vc;
+      if(!r.answered){ vb='Not answered'; vc='nd'; }
+      else if(!r.top){ vb='Below Level 11'; vc='dn'; }
+      else if(r.top>base){ vb='Level '+lvName(r.top)+' \u2191'; vc='up'; }
+      else if(r.top===base){ vb='Level '+lvName(r.top); vc='on'; }
+      else { vb='Level '+lvName(r.top); vc='dn'; }
+
+      const segs=LV.map(l=>{
+        const c=r.per[l];
+        let cls='seg', label='L'+lvName(l);
+        if(c.ok>0){ cls+=' cl'+(l>base?' above':''); }
+        else if(c.n>0){ cls+=' try'; }
+        const mark = l===base ? '<span class="startmark"></span>' : '';
+        const cnt = c.n>0 ? ` <span style="opacity:.75;font-weight:normal">${c.ok}/${c.n}</span>` : '';
+        return `<div class="${cls}">${mark}<span class="st">${label}${cnt}</span></div>`;
+      }).join('');
+
+      const sub = !r.answered
+        ? `This skill didn't come up in your session.`
+        : r.top
+          ? `Answered Level ${lvName(r.top)} items correctly${r.top>base?' \u2014 above where your grade starts':''}. Based on ${r.n} question${r.n===1?'':'s'}${r.n<3?' \u2014 a longer session would firm this up':''}.`
+          : `No items answered correctly at Level 11 yet. Based on ${r.n} question${r.n===1?'':'s'}.`;
+
+      html+=`<div class="sk">
+        <div class="top"><span class="nm">${esc(r.s.name)}${r.answered?`<span class="conf ${r.conf.k}">${r.conf.t}</span>`:''}</span><span class="vb ${vc}">${vb}</span></div>
+        <div class="meter">${segs}</div>
+        <div class="sub">${sub}</div>
+      </div>`;
+    });
+  });
+
+  html+=`<div class="foot" style="margin-top:24px"><button class="btn orange" id="again">Practice again \u2192</button></div>
+    <!-- TICKET 4 — word for word the same paragraph as public/pattern-lab/index.html.
+         scripts/check-invariants.js compares the two and fails on any difference. Each
+         clause does a specific job (names the mark's owner, disclaims sponsorship,
+         disclaims endorsement, states the questions are original, disclaims predictive
+         validity). Do not reword it. -->
+    <div class="disc" id="cogat-disclaimer">Cognitive Abilities Test™ (CogAT®) is a registered trademark of Riverside Assessments, LLC and its affiliates ("Riverside"). Riverside does not sponsor or endorse any Allgood Academy products or programs, nor has this product been reviewed, certified, or approved by Riverside. Pattern Lab uses original practice materials only, not actual test questions, and is not a predictor of official CogAT results.</div>`;
+
+  card().innerHTML=html;
+  document.getElementById('again').onclick=()=>{ tele('restart'); start(); };
+
+  /* Roll-up for THIS visit. Merged onto the session document rather than only written as
+     an event, so a later calibration pass can read a whole session in one document.
+     Nothing here is a score, a percentile or a prediction — it is per-subtest counts of
+     what was served and what was cleared, which is what the levelling question needs. */
+  const perSub = {};
+  SUBTEST_IDS.forEach(id => {
+    const mine = S.log.filter(l => l.sub === id);
+    if (!mine.length) return;
+    perSub[id] = { served: mine.length, correct: mine.filter(m => m.correct).length };
+    [11,12,13].forEach(l => {
+      const at = mine.filter(m => m.lvl === l);
+      if (at.length) perSub[id]['l' + l] = { served: at.length, correct: at.filter(m => m.correct).length };
+    });
+  });
+  tele('complete', {
+    grade: S.grade,
+    startLevel: GRADE_LVL[S.grade],
+    itemsAnswered: S.log.length,
+    itemsPlanned: S.queue.length,
+    stoppedEarly: S.log.length < S.queue.length,
+    summary: { stream: 'pattern-lab', grade: S.grade, itemsAnswered: S.log.length, bySubtest: perSub },
+  });
+}
+
+document.getElementById('nav-restart').onclick=()=>{ tele('restart'); start(); };
+
+start();
+</script>
+</body>
+</html>

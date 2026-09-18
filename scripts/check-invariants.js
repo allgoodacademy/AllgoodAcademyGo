@@ -16,6 +16,9 @@
 //   6. retention promise backing — a published deletion deadline must have a scheduled
 //      job behind it. privacy.html promised a 90-day purge from the day it shipped and
 //      nothing ever ran it (2026-09-11)
+//   7. trademark disclaimer parity   — the CogAT disclaimer must be word for word identical
+//      on both Pattern Lab pages and above the fold on the landing page, and neither page
+//      may claim or imply a score improvement
 //
 // No dependencies; run with `node scripts/check-invariants.js`. Exits 1 on any violation.
 const fs = require('fs');
@@ -52,6 +55,11 @@ const LEARNER_SURFACES = [
   'public/educational-games/room-to-think/index.html',
   'public/jsh/room-to-think-lab/index.html',
   'public/mission-control/index.html',
+  // Both Pattern Lab surfaces. Its audience is a parent, but the person answering the
+  // questions is a 10-to-14-year-old, and the landing page is the first thing they see.
+  // The other marketing pages load GA4; these two deliberately do not.
+  'public/pattern-lab/index.html',
+  'public/educational-games/pattern-lab/index.html',
 ];
 
 // Extracts the body of `window.NAME = ... };` so we can ask what a function actually calls.
@@ -310,6 +318,121 @@ function isScheduled(file) {
       `${PRUNE_SCRIPT} exists but is referenced by no npm script and no workflow. It cannot be ` +
       `run without someone reconstructing the command and its credentials from the source. A ` +
       `retention job that is this hard to run is one that does not get run.`);
+  }
+}
+
+// --- 7. The CogAT trademark disclaimer, and the absence of any efficacy claim -------
+// Two separate obligations, both on the same two pages, both of which regress silently.
+//
+// PARITY. The disclaimer mirrors the one the largest operator in this category uses, and
+// every clause is doing specific work: it identifies the mark's owner, disclaims
+// sponsorship, disclaims endorsement, states that the questions are original, and
+// disclaims predictive validity. Two copies of a legal paragraph drift — somebody tightens
+// the prose on one page — and a half-disclaimed page is the one that gets screenshotted.
+// So they are compared character for character, not merely both checked to exist.
+//
+// NO EFFICACY CLAIM. Nothing on either page may claim or imply a score improvement. That
+// is the standing product principle about efficacy claims, and it is also the specific
+// thing that would undermine the fair-use position the original questions rest on: a page
+// that promises a better CogAT result is trading on the test's name, not just naming it.
+{
+  const PAGES = ['public/pattern-lab/index.html', 'public/educational-games/pattern-lab/index.html'];
+  const DISCLAIMER_ID = 'cogat-disclaimer';
+  const found = {};
+
+  for (const file of PAGES) {
+    if (!exists(file)) { fail('cogat', `${file} does not exist — both Pattern Lab pages must carry the disclaimer`); continue; }
+    const src = read(file);
+    const m = src.match(new RegExp(`id="${DISCLAIMER_ID}"[^>]*>([\\s\\S]*?)<\\/(?:p|div)>`));
+    if (!m) {
+      fail('cogat', `${file}: no element with id="${DISCLAIMER_ID}". Both Pattern Lab pages carry the same trademark disclaimer, and the id is how this check finds it.`);
+      continue;
+    }
+    // Compare the words, not the whitespace an editor happened to leave.
+    found[file] = m[1].replace(/\s+/g, ' ').trim();
+  }
+
+  const REQUIRED_CLAUSES = [
+    'registered trademark of Riverside Assessments, LLC',
+    'does not sponsor or endorse any Allgood Academy products or programs',
+    'reviewed, certified, or approved by Riverside',
+    'original practice materials only, not actual test questions',
+    'not a predictor of official CogAT results',
+  ];
+  for (const [file, text] of Object.entries(found)) {
+    for (const clause of REQUIRED_CLAUSES) {
+      if (!text.includes(clause)) {
+        fail('cogat', `${file}: the disclaimer is missing the clause "${clause}". Each clause does a specific job — do not reword it.`);
+      }
+    }
+  }
+
+  const texts = Object.entries(found);
+  if (texts.length === 2 && texts[0][1] !== texts[1][1]) {
+    fail('cogat',
+      `the disclaimer is not identical on the two pages.\n` +
+      `       ${texts[0][0]}\n         "${texts[0][1]}"\n` +
+      `       ${texts[1][0]}\n         "${texts[1][1]}"\n` +
+      `     Make them the same text. A half-disclaimed page is the one that gets screenshotted.`);
+  }
+
+  // Above the fold on the landing page: before any <section>, i.e. inside the hero, not in
+  // a footer. A trademark disclaimer nobody scrolls to is a disclaimer nobody reads.
+  const landing = exists(PAGES[0]) ? read(PAGES[0]) : '';
+  if (landing) {
+    const discIdx = landing.indexOf(`id="${DISCLAIMER_ID}"`);
+    const firstSection = landing.indexOf('<section');
+    if (discIdx !== -1 && firstSection !== -1 && discIdx > firstSection) {
+      fail('cogat', `${PAGES[0]}: the disclaimer has moved below the first <section>. It must sit in the hero, visible without scrolling.`);
+    }
+    if (landing.toLowerCase().indexOf('<footer') !== -1 && discIdx > landing.toLowerCase().indexOf('<footer')) {
+      fail('cogat', `${PAGES[0]}: the disclaimer is in the footer. It belongs above the fold.`);
+    }
+  }
+
+  /* Teacher-facing vocabulary on the landing page.
+     /pattern-lab/ is written for a parent who arrived from a search result. None of the
+     words the rest of this site uses with teachers means anything to that reader, and all
+     of them signal "this is a school product, not for me" — which is the one impression
+     that loses the visit. Checked against the RENDERED text, with comments and tags
+     stripped, so the page's own source comment explaining this rule does not trip it. */
+  const TEACHER_WORDS = /\b(GoodBlocks?|Lab Packs?|Task Forces?|recruit codes?|Mission Control|Jodi's Schoolhouse)\b/i;
+  if (exists(PAGES[0])) {
+    const visible = read(PAGES[0])
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ');
+    const hit = visible.match(TEACHER_WORDS);
+    if (hit) {
+      fail('cogat',
+        `${PAGES[0]}: the landing copy says "${hit[0]}". This page is written for a parent who ` +
+        `arrived from a search result, not for a teacher — none of this site's classroom ` +
+        `vocabulary means anything to that reader, and all of it reads as "not for me".`);
+    }
+  }
+
+  /* Score-improvement language. A verb of increase within a short distance of a result
+     noun, unless it is negated ("does not raise", "cannot improve"), plus the outright
+     promises that need no verb. Deliberately narrow: this is a guard against a marketing
+     sentence arriving later, not a thesaurus. */
+  const CLAIM = /(?<!\b(?:not|never|cannot|can't|doesn't|does not|won't|will not|no)\s{0,4})\b(raise|raises|boost|boosts|improve|improves|increase|increases|maximi[sz]e|maximi[sz]es|guarantee|guarantees)\b[^.<>]{0,60}?\b(score|scores|percentile|percentiles|result|results|ranking|placement)\b/i;
+  const PROMISE = /\b(score guarantee|higher scores?|better scores?|guaranteed placement|raise your child'?s? score)\b/i;
+  for (const file of PAGES) {
+    if (!exists(file)) continue;
+    // Strip tags and comments so a class name or a code comment cannot trip it, and so a
+    // sentence split across two elements is still read as one sentence.
+    const text = read(file).replace(/<!--[\s\S]*?-->/g, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    for (const re of [CLAIM, PROMISE]) {
+      const hit = text.match(re);
+      if (hit) {
+        fail('cogat',
+          `${file}: reads "${hit[0].trim()}". Nothing on either Pattern Lab page may claim or imply a ` +
+          `score improvement — no "raise your child's score", no "improve CogAT results", no percentile ` +
+          `promises. It is the standing principle about efficacy claims, and it is the specific claim ` +
+          `that would undermine the fair-use position these original questions rest on.`);
+      }
+    }
   }
 }
 

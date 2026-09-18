@@ -28,8 +28,44 @@ what device they used, or anything about a lab visit that did not end in complet
 
 | Path | What it holds |
 |---|---|
-| `sessions/{sessionId}` | One doc per module visit: uid, module, gameName, startedAt, lastSeenAt, **activeMs** (only while the tab is visible), **maxStep / stepsTotal**, completed, **device**, **entry** (dashboard, lab-hub, direct, external), role / ageTier / isGuest copied from the account |
-| `events/{id}` | Append-only stream: `module_open`, `step`, `choice`, `module_complete`, plus any custom `Telemetry.track()` call. Each has uid, module, sessionId, step, meta, ts |
+| `sessions/{sessionId}` | One doc per module visit: uid, module, gameName, **stream**, startedAt, lastSeenAt, **activeMs** (only while the tab is visible), **maxStep / stepsTotal**, completed, **device**, **entry** (dashboard, lab-hub, direct, external), role / ageTier / isGuest copied from the account |
+| `events/{id}` | Append-only stream: `module_open`, `step`, `choice`, `module_complete`, plus any custom `Telemetry.track()` call. Each has uid, module, **stream**, sessionId, step, meta, ts |
+
+#### Streams: which numbers a product belongs in
+
+Every session and event carries a `stream`. It defaults to `'core'` — the site's own funnel,
+which is what every figure on Insider is computed from. A module that passes `stream` at
+`Telemetry.init()` opts **out** of that population.
+
+| Stream | Modules | In Insider's numbers? |
+|---|---|---|
+| `core` | the four games, every GoodBlock, every Challenge | yes — this is the funnel |
+| `pattern-lab` | Pattern Lab (`/educational-games/pattern-lab/`) | **no** — held in `D.offFunnel` |
+
+Pattern Lab is a free CogAT-style practice diagnostic published for parents arriving from
+search. It is not a step toward a GoodBlock and its visitors did not come from the dashboard,
+so counting its sessions would inflate "module visits" and deflate the game→GoodBlock
+conversion rate — the metric the whole funnel thesis rests on. `public/insider/index.html`
+partitions non-`core` streams into `D.offFunnel` in `loadEverything()`, once, before anything
+is computed, rather than filtering at each of the twenty-odd places sessions are read. A
+filter added per call site is a filter somebody forgets on the twenty-first.
+
+What Pattern Lab records instead, and why, is the per-item calibration data: for every
+answered item its subtest, its level, whether it was cleared, and **which distractor was
+chosen when it was not**. The L11/L12/L13 labels on the 297 items were assigned by design
+judgment and have never been normed against real students. If learners clear a subtest's
+"L13" items at the same rate as its "L11" items, that subtest's levelling is wrong and the
+bank needs recalibrating — this is the data that answers it. Get it out of Insider with
+**Data → Exports → Pattern Lab items**.
+
+Two things Pattern Lab deliberately does NOT do: it never writes a `category` on a choice
+event (its nine subtests are not in the routing vocabulary — the field is `subtest`), and it
+never loads `/js/skill-routing.js`, so nothing there can resolve to a GoodBlock.
+`scripts/check-modules.js` fails the build on either.
+
+Pattern Lab has no row in the "Steps per module" table below because it has no Insider
+`COURSES` entry — by design. Its step total is not fixed: the learner picks a 9-, 18- or
+27-item session, and `Telemetry.plan()` records the real one once they have.
 
 Each module calls `Telemetry.init()` once and then `step()`, `choice()` and `complete()` at
 the moments that matter. Steps per module:

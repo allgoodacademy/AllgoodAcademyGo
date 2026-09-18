@@ -7,6 +7,7 @@
 // handful of one-liners at the moments that matter:
 //
 //   window.Telemetry.init({ module: 'privacy-security', gameName: 'Privacy & Security', stepsTotal: 6 });
+//   window.Telemetry.plan(18);                     // revise stepsTotal once the real total is known
 //   window.Telemetry.step(3);                      // learner reached step/case/page 3 (1-indexed)
 //   window.Telemetry.choice({ scenarioIndex, choiceIndex, score, effectiveness, category });
 //   window.Telemetry.complete({ finalScore, percentage, rank, summary: { ... } });
@@ -33,6 +34,24 @@
 //     small meta object. This is the raw material for trend lines and for any later
 //     export to BigQuery / Looker Studio (see docs/insider-analytics.md).
 //
+// STREAMS. Every session and event carries a `stream`, which says which product the
+// visit belongs to. It defaults to 'core' — the site's own funnel: the four games, the
+// GoodBlocks, the Challenges, everything a Lab Pack report or a conversion rate is
+// computed from. A module passing `stream` at init() opts OUT of that population.
+//
+// There is one such module today: Pattern Lab (stream: 'pattern-lab'), the free
+// CogAT-style practice diagnostic. It is deliberately outside the funnel — its visitors
+// arrive from search, not from the dashboard, and they are not on their way to a
+// GoodBlock. Counting its sessions as game sessions would inflate "module visits" and
+// deflate the game→GoodBlock conversion rate, which is the number the whole funnel
+// thesis rests on. public/insider/index.html partitions non-'core' streams out of its
+// data BEFORE it computes anything, so an excluded stream cannot leak into a metric by
+// somebody forgetting a filter one page later.
+//
+// A stream is a reporting population, NOT a permission boundary and NOT a second pipe:
+// the collections, the rules and the writes are identical. Adding one is a decision about
+// which numbers a product belongs in, so add one deliberately — and tell Insider about it.
+//
 // Privacy: nothing here writes a name or email — only the uid already used by every
 // other per-user collection, plus role/ageTier/isGuest flags copied from the account
 // so Insider can segment without a join. Events are forwarded to Google Analytics
@@ -51,6 +70,7 @@ const state = {
     configured: false,
     module: null,
     gameName: null,
+    stream: 'core',       // reporting population — see the STREAMS note above
     stepsTotal: null,
     baseSessionId: null,
     sessionId: null,
@@ -134,6 +154,7 @@ async function openSession() {
             ...accountFlags(),
             module: state.module,
             gameName: state.gameName,
+            stream: state.stream,
             sessionId: state.sessionId,
             stepsTotal: state.stepsTotal,
             startedAt: serverTimestamp(),
@@ -181,6 +202,7 @@ async function writeEvent(evt) {
             ...accountFlags(),
             module: state.module,
             gameName: state.gameName,
+            stream: state.stream,
             sessionId: state.sessionId,
             event: evt.event,
             step: evt.step,
@@ -276,11 +298,14 @@ function listenForAuth() {
 }
 
 // --- public API ---
-function init({ module: moduleSlug, gameName, stepsTotal } = {}) {
+function init({ module: moduleSlug, gameName, stepsTotal, stream } = {}) {
     if (state.configured) return;
     state.configured = true;
     state.module = moduleSlug || window.location.pathname;
     state.gameName = gameName || document.title;
+    // Anything that is not a non-empty string stays 'core'. A typo must not silently
+    // remove a module from the funnel — the default has to be "counted".
+    state.stream = (typeof stream === 'string' && stream.trim()) ? stream.trim() : 'core';
     state.stepsTotal = typeof stepsTotal === 'number' ? stepsTotal : null;
     state.entry = detectEntry();
     state.device = detectDevice();
@@ -313,6 +338,23 @@ function restart() {
     state.dirty = false;
     openSession().then(drainPending);
     enqueue('module_open', { entry: state.entry, device: state.device, replay: true });
+}
+
+/* Revise stepsTotal after init(), for a module that does not know its own length yet.
+ *
+ * Every module until now did: a GoodBlock has a fixed case count, a Challenge a fixed
+ * scenario count, a game a fixed round size. Pattern Lab does not — the learner picks a
+ * 9-, 18- or 27-item session on the opening screen, after the page has already opened,
+ * and picks again on every replay. Without this, a 9-item session would be recorded
+ * against a 27-step denominator and complete() would backfill maxStep to 27, reporting
+ * progress through steps nobody ever saw.
+ *
+ * Call it once the real total is known and before the first step(). */
+function plan(stepsTotal) {
+    if (!state.configured || typeof stepsTotal !== 'number' || !(stepsTotal > 0)) return;
+    state.stepsTotal = stepsTotal;
+    state.dirty = true;
+    flushSession(true);
 }
 
 function track(event, meta) {
@@ -376,7 +418,8 @@ function complete(meta) {
 }
 
 window.Telemetry = {
-    init, restart, track, step, choice, complete, summary,
+    init, plan, restart, track, step, choice, complete, summary,
+    get stream() { return state.stream; },
     flush: () => flushSession(true),
     get sessionId() { return state.sessionId; },
     get activeMs() { accumulate(); return Math.round(state.activeMs); },
