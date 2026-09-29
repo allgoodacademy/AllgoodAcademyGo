@@ -88,8 +88,11 @@
     <script type="module">
         import { onAuthStateChanged, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit, deleteField, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-        // Joining a Task Force and listing what it assigned are shared with /join/ — one copy.
-        import { joinClassroom as joinClassroomByCode, loadAssignedItems } from '/js/classroom-join.js';
+        // Joining a Task Force and listing what it assigned are shared with /join/ — one copy,
+        // in /js/classroom-join.js. Imported lazily, on first use, not statically: a static
+        // import would make this entire module (the whole dashboard) fail to run if that file
+        // or anything it imports ever failed to load, for a feature most visits never touch.
+        const classroomJoin = () => import('/js/classroom-join.js');
 
         const appId = window.AuthCore.appId;
         const auth = window.AuthCore.auth;
@@ -1262,7 +1265,7 @@
                         </div>`;
                 } else {
                     try {
-                        const assigned = await loadAssignedItems(classroomCode, uid);
+                        const assigned = await (await classroomJoin()).loadAssignedItems(classroomCode, uid);
                         const items = assigned ? assigned.items : [];
                         const heading = `<p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-3">${escapeHtml(assigned ? assigned.name : 'Task Force')} · <span class="text-allgood-secondary font-mono">${escapeHtml(classroomCode)}</span></p>`;
                         if (!items.length) {
@@ -1395,7 +1398,13 @@
             const statusEl = document.getElementById('profile-classroom-status');
             if (!(input?.value || '').trim()) return;
 
-            const result = await joinClassroomByCode(input.value, { createGuest: false });
+            let result;
+            try {
+                result = await (await classroomJoin()).joinClassroom(input.value, { createGuest: false });
+            } catch (e) {
+                console.error("Couldn't load the join module:", e);
+                result = { ok: false, message: "Something went wrong — please try again." };
+            }
             if (!result.ok) {
                 if (statusEl) { statusEl.textContent = result.message; statusEl.className = "text-[10px] text-red-500 mt-1"; }
                 return;
