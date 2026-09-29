@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Join your class — Allgood Academy</title>
+<meta name="description" content="Type the class code your teacher gave you to join their class on Allgood Academy.">
+<link rel="icon" type="image/png" href="/favicon.png">
+<!--
+  /join/ — THE PERMANENT JOIN ADDRESS. DO NOT MOVE OR RENAME THIS PAGE.
+
+  "allgoodacademy.com/join" is printed on classroom walls (Mission Control's "Print for the
+  wall" poster) and in the Digital Decisions facilitation guide on Teachers Pay Teachers.
+  Paper can't be updated. If this page ever has to change shape, change it here, at this
+  address; if the site is ever restructured, /join/ and /join/?c=CODE must keep working.
+  scripts/check-invariants.js fails the build if this file disappears.
+
+  One job: a student types the class code from the board and ends up in the class, then
+  sees what to do. Works for a guest with no account (most students are under-13 Learner
+  Recruits): a guest session is created only once the code has been checked, via the same
+  AuthCore.guestStart() any lesson would call. The join itself is /js/classroom-join.js,
+  shared with the dashboard's Profile join box — there is one copy of that logic.
+
+  Learner-reachable surface: no GA4, no third-party script beyond the Firebase SDK that
+  every lesson already loads (see check-invariants.js LEARNER_SURFACES).
+-->
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+<style>
+:root{
+  --canvas:var(--color-canvas); --surface:var(--color-surface);
+  --ink:var(--color-ink); --ink-soft:var(--color-ink-soft); --ink-faint:var(--color-ink-faint);
+  --teal:var(--color-teal); --teal-deep:var(--color-teal-deep); --teal-wash:var(--color-teal-wash);
+  --hairline:var(--color-hairline);
+  --orange:var(--color-orange);
+  --shadow-card:0 30px 70px -34px rgba(23,39,44,.42);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-ui);
+     min-height:100vh;display:flex;flex-direction:column;align-items:center;
+     padding:24px 16px calc(24px + env(safe-area-inset-bottom))}
+.top{width:100%;max-width:560px;margin-bottom:18px}
+.wordmark{font-family:var(--font-display);font-size:19px;color:var(--ink);text-decoration:none}
+.wordmark em{font-style:normal;color:var(--teal-deep)}
+.card{background:var(--surface);border:1px solid var(--hairline);border-radius:14px;
+      box-shadow:var(--shadow-card);max-width:560px;width:100%;padding:36px 32px}
+h1,h2{font-family:var(--font-display);font-weight:400;line-height:1.2;margin:0 0 10px}
+h1{font-size:30px}
+h2{font-size:26px;overflow-wrap:anywhere}
+p{font-size:15px;line-height:1.6;color:var(--ink-soft);margin:0 0 20px}
+[hidden]{display:none !important}
+
+/* The one box. Big enough to read from arm's length on a Chromebook, and 16px+ so iOS
+   never zooms the page when it takes focus. */
+.code-input{display:block;width:100%;font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  font-size:40px;font-weight:600;letter-spacing:.18em;text-align:center;text-transform:uppercase;
+  color:var(--ink);background:var(--surface);border:2px solid var(--hairline);border-radius:12px;
+  padding:16px 8px;margin:0 0 14px;outline:none}
+.code-input::placeholder{color:var(--hairline);letter-spacing:.18em}
+.code-input:focus{border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-wash)}
+.code-input[aria-invalid="true"]{border-color:var(--orange)}
+.btn{display:block;width:100%;font-family:var(--font-ui);font-size:17px;font-weight:700;
+  background:var(--teal-deep);color:#fff;border:0;border-radius:12px;padding:16px;cursor:pointer}
+.btn:hover{background:var(--teal)}
+.btn:disabled{opacity:.6;cursor:progress}
+.btn:focus-visible,.item:focus-visible,.link:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.error{font-size:15px;line-height:1.5;color:var(--color-orange-deep);background:#FDF1EC;
+  border-radius:10px;padding:12px 14px;margin:0 0 14px}
+.hint{font-size:13px;color:var(--ink-faint);margin:16px 0 0;text-align:center}
+.already{margin-top:22px;padding-top:18px;border-top:1px solid var(--hairline);font-size:14px;color:var(--ink-soft)}
+.link{background:none;border:0;padding:0;font:inherit;color:var(--teal-deep);font-weight:700;
+  text-decoration:underline;cursor:pointer}
+
+.kicker{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--teal-deep);margin:0 0 6px}
+.you{font-size:14px;background:var(--teal-wash);border-radius:10px;padding:10px 14px;color:var(--ink)}
+.todo{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin:24px 0 10px}
+.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.item{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--ink);
+  border:1.5px solid var(--hairline);border-radius:12px;padding:14px 16px;min-height:64px}
+.item:hover{border-color:var(--teal)}
+.item .n{flex:none;width:32px;height:32px;border-radius:50%;background:var(--teal-wash);color:var(--teal-deep);
+  font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
+.item .t{flex:1;min-width:0}
+.item .name{display:block;font-size:16px;font-weight:700;overflow-wrap:anywhere}
+.item .meta{display:block;font-size:12px;color:var(--ink-faint);margin-top:2px}
+.item .go{flex:none;font-size:14px;font-weight:700;color:var(--teal-deep)}
+.empty{border:1.5px dashed var(--hairline);border-radius:12px;padding:18px;font-size:14px;line-height:1.6;color:var(--ink-soft)}
+.empty a{color:var(--teal-deep);font-weight:700}
+.after{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:22px;font-size:14px}
+.after a{color:var(--teal-deep);font-weight:700}
+.loading{font-size:15px;color:var(--ink-soft)}
+@media(max-width:420px){
+  .card{padding:28px 20px}
+  h1{font-size:26px}
+  .code-input{font-size:34px;letter-spacing:.12em}
+}
+</style>
+</head>
+<body>
+<header class="top"><a class="wordmark" href="/">Allgood<em>Academy</em></a></header>
+
+<main class="card">
+  <!-- STEP 1: the code. Nothing else competes with it. -->
+  <section id="step-code">
+    <h1>Join your class</h1>
+    <p>Type the class code your teacher gave you.</p>
+    <!-- method=get with the input named "c": if this is submitted before the script below has
+         loaded, the browser itself navigates to /join/?c=CODE, which then joins on load. -->
+    <form id="join-form" action="/join/" method="get" novalidate>
+      <label for="code" class="sr-only" style="position:absolute;left:-9999px">Class code</label>
+      <input id="code" name="c" class="code-input" type="text" inputmode="text"
+             autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
+             maxlength="12" placeholder="ABC234" aria-describedby="join-error" autofocus>
+      <p id="join-error" class="error" role="alert" hidden></p>
+      <button id="join-btn" class="btn" type="submit">Join class</button>
+    </form>
+    <p class="hint">No account needed.</p>
+    <div id="already" class="already" hidden>
+      You're already in <strong id="already-name"></strong>.
+      <button id="already-btn" class="link" type="button">See what's assigned</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: what you're in, and what to do. -->
+  <section id="step-joined" hidden aria-live="polite">
+    <p class="kicker" id="joined-kicker">You're in</p>
+    <h2 id="joined-name"></h2>
+    <p class="you" id="joined-you" hidden></p>
+    <p class="todo">What to do</p>
+    <div id="joined-items"><p class="loading">Loading what your teacher assigned…</p></div>
+    <div class="after">
+      <a href="/dashboard/">My dashboard</a>
+      <button id="other-code" class="link" type="button">Join a different class</button>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="/js/auth-core.js"></script>
+<script type="module">
+import { joinClassroom, loadAssignedItems, normalizeClassCode, classroomDisplayName } from '/js/classroom-join.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+const { auth, db, appId, waitForAuthReady } = window.AuthCore;
+const $ = (id) => document.getElementById(id);
+const input = $('code'), btn = $('join-btn'), err = $('join-error');
+
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function showError(message) {
+    err.textContent = message;
+    err.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+}
+function clearError() {
+    err.hidden = true;
+    input.removeAttribute('aria-invalid');
+}
+function setBusy(busy) {
+    btn.disabled = busy;
+    btn.textContent = busy ? 'Joining…' : 'Join class';
+}
+
+function renderItems(result) {
+    const host = $('joined-items');
+    if (!result || !result.items.length) {
+        host.innerHTML = `<div class="empty">Your teacher hasn't assigned anything yet — you're on their list, so anything you do now counts.
+            <br><a href="/educational-games/">Browse the games</a> while you wait.</div>`;
+        return;
+    }
+    host.innerHTML = `<ol class="items">${result.items.map((it, i) => `
+        <li><a class="item" href="${esc(it.url)}" data-id="${esc(it.id)}">
+            <span class="n" aria-hidden="true">${i + 1}</span>
+            <span class="t"><span class="name">${esc(it.name)}</span>
+                <span class="meta">${esc(it.typeLabel)}${it.minutes ? ` · about ${it.minutes} min` : ''}${it.extra ? ' · just for you' : ''}</span></span>
+            <span class="go" aria-hidden="true">Start →</span>
+        </a></li>`).join('')}</ol>`;
+}
+
+async function showJoined({ code, name, alreadyMember }) {
+    $('step-code').hidden = true;
+    $('step-joined').hidden = false;
+    $('joined-kicker').textContent = alreadyMember ? "You're already in" : "You're in";
+    $('joined-name').textContent = name;
+    const user = auth.currentUser;
+    const who = user && user.displayName;
+    if (who) {
+        $('joined-you').innerHTML = `Your teacher sees you as <strong>${esc(who)}</strong>.`;
+        $('joined-you').hidden = false;
+    }
+    $('joined-items').innerHTML = '<p class="loading">Loading what your teacher assigned…</p>';
+    try {
+        renderItems(await loadAssignedItems(code, user && user.uid));
+    } catch (e) {
+        console.error('[Join] could not load assignments', e);
+        $('joined-items').innerHTML = `<div class="empty">You're in the class, but we couldn't load the assignment list just now. <a href="">Refresh the page</a> to try again.</div>`;
+    }
+}
+
+async function submit(raw) {
+    clearError();
+    const code = normalizeClassCode(raw);
+    input.value = code;
+    setBusy(true);
+    const result = await joinClassroom(code, { createGuest: true });
+    setBusy(false);
+    if (!result.ok) {
+        showError(result.message);
+        input.focus();
+        input.select();
+        return;
+    }
+    await showJoined(result);
+}
+
+$('join-form').addEventListener('submit', (e) => { e.preventDefault(); submit(input.value); });
+input.addEventListener('input', () => { if (!err.hidden) clearError(); });
+$('other-code').addEventListener('click', () => {
+    $('step-joined').hidden = true;
+    $('step-code').hidden = false;
+    input.value = '';
+    clearError();
+    input.focus();
+});
+
+// /join/?c=CODE — the QR code on the printed poster. Pre-fill and join straight away.
+const prefill = normalizeClassCode(new URLSearchParams(location.search).get('c'));
+if (prefill) {
+    input.value = prefill;
+    submit(prefill);
+} else {
+    // No code in the link: if this browser is already in a class, offer a way straight
+    // back to its list. Never creates a session — a visitor with none just sees the box.
+    (async () => {
+        const user = await waitForAuthReady();
+        if (!user) return;
+        try {
+            const me = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
+            const current = me.exists() && me.data().role !== 'teacher' ? me.data().classroomCode : null;
+            if (!current) return;
+            const cls = await getDoc(doc(db, 'artifacts', appId, 'classrooms', current));
+            if (!cls.exists()) return;
+            const name = classroomDisplayName(cls.data());
+            $('already-name').textContent = name;
+            $('already').hidden = false;
+            $('already-btn').onclick = () => showJoined({ code: current, name, alreadyMember: true });
+        } catch (e) { /* the box still works; this is only a shortcut */ }
+    })();
+}
+</script>
+</body>
+</html>

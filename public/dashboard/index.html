@@ -88,6 +88,8 @@
     <script type="module">
         import { onAuthStateChanged, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp, onSnapshot, query, where, limit, deleteField, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        // Joining a Task Force and listing what it assigned are shared with /join/ — one copy.
+        import { joinClassroom as joinClassroomByCode, loadAssignedItems } from '/js/classroom-join.js';
 
         const appId = window.AuthCore.appId;
         const auth = window.AuthCore.auth;
@@ -1127,6 +1129,9 @@
         // renders all three tabs. Not a live listener (the dashboard's own cards already
         // have one via startModuleStatusListener) — the Profile is opened deliberately, so a
         // fresh read on open is enough and avoids a second permanent subscription.
+        // For text that came from Firestore (a class name a teacher typed) going into innerHTML.
+        const escapeHtml = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
         window.loadProfilePageData = async () => {
             const uid = localStorage.getItem('aa_uid');
             const progressTiles = document.getElementById('profile-progress-tiles');
@@ -1243,38 +1248,45 @@
             }
 
             // --- ASSIGNED TO ME TAB ---
+            // Every assigned item — the class-wide labs and Challenges, the class-wide games
+            // (classrooms.assignedGames, which this tab used to ignore entirely), and any
+            // per-student extras — each one a link straight into the activity. The list itself
+            // comes from /js/classroom-join.js, the same one /join/ shows right after joining.
             if (assignedHost) {
                 if (!classroomCode) {
                     assignedHost.innerHTML = `
                         <div class="text-center p-8 bg-white rounded-xl border border-gray-200">
                             <i data-lucide="clipboard-list" class="w-8 h-8 text-slate-300 mx-auto mb-3"></i>
                             <p class="text-sm text-slate-500 mb-1">Nothing assigned yet.</p>
-                            <p class="text-xs text-slate-400">Join a classroom to see what's assigned to you — use the Task Force Code box on the left.</p>
+                            <p class="text-xs text-slate-400">Have a class code? Go to <a href="/join/" class="font-bold text-allgood-secondary underline">allgoodacademy.com/join</a> and type it, or use the box on the left.</p>
                         </div>`;
                 } else {
                     try {
-                        const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', classroomCode));
-                        const assignedIds = (classroomSnap.exists() && classroomSnap.data().assignedModules) || [];
-                        if (!assignedIds.length) {
-                            assignedHost.innerHTML = `<div class="text-center p-8 bg-white rounded-xl border border-gray-200"><p class="text-sm text-slate-500">Your Task Force Leader hasn't assigned anything yet.</p></div>`;
+                        const assigned = await loadAssignedItems(classroomCode, uid);
+                        const items = assigned ? assigned.items : [];
+                        const heading = `<p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-3">${escapeHtml(assigned ? assigned.name : 'Task Force')} · <span class="text-allgood-secondary font-mono">${escapeHtml(classroomCode)}</span></p>`;
+                        if (!items.length) {
+                            assignedHost.innerHTML = `${heading}<div class="text-center p-8 bg-white rounded-xl border border-gray-200"><p class="text-sm text-slate-500">Your Task Force Leader hasn't assigned anything yet.</p></div>`;
                         } else {
-                            const rows = assignedIds.map(id => {
-                                const mod = getModuleById(id);
-                                if (!mod) return '';
-                                const st = computeModuleStatus(id, scoreDocs, startedModuleIds);
-                                const label = st.status === 'completed' ? 'Completed' : (st.status === 'in_progress' ? 'In Progress' : 'Not Started');
-                                const cls = st.status === 'completed' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (st.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200');
-                                return `<div class="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 mb-2">
-                                    <div>
-                                        <p class="text-sm font-bold text-slate-700">${mod.name}</p>
-                                        <p class="text-[10px] text-slate-400 uppercase tracking-wide">${mod.category === 'challenge' ? 'Challenge' : 'Lab'}</p>
+                            const rows = items.map(item => {
+                                // Labs and Challenges carry a completion status; a game has no
+                                // "finished" state of its own, so it is labelled, not graded.
+                                let pill = '<span class="text-[9px] font-bold uppercase px-2 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-200">Play</span>';
+                                if (item.type !== 'game' && getModuleById(item.id)) {
+                                    const st = computeModuleStatus(item.id, scoreDocs, startedModuleIds);
+                                    const label = st.status === 'completed' ? 'Completed' : (st.status === 'in_progress' ? 'In Progress' : 'Not Started');
+                                    const cls = st.status === 'completed' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (st.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200');
+                                    pill = `<span class="text-[9px] font-bold uppercase px-2 py-1 rounded-full border ${cls}">${label}</span>`;
+                                }
+                                return `<a href="${escapeHtml(item.url)}" data-assigned-id="${escapeHtml(item.id)}" class="flex items-center justify-between gap-3 p-3 bg-white rounded-lg border border-gray-200 mb-2 hover:border-allgood-secondary transition-colors">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-bold text-slate-700">${escapeHtml(item.name)}</p>
+                                        <p class="text-[10px] text-slate-400 uppercase tracking-wide">${escapeHtml(item.typeLabel)}${item.extra ? ' · just for you' : ''}</p>
                                     </div>
-                                    <span class="text-[9px] font-bold uppercase px-2 py-1 rounded-full border ${cls}">${label}</span>
-                                </div>`;
+                                    <span class="flex items-center gap-2 shrink-0">${pill}<i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i></span>
+                                </a>`;
                             }).join('');
-                            assignedHost.innerHTML = `
-                                <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-3">Task Force Code: <span class="text-allgood-secondary font-mono">${classroomCode}</span></p>
-                                ${rows}`;
+                            assignedHost.innerHTML = `${heading}${rows}`;
                         }
                     } catch (e) {
                         console.error("Couldn't read classroom assignment for Profile:", e);
@@ -1373,62 +1385,25 @@
         }
 
         // Lets a student (or a Task Force Leader acting as one) join a classroom anytime
-        // from their Profile — no longer forced into the first-touch login form, since it's
-        // genuinely optional, and no longer limited to one at a time. Membership itself lives
-        // in classroom_members/{code}_{uid} (see firestore.rules #6b) so this can be called
-        // any number of times for different codes without one join undoing another.
-        //
-        // ALSO mirrors onto the legacy classroomCode field on the profile — but only when
-        // this account isn't a Task Force Leader (role !== 'teacher'). That field means two
-        // different things depending on who holds it: for a teacher it's the classroom THEY
-        // teach, and overwriting it here would silently break their own roster. For a plain
-        // student it still drives the single-classroom "Assigned to me" tab, so keeping it in
-        // sync there is worth doing even though classroom_members is now the real source of
-        // truth for roster visibility. A student in more than one classroom will only ever
-        // see ONE of them reflected in "Assigned to me" — the most recently joined — which is
-        // a known limitation, not a bug: extending that tab to multiple simultaneous
-        // assignment sources is a separate, larger piece of work.
+        // from their Profile. The join itself — membership in classroom_members/{code}_{uid}
+        // (firestore.rules #6b), the legacy classroomCode mirror for students only, and the
+        // Recruit Code mirror — lives in /js/classroom-join.js, shared with /join/, so the
+        // two ways in can never disagree about what joining means. See that file for why a
+        // Task Force Leader's own classroomCode is never overwritten.
         window.joinClassroom = async () => {
             const input = document.getElementById('profile-classroom-input');
             const statusEl = document.getElementById('profile-classroom-status');
-            const code = (input?.value || '').trim().toUpperCase();
-            if (!code) return;
+            if (!(input?.value || '').trim()) return;
 
-            const user = auth.currentUser;
-            if (!user) return;
-
-            try {
-                const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
-                if (!classroomSnap.exists()) {
-                    if (statusEl) { statusEl.textContent = "Code not found — double check with your Task Force Leader."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
-                    return;
-                }
-
-                await setDoc(doc(db, 'artifacts', appId, 'classroom_members', `${code}_${user.uid}`), {
-                    classroomCode: code,
-                    uid: user.uid,
-                    joinedAt: serverTimestamp(),
-                }, { merge: true });
-
-                const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
-                const myRole = meSnap.exists() ? meSnap.data().role : null;
-                if (myRole !== 'teacher') {
-                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
-                    // Mirror onto the Recruit Code so this one shows up after a device switch —
-                    // redeeming lands on a new uid, and this is what carries it over. No-op for
-                    // anyone without a code. (Older joins in classroom_members under a
-                    // different uid do not currently follow a code redemption — a known gap.)
-                    if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(code);
-                }
-
-                if (input) input.value = '';
-                if (statusEl) { statusEl.textContent = "Joined! Your Task Force Leader can now see your progress."; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
-                if (window.sfx) window.sfx.confirm();
-                window.loadProfilePageData();
-            } catch (e) {
-                console.error("Failed to join classroom:", e);
-                if (statusEl) { statusEl.textContent = "Something went wrong — please try again."; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+            const result = await joinClassroomByCode(input.value, { createGuest: false });
+            if (!result.ok) {
+                if (statusEl) { statusEl.textContent = result.message; statusEl.className = "text-[10px] text-red-500 mt-1"; }
+                return;
             }
+            if (input) input.value = '';
+            if (statusEl) { statusEl.textContent = `Joined ${result.name}! Your Task Force Leader can now see your progress.`; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
+            if (window.sfx) window.sfx.confirm();
+            window.loadProfilePageData();
         };
 
         // Leaves one specific classroom (a student, or a Task Force Leader acting as one, may
@@ -3127,12 +3102,12 @@
                              can belong to more than one classroom, so this never hides itself. -->
                         <div class="mt-3 w-full" id="profile-join-box">
                             <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
-                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a Task Force Code?</p>
+                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a class code?</p>
                                 <div class="flex gap-2">
                                     <input type="text" id="profile-classroom-input" placeholder="e.g. 2RP878" maxlength="8" class="flex-1 min-w-0 border border-gray-300 rounded p-2 text-xs uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;">
                                     <button onclick="window.joinClassroom()" class="bg-allgood-secondary text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent shrink-0">Join</button>
                                 </div>
-                                <p id="profile-classroom-status" class="text-[10px] text-gray-400 mt-1"></p>
+                                <p id="profile-classroom-status" class="text-[10px] text-gray-400 mt-1">Type it here, or at <a href="/join/" class="underline">allgoodacademy.com/join</a>.</p>
                             </div>
                         </div>
 
