@@ -19,6 +19,9 @@
 //   7. trademark disclaimer parity   — the CogAT disclaimer must be word for word identical
 //      on both Pattern Lab pages and above the fold on the landing page, and neither page
 //      may claim or imply a score improvement
+//   8. the permanent join address    — /join/ is printed on classroom walls and in the TPT
+//      guide; it must exist, and the wall poster must send students there. The poster once
+//      said a lesson would ask for the code, and none did (UAT 2026-09-27)
 //
 // No dependencies; run with `node scripts/check-invariants.js`. Exits 1 on any violation.
 const fs = require('fs');
@@ -60,6 +63,8 @@ const LEARNER_SURFACES = [
   // The other marketing pages load GA4; these two deliberately do not.
   'public/pattern-lab/index.html',
   'public/educational-games/pattern-lab/index.html',
+  // The join page. Most students reach it as brand-new guests, many of them under 13.
+  'public/join/index.html',
 ];
 
 // Extracts the body of `window.NAME = ... };` so we can ask what a function actually calls.
@@ -439,6 +444,38 @@ function isScheduled(file) {
           `promises. It is the standing principle about efficacy claims, and it is the specific claim ` +
           `that would undermine the fair-use position these original questions rest on.`);
       }
+    }
+  }
+}
+
+// --- 8. The permanent join address ------------------------------------------------
+// "allgoodacademy.com/join" is on paper now. Paper cannot be redeployed, so the page must
+// never move, and the poster Mission Control prints must keep pointing at it — and must never
+// again promise that a lesson will ask for the code.
+{
+  const JOIN = 'public/join/index.html';
+  if (!exists(JOIN)) {
+    fail('join', `${JOIN} is missing. /join/ is printed on classroom walls and in the TPT facilitation ` +
+      `guide and must never move. Restore it (or serve /join/ from wherever the site now lives).`);
+  } else {
+    const src = read(JOIN);
+    if (!src.includes('/js/classroom-join.js')) {
+      fail('join', `${JOIN}: no longer uses /js/classroom-join.js. There is one copy of the join logic, ` +
+        `shared with the dashboard's Profile join box — do not fork it.`);
+    }
+    if (src.includes(GTAG_LIB)) fail('join', `${JOIN}: loads GA4 on a page brand-new under-13 guests land on.`);
+  }
+  const MC = 'public/mission-control/index.html';
+  if (exists(MC)) {
+    const mc = read(MC);
+    const sheet = (mc.match(/<div class="print-sheet"[\s\S]*?<\/div>\s*\n\s*<!--/) || [''])[0];
+    if (!/allgoodacademy\.com\/join/.test(sheet)) {
+      fail('join', `${MC}: the "Print for the wall" poster no longer tells students to go to ` +
+        `allgoodacademy.com/join. It is the only instruction a class following the poster gets.`);
+    }
+    if (/when it asks/i.test(sheet)) {
+      fail('join', `${MC}: the poster says a lesson will ask for the code. No lesson asks — students ` +
+        `join at /join/.`);
     }
   }
 }

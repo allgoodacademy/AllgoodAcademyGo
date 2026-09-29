@@ -571,9 +571,14 @@
       border-top: 2px solid #000; border-bottom: 2px solid #000;
       padding: 8mm 0;
     }
-    .print-sheet .p-how { font-size: 14pt; line-height: 1.6; max-width: 150mm; margin: 0 auto; }
-    .print-sheet .p-how strong { font-weight: 600; }
-    .print-sheet .p-foot { margin-top: 14mm; font-size: 10pt; color: #555; }
+    .print-sheet .p-how { font-size: 18pt; line-height: 1.5; max-width: 170mm; margin: 0 auto; }
+    .print-sheet .p-how strong { font-weight: 700; }
+    /* The QR code encodes /join/?c=CODE, so a phone or Chromebook camera lands on the join
+       page with the code already in the box. Sized so the poster stays ONE page. */
+    .print-sheet .p-qr { margin: 8mm auto 0; width: 42mm; }
+    .print-sheet .p-qr svg { display: block; width: 42mm; height: 42mm; }
+    .print-sheet .p-qr-note { font-size: 10pt; color: #333; margin-top: 2mm; }
+    .print-sheet .p-foot { margin-top: 8mm; font-size: 10pt; color: #555; }
     @page { margin: 12mm; }
   }
 </style>
@@ -667,8 +672,8 @@
         </div>
         <div class="codestrip-rule"></div>
         <div class="codestrip-hint">
-          Students enter this once to join. They can start any lesson without it — the code
-          is only what links their work to you.
+          Students go to <strong>allgoodacademy.com/join</strong> and type this code. No
+          account needed — joining is what links their work to you.
         </div>
         <div class="codestrip-acts">
           <button class="mc-btn" id="btn-copy-code" type="button">Copy</button>
@@ -727,11 +732,14 @@
   <div class="p-class" id="p-class"></div>
   <div class="p-code" id="p-code"></div>
   <div class="p-how">
-    Go to <strong>allgoodacademy.com</strong>, start any lesson, and enter this code once
-    when it asks for a Task Force.<br>
-    You don't need the code to start — it's what links your work to your teacher.
+    Go to <strong>allgoodacademy.com/join</strong> and type this code.
   </div>
-  <div class="p-foot">Enter it once. It stays linked after that.</div>
+  <!-- Filled by renderJoinQr() only when the locally bundled generator loaded; if it
+       didn't, the poster still carries the address and the code, which is all a student
+       needs. -->
+  <div class="p-qr" id="p-qr" hidden></div>
+  <div class="p-qr-note" id="p-qr-note" hidden>Or scan to join</div>
+  <div class="p-foot">No account needed. Joining is what links your work to your teacher.</div>
 </div>
 
 <!-- LOAD WATCHDOG. A CLASSIC script, deliberately not a module: it must survive exactly the
@@ -807,6 +815,9 @@
 })();
 </script>
 
+<!-- QR generator for the wall poster, bundled locally (no third-party script host). A
+     classic script: it defines the global `qrcode`. -->
+<script src="/assets/js/qrcode-generator.js"></script>
 <!-- Identity/init lives in auth-core.js, as on every other Allgood Academy page. -->
 <script type="module" src="/js/auth-core.js"></script>
 <script type="module">
@@ -1001,6 +1012,7 @@ async function load() {
     // print sheet, so a stale code cannot end up taped to a wall.
     document.getElementById('code-value').textContent = state.code;
     document.getElementById('p-code').textContent = state.code;
+    renderJoinQr(state.code);
 
     const className = state.classroom.teacherName
         ? `${state.classroom.teacherName} — Task Force`
@@ -1283,7 +1295,7 @@ function renderRoster() {
     const list = visibleStudents();
     const el = document.getElementById('roster');
     if (!state.students.length) {
-        el.innerHTML = '<div class="empty-note">No agents have joined this Task Force yet.<br>Share your code to get started.</div>';
+        el.innerHTML = '<div class="empty-note">No agents have joined this Task Force yet.<br>Students go to allgoodacademy.com/join and type your code.</div>';
         return;
     }
     if (!list.length) {
@@ -2196,6 +2208,27 @@ document.getElementById('btn-copy-code').addEventListener('click', async () => {
         toast(`Couldn't copy automatically — your code is ${state.code}.`, true);
     }
 });
+
+// The poster's QR code: /join/?c=CODE on whichever host is serving this page, so a preview
+// deploy's poster points at that preview. Rendered as inline SVG so it prints crisp at any
+// size. Best-effort — a failure hides the QR and leaves the typed instructions intact.
+function renderJoinQr(code) {
+    const host = document.getElementById('p-qr');
+    const note = document.getElementById('p-qr-note');
+    try {
+        if (typeof window.qrcode !== 'function') return;
+        const qr = window.qrcode(0, 'M');
+        qr.addData(`${location.origin}/join/?c=${encodeURIComponent(code)}`);
+        qr.make();
+        host.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true, title: `Join class ${code}` });
+        host.hidden = false;
+        note.hidden = false;
+    } catch (e) {
+        console.warn('[Mission Control] poster QR unavailable', e);
+        host.hidden = true;
+        note.hidden = true;
+    }
+}
 
 // The print sheet is already populated (see load()); printing is just the browser's own
 // dialog against the @media print rules, which hide the app and emit one wall-sized page.

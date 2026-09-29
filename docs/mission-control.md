@@ -200,6 +200,19 @@ name, the code at 96pt, and how to join — forced to black on white, because a 
 reliably paint the dark theme's background and a light-on-dark design otherwise prints as white
 on white.
 
+The poster's instruction is **"Go to allgoodacademy.com/join and type this code."** — and
+nothing else, because it has to match what actually happens. `/join/` (`public/join/index.html`)
+is a permanent address: it is on classroom walls and in the TPT facilitation guide, so it must
+never move. Under the code the poster prints a QR code for `/join/?c=CODE` (the join page with
+the code pre-filled), drawn by `public/assets/js/qrcode-generator.js`, vendored locally so the
+poster adds no third-party script host. If the generator fails to load the QR is simply left
+off; the address and the code are enough on their own.
+
+Before 2026-09-29 the poster told students to "start any lesson and enter this code when it
+asks for a Task Force". No lesson ever asked, so a class following it played a whole period
+and the roster stayed empty (UAT 2026-09-27). Joining now lives in one shared module,
+`public/js/classroom-join.js`, used by `/join/` and by the dashboard's Profile join box.
+
 ## Time on task depends on an undeployed rules grant
 
 `activeMs` exists only on a telemetry `session` document, and rule #10 opens `sessions` to the
