@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pattern Lab — Allgood Academy</title>
 <link rel="icon" type="image/png" href="/favicon.png">
-<meta name="description" content="Free CogAT-style practice for grades 5–8. Nine reasoning skills, adaptive difficulty, and the pattern behind every question explained.">
+<meta name="description" content="Free reasoning practice for grades 5–8: nine kinds of reasoning, adaptive difficulty, and the pattern behind every question explained. The same kinds of reasoning the CogAT measures.">
 
 <!-- Shared brand values. Everything design-tokens.css already defines is read from it
      below rather than restated here; see scripts/check-tokens.js, which fails the build
@@ -435,9 +435,28 @@ let S={grade:null,rounds:3,queue:[],idx:0,log:[],lvlBySub:{},answered:false};
 const MAX_ITEMS = 27;
 const SUBTEST_IDS = SUBS.map(s => s.id);
 
+/* HOW IT IS BEING USED — asked first on the start screen.
+
+   'solo'  : one learner on their own device. Exactly the behaviour Pattern Lab always
+             had — telemetry, the results report, the save offer.
+   'class' : a teacher projecting it and the room answering together. Plays identically
+             but records NOTHING: no anonymous sign-in, no telemetry session, no events,
+             no save or Recruit Code offer. A whole class answering as one "learner" would
+             otherwise land in the level-calibration data as a single, very odd student —
+             and that data is the reason Pattern Lab is free.
+
+   Null until chosen. ?mode=class in the URL preselects class mode, so a teacher can be
+   sent a direct link, and it is how a switch from solo to class gets a clean page (see
+   chooseMode). */
+let MODE = null;
+try { if (new URLSearchParams(location.search).get('mode') === 'class') MODE = 'class'; } catch (e) {}
+let telemetryStarted = false;
+
 // Telemetry must never be able to break a question. Every call goes through here: if the
-// pipe never loaded, or a write throws, the practice session is unaffected.
+// pipe never loaded, or a write throws, the practice session is unaffected. And nothing
+// passes it outside solo play.
 const tele = (fn, ...args) => {
+  if (MODE !== 'solo' || !telemetryStarted) return;
   try { if (window.Telemetry && typeof window.Telemetry[fn] === 'function') window.Telemetry[fn](...args); }
   catch (e) { /* ignore */ }
 };
@@ -532,6 +551,7 @@ async function offerSaveOnce(summary){
 // Leaving the report before the auto-offer has fired abandons it. Every exit off that
 // screen goes through here instead, exactly as the games' exits do.
 function leave(url){
+  if(MODE === 'class'){ window.location.href = url; return; }
   const g = gate();
   if(g && g.guardedLeave){ g.guardedLeave(() => { window.location.href = url; }); }
   else window.location.href = url;
@@ -540,8 +560,14 @@ function leave(url){
 // auth-core.js and telemetry.js are module scripts and have not necessarily run when this
 // classic script does. Poll briefly rather than racing them — the same pattern the four
 // games use; if neither ever arrives, the game plays exactly as it does now with no data.
+//
+// Started when "On my own" is chosen, NOT on page load: until then nobody has said
+// whether this is one learner or a whole class, and a class must never open a session.
 function initTelemetry(tries) {
+  if (MODE !== 'solo') return;
   if (window.Telemetry && window.AuthCore) {
+    if (telemetryStarted) return;
+    telemetryStarted = true;
     window.Telemetry.init({ module: 'pattern-lab', gameName: 'Pattern Lab', stepsTotal: MAX_ITEMS, stream: 'pattern-lab' });
     patternLabSession().then(async () => {
       // Only a learner who saved a previous session has one; an anonymous visitor's
@@ -554,7 +580,29 @@ function initTelemetry(tries) {
   if ((tries || 0) > 100) return;
   setTimeout(() => initTelemetry((tries || 0) + 1), 50);
 }
-initTelemetry(0);
+
+/* Switching FROM solo TO class after telemetry has started cannot be done in place:
+   telemetry.js has no off switch, and its clock would keep flushing the solo session
+   document while the class played. So that one switch reloads the page clean with
+   ?mode=class. Every other choice is in place. */
+function chooseMode(m){
+  if(m === 'class' && telemetryStarted){
+    const u = new URL(location.href); u.searchParams.set('mode','class');
+    location.replace(u.toString());
+    return false;
+  }
+  MODE = m;
+  if(m === 'solo'){
+    // A solo choice made on a ?mode=class page drops the param, so a refresh does not
+    // quietly put the page back into class mode.
+    try{
+      const u = new URL(location.href);
+      if(u.searchParams.has('mode')){ u.searchParams.delete('mode'); history.replaceState(null,'',u.toString()); }
+    }catch(e){}
+    initTelemetry(0);
+  }
+  return true;
+}
 const card=()=>document.getElementById('card');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -570,7 +618,7 @@ function setProgress(frac){
    start screen, above the grade picker. It reports what they reached, never a score and
    never a trend claim — two sessions a week apart on a 9-item sample do not support one. */
 function renderLastRun(){
-  if(!lastRun) return;
+  if(!lastRun || MODE!=='solo') return;
   const host=document.getElementById('lastrun-slot');
   if(!host) return;
   const when=lastRun.at?new Date(lastRun.at).toLocaleDateString(undefined,{month:'long',day:'numeric'}):null;
@@ -585,9 +633,16 @@ function start(){
     <div class="eyebrow">Allgood Academy \u00b7 Free Practice</div>
     <h1>Pattern Lab</h1>
     <div class="rule"></div>
-    <p class="lede">CogAT-style practice across nine reasoning skills. Every question shows you the pattern behind it \u2014 whether you get it right or not.</p>
+    <p class="lede">Reasoning practice, one question at a time &mdash; nine kinds of reasoning, and every question shows you the pattern behind it, whether you get it right or not.</p>
+    <p class="muted" style="margin:-6px 0 18px">The same kinds of reasoning the CogAT measures.</p>
     <div id="lastrun-slot"></div>
-    <p class="lede"><strong>What grade are you in?</strong></p>
+    <p class="lede"><strong>How are you using Pattern Lab?</strong></p>
+    <div class="lens" id="modes">
+      <button class="len${MODE==='solo'?' sel':''}" data-m="solo"><span class="n" aria-hidden="true">1</span><span class="w"><span class="t">On my own</span><span class="d">One learner, one device. You get your own results at the end, and can save them if you want.</span></span></button>
+      <button class="len${MODE==='class'?' sel':''}" data-m="class"><span class="n" aria-hidden="true">&#9776;</span><span class="w"><span class="t">As a class warm-up</span><span class="d">Projected for a whole class to answer together. Nothing is recorded or saved.</span></span></button>
+    </div>
+    <div id="gradewrap" style="display:${MODE?'block':'none'}">
+    <p class="lede"><strong id="grade-q">${MODE==='class'?'What grade is the class?':'What grade are you in?'}</strong></p>
     <div class="grades" id="grades">
       ${[5,6,7,8].map(g=>`<div class="grade" data-g="${g}"><div class="g">${g}</div><div class="l">Level ${GRADE_LVL[g]}${g>=7?'/14':''}</div></div>`).join('')}
     </div>
@@ -599,8 +654,26 @@ function start(){
         <button class="len" data-r="3"><span class="n">27</span><span class="w"><span class="t">Full profile</span><span class="d">About 15 minutes \u00b7 three per skill. The most reliable version.</span></span></button>
       </div>
     </div>
+    </div>
     <button class="btn" id="go" disabled>Start \u2192</button>
-    <p class="muted" style="margin-top:18px">No account needed to start, and nothing is saved to your name unless you choose to at the end. You can stop any time \u2014 you'll still get results for what you answered.</p>`;
+    <p class="muted" id="mode-note" style="margin-top:18px"></p>`;
+  const note=()=>{
+    document.getElementById('mode-note').textContent = MODE==='class'
+      ? 'Class warm-up: nothing from this session is recorded or saved \u2014 no answers, no results. You can stop any time and still see the class\'s results for what you answered.'
+      : 'No account needed to start, and nothing is saved to your name unless you choose to at the end. You can stop any time \u2014 you\'ll still get results for what you answered.';
+  };
+  note();
+  document.getElementById('modes').onclick=e=>{
+    const el=e.target.closest('.len'); if(!el)return;
+    if(!chooseMode(el.dataset.m)) return;
+    document.querySelectorAll('#modes .len').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');
+    document.getElementById('grade-q').textContent = MODE==='class'?'What grade is the class?':'What grade are you in?';
+    document.getElementById('gradewrap').style.display='block';
+    note();
+    if(MODE==='class'){ const h=document.getElementById('lastrun-slot'); if(h) h.innerHTML=''; }
+    else renderLastRun();
+  };
   document.getElementById('grades').onclick=e=>{
     const el=e.target.closest('.grade'); if(!el)return;
     document.querySelectorAll('.grade').forEach(x=>x.classList.remove('sel'));
@@ -609,15 +682,16 @@ function start(){
   };
   document.getElementById('lens').onclick=e=>{
     const el=e.target.closest('.len'); if(!el)return;
-    document.querySelectorAll('.len').forEach(x=>x.classList.remove('sel'));
+    document.querySelectorAll('#lens .len').forEach(x=>x.classList.remove('sel'));
     el.classList.add('sel'); S.rounds=+el.dataset.r;
     document.getElementById('go').disabled=false;
   };
   document.getElementById('go').onclick=begin;
-  renderLastRun();
+  if(MODE==='solo') renderLastRun();
 }
 
 function begin(){
+  if(!MODE) return;
   SUBS.forEach(s=>S.lvlBySub[s.id]=GRADE_LVL[S.grade]);
   S.queue=buildQueue(); S.idx=0; S.log=[];
   // The learner picks the session length AFTER the page has opened, so the real step
@@ -788,6 +862,8 @@ function answer(val){
 }
 
 function report(){
+  const CLS = MODE==='class';
+  const You = CLS?'The class':'You', your = CLS?"the class's":'your', Your = CLS?"The class's":'Your';
   document.getElementById('prog').textContent='';
   setProgress(1);
   const base=GRADE_LVL[S.grade];
@@ -813,19 +889,20 @@ function report(){
     const hi=solid.reduce((a,b)=>b.top>a.top?b:a);
     const lo=solid.reduce((a,b)=>b.top<a.top?b:a);
     head = hi.top===lo.top
-      ? `<div class="summary"><div class="sh">Even across the board</div><p>You landed at <b>Level ${lvName(hi.top)}</b> in every skill with enough data. That's a consistent profile \u2014 no single area pulling ahead or lagging.</p></div>`
-      : `<div class="summary"><div class="sh">Your strongest and weakest</div><p>You reached <b>Level ${lvName(hi.top)}</b> in <b>${esc(hi.s.name)}</b> and <b>Level ${lvName(lo.top)}</b> in <b>${esc(lo.s.name)}</b>. Being stronger in one kind of reasoning than another is normal and common \u2014 it's the most useful thing this shows you.</p></div>`;
+      ? `<div class="summary"><div class="sh">Even across the board</div><p>${You} landed at <b>Level ${lvName(hi.top)}</b> in every skill with enough data. That's a consistent profile \u2014 no single area pulling ahead or lagging.</p></div>`
+      : `<div class="summary"><div class="sh">${Your} strongest and weakest</div><p>${You} reached <b>Level ${lvName(hi.top)}</b> in <b>${esc(hi.s.name)}</b> and <b>Level ${lvName(lo.top)}</b> in <b>${esc(lo.s.name)}</b>. Being stronger in one kind of reasoning than another is normal and common \u2014 it's the most useful thing this shows you.</p></div>`;
   }
 
-  let html=`<div class="eyebrow">Your results</div>
+  let html=`<div class="eyebrow">${CLS?'Class warm-up \u00b7 the class\'s results':'Your results'}</div>
     <h1>Nine skills, measured separately</h1><div class="rule"></div>
+    ${CLS?'<p class="muted" id="class-note" style="margin:-4px 0 18px">These are the class\'s answers together, not any one student\'s. Nothing from this session was recorded or saved.</p>':''}
     ${head}
     <div class="legend">
       <span><i style="background:var(--teal)"></i>Cleared</span>
-      <span><i style="background:var(--sage)"></i>Above your grade</span>
+      <span><i style="background:var(--sage)"></i>Above ${your} grade</span>
       <span><i style="background:#fdf1ec;border:1px solid var(--orange)"></i>Tried, not cleared</span>
       <span><i style="background:#f0ebe0;border:1px solid var(--line)"></i>Not reached</span>
-      <span><i style="background:var(--dark);opacity:.35"></i>Your grade's start</span>
+      <span><i style="background:var(--dark);opacity:.35"></i>${CLS?'The class\'s':'Your'} grade's start</span>
     </div>
     <p class="muted" style="margin:-8px 0 20px">Each skill is labelled by how much it rests on: <strong>First impression</strong> (1\u20132 questions), <strong>Provisional</strong> (3\u20134), <strong>Solid</strong> (5+). A longer session moves these up.</p>`;
 
@@ -853,9 +930,9 @@ function report(){
       }).join('');
 
       const sub = !r.answered
-        ? `This skill didn't come up in your session.`
+        ? `This skill didn't come up in ${your} session.`
         : r.top
-          ? `Answered Level ${lvName(r.top)} items correctly${r.top>base?' \u2014 above where your grade starts':''}. Based on ${r.n} question${r.n===1?'':'s'}${r.n<3?' \u2014 a longer session would firm this up':''}.`
+          ? `Answered Level ${lvName(r.top)} items correctly${r.top>base?' \u2014 above where ${your} grade starts':''}. Based on ${r.n} question${r.n===1?'':'s'}${r.n<3?' \u2014 a longer session would firm this up':''}.`
           : `No items answered correctly at Level 11 yet. Based on ${r.n} question${r.n===1?'':'s'}.`;
 
       html+=`<div class="sk">
@@ -866,7 +943,9 @@ function report(){
     });
   });
 
-  html+=`<div class="foot" style="margin-top:24px;flex-wrap:wrap">
+  html+= CLS ? `<div class="foot" style="margin-top:24px;flex-wrap:wrap">
+      <button class="btn orange" id="again">Another round \u2192</button>
+    </div>` : `<div class="foot" style="margin-top:24px;flex-wrap:wrap">
       <button class="btn orange" id="again">Practice again \u2192</button>
       <button class="btn save" id="save-state">Save my results</button>
     </div>
@@ -879,6 +958,13 @@ function report(){
     <div class="disc" id="cogat-disclaimer">Cognitive Abilities Test™ (CogAT®) is a registered trademark of Riverside Assessments, LLC and its affiliates ("Riverside"). Riverside does not sponsor or endorse any Allgood Academy products or programs, nor has this product been reviewed, certified, or approved by Riverside. Pattern Lab uses original practice materials only, not actual test questions, and is not a predictor of official CogAT results.</div>`;
 
   card().innerHTML=html;
+
+  // Class warm-up ends here: no save offer, no Recruit Code, no roll-up. Nothing below
+  // this line runs for a class.
+  if(CLS){
+    document.getElementById('again').onclick=()=>start();
+    return;
+  }
 
   // Strongest skill with enough behind it to name, for the save record and the
   // "last time you were here" line. Null when nothing cleared — never invented.
