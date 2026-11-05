@@ -142,12 +142,17 @@ for (const [name, tok] of tokens) {
 // ---------------------------------------------------------------------------
 // 4. Regression guards for the invariants the consolidation established.
 // ---------------------------------------------------------------------------
+// Client buy sheets hosted verbatim at an unlisted address. Each is a finished,
+// self-contained file delivered to one buyer and must be served byte for byte as
+// approved (apart from a robots meta line), so it cannot be edited to use the tokens.
+const SERVED_VERBATIM = new Set(['public/AllgoodOS_Hurtado001']);
 const pages = [];
 (function walk(dir) {
   for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
     const rel = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (rel.replace(/\\/g, '/') === 'public/assets/css') continue; // generated bundles
+      if (SERVED_VERBATIM.has(rel.replace(/\\/g, '/'))) continue;
       walk(rel);
     } else if (/\.(html|js)$/.test(entry.name)) {
       pages.push(rel.replace(/\\/g, '/'));
