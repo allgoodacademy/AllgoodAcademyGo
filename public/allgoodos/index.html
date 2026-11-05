@@ -110,6 +110,37 @@ footer .in{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 footer a{color:var(--on2);text-decoration:none}
 footer a:hover{color:#fff}
 
+
+/* live example card + demo dialog */
+.tile.live{box-shadow:0 0 0 1.5px var(--teal)}
+.tile .im.shot{position:relative;display:block;width:100%;padding:0;border:0;cursor:pointer;background:#efe7da}
+.tile .im.shot img{transition:transform .35s, filter .35s}
+.tile .im.shot:hover img{transform:scale(1.03);filter:brightness(.82)}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;font-weight:700;font-size:15px;padding:11px 17px 11px 14px;border-radius:999px;box-shadow:0 8px 22px rgba(0,0,0,.3);white-space:nowrap;transition:transform .2s}
+.play svg{width:18px;height:18px}
+.tile .im.shot:hover .play{transform:translate(-50%,-50%) scale(1.05)}
+.tile .go{display:block;margin-top:10px;padding:0;border:0;background:none;color:var(--teal);font:inherit;font-weight:700;font-size:14px;cursor:pointer}
+.tile .go:hover{text-decoration:underline;text-underline-offset:3px}
+dialog.demo-dlg{width:min(1240px,94vw);height:min(900px,92vh);height:min(900px,92dvh);max-width:none;max-height:none;padding:0;border:0;border-radius:16px;background:var(--navy);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+dialog.demo-dlg::backdrop{background:rgba(10,18,32,.72);backdrop-filter:blur(3px)}
+dialog.demo-dlg[open]{display:flex;flex-direction:column;animation:dlgIn .22s ease-out}
+@keyframes dlgIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.dlg-bar{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 18px;color:var(--on);flex:none}
+.dlg-bar b{font-family:var(--display);font-size:16px}
+.dlg-bar span{color:var(--on3);font-size:13px}
+.dlg-bar .sp{flex:1}
+.dlg-bar a{color:var(--on2);font-size:13.5px;text-decoration:none;padding:8px 10px;border-radius:8px}
+.dlg-bar a:hover{background:rgba(255,255,255,.08);color:#fff}
+.dlg-x{width:40px;height:40px;border-radius:10px;border:0;background:rgba(255,255,255,.1);color:#fff;font-size:22px;line-height:1;cursor:pointer;flex:none}
+.dlg-x:hover{background:rgba(255,255,255,.18)}
+.dlg-frame{flex:1;position:relative;background:#f3f5f8}
+.dlg-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#f3f5f8}
+.dlg-load{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px}
+@media (max-width:700px){
+  dialog.demo-dlg{width:100vw;height:100vh;height:100dvh;border-radius:0;margin:0;inset:0}
+  .dlg-bar span:not(.sp),.dlg-bar a{display:none}
+  .dlg-bar{padding:max(8px,env(safe-area-inset-top)) 10px 8px 16px}}
+@media (prefers-reduced-motion:reduce){dialog.demo-dlg[open]{animation:none}}
 @media (max-width:900px){.grid{grid-template-columns:1fr;gap:36px;padding-top:34px}.hero{padding-bottom:52px}.tiles{grid-template-columns:1fr}.work{padding:38px 20px 34px}}
 @media (max-width:480px){.hero{padding:20px 18px 44px}.btn{width:100%;justify-content:center}.dm .row{grid-template-columns:1fr;gap:0}.dm{padding:16px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -167,8 +198,13 @@ footer a:hover{color:#fff}
   <div class="in">
     <div class="work-h"><h2>Built with Allgood OS</h2><p data-placeholder>More examples as they ship.</p></div>
     <div class="tiles">
-      <article class="tile"><div class="im"><img src="/allgoodos/buy-sheet-preview.jpg" alt="A new-construction buy sheet with home photos, details and a price summary" loading="lazy" width="960" height="480"></div>
-        <div class="tx"><b>Real estate buy sheet</b>A buyer picks options for a new-construction home and sees the price, payment and cash to close move.</div></article>
+      <article class="tile live">
+        <button class="im shot" type="button" data-open-demo aria-haspopup="dialog" aria-label="Try the buy sheet demo">
+          <img src="/allgoodos/buy-sheet-preview.jpg" alt="" loading="lazy" width="960" height="480">
+          <span class="play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Try the live demo</span>
+        </button>
+        <div class="tx"><b>Real estate buy sheet</b>A buyer picks options for a new-construction home and sees the price, payment and cash to close move.
+          <button class="go" type="button" data-open-demo aria-haspopup="dialog">Open the demo →</button></div></article>
       <article class="tile"><div class="im soon">Example coming soon</div>
         <div class="tx"><b data-placeholder>Interactive lesson</b><span data-placeholder>A GoodBlock-style module that teaches by letting people try.</span></div></article>
       <article class="tile"><div class="im soon">Example coming soon</div>
@@ -182,6 +218,13 @@ footer a:hover{color:#fff}
   <span><a href="mailto:learning@allgoodacademy.com">learning@allgoodacademy.com</a> · <a href="https://www.linkedin.com/in/william-allgood-ms-81575196/" target="_blank" rel="noopener">LinkedIn</a></span></div>
 </footer>
 
+<dialog class="demo-dlg" id="demoDlg" aria-labelledby="demoTitle">
+  <div class="dlg-bar"><b id="demoTitle">Buy sheet demo</b><span>Sample agent and buyer · tap anything</span><span class="sp"></span>
+    <a href="/allgoodos/demo/buy-sheet.html" target="_blank" rel="noopener">Open in a new tab ↗</a>
+    <button class="dlg-x" type="button" data-close-demo aria-label="Close demo">×</button></div>
+  <div class="dlg-frame"><div class="dlg-load">Loading the demo…</div><iframe id="demoFrame" title="Interactive buy sheet demo" loading="lazy"></iframe></div>
+</dialog>
+
 <script>
 (function(){
   var base=703990, tot=document.getElementById("tot");
@@ -192,6 +235,17 @@ footer a:hover{color:#fff}
     tot.textContent="$"+s.toLocaleString("en-US");
   });});
   document.getElementById("yr").textContent=new Date().getFullYear();
+  var dlg=document.getElementById("demoDlg"), fr=document.getElementById("demoFrame"), opener=null;
+  document.querySelectorAll("[data-open-demo]").forEach(function(b){ b.addEventListener("click", function(){
+    opener=b; if(!fr.getAttribute("src")) fr.setAttribute("src","/allgoodos/demo/buy-sheet.html");
+    if(dlg.showModal){ dlg.showModal(); document.documentElement.style.overflow="hidden"; }
+    else { window.open("/allgoodos/demo/buy-sheet.html","_blank","noopener"); }
+  });});
+  dlg.querySelector("[data-close-demo]").addEventListener("click", function(){ dlg.close(); });
+  dlg.addEventListener("click", function(e){ if(e.target===dlg) dlg.close(); });
+  dlg.addEventListener("close", function(){ document.documentElement.style.overflow=""; if(opener) opener.focus(); });
+  fr.addEventListener("load", function(){ var l=dlg.querySelector(".dlg-load"); if(l) l.remove(); });
+
 })();
 </script>
 <script type="module" src="/allgoodos/message.js"></script>
