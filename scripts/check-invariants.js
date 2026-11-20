@@ -65,6 +65,9 @@ const LEARNER_SURFACES = [
   'public/educational-games/pattern-lab/index.html',
   // The join page. Most students reach it as brand-new guests, many of them under 13.
   'public/join/index.html',
+  // Take the Bait (2D v1 and the 3D build). No analytics of any kind on these routes.
+  'public/educational-games/takethebait/index.html',
+  'public/educational-games/takethebait-3d/index.html',
 ];
 
 // Extracts the body of `window.NAME = ... };` so we can ask what a function actually calls.
