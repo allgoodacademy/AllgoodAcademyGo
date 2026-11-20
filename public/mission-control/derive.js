@@ -235,9 +235,9 @@ export const GAME_REGISTRY = {
     'the-rumor-mill':   { name: 'The Rumor Mill', icon: '🌀', url: '/educational-games/the-rumor-mill/' },
     'money-moves':      { name: 'Money Moves', icon: '💸', url: '/educational-games/money-moves/' },
     // Off the core funnel (its own telemetry stream) but assignable like the others. Its
-    // summary uses the same scenariosPlayed/correct/categories shape — Real or Bait answers,
-    // and lures seen/dodged per scam technique — plus a `ttb` block read below.
-    'take-the-bait':    { name: 'Take the Bait', icon: '🎣', url: '/educational-games/takethebait/', scoreLabel: 'Real or Bait', categoryNoun: 'technique', noDeeperLink: true },
+    // summary uses the same scenariosPlayed/correct/categories shape — messages answered and
+    // right calls, and bait seen/blocked per scam technique — plus a `ttb` block read below.
+    'take-the-bait':    { name: 'Take the Bait', icon: '🎣', url: '/educational-games/takethebait/', scoreLabel: 'right calls', categoryNoun: 'technique', noDeeperLink: true },
 };
 
 /* Pull the four standalone games out of a student's telemetry session documents.

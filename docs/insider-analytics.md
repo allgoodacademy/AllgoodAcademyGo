@@ -43,7 +43,7 @@ which is what every figure on Insider is computed from. A module that passes `st
 | `pattern-lab` | Pattern Lab (`/educational-games/pattern-lab/`) | **no** — held in `D.offFunnel` |
 | `take-the-bait` | Take the Bait (`/educational-games/takethebait/`) | **no** — its own Insider page, from its own queries |
 
-**Take the Bait** is a Mob Control-style arcade game, visible on the games hub and assignable
+**Take the Bait** is a scam-spotting game (messages fall from Scam HQ; let the real ones in, block the bait and name its trick, then your crew charges Scam HQ), visible on the games hub and assignable
 in Mission Control, but on its own stream so holiday-scale play cannot skew the core funnel.
 The registry marks it with `stream` (see the `stream` contract in
 `public/data/modules-registry.json`); its Insider `COURSES` row carries `offFunnel: true`,
@@ -56,16 +56,16 @@ What it records (one session per level played):
 
 | Event | When | Meta |
 |---|---|---|
-| `step` | a message pair (round) resolves | step = pairs resolved this level |
-| `choice` | a pair resolves and the player shot through it | `level, round, pairId, pick ('left'\|'gap'\|'right'), pickedReal, otherReal, cardsReal, techniques, technique, outcome ('bait'\|'spotted'\|'trusted'\|'smart_scroll'\|'safe_scroll'\|'over_scroll'), usedCheck` |
-| `real_or_bait` | each end-of-level quiz answer | `level, itemId, answeredReal, isReal, correct, technique` |
-| `level_start` / `level_end` | level start / results | `level, won, heartsLeft, baitsTaken, luresSeen, realOrBaitScore, checksUsed, speedSetting, durationMs` |
+| `step` | a message is answered (let in or blocked; one left untouched lands as let in) | step = messages answered this level; `plan()` sets the level's real count |
+| `choice` | each message answered | `level, pairId, messageId, pick ('let'\|'block'), isReal, pickedReal, cardsReal, techniques, technique, named, namedRight, outcome ('trusted'\|'bait'\|'spotted'\|'over_scroll'), usedCheck (= opened it before deciding)` |
+| `real_or_bait` | each end-of-level bonus question | `level, itemId, answeredReal, isReal, correct, technique` |
+| `level_start` / `level_end` | level start / results | `level, won, crewLeft, guards, baitsTaken, luresSeen, realsBlocked, rightCalls, messages, realOrBaitScore, speedSetting, durationMs` |
 | `module_complete` | Level 5 won | — |
 
 Like Pattern Lab it never writes `category` on a choice (techniques are not in the routing
 vocabulary; the field is `technique`) and never loads `/js/skill-routing.js`. The session
-`summary` uses the four games' shape (`scenariosPlayed`/`correct` = Real or Bait answers,
-`categories` = lures seen/dodged per technique) plus a `ttb` block, which is what Mission
+`summary` uses the four games' shape (`scenariosPlayed`/`correct` = messages answered / right
+calls, `categories` = bait seen/blocked per technique) plus a `ttb` block, which is what Mission
 Control's Agent Detail reads. A signed-in student (a profile with a 13+ account, Recruit Code
 or Task Force membership) also gets `users/{uid}/game_scores/{visitId}`; a guest gets
 telemetry only, with no name and no free text.
@@ -115,7 +115,7 @@ the moments that matter. Steps per module:
 | Where You Say It | cases reached | 6 |
 | The Cost of Later | cases reached | 6 |
 | Room to Think Challenge | scenarios answered | 24 |
-| Take the Bait | message pairs resolved | 5 |
+| Take the Bait | messages answered | 10 |
 
 The table above is hand-written but no longer hand-*checked*: `node scripts/check-modules.js`
 verifies every row against Insider's `COURSES` and against the shared registry, and fails on a
