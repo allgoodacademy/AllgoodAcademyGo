@@ -19,7 +19,7 @@
    HQ's front wall at z=−HQZ. Units move toward −z, enemies toward +z. A unit or enemy
    object can stand for several soldiers (n>1) once the field is crowded, so the drawn
    count stays capped; every rule counts n, never objects. */
-import {LEVELS,EXTRA} from "./content.js";
+import {LEVELS,EXTRA} from "./content.js?v=20261120b";
 
 export const HW=4.6,HQZ=21,GZ=-7.5,CANNON_Z=0;
 export const GATE_W=3.0,GATE_C=2.2;          // each gate's width, and its centre offset from the pair's middle

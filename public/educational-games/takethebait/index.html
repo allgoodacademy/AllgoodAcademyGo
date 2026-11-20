@@ -206,8 +206,14 @@ h2{margin:0 0 4px;font-family:var(--disp);font-size:26px;font-weight:700;line-he
 </script>
 
 <script type="module">
-import {TECH,OPEN,LEVELS,SPEED} from "./content.js";
-import {Game,buildPairs,HW,HQZ,GZ,GATE_W,HEARTS,PER_HEART,CHECKS,SPEEDS,INTRO_S} from "./game.js";
+/* The ?v= on these two imports is a cache-buster, not decoration. The page is served
+   no-cache but, until firebase.json said otherwise, these modules were cached for an hour:
+   a browser holding the previous game.js got the new page asking it for exports it did not
+   have, the whole module failed, and the student saw "The game couldn't start". The files
+   are now no-cache too (firebase.json), so this only has to change if that header is ever
+   lost. game.js imports content.js with the same value. */
+import {TECH,OPEN,LEVELS,SPEED} from "./content.js?v=20261120b";
+import {Game,buildPairs,HW,HQZ,GZ,GATE_W,HEARTS,PER_HEART,CHECKS,SPEEDS,INTRO_S} from "./game.js?v=20261120b";
 if(window.TTB_3D!=="ok")throw new Error("no 3D");
 const fail=e=>{window.showNo3D("failed");throw e;};
 
