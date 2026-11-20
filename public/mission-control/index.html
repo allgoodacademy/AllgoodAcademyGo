@@ -1890,7 +1890,7 @@ function gameCard(g) {
     const gameKey = `game:${g.id}`;
     const open = state.expanded[gameKey] ? ' expanded' : '';
     const scoreLine = g.bestPct == null ? '' :
-        `<div style="margin-top:2px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">Best score: <span style="color:#00D4B8">${g.bestPct}%</span></div>`;
+        `<div style="margin-top:2px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">${esc(g.meta.scoreLabel ? `Best ${g.meta.scoreLabel}` : 'Best score')}: <span style="color:#00D4B8">${g.bestPct}%</span></div>`;
     return `<div class="module-card${open}" id="gcard-${esc(g.id)}">
       <button type="button" class="module-card-header" data-game="${esc(g.id)}" aria-expanded="${state.expanded[gameKey] ? 'true' : 'false'}">
         <div class="module-icon" style="background:rgba(0,212,184,0.15);color:#00D4B8" aria-hidden="true">${g.meta.icon}</div>
@@ -1907,12 +1907,28 @@ function gameCard(g) {
         <span class="tot-val">${esc(relativeTime(g.lastPlayed))}</span>
       </div>
       <div class="module-steps">
+        ${ttbResults(g)}
         ${gameSkillBreakdown(g)}
-        ${gameDeeperLinkLine(g)}
+        ${g.meta.noDeeperLink ? '' : gameDeeperLinkLine(g)}
         <div class="steps-label" style="margin-top:12px">SESSION HISTORY</div>
         ${g.sessions.map((sess) => gameSessionRow(sess)).join('')}
       </div>
     </div>`;
+}
+
+/* Take the Bait's own results: levels won, lures dodged, and the techniques that hooked
+   this student. Shown above the skill rows (which, for this game, are per technique). */
+function ttbResults(g) {
+    const t = g.ttb;
+    if (!t) return '';
+    const row = (title, body, color) => `<div class="step-row" style="cursor:default"><div class="step-content">
+        <div class="step-title">${title}</div><div class="step-choice"${color ? ` style="color:${color}"` : ''}>${body}</div></div></div>`;
+    const won = t.levelsWon.length ? `Level${t.levelsWon.length === 1 ? '' : 's'} ${t.levelsWon.join(', ')}` : 'None yet';
+    const dodged = t.luresSeen ? `${t.luresDodged} of ${t.luresSeen} (${Math.round(t.luresDodged / t.luresSeen * 100)}%)` : 'No lures met yet';
+    const taken = t.baitTechniques.length ? t.baitTechniques.map(esc).join(', ') : 'None — not hooked yet';
+    return row(`Levels won: ${t.levelsWon.length} of 5`, esc(won))
+        + row('Lures dodged', esc(dodged))
+        + row('Took the bait on', taken, t.baitTechniques.length ? '#F43F5E' : '#10B981');
 }
 
 function gameSkillBreakdown(g) {
@@ -1925,7 +1941,8 @@ function gameSkillBreakdown(g) {
              </div>
            </div>`
         : '';
-    return row('Strongest skill', g.strongestCategory, '#10B981') + row('Weakest skill', g.weakestCategory, '#F43F5E');
+    const noun = g.meta.categoryNoun || 'skill';
+    return row(`Strongest ${noun}`, g.strongestCategory, '#10B981') + row(`Weakest ${noun}`, g.weakestCategory, '#F43F5E');
 }
 
 function gameDeeperLinkLine(g) {

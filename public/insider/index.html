@@ -70,6 +70,7 @@
                 <a href="#/overview" data-route="overview" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>Overview</a>
                 <a href="#/users" data-route="users" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="users" class="w-4 h-4"></i>Users</a>
                 <a href="#/courses" data-route="courses" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="book-open" class="w-4 h-4"></i>Courses</a>
+                <a href="#/takethebait" data-route="takethebait" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="fish" class="w-4 h-4"></i>Take the Bait</a>
                 <a href="#/classrooms" data-route="classrooms" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="school" class="w-4 h-4"></i>Classrooms</a>
                 <a href="#/inbox" data-route="inbox" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="inbox" class="w-4 h-4"></i>Inbox</a>
                 <a href="#/feedback" data-route="feedback" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="star" class="w-4 h-4"></i>Feedback</a>
@@ -266,7 +267,26 @@
                 scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
                 progressStep: p => Object.keys(p.answeredScenarioScores || {}).length,
             },
+            {
+                // OFF-FUNNEL. Take the Bait reports on its own telemetry stream and is split
+                // out of every core figure (see OFF_FUNNEL_COURSES below and the Take the Bait
+                // page). It is listed here so scripts/check-modules.js can verify its
+                // Telemetry.init and its Steps-per-module row like every other module.
+                id: 'take-the-bait', name: 'Take the Bait', category: 'Game',
+                gameNames: ['Take the Bait'], launchNames: [],
+                stepsTotal: 5, stepLabel: 'message pairs resolved', stepBucket: 1, scored: true, offFunnel: true,
+                isComplete: d => d.completed === true,
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: () => 0,
+            },
         ];
+        /* Courses flagged offFunnel are lifted out of COURSES here, once, before anything
+           reads it — the same single-split rule the stream partition below follows. Every
+           core figure (user status, completions, Courses page, Classrooms grid, exports)
+           iterates COURSES, so none of them can see these. */
+        const OFF_FUNNEL_COURSES = COURSES.filter(c => c.offFunnel);
+        for (let i = COURSES.length - 1; i >= 0; i--) if (COURSES[i].offFunnel) COURSES.splice(i, 1);
+        const OFF_FUNNEL_GAMENAMES = new Set(OFF_FUNNEL_COURSES.flatMap(c => c.gameNames));
         const courseByGameName = {};
         const courseByLaunchName = {};
         const courseBySlug = {};
@@ -287,7 +307,10 @@
             // still exportable for item calibration, and separately rather than filtered
             // at each call site, so a metric added later cannot pick it up by default.
             // See offFunnel() and the STREAMS note in /js/telemetry.js.
-            offFunnel: { sessions: [], events: [] },
+            offFunnel: { sessions: [], events: [], scores: [] },
+            // Take the Bait's own data, loaded by its own module-filtered queries so the page
+            // is complete no matter how busy the shared 5,000 / 3,000 windows above are.
+            ttb: { sessions: [], events: [] },
             errors: {}, loadedAt: null,
         };
         // Which telemetry streams this dashboard's numbers are computed from. A session or
@@ -494,6 +517,12 @@
                 safe('sessions', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), orderBy('startedAt', 'desc'), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
                 safe('events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), orderBy('ts', 'desc'), limit(3000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
             ]);
+            // Equality-only filters: served by Firestore's automatic single-field index, so no
+            // composite index is needed (an orderBy here would need one).
+            const [ttbSessions, ttbEvents] = await Promise.all([
+                safe('take-the-bait sessions', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('module', '==', 'take-the-bait'), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+                safe('take-the-bait events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), where('module', '==', 'take-the-bait'), limit(10000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+            ]);
 
             /* THE EXCLUSION, DONE ONCE.
                Pattern Lab (/educational-games/pattern-lab/) writes to the same two
@@ -510,12 +539,18 @@
             const offFunnel = {
                 sessions: sessions.filter(s => !inFunnel(s)),
                 events: events.filter(e => !inFunnel(e)),
+                // game_scores carry no stream, so an off-funnel game's rows are split by gameName.
+                scores: scores.filter(s => OFF_FUNNEL_GAMENAMES.has(s.gameName)),
             };
+            const funnelScores = scores.filter(s => !OFF_FUNNEL_GAMENAMES.has(s.gameName));
 
             Object.assign(D, {
-                users, classrooms, messages, feedback, launches, scores, attempts, progress,
+                users, classrooms, messages, feedback, launches, scores: funnelScores, attempts, progress,
                 sessions: funnelSessions, events: funnelEvents, offFunnel, loadedAt: Date.now(),
+                ttb: { sessions: ttbSessions, events: ttbEvents },
             });
+            D.ttb.sessions.forEach(s => { s.startMs = toMs(s.startedAt); s.lastMs = toMs(s.lastSeenAt); });
+            D.ttb.events.forEach(e => { e.ms = toMs(e.ts) || e.clientTs || 0; });
             D.offFunnel.sessions.forEach(s => { s.startMs = toMs(s.startedAt); s.lastMs = toMs(s.lastSeenAt); });
             D.offFunnel.events.forEach(e => { e.ms = toMs(e.ts) || e.clientTs || 0; });
 
@@ -698,7 +733,7 @@
         // ------------------------------------------------------------------
         // ROUTER
         // ------------------------------------------------------------------
-        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
+        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', takethebait: 'Take the Bait', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
         function route() {
             if (mainView.classList.contains('hidden')) return;
             const hash = location.hash.replace(/^#\/?/, '');
@@ -706,7 +741,7 @@
             const page = TITLES[section] ? section : 'overview';
             document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === page));
             $('page-title').textContent = TITLES[page];
-            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
+            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, takethebait: renderTakeTheBait, classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
             const out = typeof render === 'function' ? render() : '';
             $('page').innerHTML = typeof out === 'function' ? out() : out;
             if (window.lucide) lucide.createIcons();
@@ -787,6 +822,83 @@
                 const stepTxt = e.event === 'step' && e.meta && e.meta.step ? ` ${e.meta.step}` : '';
                 return `<div class="text-xs flex items-center justify-between gap-2"><span class="truncate"><a href="#/users/${esc(e.uid)}" class="font-bold text-slate-700 hover:underline">${esc(u ? u.name : 'Unknown')}</a> <span class="text-slate-500">${label[e.event] || esc(e.event)}${stepTxt}</span> <span class="text-slate-700">${esc(c ? c.name : (e.gameName || e.module || ''))}</span></span><span class="text-[10px] text-slate-400 shrink-0">${fmtAgo(e.ms)}</span></div>`;
             }).join('')}</div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: TAKE THE BAIT (off-funnel; reads only D.ttb, never the core arrays)
+        // ------------------------------------------------------------------
+        const TTB_TECH = { rush: 'The Rush', toogood: 'Too Good', disguise: 'The Disguise', login: 'The Login Trap', secret: 'The Secret', feelings: 'Big Feelings', crowd: 'The Crowd', ask: 'The Ask' };
+        function hbarRows(rows, fmt) {
+            if (!rows.length) return emptyMsg('No plays in this range yet.');
+            return `<div class="space-y-1.5">${rows.map(r => `<div class="flex items-center gap-2 text-[11px]"><div class="w-36 shrink-0 text-slate-600 truncate" title="${esc(r.label)}">${esc(r.label)}</div><div class="flex-1 bg-slate-100 rounded h-3.5 overflow-hidden"><div class="h-3.5 rounded" style="width:${Math.max(0, Math.min(100, r.pct))}%;background:${r.color || BRAND}" data-tip="${esc(r.tip || '')}"></div></div><div class="w-24 shrink-0 text-right text-slate-600 font-bold">${fmt(r)}</div></div>`).join('')}</div>`;
+        }
+        function renderTakeTheBait() {
+            const start = rangeStart();
+            const sessions = D.ttb.sessions.filter(s => (s.startMs || 0) >= start);
+            const events = D.ttb.events.filter(e => e.ms >= start);
+            const ev = name => events.filter(e => e.event === name && e.meta);
+            const starts = ev('level_start'), ends = ev('level_end'), choices = ev('choice'), rob = ev('real_or_bait');
+            const players = new Set(sessions.map(s => s.uid)).size;
+
+            // Completion by level
+            const lv = [1, 2, 3, 4, 5].map(n => {
+                const st = starts.filter(e => e.meta.level === n).length, en = ends.filter(e => e.meta.level === n), won = en.filter(e => e.meta.won).length;
+                const dur = en.map(e => e.meta.durationMs).filter(x => typeof x === 'number');
+                return { n, started: st, finished: en.length, won, winRate: pct(won, en.length), medDur: dur.length ? median(dur) : null };
+            });
+            // Device
+            const dev = {}; sessions.forEach(s => { const d = s.device || 'unknown'; dev[d] = (dev[d] || 0) + 1; });
+            // Discernment
+            const withBait = choices.filter(e => Array.isArray(e.meta.techniques) && e.meta.techniques.length);
+            const avoided = withBait.filter(e => e.meta.outcome !== 'bait').length;
+            const withReal = choices.filter(e => Array.isArray(e.meta.cardsReal) && e.meta.cardsReal.includes(true));
+            const trusted = withReal.filter(e => e.meta.pickedReal === true).length;
+            const overScroll = choices.filter(e => e.meta.outcome === 'over_scroll').length;
+            const bothReal = choices.filter(e => Array.isArray(e.meta.cardsReal) && e.meta.cardsReal.every(Boolean)).length;
+            const checkPairs = choices.filter(e => e.meta.usedCheck).length;
+            // Bait rate per technique: first exposure vs later exposures, per player
+            const seen = {}, tech = {};
+            [...choices].sort((a, b) => a.ms - b.ms).forEach(e => {
+                (e.meta.techniques || []).forEach(k => {
+                    const key = e.uid + '|' + k, first = !seen[key]; seen[key] = true;
+                    const t = tech[k] || (tech[k] = { firstN: 0, firstBait: 0, laterN: 0, laterBait: 0 });
+                    const baited = e.meta.outcome === 'bait' && e.meta.technique === k;
+                    if (first) { t.firstN++; if (baited) t.firstBait++; } else { t.laterN++; if (baited) t.laterBait++; }
+                });
+            });
+            const techRows = Object.keys(TTB_TECH).map(k => ({ k, ...(tech[k] || { firstN: 0, firstBait: 0, laterN: 0, laterBait: 0 }) }));
+            // Real or Bait accuracy by level
+            const robLv = [1, 2, 3, 4, 5].map(n => { const r = rob.filter(e => e.meta.level === n); const c = r.filter(e => e.meta.correct).length; return { label: `Level ${n}`, pct: pct(c, r.length), n: r.length, c, tip: `${c} of ${r.length} answers correct` }; });
+            // Speed setting
+            const sp = { relaxed: 0, normal: 0, fast: 0 }; ends.forEach(e => { const k = e.meta.speedSetting; if (k in sp) sp[k]++; });
+            const spTotal = sp.relaxed + sp.normal + sp.fast;
+
+            const th = 'text-right font-bold py-1 px-2';
+            return `${errorStrip()}
+                <p class="text-[11px] text-slate-500 mb-4">Take the Bait reports on its own telemetry stream (<span class="font-mono">take-the-bait</span>) and is in none of the core figures on the other pages. ${rangeLabel()} · refresh to pick up plays from the last minute.</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    ${tile('Plays', sessions.length, `${players} player${players === 1 ? '' : 's'} · one session per level`)}
+                    ${tile('Levels finished', ends.length, `${ends.filter(e => e.meta.won).length} won`)}
+                    ${tile('Bait avoided', withBait.length ? pct(avoided, withBait.length) + '%' : '—', `${avoided} of ${withBait.length} pairs with a lure`)}
+                    ${tile('Real messages trusted', withReal.length ? pct(trusted, withReal.length) + '%' : '—', `${trusted} of ${withReal.length} pairs with a real one`)}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-6">
+                    ${card('Completion by level', `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Level</th><th class="${th}">Started</th><th class="${th}">Finished</th><th class="${th}">Won</th><th class="${th}">Win rate</th><th class="${th}">Median time</th></tr></thead><tbody>${lv.map(r => `<tr class="border-t border-slate-50"><td class="py-1.5 font-bold text-slate-700">Level ${r.n}</td><td class="text-right px-2">${r.started}</td><td class="text-right px-2">${r.finished}</td><td class="text-right px-2">${r.won}</td><td class="text-right px-2 font-bold">${r.finished ? r.winRate + '%' : '—'}</td><td class="text-right px-2">${r.medDur ? fmtDuration(r.medDur) : '—'}</td></tr>`).join('')}</tbody></table>`)}
+                    ${card('Discernment', `<div class="space-y-2 text-xs">
+                        <div class="flex justify-between"><span class="text-slate-500">Bait avoided (pairs with at least one lure)</span><span class="font-bold">${withBait.length ? pct(avoided, withBait.length) + '%' : '—'}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Real messages trusted (pairs with at least one real)</span><span class="font-bold">${withReal.length ? pct(trusted, withReal.length) + '%' : '—'}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Over-caution: scrolled past two real messages</span><span class="font-bold">${bothReal ? pct(overScroll, bothReal) + '%' : '—'} <span class="text-slate-400 font-normal">(${overScroll} of ${bothReal})</span></span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Pairs where Check was used</span><span class="font-bold">${choices.length ? pct(checkPairs, choices.length) + '%' : '—'}</span></div>
+                        <p class="text-[10px] text-slate-400 pt-2 border-t border-slate-100">A pair counts as the gate that got most of the player's shots (left, gap or right). Both numbers matter: avoiding every lure by never trusting anything is not discernment.</p></div>`)}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-6">
+                    ${card('Bait rate by technique · first exposure vs later', `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Technique</th><th class="${th}">First time</th><th class="${th}">Later</th></tr></thead><tbody>${techRows.map(r => `<tr class="border-t border-slate-50"><td class="py-1.5 font-bold text-slate-700">${esc(TTB_TECH[r.k])}</td><td class="text-right px-2">${r.firstN ? pct(r.firstBait, r.firstN) + '%' : '—'} <span class="text-slate-400">(${r.firstBait}/${r.firstN})</span></td><td class="text-right px-2">${r.laterN ? pct(r.laterBait, r.laterN) + '%' : '—'} <span class="text-slate-400">(${r.laterBait}/${r.laterN})</span></td></tr>`).join('')}</tbody></table><p class="text-[10px] text-slate-400 mt-2">Per player: the first pair in which they met a technique, against every later one. A falling rate means the tell is landing.</p>`)}
+                    ${card('Real or Bait? accuracy by level', hbarRows(robLv.filter(r => r.n), r => `${r.pct}% <span class="text-slate-400 font-normal">(${r.c}/${r.n})</span>`))}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4">
+                    ${card('Device', hbarRows(Object.entries(dev).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ label: k, pct: pct(n, sessions.length), n, tip: `${n} sessions` })), r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
+                    ${card('Speed setting (levels finished)', hbarRows(spTotal ? [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['fast', 'Fast']].map(([k, l]) => ({ label: l, pct: pct(sp[k], spTotal), n: sp[k], tip: `${sp[k]} levels` })) : [], r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
+                </div>`;
         }
 
         // ------------------------------------------------------------------
@@ -1035,7 +1147,7 @@
                             ${[['users', 'Users (with rollups)'], ['sessions', 'Sessions (time on task)'], ['events', 'Events (raw stream)'], ['scores', 'Scores'], ['attempts', 'Scenario attempts'], ['launches', 'Launches'], ['feedback', 'Course feedback'], ['messages', 'Messages'], ['pattern-lab-items', 'Pattern Lab items (levelling)']].map(([k, l]) => `<button data-export="${k}" class="text-[10px] font-bold uppercase tracking-wide border border-slate-200 rounded px-3 py-1.5 hover:border-[#357889] hover:text-[#357889]">${l}</button>`).join('')}
                         </div>
                         <p class="text-[10px] text-slate-400 mt-3">For live, always-on dashboards instead of exports, see <span class="font-mono">docs/insider-analytics.md</span> in the repo — it walks through the Firestore → BigQuery → Looker Studio path.</p>`)}
-                    ${card('Data sources loaded', `${src('users', D.users.length)}${src('classrooms', D.classrooms.length)}${src('launches', D.launches.length)}${src('game_scores', D.scores.length)}${src('scenario_attempts', D.attempts.length)}${src('module_progress', D.progress.length)}${src('sessions', D.sessions.length)}${src('events', D.events.length)}${src('pattern-lab (off-funnel)', D.offFunnel.sessions.length)}${src('messages', D.messages.length)}${src('course_feedback', D.feedback.length)}<p class="text-[10px] text-slate-400 mt-3">Loaded ${D.loadedAt ? new Date(D.loadedAt).toLocaleString() : '—'}. Sessions and events are capped at the most recent 5,000 / 3,000. Pattern Lab (${D.offFunnel.sessions.length} session${D.offFunnel.sessions.length === 1 ? '' : 's'}, ${D.offFunnel.events.length} event${D.offFunnel.events.length === 1 ? '' : 's'}) is held off-funnel and is in none of the figures on this dashboard — it is free practice for search traffic, not a step toward a GoodBlock. Export it with <strong>Pattern Lab items</strong> above.</p>`)}
+                    ${card('Data sources loaded', `${src('users', D.users.length)}${src('classrooms', D.classrooms.length)}${src('launches', D.launches.length)}${src('game_scores', D.scores.length)}${src('scenario_attempts', D.attempts.length)}${src('module_progress', D.progress.length)}${src('sessions', D.sessions.length)}${src('events', D.events.length)}${src('off-funnel sessions (Pattern Lab, Take the Bait)', D.offFunnel.sessions.length)}${src('take-the-bait (own query)', D.ttb.sessions.length)}${src('messages', D.messages.length)}${src('course_feedback', D.feedback.length)}<p class="text-[10px] text-slate-400 mt-3">Loaded ${D.loadedAt ? new Date(D.loadedAt).toLocaleString() : '—'}. Sessions and events are capped at the most recent 5,000 / 3,000. Pattern Lab and Take the Bait (${D.offFunnel.sessions.length} session${D.offFunnel.sessions.length === 1 ? '' : 's'}, ${D.offFunnel.events.length} event${D.offFunnel.events.length === 1 ? '' : 's'} in the shared window) are held off-funnel and are in none of the figures on this dashboard. Pattern Lab is free practice for search traffic; Take the Bait has its own page. Export it with <strong>Pattern Lab items</strong> above.</p>`)}
                 </div>
                 <div class="mt-4">${card('Delete a user\'s data', `
                     <p class="text-[11px] text-slate-500 mb-3">Permanently deletes a user's profile, scores, launches, progress, continuity bank, telemetry sessions/events, messages, feedback and recruit code. Use only to fulfil a deletion request — this cannot be undone. You can also do this from any user's profile drawer.</p>

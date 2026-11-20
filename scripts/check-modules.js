@@ -112,6 +112,15 @@ for (const m of REGISTRY) {
       if (!(m.hiddenReason && String(m.hiddenReason).trim().length > 30)) fail(`registry: hidden module "${m.id}" needs a \`hiddenReason\` saying why it is off every site surface`);
     }
   }
+  // A STREAMED game is visible and assignable but reports outside the core funnel (see the
+  // `stream` contract in the registry's _comment). Like `hidden`, it is a decision someone
+  // made, so it must say why; unlike `hidden`, it stays on every surface a teacher uses.
+  if (m.stream !== undefined) {
+    if (m.type !== 'game') fail(`registry: "${m.id}" has a \`stream\` but only games may report on their own stream`);
+    if (typeof m.stream !== 'string' || !m.stream.trim() || m.stream === 'core') fail(`registry: "${m.id}" \`stream\` must be a non-empty string other than 'core', got ${JSON.stringify(m.stream)}`);
+    if (m.hidden === true) fail(`registry: "${m.id}" is both hidden and streamed — pick one (hidden = off every surface; streamed = visible but off the funnel)`);
+    if (!(m.streamReason && String(m.streamReason).trim().length > 30)) fail(`registry: streamed game "${m.id}" needs a \`streamReason\` saying why it is outside the core funnel`);
+  }
   if (m.type !== 'game' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
   if (m.pack && !PACKS[m.pack]) fail(`registry: "${m.id}" has unknown pack "${m.pack}"`);
   if (m.retired) {
@@ -148,7 +157,11 @@ const games = REGISTRY.filter(m => m.type === 'game');
 const HIDDEN = REGISTRY.filter(m => m.hidden === true && !m.retired);
 const hiddenIds = new Set(HIDDEN.map(m => m.id));
 const visibleGames = games.filter(g => !hiddenIds.has(g.id));
-if (visibleGames.length !== 4) fail(`registry: expected the four standalone games, found ${visibleGames.length}`);
+// Streamed games (registry `stream`) are visible and assignable but outside the funnel; the
+// four funnel games are the ones that route into GoodBlocks and count in Insider's numbers.
+const streamedGames = visibleGames.filter(g => typeof g.stream === 'string' && g.stream.trim());
+const funnelGames = visibleGames.filter(g => !streamedGames.includes(g));
+if (funnelGames.length !== 4) fail(`registry: expected the four standalone funnel games, found ${funnelGames.length}`);
 
 // --- internal skill tags: a game must never route to nothing.
 // skill-routing.js falls back to the game's own default when a category matches no lab, so
@@ -280,6 +293,17 @@ for (const cfg of Object.values(PACKS)) {
   const m = src.match(/Telemetry\.init\(\{\s*module:\s*'([^']+)'/);
   if (m) modulePages[m[1]] = cfg.challengePage;
 }
+// A streamed game has an Insider COURSES row of its own (so it gets a page and a Steps row)
+// flagged offFunnel: true, which keeps it out of every core figure. The flag is checked in
+// both directions: a streamed game without it would be counted, and a flagged row that is
+// not a streamed game would silently drop a funnel module from the numbers.
+const offFunnelIds = new Set([...(coursesSrc || '').matchAll(/id:\s*'([^']+)'[^{}]*?offFunnel:\s*true/g)].map(m => m[1]));
+for (const g of streamedGames) {
+  modulePages[g.id] = GAME_PAGES[g.id];
+  if (!courses.find(c => c.id === g.id)) fail(`insider: streamed game "${g.id}" has no COURSES entry`);
+  else if (!offFunnelIds.has(g.id)) fail(`insider: COURSES "${g.id}" must carry offFunnel: true — it is a streamed game and must stay out of the core figures`);
+}
+for (const id of offFunnelIds) if (!streamedGames.find(g => g.id === id)) fail(`insider: COURSES "${id}" is flagged offFunnel but is not a streamed game in the registry`);
 for (const c of courses) {
   if (RETIRED_NO_LIVE_PAGE.includes(c.id)) continue;
   const page = modulePages[c.id];
@@ -301,6 +325,7 @@ for (const g of games) {
   const page = GAME_PAGES[g.id];
   const src = read(page);
   const isHidden = hiddenIds.has(g.id);
+  const isStreamed = streamedGames.includes(g);
   // Unlike a GoodBlock, a game's stepsTotal is its round size, which some games hold in a
   // named constant — accept either and resolve the constant, rather than forcing a magic
   // number into the call just to satisfy a regex.
@@ -315,7 +340,17 @@ for (const g of games) {
   // game without the resolver has a hardcoded end-screen destination; a hidden one that
   // loads it at all is one line away from routing a student into a GoodBlock from a
   // product that is not part of the funnel.
-  if (!isHidden && !/src="\/js\/skill-routing\.js"/.test(src)) fail(`${page}: does not load /js/skill-routing.js — its end-screen destination would stay hardcoded`);
+  if (isStreamed) {
+    // Off the funnel by its own declaration: it must SAY so at init (or its sessions land in
+    // 'core' and inflate the funnel), must not route into a GoodBlock, and Insider must not
+    // be counting its stream.
+    const init = (src.match(/Telemetry\.init\(\{[^}]*\}\)/) || [''])[0];
+    const st = (init.match(/stream:\s*'([^']+)'/) || [])[1];
+    if (st !== g.stream) fail(`${page}: streamed game "${g.id}" must pass stream: '${g.stream}' to Telemetry.init (found ${st ? `'${st}'` : 'none'}) — without it every session counts in the core funnel`);
+    if (/<script[^>]+src="\/js\/skill-routing\.js"/.test(src) || /SkillRouting\s*\./.test(src)) fail(`${page}: streamed game "${g.id}" uses /js/skill-routing.js — a game outside the funnel must not route students into a GoodBlock`);
+    if (new RegExp(`FUNNEL_STREAMS = \\[[^\\]]*'${g.stream}'`).test(read('public/insider/index.html'))) fail(`public/insider/index.html: FUNNEL_STREAMS counts '${g.stream}' — streamed game "${g.id}" would be inside the funnel metrics it is registered to stay out of`);
+  }
+  if (!isHidden && !isStreamed && !/src="\/js\/skill-routing\.js"/.test(src)) fail(`${page}: does not load /js/skill-routing.js — its end-screen destination would stay hardcoded`);
   if (isHidden && /<script[^>]+src="\/js\/skill-routing\.js"/.test(src)) fail(`${page}: hidden module "${g.id}" loads /js/skill-routing.js. A hidden module is outside the routing vocabulary and must never resolve to a GoodBlock — see its hiddenReason in the registry.`);
   if (isHidden && /SkillRouting\s*\./.test(src)) fail(`${page}: hidden module "${g.id}" calls SkillRouting — a hidden module must never resolve to a GoodBlock.`);
   // The retired collection must not come back, in a game or anywhere else.
