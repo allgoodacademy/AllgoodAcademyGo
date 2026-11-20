@@ -1,113 +1,122 @@
 /* Take the Bait: the rules. No DOM, so the balance can be simulated headless (node)
    as well as played. index.html reads this state and draws it.
 
-   THE LOOP
-   Your friends (your crew) stand at the bottom. Scam HQ, at the top, fires messages
-   down at them, one or two at a time. Tap a falling message and time stops while it
-   opens up; then decide:
-     - LET IT IN. A real message brings friends (+JOIN). A bait message drops hooks
-       that pull about a quarter of your crew away.
-     - BLOCK IT, then name the trick from two choices. Named right: the hook snaps,
-       +BONUS friends. Named wrong: still blocked, no bonus. Blocking a REAL message
-       means those friends never arrive (over-suspicion costs you).
-   A message nobody taps reaches the crew as if it was let in. Speed is never the
-   winning move: looking closer is free and stops time.
-   When every message is resolved, the crew charges Scam HQ. Guards fight one for one;
-   the crew wins if anyone is left standing. */
-import {LEVELS,EXTRA,TECH} from "./content.js?v=20261121a";
+   THE GAME (pure Mob Control while you play; the learning comes after each level)
+   - Your cannon sits at the bottom. Hold to fire a stream of your crew up the field;
+     drag (or ← →) to aim.
+   - Gate rows slide across the field. A blue gate multiplies whoever passes through it
+     (×2, ×3). A red gate destroys them. Aim the stream through the blue ones.
+   - Scam HQ sits at the top with a health bar. It sends waves of spam bots down at you.
+     Crew and bots destroy each other one for one.
+   - Crew that reach Scam HQ knock its health down. Empty it to win.
+   - Bots that reach your cannon cost hearts (one heart per HURT_PER_HEART bots).
+     Three hearts gone and the level is lost.
+   After each level: three Real or Bait? messages from that level's content bank, and
+   Jodi's recap of each one (that part lives in index.html).
 
-export const START_CREW=10,JOIN=4,BONUS=2,HOOK_FRAC=0.2,MIN_HOOK=2,GUARD_SHARE=0.25;
-export const SPEEDS={relaxed:0.7,normal:1,fast:1.3};
-export const FALL_S=11,SPAWN_S=3.4;
-export const TECH_KEYS=Object.keys(TECH);
+   Coordinates are normalised: x 0..1 across, y 0..1 down the field. `aspect` (width /
+   height of the field on screen) keeps collision distances round on any screen. A unit
+   or bot can stand for several (n>1) once the field is crowded, so the number of
+   objects stays capped; every rule counts n, never objects. */
+export const SPEEDS={relaxed:0.75,normal:1,fast:1.3};
+export const HEARTS=3,HURT_PER_HEART=5;
+export const CANNON_Y=0.9,BASE_Y=0.12,FIRE_RATE=7,UNIT_SPEED=0.5,CAP=320;
 
-/* A level's message pairs, each shuffled left/right. Levels 1–4 use their own five
-   pairs; the Mix draws 6 from those twenty, weighted toward techniques the player has
-   taken the bait on, then adds both EXTRA pairs. */
-export function buildPairs(L,techStats,rng=Math.random){
-  const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-  let src,ids;
-  if(LEVELS[L].gates){src=LEVELS[L].gates.slice();ids=src.map((_,i)=>"L"+(L+1)+"-"+(i+1));}
-  else{
-    const pool=[];LEVELS.forEach((l,li)=>l.gates&&l.gates.forEach((p,pi)=>pool.push({p,id:"L"+(li+1)+"-"+(pi+1)})));
-    const weight=p=>p.reduce((w,c)=>w+(c.r?0:((techStats[c.k]&&techStats[c.k].bait)||0)*10+1),0)+rng();
-    const picked=shuffle(pool.map(o=>({...o,w:weight(o.p)})).sort((a,b)=>b.w-a.w).slice(0,6));
-    src=picked.map(o=>o.p).concat(EXTRA);ids=picked.map(o=>o.id).concat(EXTRA.map((_,i)=>"X-"+(i+1)));
+/* Five levels. Each gate: x centre at rest (0..1), w width (0..1), op 'x' (multiply by v)
+   or 'kill'. A row slides by `amp` at `spd` radians per second. */
+export const LEVEL_DEFS=[
+  {name:"The Lobby",hp:700,waveEvery:4.5,wave0:8,waveGrow:2.5,waveCap:34,enemySpeed:0.1,
+    rows:[{y:0.62,amp:0.18,spd:0.7,gates:[{x:0.5,w:0.34,op:"x",v:2}]},
+          {y:0.4,amp:0.22,spd:0.55,gates:[{x:0.5,w:0.3,op:"x",v:2}]}]},
+  {name:"The Feed",hp:800,waveEvery:5,wave0:8,waveGrow:2.2,waveCap:30,enemySpeed:0.1,
+    rows:[{y:0.64,amp:0.2,spd:0.8,gates:[{x:0.3,w:0.28,op:"x",v:2},{x:0.72,w:0.24,op:"kill"}]},
+          {y:0.42,amp:0.24,spd:0.6,gates:[{x:0.5,w:0.26,op:"x",v:3}]}]},
+  {name:"The Group Chat",hp:950,waveEvery:4.8,wave0:9,waveGrow:2.4,waveCap:34,enemySpeed:0.105,
+    rows:[{y:0.66,amp:0.22,spd:0.9,gates:[{x:0.28,w:0.26,op:"x",v:2},{x:0.72,w:0.26,op:"x",v:2}]},
+          {y:0.5,amp:0.26,spd:1.1,gates:[{x:0.5,w:0.22,op:"kill"}]},
+          {y:0.34,amp:0.2,spd:0.7,gates:[{x:0.5,w:0.26,op:"x",v:3}]}]},
+  {name:"The Shop",hp:1100,waveEvery:4.6,wave0:10,waveGrow:2.6,waveCap:38,enemySpeed:0.11,
+    rows:[{y:0.66,amp:0.24,spd:1,gates:[{x:0.3,w:0.24,op:"x",v:3},{x:0.72,w:0.24,op:"kill"}]},
+          {y:0.48,amp:0.26,spd:1.2,gates:[{x:0.3,w:0.22,op:"kill"},{x:0.72,w:0.24,op:"x",v:2}]},
+          {y:0.33,amp:0.22,spd:0.8,gates:[{x:0.5,w:0.24,op:"x",v:2}]}]},
+  {name:"The Mix",hp:680,waveEvery:4.8,wave0:9,waveGrow:2.3,waveCap:34,enemySpeed:0.105,
+    rows:[{y:0.68,amp:0.26,spd:1.1,gates:[{x:0.28,w:0.22,op:"x",v:2},{x:0.72,w:0.22,op:"kill"}]},
+          {y:0.52,amp:0.28,spd:1.3,gates:[{x:0.3,w:0.2,op:"kill"},{x:0.7,w:0.24,op:"x",v:3}]},
+          {y:0.36,amp:0.24,spd:0.9,gates:[{x:0.5,w:0.24,op:"x",v:2}]}]}];
+
+export class Battle{
+  constructor({L,speed="normal",rng=Math.random,aspect=0.56}){
+    this.L=L;this.def=LEVEL_DEFS[L];this.rng=rng;this.mul=SPEEDS[speed]||1;this.aspect=aspect;
+    this.hp0=this.hp=this.def.hp;this.cx=0.5;this.firing=false;this.fireAcc=0;
+    this.units=[];this.enemies=[];this.dmg=0;this.t=0;this.over=null;this.events=[];
+    this.wave=0;this.waveT=3;this.spawnQ=[];this.ph=this.def.rows.map(()=>rng()*6.28);
+    this.stats={fired:0,multiplied:0,lostToRed:0,botsStopped:0,botsThrough:0,hits:0};
   }
-  return src.map((pair,i)=>({id:ids[i],cards:rng()<0.5?[pair[0],pair[1]]:[pair[1],pair[0]]}));
-}
-
-/* Every card of every pair becomes one falling message, pair by pair. */
-export function buildMessages(pairs){
-  const out=[];pairs.forEach(p=>p.cards.forEach((card,j)=>out.push({id:p.id+(j?"b":"a"),pairId:p.id,card})));
-  return out;
-}
-
-/* Two trick names to choose from when blocking: the right one, and one other. */
-export function trickChoices(card,rng=Math.random){
-  if(card.r){const a=TECH_KEYS[Math.floor(rng()*TECH_KEYS.length)];let b=a;while(b===a)b=TECH_KEYS[Math.floor(rng()*TECH_KEYS.length)];return[a,b];}
-  let other=card.k;while(other===card.k)other=TECH_KEYS[Math.floor(rng()*TECH_KEYS.length)];
-  return rng()<0.5?[card.k,other]:[other,card.k];
-}
-
-export function outcomeOf(card,decision){
-  if(decision==="let")return card.r?"trusted":"bait";
-  return card.r?"over_scroll":"spotted";
-}
-
-export class Level{
-  constructor({L,messages,speed="normal",rng=Math.random}){
-    this.L=L;this.lv=LEVELS[L];this.rng=rng;this.mul=SPEEDS[speed]||1;
-    this.queue=messages.slice();this.total=messages.length;
-    this.falling=[];this.log=[];this.crew=START_CREW;this.t=0;this.spawnT=1.2;
-    this.maxOnScreen=L<2?2:3;this.events=[];this.phase="play";this.nextId=0;
-    const reals=messages.filter(m=>m.card.r).length,baits=messages.length-reals;
-    // Guards sit between "block everything" (START + BONUS per bait, never trusting a
-    // real message) and perfect play (that plus JOIN per real message): blocking
-    // everything always falls short; trusting the real ones is what wins.
-    this.guards=START_CREW+BONUS*baits+Math.ceil(GUARD_SHARE*JOIN*reals);
-  }
-  get resolved(){return this.log.length;}
-  get fallTime(){return FALL_S/this.mul;}
+  get hearts(){return Math.max(0,HEARTS-this.dmg/HURT_PER_HEART);}
+  get count(){return this.units.length+this.enemies.length;}
+  /* Where each gate is right now (x is its centre). */
+  gates(){return this.def.rows.map((r,i)=>{const off=Math.sin(this.t*r.spd+this.ph[i])*r.amp;
+    return{y:r.y,gates:r.gates.map(g=>({...g,cx:Math.min(1-g.w/2,Math.max(g.w/2,g.x+off))}))};});}
 
   step(dt){
-    if(this.phase!=="play"||dt<=0)return;
-    this.t+=dt;this.spawnT-=dt;
-    if(this.spawnT<=0&&this.queue.length&&this.falling.length<this.maxOnScreen){
-      const used=this.falling.filter(f=>f.y<0.4).map(f=>f.lane);
-      const free=[0,1,2].filter(l=>!used.includes(l));
-      const lane=free.length?free[Math.floor(this.rng()*free.length)]:Math.floor(this.rng()*3);
-      const m=this.queue.shift();this.falling.push({key:++this.nextId,msg:m,lane,y:0});
-      this.spawnT=SPAWN_S/this.mul;this.events.push({type:"spawn",key:this.nextId});
-    }
-    for(const f of this.falling.slice()){f.y+=dt/this.fallTime;if(f.y>=1)this.decide(f.key,"let",null,false);}
-    if(!this.queue.length&&!this.falling.length)this.startCharge();
-  }
+    if(this.over||dt<=0)return;
+    const r=this.rng;this.t+=dt;
+    if(this.firing){this.fireAcc+=dt*FIRE_RATE;while(this.fireAcc>=1){this.fireAcc-=1;this.units.push({x:this.cx+(r()-0.5)*0.025,y:CANNON_Y-0.03,n:1,mask:0});this.stats.fired++;this.events.push({type:"fire"});}}
+    else this.fireAcc=Math.min(this.fireAcc,0.99);
 
-  /* Resolve one falling message. `named` is the trick picked when blocking. */
-  decide(key,decision,named,looked=true){
-    const i=this.falling.findIndex(f=>f.key===key);if(i<0)return null;
-    const f=this.falling.splice(i,1)[0],card=f.msg.card,outcome=outcomeOf(card,decision);
-    let delta=0,namedRight=null;
-    if(outcome==="trusted")delta=JOIN;
-    else if(outcome==="bait")delta=-Math.min(this.crew,Math.max(MIN_HOOK,Math.round(this.crew*HOOK_FRAC)));
-    else if(outcome==="spotted"){namedRight=named===card.k;if(namedRight)delta=BONUS;}
-    this.crew=Math.max(0,this.crew+delta);
-    const entry={key,msg:f.msg,card,decision,outcome,named,namedRight,delta,looked,lane:f.lane,y:f.y};
-    this.log.push(entry);this.events.push({type:"resolve",entry});
-    if(!this.queue.length&&!this.falling.length)this.startCharge();
-    return entry;
-  }
-  startCharge(){if(this.phase!=="play")return;this.phase="charge";this.won=this.crew>this.guards;this.left=Math.max(0,this.crew-this.guards);this.events.push({type:"charge"});}
+    // waves of spam bots from Scam HQ: bigger every wave, capped per level
+    this.waveT-=dt;
+    if(this.waveT<=0){this.wave++;this.waveT=this.def.waveEvery/this.mul;
+      const size=Math.min(this.def.waveCap,Math.round(this.def.wave0+(this.wave-1)*this.def.waveGrow));
+      for(let i=0;i<size;i++)this.spawnQ.push(i*0.07);this.events.push({type:"wave",n:size,wave:this.wave});}
+    for(let i=this.spawnQ.length-1;i>=0;i--){this.spawnQ[i]-=dt;if(this.spawnQ[i]<=0){this.spawnQ.splice(i,1);
+      this.enemies.push({x:0.5+(r()-0.5)*0.28,y:BASE_Y+0.04,n:this.count>=CAP?2:1,ph:r()*6.28});}}
 
-  summary(){
-    const items=this.log;
-    const baits=items.filter(e=>!e.card.r),reals=items.filter(e=>e.card.r);
-    const baitsLetIn=baits.filter(e=>e.outcome==="bait").length;
-    const rightCalls=items.filter(e=>e.outcome==="trusted"||e.outcome==="spotted").length;
-    return{items,lures:baits.length,dodged:baits.length-baitsLetIn,baitsLetIn,
-      realsTrusted:reals.filter(e=>e.outcome==="trusted").length,reals:reals.length,
-      rightCalls,named:baits.filter(e=>e.namedRight).length,
-      stars:this.won?(baitsLetIn===0?3:baitsLetIn===1?2:1):0};
+    // crew: up the field, through gates, into Scam HQ
+    const rows=this.gates();
+    for(let i=this.units.length-1;i>=0;i--){const u=this.units[i],y0=u.y;u.y-=UNIT_SPEED*dt;
+      for(let ri=0;ri<rows.length;ri++){const row=rows[ri];if(u.mask&(1<<ri))continue;if(!(y0>row.y&&u.y<=row.y))continue;u.mask|=1<<ri;
+        const g=row.gates.find(g=>Math.abs(u.x-g.cx)<=g.w/2);if(!g)continue;
+        if(g.op==="kill"){this.units.splice(i,1);this.stats.lostToRed+=u.n;this.events.push({type:"red",x:u.x,y:row.y,n:u.n});break;}
+        const add=u.n*(g.v-1);this.stats.multiplied+=add;
+        if(u.n===1&&this.count+add<=CAP){for(let k=0;k<add;k++)this.units.push({x:Math.min(0.98,Math.max(0.02,u.x+(r()-0.5)*0.05)),y:u.y-r()*0.02,n:1,mask:u.mask});}
+        else u.n*=g.v;
+        this.events.push({type:"mult",x:g.cx,y:row.y,v:g.v});}
+      if(!this.units[i]||this.units[i]!==u)continue;
+      if(u.y<=BASE_Y+0.02){this.units.splice(i,1);this.hp-=u.n;this.stats.hits+=u.n;this.events.push({type:"hq",x:u.x,n:u.n});
+        if(this.hp<=0){this.hp=0;return this.finish(true);}}}
+
+    // bots: down at the cannon, drifting toward it
+    const es=this.def.enemySpeed*this.mul;
+    for(let i=this.enemies.length-1;i>=0;i--){const e=this.enemies[i];e.y+=es*dt;
+      const d=this.cx-e.x;e.x+=Math.sign(d)*Math.min(Math.abs(d),0.06*this.mul*dt);
+      if(e.y>=CANNON_Y){this.enemies.splice(i,1);this.dmg+=e.n;this.stats.botsThrough+=e.n;this.events.push({type:"hurt",x:e.x,n:e.n});
+        if(this.dmg>=HEARTS*HURT_PER_HEART)return this.finish(false);}}
+
+    this.collide();
   }
+  collide(){
+    const R=0.022,cell=new Map(),key=(x,y)=>Math.floor(y/0.04)*100+Math.floor(x*this.aspect/0.04);
+    for(const e of this.enemies){const k=key(e.x,e.y);let a=cell.get(k);if(!a)cell.set(k,a=[]);a.push(e);}
+    let any=false;
+    for(const u of this.units){if(u.n<=0)continue;const k0=key(u.x,u.y);
+      for(let dy=-1;dy<=1&&u.n>0;dy++)for(let dx=-1;dx<=1&&u.n>0;dx++){const a=cell.get(k0+dy*100+dx);if(!a)continue;
+        for(const e of a){if(e.n<=0)continue;const ddx=(e.x-u.x)*this.aspect,ddy=e.y-u.y;if(ddx*ddx+ddy*ddy>R*R*4)continue;
+          const k=Math.min(u.n,e.n);u.n-=k;e.n-=k;this.stats.botsStopped+=k;any=true;this.events.push({type:"pop",x:(u.x+e.x)/2,y:(u.y+e.y)/2});if(u.n<=0)break;}}}
+    if(any){this.units=this.units.filter(u=>u.n>0);this.enemies=this.enemies.filter(e=>e.n>0);}
+  }
+  finish(won){if(this.over)return;this.over=won?"win":"lose";this.firing=false;this.events.push({type:won?"win":"lose"});}
+  /* Stars for the battle: a win with no hearts lost is 3. */
+  get stars(){if(this.over!=="win")return 0;const h=this.hearts;return h>=HEARTS?3:h>=HEARTS-1?2:1;}
+}
+
+/* The Real or Bait? round after each level: three messages from that level's own content
+   bank (the Mix draws from all of them), always at least one real and one bait. */
+export function quizItems(LEVELS,EXTRA,L,rng=Math.random){
+  const pairs=LEVELS[L].gates||LEVELS.flatMap(l=>l.gates||[]).concat(EXTRA);
+  const cards=pairs.flat();
+  const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+  const reals=shuffle(cards.filter(c=>c.r)),baits=shuffle(cards.filter(c=>!c.r));
+  const pick=[reals[0],baits[0],rng()<0.5?reals[1]:baits[1]].filter(Boolean);
+  return shuffle(pick);
 }

@@ -274,7 +274,7 @@
                 // Telemetry.init and its Steps-per-module row like every other module.
                 id: 'take-the-bait', name: 'Take the Bait', category: 'Game',
                 gameNames: ['Take the Bait'], launchNames: [],
-                stepsTotal: 10, stepLabel: 'messages answered', stepBucket: 2, scored: true, offFunnel: true,
+                stepsTotal: 3, stepLabel: 'Real or Bait answers', stepBucket: 1, scored: true, offFunnel: true,
                 isComplete: d => d.completed === true,
                 scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
                 progressStep: () => 0,
@@ -879,17 +879,17 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     ${tile('Plays', sessions.length, `${players} player${players === 1 ? '' : 's'} · one session per level`)}
                     ${tile('Levels finished', ends.length, `${ends.filter(e => e.meta.won).length} won`)}
-                    ${tile('Bait blocked', withBait.length ? pct(avoided, withBait.length) + '%' : '—', `${avoided} of ${withBait.length} bait messages`)}
+                    ${tile('Bait spotted', withBait.length ? pct(avoided, withBait.length) + '%' : '—', `${avoided} of ${withBait.length} bait messages`)}
                     ${tile('Real messages trusted', withReal.length ? pct(trusted, withReal.length) + '%' : '—', `${trusted} of ${withReal.length} real messages`)}
                 </div>
                 <div class="grid lg:grid-cols-2 gap-4 mb-6">
                     ${card('Completion by level', `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Level</th><th class="${th}">Started</th><th class="${th}">Finished</th><th class="${th}">Won</th><th class="${th}">Win rate</th><th class="${th}">Median time</th></tr></thead><tbody>${lv.map(r => `<tr class="border-t border-slate-50"><td class="py-1.5 font-bold text-slate-700">Level ${r.n}</td><td class="text-right px-2">${r.started}</td><td class="text-right px-2">${r.finished}</td><td class="text-right px-2">${r.won}</td><td class="text-right px-2 font-bold">${r.finished ? r.winRate + '%' : '—'}</td><td class="text-right px-2">${r.medDur ? fmtDuration(r.medDur) : '—'}</td></tr>`).join('')}</tbody></table>`)}
                     ${card('Discernment', `<div class="space-y-2 text-xs">
-                        <div class="flex justify-between"><span class="text-slate-500">Bait blocked (of bait messages)</span><span class="font-bold">${withBait.length ? pct(avoided, withBait.length) + '%' : '—'}</span></div>
-                        <div class="flex justify-between"><span class="text-slate-500">Real messages let in (of real messages)</span><span class="font-bold">${withReal.length ? pct(trusted, withReal.length) + '%' : '—'}</span></div>
-                        <div class="flex justify-between"><span class="text-slate-500">Over-caution: blocked a real message</span><span class="font-bold">${bothReal ? pct(overScroll, bothReal) + '%' : '—'} <span class="text-slate-400 font-normal">(${overScroll} of ${bothReal})</span></span></div>
-                        <div class="flex justify-between"><span class="text-slate-500">Messages opened (looked closer) before deciding</span><span class="font-bold">${choices.length ? pct(checkPairs, choices.length) + '%' : '—'}</span></div>
-                        <p class="text-[10px] text-slate-400 pt-2 border-t border-slate-100">Each message is one decision: let it in or block it. A message that reaches the crew untouched counts as let in. Both numbers matter: blocking every lure by never trusting anything is not discernment.</p></div>`)}
+                        <div class="flex justify-between"><span class="text-slate-500">Bait spotted (called it bait)</span><span class="font-bold">${withBait.length ? pct(avoided, withBait.length) + '%' : '—'}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Real messages trusted (called it real)</span><span class="font-bold">${withReal.length ? pct(trusted, withReal.length) + '%' : '—'}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Over-caution: called a real message bait</span><span class="font-bold">${bothReal ? pct(overScroll, bothReal) + '%' : '—'} <span class="text-slate-400 font-normal">(${overScroll} of ${bothReal})</span></span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Battles won (of levels finished)</span><span class="font-bold">${ends.length ? pct(ends.filter(e => e.meta.won).length, ends.length) + '%' : '—'}</span></div>
+                        <p class="text-[10px] text-slate-400 pt-2 border-t border-slate-100">Each level is a Mob Control battle followed by three Real or Bait? messages from that level's content; these figures come from those answers. Both numbers matter: calling everything bait is not discernment.</p></div>`)}
                 </div>
                 <div class="grid lg:grid-cols-2 gap-4 mb-6">
                     ${card('Bait rate by technique · first exposure vs later', `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Technique</th><th class="${th}">First time</th><th class="${th}">Later</th></tr></thead><tbody>${techRows.map(r => `<tr class="border-t border-slate-50"><td class="py-1.5 font-bold text-slate-700">${esc(TTB_TECH[r.k])}</td><td class="text-right px-2">${r.firstN ? pct(r.firstBait, r.firstN) + '%' : '—'} <span class="text-slate-400">(${r.firstBait}/${r.firstN})</span></td><td class="text-right px-2">${r.laterN ? pct(r.laterBait, r.laterN) + '%' : '—'} <span class="text-slate-400">(${r.laterBait}/${r.laterN})</span></td></tr>`).join('')}</tbody></table><p class="text-[10px] text-slate-400 mt-2">Per player: the first message in which they met a technique, against every later one. A falling rate means the tell is landing.</p>`)}
