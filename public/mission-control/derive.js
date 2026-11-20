@@ -234,6 +234,10 @@ export const GAME_REGISTRY = {
     'before-you-send':  { name: 'Before You Send', icon: '✉️', url: '/educational-games/before-you-send/' },
     'the-rumor-mill':   { name: 'The Rumor Mill', icon: '🌀', url: '/educational-games/the-rumor-mill/' },
     'money-moves':      { name: 'Money Moves', icon: '💸', url: '/educational-games/money-moves/' },
+    // Off the core funnel (its own telemetry stream) but assignable like the others. Its
+    // summary uses the same scenariosPlayed/correct/categories shape — Real or Bait answers,
+    // and lures seen/dodged per scam technique — plus a `ttb` block read below.
+    'take-the-bait':    { name: 'Take the Bait', icon: '🎣', url: '/educational-games/takethebait/', scoreLabel: 'Real or Bait', categoryNoun: 'technique', noDeeperLink: true },
 };
 
 /* Pull the four standalone games out of a student's telemetry session documents.
@@ -267,6 +271,7 @@ export function gameSessionsFromTelemetry(sessions = []) {
             correct: summary.correct,
             categories: summary.categories || null,
             clickedDeeperLink: summary.clickedDeeperLink === true,
+            ttb: summary.ttb && typeof summary.ttb === 'object' ? summary.ttb : null,
         });
     }
     return out;
@@ -336,6 +341,16 @@ export function summarizeGameSessions(sessions) {
             id: s.game, meta, plays: 0, bestPct: null, lastPlayed: 0,
             categoryTotals: {}, deeperLinkClicks: 0, sessions: [],
         };
+        // Take the Bait: one session per level played. Levels won is a set (replaying a
+        // won level does not count twice); lures are summed; techniques taken are a union.
+        if (s.ttb) {
+            const t = g.ttb || (g.ttb = { levelsWon: [], luresSeen: 0, luresDodged: 0, baitTechniques: [] });
+            if (s.ttb.won && typeof s.ttb.level === 'number' && !t.levelsWon.includes(s.ttb.level)) t.levelsWon.push(s.ttb.level);
+            t.luresSeen += Number(s.ttb.luresSeen) || 0;
+            t.luresDodged += Number(s.ttb.luresDodged) || 0;
+            for (const k of (Array.isArray(s.ttb.baitTechniques) ? s.ttb.baitTechniques : [])) if (!t.baitTechniques.includes(k)) t.baitTechniques.push(k);
+            t.levelsWon.sort((a, b) => a - b);
+        }
         g.plays += 1;
         if (pct != null) g.bestPct = g.bestPct == null ? pct : Math.max(g.bestPct, pct);
         if (playedAtMs > g.lastPlayed) g.lastPlayed = playedAtMs;
@@ -347,6 +362,7 @@ export function summarizeGameSessions(sessions) {
             playedAt: playedAtMs,
             categories: cats || null,
             clickedDeeperLink: s.clickedDeeperLink === true,
+            ttb: s.ttb || null,
         });
         byGame[s.game] = g;
     }

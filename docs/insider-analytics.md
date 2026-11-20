@@ -41,6 +41,34 @@ which is what every figure on Insider is computed from. A module that passes `st
 |---|---|---|
 | `core` | the four games, every GoodBlock, every Challenge | yes — this is the funnel |
 | `pattern-lab` | Pattern Lab (`/educational-games/pattern-lab/`) | **no** — held in `D.offFunnel` |
+| `take-the-bait` | Take the Bait (`/educational-games/takethebait/`) | **no** — its own Insider page, from its own queries |
+
+**Take the Bait** is a Mob Control-style arcade game, visible on the games hub and assignable
+in Mission Control, but on its own stream so holiday-scale play cannot skew the core funnel.
+The registry marks it with `stream` (see the `stream` contract in
+`public/data/modules-registry.json`); its Insider `COURSES` row carries `offFunnel: true`,
+which lifts it out of `COURSES` before any core figure is computed, and its `game_scores`
+rows (gameName `Take the Bait`) are split into `D.offFunnel.scores` at load. The Take the
+Bait page reads its sessions and events through two `where('module', '==', 'take-the-bait')`
+queries of its own, so it stays complete however busy the shared windows are.
+
+What it records (one session per level played):
+
+| Event | When | Meta |
+|---|---|---|
+| `step` | a message pair (round) resolves | step = pairs resolved this level |
+| `choice` | a pair resolves and the player shot through it | `level, round, pairId, pick ('left'\|'gap'\|'right'), pickedReal, otherReal, cardsReal, techniques, technique, outcome ('bait'\|'spotted'\|'trusted'\|'smart_scroll'\|'safe_scroll'\|'over_scroll'), usedCheck` |
+| `real_or_bait` | each end-of-level quiz answer | `level, itemId, answeredReal, isReal, correct, technique` |
+| `level_start` / `level_end` | level start / results | `level, won, heartsLeft, baitsTaken, luresSeen, realOrBaitScore, checksUsed, speedSetting, durationMs` |
+| `module_complete` | Level 5 won | — |
+
+Like Pattern Lab it never writes `category` on a choice (techniques are not in the routing
+vocabulary; the field is `technique`) and never loads `/js/skill-routing.js`. The session
+`summary` uses the four games' shape (`scenariosPlayed`/`correct` = Real or Bait answers,
+`categories` = lures seen/dodged per technique) plus a `ttb` block, which is what Mission
+Control's Agent Detail reads. A signed-in student (a profile with a 13+ account, Recruit Code
+or Task Force membership) also gets `users/{uid}/game_scores/{visitId}`; a guest gets
+telemetry only, with no name and no free text.
 
 Pattern Lab is a free CogAT-style practice diagnostic published for parents arriving from
 search. It is not a step toward a GoodBlock and its visitors did not come from the dashboard,
@@ -87,6 +115,7 @@ the moments that matter. Steps per module:
 | Where You Say It | cases reached | 6 |
 | The Cost of Later | cases reached | 6 |
 | Room to Think Challenge | scenarios answered | 24 |
+| Take the Bait | message pairs resolved | 5 |
 
 The table above is hand-written but no longer hand-*checked*: `node scripts/check-modules.js`
 verifies every row against Insider's `COURSES` and against the shared registry, and fails on a

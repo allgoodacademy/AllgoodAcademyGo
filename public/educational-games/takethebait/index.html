@@ -20,6 +20,14 @@ window.TTB_3D=(function(){try{
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js","three/addons/":"./vendor/three/addons/"}}</script>
 <link rel="modulepreload" href="./vendor/three/three.module.min.js">
+<!-- First-party learning telemetry, same pipe as every module (see docs/insider-analytics.md).
+     Firebase (gstatic + Firestore) is the only thing these talk to. Tagged
+     stream: 'take-the-bait' so these sessions stay out of Insider's core funnel, like
+     Pattern Lab. No third-party or ad tracking of any kind.
+     DELIBERATELY NOT LOADED: /js/skill-routing.js — this game has its own stream and does
+     not route into a GoodBlock (scripts/check-modules.js asserts this). -->
+<script type="module" src="/js/auth-core.js"></script>
+<script type="module" src="/js/telemetry.js"></script>
 <style>
 /* Short local names, sourced from /assets/css/design-tokens.css (no values restated here). */
 :root{--teal:var(--color-teal);--teal-d:var(--color-teal-deep);--teal-w:var(--color-teal-wash);--orange:var(--color-orange);--orange-d:var(--color-orange-deep);--cream:var(--color-cream);--cream-b:var(--color-cream-border);--ink:var(--color-ink);--ink-s:var(--color-ink-soft);--disp:var(--font-display);--ui:var(--font-ui)}
@@ -68,6 +76,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--cream);font-fami
 #hint .hand{width:30px;height:30px;margin:0 auto 6px;border-radius:50%;background:var(--teal);animation:swipe 1.4s ease-in-out infinite}
 @keyframes swipe{0%,100%{transform:translateX(-50px)}50%{transform:translateX(50px)}}
 #hint small{display:block;font-size:12px;font-weight:400;color:var(--ink-s)}
+#banner{position:fixed;left:50%;bottom:19%;transform:translateX(-50%);text-align:center;pointer-events:none;background:rgba(23,39,44,.88);color:#fff;border-radius:18px;padding:12px 22px 10px;min-width:min(340px,86vw);animation:bannerIn .35s ease-out}
+#banner b{display:block;font-family:var(--disp);font-size:26px;line-height:1.1}
+#banner span{display:block;font-size:13px;font-weight:700;color:#F6A57F;margin-top:4px;letter-spacing:.3px}
+@keyframes bannerIn{from{transform:translate(-50%,10px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#hurt{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 90px 30px rgba(211,71,22,.55);opacity:0;transition:opacity .35s}
+#hurt.on{opacity:1;transition:none}
+.hearts.shake{animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 #freeze{position:fixed;left:50%;top:58px;transform:translateX(-50%);background:var(--ink);color:#fff;font-weight:700;font-size:13px;border-radius:99px;padding:6px 14px;pointer-events:none;letter-spacing:.5px}
 #jodi{position:fixed;left:50%;top:58px;transform:translateX(-50%);width:min(480px,calc(100% - 20px));display:flex;gap:12px;align-items:flex-start;background:var(--cream);border:1px solid var(--cream-b);border-radius:20px;padding:12px 16px 12px 10px;box-shadow:0 10px 30px rgba(74,53,32,.18);text-align:left;animation:pop .28s ease-out;cursor:pointer;z-index:5}
 @keyframes pop{from{transform:translate(-50%,-14px) scale(.94);opacity:0}to{transform:translate(-50%,0) scale(1);opacity:1}}
@@ -120,6 +136,7 @@ h2{margin:0 0 4px;font-family:var(--disp);font-size:26px;font-weight:700;line-he
 
 <div id="hud" class="hide">
   <span class="pill" id="hudL">1 · The Lobby</span>
+  <span class="pill" id="hudR">Message 1/5</span>
   <div class="hq" aria-label="Scam HQ health"><span>SCAM HQ</span><div class="bar"><i id="hqBar"></i></div></div>
   <div class="hearts" id="hearts" aria-label="Hearts"></div>
   <button class="ib" id="pauseBtn" aria-label="Pause">II</button>
@@ -127,6 +144,8 @@ h2{margin:0 0 4px;font-family:var(--disp);font-size:26px;font-weight:700;line-he
 <button class="btn alt hide" id="checkBtn" aria-label="Check the messages (C)">Check ×3</button>
 <div id="hint" class="hide"><div class="hand"></div>Hold to fire, drag to aim<small>or hold Space and use ← →</small></div>
 <div id="freeze" class="hide">CHECKING… time is frozen</div>
+<div id="banner" class="hide"><b id="bannerT"></b><span id="bannerS"></span></div>
+<div id="hurt"></div>
 
 <div id="jodi" class="hide" role="status">
   <img id="jimg" alt="Jodi" src="/assets/jodi/jodi-concerned.svg">
@@ -188,7 +207,7 @@ h2{margin:0 0 4px;font-family:var(--disp);font-size:26px;font-weight:700;line-he
 
 <script type="module">
 import {TECH,OPEN,LEVELS,SPEED} from "./content.js";
-import {Game,buildPairs,HW,HQZ,GZ,GATE_W,HEARTS,PER_HEART,CHECKS,SPEEDS} from "./game.js";
+import {Game,buildPairs,HW,HQZ,GZ,GATE_W,HEARTS,PER_HEART,CHECKS,SPEEDS,INTRO_S} from "./game.js";
 if(window.TTB_3D!=="ok")throw new Error("no 3D");
 const fail=e=>{window.showNo3D("failed");throw e;};
 
@@ -225,6 +244,40 @@ const sfx={
   lose(){[392,330,262].forEach((f,i)=>tone(f,0.3,"triangle",0.1,0,i*0.14));}};
 function buzz(ms){try{if(navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
 function setMute(m){muted=m;save.muted=m;persist();$("mute1").textContent=$("mute2").textContent="Sound: "+(m?"off":"on");}
+
+/* ---------- telemetry (first-party: /js/telemetry.js → Firestore, nothing else) ----------
+   One telemetry session per level played (Telemetry.restart() between levels), on its own
+   stream so Insider keeps it out of the core funnel. A guest gets an anonymous Firebase
+   session (no profile, no name) so their play still counts; a signed-in student also gets
+   a users/{uid}/game_scores/{visitId} row, like the other games. No free text is sent. */
+const VISIT_ID=window.sessionId=window.sessionId||("ttb_"+Date.now()+"_"+Math.floor(Math.random()*1e4));
+const TM={started:false,levels:0,visit:{robCorrect:0,robTotal:0,won:new Set()}};
+const T_=()=>(TM.started&&window.Telemetry)?window.Telemetry:null;
+function initTelemetry(tries){
+  if(window.Telemetry&&window.AuthCore){
+    if(TM.started)return;TM.started=true;
+    window.Telemetry.init({ module: 'take-the-bait', gameName: 'Take the Bait', stepsTotal: 5, stream: 'take-the-bait' });
+    try{const c=window.AuthCore;if(c.anonymousSessionOnly)c.anonymousSessionOnly().catch(()=>{});}catch(e){}
+    return;}
+  if((tries||0)>200)return;setTimeout(()=>initTelemetry((tries||0)+1),50);}
+initTelemetry(0);
+async function saveGameScore(){
+  try{
+    const c=window.AuthCore,u=c&&c.auth&&c.auth.currentUser;if(!u)return;
+    const acct=c.getAccount?await c.getAccount(u.uid):null;
+    // A signed-in student has a profile: a 13+ account, a Recruit Code, or a Task Force
+    // membership. A bare anonymous session (a guest) gets telemetry only.
+    if(!acct||!(!u.isAnonymous||acct.recruitCode||acct.classroomCode))return;
+    const {doc,setDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+    const v=TM.visit,won=[...v.won].sort((a,b)=>a-b);
+    await setDoc(doc(c.db,"artifacts",c.appId,"users",u.uid,"game_scores",VISIT_ID),{
+      gameName:"Take the Bait",
+      percentage:v.robTotal?Math.round(v.robCorrect/v.robTotal*100):0,
+      realOrBaitCorrect:v.robCorrect,realOrBaitTotal:v.robTotal,
+      levelsWon:won,levelsWonCount:won.length,completed:won.includes(5),
+      lastUpdated:serverTimestamp()},{merge:true});
+  }catch(e){console.warn("[TTB] game_scores write skipped",e);}
+}
 
 /* ---------- Three.js ---------- */
 let THREE,GLTFLoader,mergeGeometries;
@@ -298,7 +351,7 @@ const CAP_DRAW=320,CH={};let BS=1,FOOT=0,CHAR_H=0.6;
  const torso=bake(by["torso"],true),ant=by["antenna"]?bake(by["antenna"],true):null;
  const P5={body:{g:ant?mergeGeometries([torso.g,ant.g]):torso.g,p:new THREE.Vector3()},legL:bake(by["leg-left"]),legR:bake(by["leg-right"]),armL:bake(by["arm-left"]),armR:bake(by["arm-right"])};
  const bb=new THREE.Box3();for(const k in P5){const g=P5[k].g;g.computeBoundingBox();bb.union(g.boundingBox.clone().translate(P5[k].p));}
- const sz=bb.getSize(new THREE.Vector3());BS=0.46/Math.max(sz.x,0.001);FOOT=-bb.min.y;CHAR_H=sz.y*BS;
+ const sz=bb.getSize(new THREE.Vector3());BS=0.6/Math.max(sz.x,0.001);FOOT=-bb.min.y;CHAR_H=sz.y*BS;
  for(const k in P5){const m=new THREE.InstancedMesh(P5[k].g,charMat,CAP_DRAW);m.castShadow=true;m.frustumCulled=false;for(let i=0;i<CAP_DRAW;i++)m.setColorAt(i,tc(K.teal));m.count=0;scene.add(m);CH[k]={m,p:P5[k].p};}}
 const _m=new THREE.Matrix4(),_l=new THREE.Matrix4(),_r=new THREE.Matrix4(),_q=new THREE.Quaternion(),_e=new THREE.Euler(),_p=new THREE.Vector3(),_s=new THREE.Vector3(),_c=new THREE.Color();
 let ci=0;
@@ -391,6 +444,7 @@ function resize(){W=innerWidth;H=innerHeight;const dpr=Math.min(2,window.deviceP
 addEventListener("resize",resize);resize();
 
 /* ---------- game flow ---------- */
+let levelStartMs=0,resolvedRounds=0,bannerT=0;
 let state="home",L=0,g=null,T=0,slowT=0,freezeT=0,pops=[],parts=[],conf=[],moved=false,fired=false,hookTagT={},quiz=null;
 const speedName=()=>save.speed in SPEEDS?save.speed:"normal";
 function renderSeg(el){el.innerHTML="";[["relaxed","Relaxed"],["normal","Normal"],["fast","Fast"]].forEach(([k,lab])=>{const b=document.createElement("button");b.textContent=lab;b.className=k===speedName()?"on":"";
@@ -398,11 +452,13 @@ function renderSeg(el){el.innerHTML="";[["relaxed","Relaxed"],["normal","Normal"
 function show(id){["home","pause","quiz","result","guideOv"].forEach(o=>$(o).classList.toggle("hide",o!==id));}
 function startLevel(l){
   L=l;demo=null;const pairs=buildPairs(l,save.tech);g=new Game({L:l,pairs,speed:speedName()});
+  levelStartMs=Date.now();resolvedRounds=0;
+  const tm=T_();if(tm){if(TM.levels>0)tm.restart();tm.plan(pairs.length);tm.track("level_start",{level:l+1,speedSetting:speedName()});}TM.levels++;
   pops=[];parts=[];conf=[];slowT=freezeT=0;hookTagT={};state="play";show(null);hideJodi();gates.forEach(gt=>{gt.showBack=false;});
   $("hud").classList.remove("hide");$("checkBtn").classList.remove("hide");$("hudL").innerHTML="<b>"+(l+1)+"</b> · "+esc(LEVELS[l].name);
   fired=false;$("hint").classList.toggle("hide",!!save.played&&l>0);updHud();processEvents();
 }
-function goHome(){state="home";g=null;$("hud").classList.add("hide");$("checkBtn").classList.add("hide");$("hint").classList.add("hide");$("freeze").classList.add("hide");hideJodi();renderMap();renderSeg($("segHome"));show("home");
+function goHome(){state="home";g=null;$("banner").classList.add("hide");$("hud").classList.add("hide");$("checkBtn").classList.add("hide");$("hint").classList.add("hide");$("freeze").classList.add("hide");hideJodi();renderMap();renderSeg($("segHome"));show("home");
   // a quiet demo field behind the home screen
   demo=new Game({L:0,pairs:buildPairs(0,{}),speed:"relaxed"});demo.firing=true;processEvents(demo);}
 let demo=null;
@@ -429,21 +485,39 @@ function burst(x,y,z,col,n){for(let k=0;k<n&&parts.length<400;k++)parts.push({x,
 let lastFireSfx=0,lastPopSfx=0;
 function processEvents(game){game=game||g;if(!game)return;const isDemo=game===demo;
   for(const ev of game.events){
-    if(ev.type==="pair"){setPair(ev.pair,!isDemo&&state==="play");
-      if(!isDemo)ev.pair.cards.forEach(c=>{if(!c.r)tstat(c.k).seen++;});}
+    if(ev.type==="round"){setPair(ev.pair,!isDemo&&state==="play");
+      if(!isDemo){ev.pair.cards.forEach(c=>{if(!c.r)tstat(c.k).seen++;});hookTagT={};
+        const n=game.pairs.length,i=ev.round%n;
+        showBanner(ev.round===0?"Message 1 of "+n:"Next message: "+(i+1)+" of "+n,"Read both. Shoot the real one.");
+        $("hudR").textContent="Message "+(i+1)+"/"+n;}}
     if(isDemo)continue;
+    if(ev.type==="roundEnd")roundTelemetry(ev.entry);
     if(ev.type==="mult"){pop("×"+ev.m,ev.x,0.9,GZ-1.2,"#FFFFFF",1.4);sfx.mult(ev.m);burst(ev.x,1.4,GZ,K.teal,10);}
-    else if(ev.type==="hooked"){sfx.hook();burst(ev.x,1,ev.z,K.inkSoft,6);
+    else if(ev.type==="hooked"){sfx.hook();burst(ev.x,1,ev.z,K.orange,6);
       if(ev.first){slowT=RM?0:2;showJodi(ev.card);buzz([40,40,80]);}
       else{const k=ev.card.k;if(!hookTagT[k]||T-hookTagT[k]>2.5){hookTagT[k]=T;pop("Hooked: "+TECH[k].name,ev.x,2.4,ev.z,"#F6A57F",0.62);}}}
-    else if(ev.type==="hit"){sfx.hit();buzz(30);burst(ev.x,0.6,0.3,K.orange,12);pop("−"+ev.n,ev.x,1.6,0.4,"#F6A57F",0.9);}
-    else if(ev.type==="pop"){if(T-lastPopSfx>0.06){sfx.pop();lastPopSfx=T;}burst(ev.x,0.6,ev.z,Math.random()<0.5?K.teal:K.muted,3);}
-    else if(ev.type==="wave"){sfx.wave();pop("Incoming spam ×"+ev.n,0,6.5,-HQZ+1,"#FFFFFF",0.7);}
+    else if(ev.type==="hit"){sfx.hit();buzz(30);burst(ev.x,0.6,0.3,K.orange,12);pop(ev.hooked?"Your hooked crew got through":"Spam got through",ev.x,1.8,0.4,"#F6A57F",0.62);hurt();}
+    else if(ev.type==="pop"){if(T-lastPopSfx>0.06){sfx.pop();lastPopSfx=T;}burst(ev.x,0.6,ev.z,Math.random()<0.5?K.teal:K.orange,3);}
+    else if(ev.type==="wave"){sfx.wave();showBanner("Spam wave incoming","×"+ev.n+" bots from Scam HQ — stop them before they reach you");}
+    else if(ev.type==="spawn"){burst(ev.x,1,-HQZ+0.6,K.orange,4);}
     else if(ev.type==="hq"){tower.flash=0.1;}
     else if(ev.type==="check"){sfx.check();freezeT=3;gates.forEach(gt=>{gt.showBack=true;gt.flip=1;});$("freeze").classList.remove("hide");}
     else if(ev.type==="win"||ev.type==="lose")endLevel(ev.type==="win");
   }
   game.events.length=0;}
+
+function showBanner(t,sub){$("bannerT").textContent=t;$("bannerS").textContent=sub||"";const b=$("banner");b.classList.add("hide");void b.offsetWidth;b.classList.remove("hide");bannerT=2.2;}
+function hurt(){const h=$("hurt");h.classList.add("on");void h.offsetWidth;h.classList.remove("on");const hs=$("hearts");hs.classList.remove("shake");void hs.offsetWidth;hs.classList.add("shake");}
+/* One message pair resolved: a step, and (if anything was shot through it) a choice. */
+function roundTelemetry(e){
+  const tm=T_();if(!tm||!g)return;
+  resolvedRounds++;tm.step(Math.min(resolvedRounds,g.pairs.length));
+  if(!e.fired)return;
+  const cs=e.pair.cards;
+  tm.choice({level:L+1,round:e.round+1,pairId:e.pair.id,pick:e.pick<0?"gap":(e.pick===0?"left":"right"),
+    pickedReal:e.pick<0?null:cs[e.pick].r,otherReal:e.pick<0?null:cs[1-e.pick].r,cardsReal:cs.map(c=>c.r),
+    techniques:cs.filter(c=>!c.r).map(c=>c.k),technique:e.pick>=0&&!cs[e.pick].r?cs[e.pick].k:null,
+    outcome:e.outcome,usedCheck:e.usedCheck});}
 
 /* ---------- input ---------- */
 let drag=null;const keys={L:false,R:false,F:false};
@@ -483,7 +557,7 @@ function updHud(){if(!g)return;const hp=Math.round(g.hp/g.hp0*100),h=g.hearts,ke
 let lastWon=false,lastSummary=null;
 function endLevel(won){if(state!=="play")return;state="end";lastWon=won;lastSummary=g.summary();g.firing=false;
   if(won){sfx.win();confettiBurst();}else sfx.lose();
-  for(const it of lastSummary.items)if(it.kind==="bait")tstat(it.picked.k).bait++;
+  for(const it of lastSummary.items)if(it.outcome==="bait")tstat(it.pair.cards[it.pick].k).bait++;
   save.played=true;persist();$("checkBtn").classList.add("hide");$("freeze").classList.add("hide");hideJodi();
   setTimeout(()=>startQuiz(),won?1500:1100);}
 function startQuiz(){state="quiz";$("hud").classList.add("hide");quiz={items:SPEED[L],i:0,score:0,answered:false};renderQuiz();show("quiz");}
@@ -496,32 +570,55 @@ function renderQuiz(){const q=quiz.items[quiz.i];
   $("quizCard").innerHTML=h;
   if(!quiz.answered){$("qReal").onclick=()=>answer(true);$("qBait").onclick=()=>answer(false);}
   else $("qNext").onclick=()=>{if(quiz.i<quiz.items.length-1){quiz.i++;quiz.answered=false;renderQuiz();}else showResults();};}
-function answer(isReal){quiz.answered=true;quiz.pick=isReal;if(isReal===quiz.items[quiz.i].r){quiz.score++;sfx.mult(2);}else sfx.hit();renderQuiz();}
+function answer(isReal){quiz.answered=true;quiz.pick=isReal;const q=quiz.items[quiz.i],ok=isReal===q.r;if(ok){quiz.score++;sfx.mult(2);}else sfx.hit();
+  const tm=T_();if(tm)tm.track("real_or_bait",{level:L+1,itemId:"L"+(L+1)+"-q"+(quiz.i+1),answeredReal:isReal,isReal:q.r,correct:ok,technique:q.k||null});
+  renderQuiz();}
 function showResults(){state="result";const s=lastSummary,won=lastWon;
   const stars=won?(s.baitPairs===0?3:s.baitPairs===1?2:1):0;
   if(won){save.stars[L]=Math.max(save.stars[L]||0,stars);save.unlocked=Math.max(save.unlocked,Math.min(LEVELS.length,L+2));}
   const rk="L"+L;save.runs[rk]=(save.runs[rk]||[]).concat([{won,stars,bait:s.baitPairs,quiz:quiz.score}]).slice(-20);persist();
+  levelTelemetry(won,s);
   const title=won?(s.baitPairs===0?"Not hooked once!":"Scam HQ is down!"):"Scam HQ held on";
   const jl=won?"Go on now — go be somebody’s good day.":"Let’s see why there may be stronger choices here, and how they compare.";
   const st=[0,1,2].map(i=>'<span class="'+(i<stars?"on":"")+'">★</span>').join("");
-  const li=it=>{const cs=it.pair.cards,b=cs.find(c=>!c.r),m=c=>'<span class="msg">'+esc(c.f)+": “"+esc(c.t)+"”</span>";
-    if(it.kind==="bait")return'<li class="bait"><span class="k">TOOK THE BAIT · '+esc(TECH[it.picked.k].name)+"</span>"+m(it.picked)+esc(it.picked.j)+"</li>";
-    if(it.kind==="spotted")return'<li><span class="k">SPOTTED IT · '+esc(TECH[b.k].name)+"</span>"+m(b)+esc(b.j)+"</li>";
-    if(it.kind==="scrolled")return'<li><span class="k">SCROLLED PAST · '+cs.filter(c=>!c.r).map(c=>esc(TECH[c.k].name)).join(" + ")+"</span>"+m(b)+esc(b.j)+"</li>";
-    if(it.kind==="trusted")return'<li class="soft"><span class="k">BOTH REAL · YOU TRUSTED IT</span>'+m(it.picked)+esc(it.picked.c)+"</li>";
-    return'<li class="soft"><span class="k">BOTH REAL · YOU SCROLLED PAST</span>'+m(cs[0])+"Both were real — knowing when to trust is a skill too.</li>";};
+  const li=it=>{const cs=it.pair.cards,b=cs.find(c=>!c.r),picked=it.pick>=0?cs[it.pick]:null,m=c=>'<span class="msg">'+esc(c.f)+": “"+esc(c.t)+"”</span>";
+    const techs=cs.filter(c=>!c.r).map(c=>esc(TECH[c.k].name)).join(" + ");
+    switch(it.outcome){
+      case"bait":return'<li class="bait"><span class="k">TOOK THE BAIT · '+esc(TECH[picked.k].name)+"</span>"+m(picked)+esc(picked.j)+"</li>";
+      case"spotted":return'<li><span class="k">SPOTTED IT · '+esc(TECH[b.k].name)+"</span>"+m(b)+esc(b.j)+"</li>";
+      case"trusted":return'<li class="soft"><span class="k">BOTH REAL · YOU TRUSTED IT</span>'+m(picked)+esc(picked.c)+"</li>";
+      case"smart_scroll":return'<li><span class="k">BOTH BAIT · YOU SCROLLED PAST · '+techs+"</span>"+m(b)+esc(b.j)+"</li>";
+      case"safe_scroll":return'<li class="soft"><span class="k">SCROLLED PAST · '+techs+"</span>"+m(b)+esc(b.j)+" The real message next to it would have multiplied your crew.</li>";
+      default:return'<li class="soft"><span class="k">BOTH REAL · YOU SCROLLED PAST</span>'+m(cs[0])+"Both were real — knowing when to trust is a skill too.</li>";}};
   const next=won&&L<LEVELS.length-1;
   $("resCard").innerHTML='<div class="rhead"><img src="'+(won?JODI.happy:JODI.thinking)+'" alt="Jodi"><div><h2>'+title+"</h2><em>"+jl+'</em></div></div><div class="stars">'+st+'</div><p class="sub">Dodged '+s.dodged+" of "+s.lures+" lures · Real or Bait: "+quiz.score+"/"+quiz.items.length+"</p>"+
     '<ul class="recap">'+(s.items.length?s.items.map(li).join(""):'<li class="soft">No messages were shot through this time. Hold to fire and aim at a gate.</li>')+'</ul><div class="row">'+(next?'<button class="btn" id="rNext">Next level</button>':"")+
     '<button class="btn '+(next?"alt":"")+'" id="rRetry">Try again</button><button class="btn alt" id="rHome">Home</button></div>'+
     '<a class="cta" href="https://allgoodacademy.com" target="_blank" rel="noopener">Teachers: run this with your class for free →</a>';
   show("result");if(next)$("rNext").onclick=()=>startLevel(L+1);$("rRetry").onclick=()=>startLevel(L);$("rHome").onclick=goHome;}
+/* End of a level: the level_end event, the session roll-up a teacher's Mission Control
+   reads (scenariosPlayed/correct/categories, the same shape the other games write), the
+   visit's game_scores row for a signed-in student, and complete() on a Level 5 win. */
+function levelTelemetry(won,s){
+  TM.visit.robCorrect+=quiz.score;TM.visit.robTotal+=quiz.items.length;if(won)TM.visit.won.add(L+1);
+  saveGameScore();
+  const tm=T_();if(!tm)return;
+  const cats={},taken=[];
+  for(const it of s.items){const cs=it.pair.cards;for(let i=0;i<2;i++){const c=cs[i];if(c.r)continue;const n=TECH[c.k].name;
+    const t=cats[n]||(cats[n]={played:0,correct:0});t.played++;if(!(it.outcome==="bait"&&it.pick===i))t.correct++;else if(!taken.includes(n))taken.push(n);}}
+  tm.track("level_end",{level:L+1,won,heartsLeft:Math.round(g.hearts*10)/10,baitsTaken:s.baitPairs,luresSeen:s.lures,
+    realOrBaitScore:quiz.score,checksUsed:CHECKS-g.checks,speedSetting:speedName(),durationMs:Date.now()-levelStartMs});
+  const summary={scenariosPlayed:quiz.items.length,correct:quiz.score,categories:cats,
+    ttb:{level:L+1,won,luresSeen:s.lures,luresDodged:s.dodged,baitTechniques:taken}};
+  if(won&&L===LEVELS.length-1)tm.complete({level:L+1,summary});else tm.summary(summary);
+}
 function confettiBurst(){if(RM)return;const cs=[K.teal,K.orange,K.creamBorder,K.tealDeep,"#F6A57F"];for(let i=0;i<140;i++)conf.push({x:rand(0,W),y:rand(-H*0.5,0),vx:rand(-40,40),vy:rand(80,220),r:rand(0,6),vr:rand(-6,6),c:cs[i%5],w:rand(6,11)});}
 
 /* ---------- update ---------- */
 function update(dr){
   T+=dr;
   if(jodiT>0){jodiT-=dr;if(jodiT<=0)hideJodi();}
+  if(bannerT>0){bannerT-=dr;if(bannerT<=0)$("banner").classList.add("hide");}
   if(freezeT>0){freezeT-=dr;if(freezeT<=0){freezeT=0;gates.forEach(gt=>{gt.showBack=false;gt.flip=1;});$("freeze").classList.add("hide");}}
   if(slowT>0)slowT-=dr;
   const ts=freezeT>0?0:slowT>0?0.25:1;
@@ -539,7 +636,7 @@ function update(dr){
 }
 
 /* ---------- render ---------- */
-const ALLY=tc(K.teal),ENEMY=tc(K.inkSoft),BOSS=tc(K.dark);
+const ALLY=tc(K.teal),ENEMY=tc(K.orange),BOSS=tc(K.dark);
 function label(x,y,txt,bg,fs){X.font="900 "+fs+"px "+K.ui;const w=X.measureText(txt).width+fs*0.9,h=fs*1.4;
   X.fillStyle="rgba(0,0,0,.15)";rr(X,x-w/2,y-h/2+3,w,h,h/2);X.fill();X.fillStyle=bg;rr(X,x-w/2,y-h/2,w,h,h/2);X.fill();
   X.fillStyle="#fff";X.textAlign="center";X.textBaseline="middle";X.fillText(txt,x,y+1);}
@@ -551,7 +648,7 @@ function render(){
   gates.forEach((gt,s)=>{const x=slide+(s?2.2:-2.2);gt.gr.position.x=x;
     gt.card.position.set(x,2.6+CARD_H/2+0.15,GZ+0.1);gt.card.quaternion.copy(camera.quaternion);
     const f=gt.flip>0?Math.abs(gt.flip-0.5)*2:1;gt.card.scale.set(Math.max(0.02,f),1,1);
-    gt.fill.material.opacity=0.22;});
+    const live=!G||G.phase==="live";gt.fill.material.opacity=live?0.24:0.06;gt.fill.material.color.copy(tc(live?K.teal:K.creamBorder));});
   // cannon
   cannon.position.x=G?G.cx:0;cannon.userData.barrel.position.z=-0.25+(G&&G.firing?Math.abs(Math.sin(T*38))*0.08:0);
   // tower
@@ -561,9 +658,9 @@ function render(){
     addChar(0,3.6-(down?1:0),-HQZ-1.3,0,3.6,BOSS,0,state==="play"?0.4:0.15,state==="play"?12:3,down?-1.4:((tower.flash||0)>0?0.25:0));
     const sc=n=>n>1?1+0.28*Math.log2(n):1;
     for(const u of G.units)addChar(u.x,0,u.z,Math.PI,sc(u.n),ALLY,u.ph,1,12,0.12);
-    for(const e of G.enemies)addChar(e.x,0,e.z,0,sc(e.n),ENEMY,e.ph,0.8,9,0.05);
+    for(const e of G.enemies){const pop=Math.min(1,e.age/0.25);addChar(e.x,0,e.z,0,sc(e.n)*1.3*(0.4+0.6*pop),ENEMY,e.ph,0.8,9,0.05);}
     let hi=0;
-    for(const h of G.hooks){const t=Math.min(1,h.t/0.8),y=Math.sin(Math.PI*t)*1.6;_c.copy(ALLY).lerp(ENEMY,clamp((t-0.3)/0.4,0,1));
+    for(const h of G.hooks){const t=Math.min(1,h.t/0.9),y=Math.sin(Math.PI*t)*1.6;_c.copy(ALLY).lerp(ENEMY,clamp((t-0.3)/0.4,0,1));
       addChar(h.x,y,h.z,Math.PI*(1-clamp((t-0.35)/0.5,0,1)),sc(h.n),_c,h.x*9,2.2,26,-0.3);
       if(hi<64){const top=y+CHAR_H*sc(h.n)+0.05;_q.identity();_p.set(h.x,top,h.z);_s.set(0.7,0.7,0.7);_m.compose(_p,_q,_s);hookMesh.setMatrixAt(hi,_m);
         _p.set(h.x-0.22,top+0.5,h.z);_s.set(1,Math.max(0.1,30-top),1);_m.compose(_p,_q,_s);lineMesh.setMatrixAt(hi,_m);hi++;}}
@@ -574,7 +671,7 @@ function render(){
   renderer.render(scene,camera);
   // overlay: clump sizes, Scam HQ HP, popups, confetti
   X.clearRect(0,0,W,H);
-  if(G&&g){let n=0;for(const arr of[G.units,G.enemies]){for(const o of arr){if(o.n<2||n>40)continue;n++;const p=P(o.x,1.2+0.3*Math.log2(o.n),o.z);if(p)label(p.x,p.y,"×"+o.n,arr===G.units?K.teal:K.inkSoft,Math.max(11,p.s*0.36));}}
+  if(G&&g){let n=0;for(const arr of[G.units,G.enemies]){for(const o of arr){if(o.n<2||n>40)continue;n++;const p=P(o.x,1.2+0.3*Math.log2(o.n),o.z);if(p)label(p.x,p.y,"×"+o.n,arr===G.units?K.teal:K.orange,Math.max(11,p.s*0.36));}}
     const p=P(0,8.4,-HQZ-1.3);if(p&&G.hp>0)label(p.x,p.y,String(G.hp),K.orange,Math.max(13,p.s*0.6));}
   for(const p of pops){const q=P(p.x,p.y,p.z);if(!q)continue;const fs=Math.max(14,q.s*0.75*p.size);X.globalAlpha=clamp(1.6-p.t*1.4,0,1);
     X.font="900 "+fs+"px "+K.ui;X.textAlign="center";X.textBaseline="middle";X.lineWidth=fs*0.16;X.strokeStyle="rgba(23,39,44,.75)";X.strokeText(p.txt,q.x,q.y);X.fillStyle=p.col;X.fillText(p.txt,q.x,q.y);}
