@@ -236,8 +236,8 @@ export const GAME_REGISTRY = {
     'money-moves':      { name: 'Money Moves', icon: '💸', url: '/educational-games/money-moves/' },
     // Off the core funnel (its own telemetry stream) but assignable like the others. Its
     // summary uses the same scenariosPlayed/correct/categories shape — messages answered and
-    // right calls, and bait seen/blocked per scam technique — plus a `ttb` block read below.
-    'take-the-bait':    { name: 'Take the Bait', icon: '🎣', url: '/educational-games/takethebait/', scoreLabel: 'right calls', categoryNoun: 'technique', noDeeperLink: true },
+    // Real or Bait answers, and bait seen/spotted per scam technique — plus a `ttb` block read below.
+    'take-the-bait':    { name: 'Take the Bait', icon: '🎣', url: '/educational-games/takethebait/', scoreLabel: 'Real or Bait', categoryNoun: 'technique', noDeeperLink: true },
 };
 
 /* Pull the four standalone games out of a student's telemetry session documents.
