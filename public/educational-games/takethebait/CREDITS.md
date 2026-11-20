@@ -1,4 +1,4 @@
-# Take the Bait 3D: credits and licenses
+# Take the Bait: credits and licenses
 
 Every file below is stored in this repository and served from allgoodacademy.com.
 Nothing is hotlinked.
