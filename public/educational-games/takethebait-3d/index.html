@@ -416,6 +416,15 @@ let THREE,GLTFLoader;
 /* Scenery randomness never touches Math.random(), so the game's own random stream
    (gate sides, spam-crowd slots and positions) is exactly v1's. */
 let seed3=20261120;const srand=(a,b)=>{seed3=(seed3*1103515245+12345)%2147483648;return a+seed3/2147483648*(b-a);};
+/* Three.js stamps every geometry, material and texture with a UUID drawn from
+   Math.random(). Left alone, that would shift the game's random stream, and a
+   level's gate sides and spam-crowd positions would stop matching v1's. So
+   everything Three.js creates (setup, level builds, render-target creation
+   inside render()) runs with Math.random pointed at the scenery dice, and the
+   game's own Math.random is restored before the game starts. */
+const GAME_RANDOM=Math.random,sceneRandom=()=>srand(0,1);
+function sceneDice(f){const m=Math.random;Math.random=sceneRandom;try{return f();}finally{Math.random=m;}}
+Math.random=sceneRandom;
 try{THREE=await import("three");({GLTFLoader}=await import("three/addons/loaders/GLTFLoader.js"));}
 catch(e){toV1();throw e;}
 
@@ -598,10 +607,10 @@ function makeTower(){
   scene.add(gr);return{gr,body,dark,flag};
 }
 function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
-function sceneBuild(){
+function sceneBuild(){sceneDice(()=>{
   gates3.forEach(g=>disposeGroup(g.gr));gates3=ev.filter(e=>e.t==="gate").map(makeGate);
   if(!tower3)tower3=makeTower();
-}
+});}
 
 /* --- camera framing: whole lane visible at the crowd, crowd low on screen --- */
 function frameCamera(){
@@ -691,7 +700,7 @@ function render(){
     _q.identity();_p.set(p.x,p.y,wz(p.z));_s.set(s,s,s);_m.compose(_p,_q,_s);partMesh.setMatrixAt(pi,_m);partMesh.setColorAt(pi,tc(p.col));pi++;}
   partMesh.count=pi;partMesh.instanceMatrix.needsUpdate=true;if(partMesh.instanceColor)partMesh.instanceColor.needsUpdate=true;
 
-  renderer.render(scene,camera);
+  sceneDice(()=>renderer.render(scene,camera));
 
   /* overlay */
   X.clearRect(0,0,W,H);
@@ -707,13 +716,14 @@ function quality(dr){if(state!=="play"&&state!=="battle")return;qAcc+=dr;qN++;if
   if(avg>1/42&&qStep<3){qStep++;
     if(qStep===1&&PR>1){PR=1;renderer.setPixelRatio(PR);onResize3D();}
     else if(qStep<=2){PR=Math.max(0.75,PR-0.25);renderer.setPixelRatio(PR);onResize3D();}
-    else{renderer.shadowMap.type=THREE.PCFShadowMap;sun.shadow.mapSize.set(512,512);sun.shadow.map&&sun.shadow.map.dispose();sun.shadow.map=null;}}}
+    else{renderer.shadowMap.type=THREE.PCFShadowMap;sun.shadow.mapSize.set(512,512);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}}}
 
 /* --- loop (same as v1, plus the quality governor) --- */
 let last=performance.now();
 function frame(now){const dr=Math.min(0.05,(now-last)/1000);last=now;update(dr);render();quality(dr);requestAnimationFrame(frame);}
 window.__ttb3d={tris,get chars(){return ci;}};
-resize();
+sceneDice(()=>resize());
+Math.random=GAME_RANDOM;
 $("heroImg").src=JODI.neutral;$("jimg").src=JODI.concerned;setMute(false);goHome();
 $("play").disabled=false;
 requestAnimationFrame(frame);
