@@ -273,9 +273,9 @@ if (claimingPages.length) {
   }
   if (exists('public/js/auth-core.js')) {
     const core = read('public/js/auth-core.js');
-    if (/createUserWithEmailAndPassword|recruitSignIn|claimGuestCode|claimRecruitCode/.test(core)) {
+    if (/recruitSignIn|claimGuestCode|claimRecruitCode|createAccountWithEmail|finalizeThirteenPlusAccount/.test(core)) {
       fail('no-gate', `public/js/auth-core.js: a student sign-up or Recruit Code claim path is back. ` +
-        `Students never make an account; the only sign-in is teacherGoogleSignIn().`);
+        `Students never make an account; the only sign-ins are the teacher ones on /mission-control/.`);
     }
   }
 }

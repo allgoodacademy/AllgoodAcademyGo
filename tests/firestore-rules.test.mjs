@@ -128,7 +128,7 @@ await it('teacher CAN read a student\'s module_progress in their own classroom',
   await assertSucceeds(getDoc(PROGRESS(teacher, 'student_1', 'social-intelligence')));
 });
 
-console.log('\nBECOME-A-TEACHER — Google sign-in only, and only classroom-first');
+console.log('\nBECOME-A-TEACHER — a teacher sign-in (Google or email), never anonymous, classroom-first');
 // Google signed in directly, and Google linked onto an earlier anonymous session (what
 // AuthCore.teacherGoogleSignIn does when the browser already has one): both carry
 // google.com in firebase.identities, which is what the rule reads.
@@ -151,8 +151,13 @@ await it('...and that new teacher STILL cannot read the other classroom\'s roste
 await it('an anonymous session CANNOT create a classroom', async () => {
   await assertFails(setDoc(CLASS(guest, 'ANON01'), { teacherUid: 'guest_1', teacherName: 'Sunny', createdAt: 2 }));
 });
-await it('an email/password account CANNOT create a classroom', async () => {
-  await assertFails(setDoc(CLASS(passwordUser, 'PASS01'), { teacherUid: 'pw_1', teacherName: 'Pw', createdAt: 2 }));
+await it('an email/password teacher account CAN create a classroom and become its teacher', async () => {
+  await assertSucceeds(setDoc(CLASS(passwordUser, 'PASS01'), { teacherUid: 'pw_1', teacherName: 'Pw', createdAt: 2 }));
+  await assertSucceeds(setDoc(U(passwordUser, 'pw_1'), { role: 'teacher', classroomCode: 'PASS01' }, { merge: true }));
+});
+await it('a token with some OTHER provider and no Google/email identity CANNOT create a classroom', async () => {
+  const phoneOnly = env.authenticatedContext('ph_1', { firebase: { sign_in_provider: 'phone', identities: { phone: ['+15555550100'] } } }).firestore();
+  await assertFails(setDoc(CLASS(phoneOnly, 'PHON01'), { teacherUid: 'ph_1', teacherName: 'Ph', createdAt: 2 }));
 });
 await it('an anonymous session CANNOT become teacher even of a classroom it owns', async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
@@ -161,7 +166,7 @@ await it('an anonymous session CANNOT become teacher even of a classroom it owns
   await assertFails(setDoc(U(guest, 'guest_1'), { role: 'teacher', classroomCode: 'ANON02' }, { merge: true }));
 });
 await it('an EXISTING teacher who never used Google still works: profile writes and assigning', async () => {
-  // teacher_1's token has no google.com identity (they predate the Google-only rule).
+  // teacher_1's token has no google.com identity (they predate the teacher-sign-in rule).
   await assertSucceeds(setDoc(U(teacher, 'teacher_1'), { displayName: 'Ms Real', lastLogin: 2 }, { merge: true }));
   await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { lastReviewedAt: 2 }, { merge: true }));
   await assertSucceeds(getDocs(query(collection(teacher, 'artifacts', APP, 'users'),

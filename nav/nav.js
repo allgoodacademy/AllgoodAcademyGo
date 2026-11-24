@@ -35,24 +35,25 @@ const LINKS = [
     { label: 'Contact',      href: page => (page === 'about' ? '#contact' : '/about/#contact') },
 ];
 
-// The nav's one button. Points at a real lesson, not at a menu: students never
-// sign in or make an account, and this is the same GoodBlock the homepage
-// hero's "I'm a student" CTA has always used. For a browser that already has a
-// session the session script turns it into "My progress" (/dashboard/).
+// The nav's one button: the student dashboard, which reaches every lesson,
+// Challenge, game and simulation, with no sign-in in front of it. It reads
+// "Start learning" for a new visitor and "My dashboard" (same place) for a
+// browser that already has a session — see the session script. The homepage
+// hero's "I'm a student" goes to the same place.
 //
 // "Teacher sign in" is the ONLY sign-in anywhere on the site (founder decision,
-// 2026-11-23): teachers sign in with Google on /mission-control/. It sits beside
+// 2026-11-23): teachers sign in with Google or email on /mission-control/. It sits beside
 // the button as a plain text link — available, not advertised, and labelled so
 // no student mistakes it for something they need.
-const CTA = { label: 'Try a lesson', href: '/jsh/digital-decisions-lab/social-intelligence/' };
+const CTA = { label: 'Start learning', href: '/dashboard/' };
 const SIGNIN = { label: 'Teacher sign in', href: '/mission-control/' };
 
 // --- The session script, emitted inline directly under the bar. -------------
 //
 // Two words change, nothing else:
 //   - a browser with a session (ag_signed_in — every student who has played
-//     anything) gets "My progress" in place of "Try a lesson", so a student on a
-//     phone always has the way back to their own work;
+//     anything) reads "My dashboard" in place of "Start learning": same link,
+//     but it tells a returning student their work is there;
 //   - a signed-in teacher (ag_account) sees "Mission Control" in place of
 //     "Teacher sign in", since that is where the link already goes.
 //
@@ -69,7 +70,7 @@ const SESSION_SCRIPT = `<script>
   var s=false,a=false;
   try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
-  if(s&&cta){cta.textContent='My progress';cta.href='/dashboard/';}
+  if(s&&cta)cta.textContent='My dashboard';
   if(a&&signin)signin.textContent='Mission Control';
 })();
 <\/script>`;

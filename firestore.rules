@@ -112,10 +112,10 @@ service cloud.firestore {
     // What a client is allowed to do to the two privileged fields on its OWN profile.
     // Everything else on the profile stays freely writable by its owner.
     //   role         : may be left alone, set to 'student', or set to 'teacher' ONLY by a
-    //                  Google-signed-in account for a classroom this uid demonstrably owns
+    //                  signed-in (Google or email) account for a classroom this uid owns
     //                  (Mission Control's setup creates the classroom first, then flips
     //                  the role). An existing teacher's role is "left alone", so teachers
-    //                  from before the Google-only rule keep working unchanged.
+    //                  from before the teacher-sign-in rule keep working unchanged.
     //   classroomCode: may be left alone, cleared, or set to a classroom that exists
     //                  (the join-by-code flow — knowing the code is the trust model, as
     //                  for rule #5; joining someone else's classroom grants no read access).
@@ -131,19 +131,20 @@ service cloud.firestore {
         || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 60);
     }
 
-    // Teachers sign in with Google, and only teachers sign in (identity reset, 2026-11-23).
-    // True when Google is one of this account's linked providers — whether the session
-    // signed in with Google or linked it onto an earlier anonymous session. Read with
-    // get() defaults so a token without the claim is a plain false, never an error.
-    function hasGoogleSignIn() {
-      return request.auth.token.get('firebase', {}).get('identities', {}).keys().hasAny(['google.com']);
+    // Only teachers sign in (identity reset, 2026-11-23), with Google or with an email and
+    // password. True when either is one of this account's linked providers — whether the
+    // session signed in with it or linked it onto an earlier anonymous session — and false
+    // for a purely anonymous session (a student). Read with get() defaults so a token
+    // without the claim is a plain false, never an error.
+    function hasTeacherSignIn() {
+      return request.auth.token.get('firebase', {}).get('identities', {}).keys().hasAny(['google.com', 'email']);
     }
 
     function profileFieldsOk(appId, priorRole, priorCode) {
       return (request.resource.data.get('role', NONE()) == priorRole
               || request.resource.data.get('role', NONE()) == 'student'
               || (request.resource.data.get('role', NONE()) == 'teacher'
-                  && hasGoogleSignIn()
+                  && hasTeacherSignIn()
                   && classroomOwnedBy(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid)))
         && classroomCodeOk(appId, priorCode)
         && displayNameOk();
@@ -262,9 +263,10 @@ service cloud.firestore {
     //      codes are otherwise shared out-of-band, no student/teacher should browse all classrooms
     match /artifacts/{appId}/classrooms/{code} {
       allow get: if request.auth != null;
-      // Creating a class is the teacher step, so it needs a Google sign-in. Updating your
-      // own class (assignments) does not: existing teachers keep working as they are.
-      allow create: if request.auth != null && hasGoogleSignIn()
+      // Creating a class is the teacher step, so it needs a teacher sign-in (Google or email),
+      // never an anonymous student session. Updating your own class (assignments) does not:
+      // existing teachers keep working as they are.
+      allow create: if request.auth != null && hasTeacherSignIn()
         && request.resource.data.teacherUid == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.teacherUid == request.auth.uid;
       allow list: if isAllowlistedAdmin();

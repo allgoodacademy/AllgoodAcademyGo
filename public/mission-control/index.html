@@ -379,6 +379,17 @@
   button.screen-link { border: 0; cursor: pointer; }
   button.screen-link:disabled { opacity: .5; cursor: not-allowed; }
   .screen-error { font-size: 13px; color: var(--rose); max-width: 460px; }
+  .screen-ok { font-size: 13px; color: var(--teal); max-width: 460px; }
+  .signin-or { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 320px; color: var(--text-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .signin-or::before, .signin-or::after { content: ''; flex: 1; height: 1px; background: var(--navy-border); }
+  .email-form { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; }
+  .email-form input {
+    font: inherit; font-size: 16px; color: var(--text-primary); background: var(--navy-surface);
+    border: 1px solid var(--navy-border); border-radius: 8px; padding: 10px 12px;
+  }
+  .email-form input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+  .email-form .screen-link { text-align: center; }
+  .text-btn { background: none; border: 0; padding: 4px; color: var(--teal); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
   .consent {
     text-align: left; max-width: 460px; font-size: 13px; line-height: 1.6; color: var(--text-secondary);
     background: var(--navy-surface); border: 1px solid var(--navy-border); border-radius: 10px; padding: 14px 16px;
@@ -602,13 +613,23 @@
   <div class="screen-body" id="loading-note">Contacting Mission Control…</div>
 </div>
 
-<!-- TEACHER SIGN IN: the one place anyone signs in. Google only. -->
+<!-- TEACHER SIGN IN: the one place anyone signs in. Google, or email and password for a
+     teacher without Google. -->
 <div class="screen" id="screen-signin" hidden>
   <div class="brand-label">MISSION CONTROL</div>
   <div class="screen-title">Teacher sign in</div>
-  <div class="screen-body">Sign in with Google to see your classes, rosters and what you've assigned. Students don't need to sign in. They join your class with your class code at allgoodacademy.com/join.</div>
+  <div class="screen-body">Sign in to see your classes, rosters and what you've assigned. Students don't need to sign in. They join your class with your class code at allgoodacademy.com/join.</div>
   <button class="screen-link" id="btn-teacher-google" type="button">Continue with Google</button>
+  <div class="signin-or">or</div>
+  <form class="email-form" id="email-form" novalidate>
+    <input type="email" id="teacher-email" autocomplete="email" placeholder="School email" aria-label="Email">
+    <input type="password" id="teacher-password" autocomplete="current-password" placeholder="Password" aria-label="Password">
+    <button class="screen-link" id="btn-email-submit" type="submit">Sign in with email</button>
+    <button class="text-btn" id="btn-email-mode" type="button">New here? Create a teacher account</button>
+    <button class="text-btn" id="btn-email-reset" type="button">Forgot your password?</button>
+  </form>
   <div class="screen-error" id="signin-error" hidden></div>
+  <div class="screen-ok" id="signin-ok" hidden></div>
 </div>
 
 <!-- FIRST CLASS: a signed-in teacher with no class yet. The consent notice (text unchanged
@@ -1004,11 +1025,20 @@ function showGate(title, body, linkText, linkHref) {
 
 /* ── teacher sign in and first-class setup ────────────────────────────────────
    Sign-in lives here and nowhere else: the site nav's "Teacher sign in" points at this
-   page. Google only (AuthCore.teacherGoogleSignIn). */
+   page. Google (AuthCore.teacherGoogleSignIn) or, for a teacher without Google, email and
+   password (AuthCore.teacherEmailSignIn). */
 const SIGNIN_ERRORS = {
     'auth/popup-blocked': 'Your browser blocked the sign-in popup. Allow popups for this site and try again.',
     'auth/unauthorized-domain': "This site isn't authorized for Google sign-in yet. Contact the site admin.",
     'auth/cancelled-popup-request': 'Sign-in was interrupted. Please try again.',
+    'auth/email-already-in-use': 'That email already has a teacher account. Sign in instead.',
+    'auth/credential-already-in-use': 'That email already has a teacher account. Sign in instead.',
+    'auth/invalid-email': "That email address doesn't look right.",
+    'auth/weak-password': 'Use a password of at least 6 characters.',
+    'auth/invalid-credential': "That email and password don't match an account.",
+    'auth/wrong-password': "That email and password don't match an account.",
+    'auth/user-not-found': "That email and password don't match an account.",
+    'auth/too-many-requests': 'Too many tries. Wait a minute, or reset your password.',
 };
 function showOnly(id) {
     ['screen-loading', 'screen-signin', 'screen-setup', 'screen-gate'].forEach((s) => {
@@ -1019,6 +1049,54 @@ function showSignIn() {
     showOnly('screen-signin');
     const btn = document.getElementById('btn-teacher-google');
     const err = document.getElementById('signin-error');
+    const okNote = document.getElementById('signin-ok');
+    const emailEl = document.getElementById('teacher-email');
+    const pwEl = document.getElementById('teacher-password');
+    const submit = document.getElementById('btn-email-submit');
+    const modeBtn = document.getElementById('btn-email-mode');
+    let mode = 'signin';
+    const say = (el, text) => { el.textContent = text; el.hidden = !text; };
+    modeBtn.onclick = () => {
+        mode = mode === 'signin' ? 'create' : 'signin';
+        submit.textContent = mode === 'create' ? 'Create teacher account' : 'Sign in with email';
+        modeBtn.textContent = mode === 'create' ? 'Already have an account? Sign in' : 'New here? Create a teacher account';
+        pwEl.autocomplete = mode === 'create' ? 'new-password' : 'current-password';
+        say(err, ''); say(okNote, '');
+    };
+    document.getElementById('email-form').onsubmit = async (e) => {
+        e.preventDefault();
+        say(err, ''); say(okNote, '');
+        const email = emailEl.value.trim();
+        if (!email || !pwEl.value) return say(err, 'Type your email and a password.');
+        submit.disabled = true;
+        const label = submit.textContent;
+        submit.textContent = 'Connecting…';
+        try {
+            await window.AuthCore.teacherEmailSignIn(email, pwEl.value, mode);
+            showOnly('screen-loading');
+            await load();
+        } catch (e2) {
+            console.error('[Mission Control] email sign-in failed', e2);
+            say(err, SIGNIN_ERRORS[e2 && e2.code] || 'Sign-in failed. Please try again.');
+        } finally {
+            submit.disabled = false;
+            submit.textContent = label;
+        }
+    };
+    document.getElementById('btn-email-reset').onclick = async () => {
+        say(err, ''); say(okNote, '');
+        const email = emailEl.value.trim();
+        if (!email) return say(err, 'Type your email above first, then tap "Forgot your password?" again.');
+        try {
+            await window.AuthCore.teacherPasswordReset(email);
+        } catch (e2) {
+            if (e2 && e2.code === 'auth/invalid-email') return say(err, SIGNIN_ERRORS['auth/invalid-email']);
+            console.warn('[Mission Control] password reset', e2);
+        }
+        // Same message whether or not the address has an account, so this can't be used to
+        // find out who does.
+        say(okNote, `If ${email} has a teacher account, a reset link is on its way.`);
+    };
     btn.onclick = async () => {
         err.hidden = true;
         btn.disabled = true;

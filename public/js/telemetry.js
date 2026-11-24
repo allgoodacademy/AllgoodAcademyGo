@@ -108,7 +108,7 @@ function detectEntry() {
         if (!ref) return 'direct';
         const refUrl = new URL(ref);
         if (refUrl.host !== window.location.host) return 'external';
-        if (refUrl.pathname === '/' || refUrl.pathname === '/index.html') return 'dashboard';
+        if (refUrl.pathname === '/' || refUrl.pathname === '/index.html' || refUrl.pathname.startsWith('/dashboard')) return 'dashboard';
         if (refUrl.pathname.startsWith('/jsh/digital-decisions-lab/') && refUrl.pathname.split('/').filter(Boolean).length === 2) return 'lab-hub';
         return 'site';
     } catch (e) {

@@ -10,11 +10,12 @@ classroom's `teacherUid`.
 **It is no longer read-only.** Every teacher function used to be split between here and
 `/dashboard/`, which also held the only place to assign a module, see a Task Force code, or
 export a roster. All of that moved here, and since the identity reset (2026-11-24) so did the
-rest: **this page is also Teacher sign in** (Google only — the site nav's "Teacher sign in"
-points here) **and the one-time setup** (the consent notice, then creating the class). A
-signed-out visitor sees "Continue with Google"; a signed-in non-teacher sees the consent
+rest: **this page is also Teacher sign in** (Google, or email and password for a teacher
+without Google — the site nav's "Teacher sign in" points here) **and the one-time setup** (the consent notice, then creating the class). A
+signed-out visitor sees "Continue with Google" and an email form (sign in, create a teacher
+account, forgot password); a signed-in non-teacher sees the consent
 notice and "I Agree — Continue"; an existing teacher goes straight to their class, however
-they first signed in. `/dashboard/` is the student's own "My progress" page and asks nobody
+they first signed in. `/dashboard/` is the student's own "My dashboard" page and asks nobody
 to sign in.
 
 ## The three tabs

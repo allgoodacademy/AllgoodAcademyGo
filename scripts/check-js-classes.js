@@ -142,6 +142,21 @@ for (const js of jsFiles) {
   }
 }
 
+// The exempt modal classes above are exempt from the BUNDLE, not from existing at all:
+// /js/message-hq.js shows and hides its modal only by toggling .hidden-modal / .visible-modal,
+// so every page that loads it must define both in its own CSS. A page that doesn't has an
+// invisible full-screen layer swallowing every tap (it happened on mobile once, and again on
+// the rebuilt dashboard before this check existed).
+for (const page of pages) {
+  const html = read(page);
+  if (!html.includes('src="/js/message-hq.js"')) continue;
+  for (const cls of ['hidden-modal', 'visible-modal']) {
+    if (!new RegExp(`\\.${cls}\\s*\\{[^}]*pointer-events`).test(html)) {
+      problems.push(`${page}: loads /js/message-hq.js but defines no .${cls} { pointer-events: ... } rule — Comms' closed modal would block every tap`);
+    }
+  }
+}
+
 if (problems.length) {
   console.error(`check-js-classes: ${problems.length} missing class/bundle pair(s)\n`);
   for (const p of problems) console.error('  - ' + p);

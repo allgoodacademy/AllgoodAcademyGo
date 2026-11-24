@@ -58,8 +58,8 @@ h1,h2,h3{font-family:Georgia,'Times New Roman',serif;font-weight:700;margin:0;li
 .nav-right{display:flex;align-items:center;gap:4px}
 .nav-link{font-family:Verdana,Geneva,sans-serif;font-size:13px;color:var(--ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap}
 .nav-link:hover{background:var(--teal-wash);color:var(--teal-deep)}
-/* The one button in the nav. It points at a real lesson, because the product needs no
-   account to start — the hero's "I'm a student" CTA and this go to the same GoodBlock. */
+/* The one button in the nav. It goes to the student dashboard (every lesson, game and
+   simulation, no sign-in) — the hero's "I'm a student" CTA goes to the same place. */
 .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--orange);border:1.5px solid var(--orange);color:#fff;padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block}
 .nav-cta:hover{background:var(--orange-deep);border-color:var(--orange-deep);color:#fff}
 /* Sign in is a plain text link now — available, not advertised. The class stays as the hook
@@ -283,7 +283,7 @@ footer{background:var(--surface);padding:0 0 44px}
         <a class="nav-link" href="/about/">About</a>
         <a class="nav-link" href="/about/#contact">Contact</a>
         <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
-        <a class="nav-cta" href="/jsh/digital-decisions-lab/social-intelligence/">Try a lesson</a>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
       </div>
     </nav>
   </div>
@@ -293,7 +293,7 @@ footer{background:var(--surface);padding:0 0 44px}
   var s=false,a=false;
   try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
-  if(s&&cta){cta.textContent='My progress';cta.href='/dashboard/';}
+  if(s&&cta)cta.textContent='My dashboard';
   if(a&&signin)signin.textContent='Mission Control';
 })();
 </script>
@@ -305,7 +305,7 @@ footer{background:var(--surface);padding:0 0 44px}
       <h1>Most lessons tell you what not to do.<br>We show you what happens when you do.</h1>
       <p class="sub">Free interactive games and labs that teach students the consequences of bad decisions — before those decisions cost them anything real.</p>
       <div class="actions">
-        <a class="btn btn-primary" href="/jsh/digital-decisions-lab/social-intelligence/" onclick="gtag('event', 'cta_click', { 'button': 'student' })">I'm a student</a>
+        <a class="btn btn-primary" href="/dashboard/" onclick="gtag('event', 'cta_click', { 'button': 'student' })">I'm a student</a>
         <a class="btn btn-secondary" href="/for-teachers/" onclick="gtag('event', 'cta_click', { 'button': 'teacher' })">I'm a teacher</a>
       </div>
       <p class="trust">

@@ -8,9 +8,10 @@
 //     session on that device. No name, email, age or code is asked before content.
 //   - A student joins a teacher's class with a class code + a nickname (/join/, see
 //     /js/classroom-join.js). That is the only thing a student is ever asked.
-//   - TEACHERS ARE THE ONLY PEOPLE WHO SIGN IN, with Google only (teacherGoogleSignIn),
-//     from one place: "Teacher sign in" -> /mission-control/. A teacher accepts the
-//     consent notice once before their first class is created.
+//   - TEACHERS ARE THE ONLY PEOPLE WHO SIGN IN — with Google (teacherGoogleSignIn) or, for a
+//     teacher without Google, an email and password (teacherEmailSignIn) — from one place:
+//     "Teacher sign in" -> /mission-control/. A teacher accepts the consent notice once
+//     before their first class is created.
 //   - Students from the old model (Recruit Codes, 13+ Google or email/password accounts)
 //     get their progress back with the restore functions at the bottom of the identity
 //     section. They copy the old progress INTO this device's anonymous session; the
@@ -23,7 +24,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebas
 import {
     getAuth, signInAnonymously, onAuthStateChanged, updateProfile, signOut,
     GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithPopup,
-    signInWithEmailAndPassword, updateCurrentUser, getAdditionalUserInfo,
+    EmailAuthProvider, linkWithCredential, createUserWithEmailAndPassword,
+    signInWithEmailAndPassword, sendPasswordResetEmail, updateCurrentUser, getAdditionalUserInfo,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
     getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, query, where, serverTimestamp,
@@ -46,7 +48,7 @@ const db = getFirestore(app);
 
 // --- ROUTING HINTS (localStorage, this domain only). Neither is an auth check; nothing
 // real is gated on them — firestore.rules decides every access.
-//   ag_signed_in : this browser has a session. The nav shows "My progress" for it.
+//   ag_signed_in : this browser has a session. The nav shows "My dashboard" for it.
 //   ag_account   : this browser's session is a real (non-anonymous) account — a teacher,
 //                  or a legacy account. The dashboard's GA4 snippet loads only behind it,
 //                  so no anonymous (student) session ever loads Google Analytics.
@@ -200,11 +202,32 @@ async function startSession() {
     return user;
 }
 
-// --- TEACHER SIGN IN: Google only. Links onto this browser's existing anonymous session
-// when there is one, so a teacher who used the site anonymously (including the handful of
-// pre-2026-09 anonymous Task Force Leaders) keeps their uid, role and class. If the Google
-// account already exists, signs into that account instead, reusing the popup's credential
-// (a second popup after an await is usually blocked).
+// --- TEACHER SIGN IN: Google, or email and password. Both link onto this browser's
+// existing anonymous session when there is one, so a teacher who used the site anonymously
+// (including the handful of pre-2026-09 anonymous Task Force Leaders) keeps their uid, role
+// and class. If the account already exists, they sign into that account instead.
+async function finishTeacherSignIn(user) {
+    const ref = userRef(user.uid);
+    const snap = await getDoc(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const displayName = user.displayName || data.displayName || (user.email ? user.email.split('@')[0] : 'Teacher');
+    if (user.displayName !== displayName) {
+        try { await updateProfile(user, { displayName }); } catch (e) { console.error('[AuthCore] updateProfile failed', e); }
+    }
+    await setDoc(ref, {
+        displayName,
+        email: user.email || null,
+        isGuest: false,
+        ...(data.role ? {} : { role: 'student' }),
+        lastLogin: serverTimestamp(),
+    }, { merge: true });
+    markSignedIn();
+    markAccount();
+    return user;
+}
+
+// Google. Reuses the popup's credential when the account already exists (a second popup
+// after an await is usually blocked).
 async function teacherGoogleSignIn() {
     const provider = new GoogleAuthProvider();
     const current = auth.currentUser;
@@ -219,21 +242,28 @@ async function teacherGoogleSignIn() {
     } else {
         user = (await signInWithPopup(auth, provider)).user;
     }
+    return finishTeacherSignIn(user);
+}
 
-    const ref = userRef(user.uid);
-    const snap = await getDoc(ref);
-    const data = snap.exists() ? snap.data() : {};
-    const displayName = user.displayName || data.displayName || (user.email ? user.email.split('@')[0] : 'Teacher');
-    await setDoc(ref, {
-        displayName,
-        email: user.email || null,
-        isGuest: false,
-        ...(data.role ? {} : { role: 'student' }),
-        lastLogin: serverTimestamp(),
-    }, { merge: true });
-    markSignedIn();
-    markAccount();
-    return user;
+// Email and password, for a teacher without Google. mode 'create' makes the account (linked
+// onto this browser's anonymous session when there is one); mode 'signin' signs into an
+// existing one. Firebase's own errors (auth/email-already-in-use, auth/invalid-credential,
+// auth/weak-password, ...) are thrown to the caller, which words them for a person.
+async function teacherEmailSignIn(email, password, mode) {
+    let user;
+    if (mode === 'create') {
+        const current = auth.currentUser;
+        user = current && current.isAnonymous
+            ? (await linkWithCredential(current, EmailAuthProvider.credential(email, password))).user
+            : (await createUserWithEmailAndPassword(auth, email, password)).user;
+    } else {
+        user = (await signInWithEmailAndPassword(auth, email, password)).user;
+    }
+    return finishTeacherSignIn(user);
+}
+
+function teacherPasswordReset(email) {
+    return sendPasswordResetEmail(auth, email);
 }
 
 async function getAccount(uid) {
@@ -559,7 +589,7 @@ window.AuthCore = {
     auth, db, appId,
     startSession, anonymousSessionOnly, waitForAuthReady, markEngaged, writeStudentProfile,
     whenEngaged: () => engaged,
-    teacherGoogleSignIn, getAccount,
+    teacherGoogleSignIn, teacherEmailSignIn, teacherPasswordReset, getAccount,
     markSignedIn, markAccount, clearSignedIn,
     hasAcceptedTeacherConsent, recordTeacherConsent,
     legacyRestoreOpen, LEGACY_RESTORE_UNTIL, restoreFromRecruitCode, restoreWithGoogle, restoreWithEmail,

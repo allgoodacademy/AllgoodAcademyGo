@@ -2,7 +2,7 @@
 
 > **OUT OF DATE AGAIN, 2026-11-24 — identity reset.** Students no longer sign in at any age,
 > no Recruit Codes are issued, there is no age question and no 13+ student account path;
-> teachers sign in with Google only. `public/privacy.html` and `public/terms.html` still
+> teachers sign in with Google or an email and password. `public/privacy.html` and `public/terms.html` still
 > describe Learner Recruits, Recruit Codes and 13+ student sign-in. Per this document's own
 > rule, that legal copy was **not** edited by the engineering change; it is an open
 > follow-up for a human to rewrite (see the PR for the identity reset).

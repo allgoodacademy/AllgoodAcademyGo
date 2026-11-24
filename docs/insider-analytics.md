@@ -337,7 +337,7 @@ Three options, in order of effort:
 
 - `firestore.rules` gained rules for `sessions`, `events`, collection-group reads and
   recruit-code deletion (and, on 2026-11-24, made `recruit_codes` read-only and required a
-  Google sign-in to create a class). They deploy automatically on merge to `main` (see
+  teacher sign-in — Google or email, never anonymous — to create a class). They deploy automatically on merge to `main` (see
   `.github/workflows/firebase-firestore-rules.yml`). They went live on 2026-09-06 (run #2
   of that workflow, re-run after a service-account permission fix). If a later rules deploy
   fails, Insider shows an amber "some data sources didn't load" strip naming the affected
