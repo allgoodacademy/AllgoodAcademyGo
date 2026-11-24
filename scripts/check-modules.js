@@ -5,9 +5,10 @@
 // That catches drift between them but cannot catch a module missing from all of them at
 // once — which is exactly how four live games went unregistered. The registry is now the
 // single source and every surface is checked against it:
-//   - public/dashboard/index.html reads the registry at runtime, so what is checked here is
-//     that it still does, and that LAB_PACK_PLANNED / RWR_PACK_PLANNED / RTT_PACK_PLANNED
-//     name exactly the labs the registry says are live in each pack
+//   - public/dashboard/index.html renders every lesson, Challenge and game from the registry
+//     (and every simulation from public/data/simulations.json) at runtime, so what is checked
+//     here is that it still does, links no module by hand, and that every simulation folder
+//     is listed; PACKS[...].planned below names the labs each pack will hold
 //   - COURSES in public/insider/index.html (still hand-maintained, so checked entry by entry)
 //   - each Lab Pack hub renders its cards from the registry, so what is checked is that it
 //     still fetches it and still carries the anchors the cards are inserted at
@@ -42,7 +43,7 @@ const warn = (msg) => warnings.push(msg);
 // Challenge category each lab's badge counts. Add a row here when a pack or lab ships.
 const PACKS = {
   'digital-decisions': {
-    plannedConst: 'LAB_PACK_PLANNED',
+    planned: ['Social Intelligence', 'Privacy & Security', 'Digital Citizenship', 'Professional Brand'],
     hub: 'public/jsh/digital-decisions-lab/index.html',
     hubPrefix: '/jsh/digital-decisions-lab/',
     challengeId: 'ddc',
@@ -50,7 +51,7 @@ const PACKS = {
     badgeCategory: { 'social-intelligence': 'social_intelligence', 'privacy-security': 'privacy_security', 'digital-citizenship': 'digital_citizenship', 'professional-brand': 'professional_brand' },
   },
   'real-world-ready': {
-    plannedConst: 'RWR_PACK_PLANNED',
+    planned: ['Money as a Skill', 'Conflict Has a Winner', 'Reading the Room'],
     hub: 'public/jsh/real-world-ready-lab/index.html',
     hubPrefix: '/jsh/real-world-ready-lab/',
     challengeId: 'rwr-challenge',
@@ -58,7 +59,7 @@ const PACKS = {
     badgeCategory: { 'money-as-a-skill': 'money', 'conflict-has-a-winner': 'conflict', 'reading-the-room': 'reading_room' },
   },
   'room-to-think': {
-    plannedConst: 'RTT_PACK_PLANNED',
+    planned: ['Ten Voices, One Source', 'The Question Decides the Answer', 'Where You Say It', 'The Cost of Later'],
     hub: 'public/jsh/room-to-think-lab/index.html',
     hubPrefix: '/jsh/room-to-think-lab/',
     challengeId: 'rtt-challenge',
@@ -227,36 +228,44 @@ for (const g of visibleGames) {
   for (const c of used) if (!declared.has(c)) fail(`registry: "${g.id}" has scenarios tagged "${c}" but its skillTags do not declare it`);
 }
 
-// --- dashboard: it reads the registry now, so what is checked is that it still does
+// --- dashboard: the student dashboard renders the WHOLE catalog from data, never by hand.
+// Rebuilt 2026-11-24 so a student can reach every lesson, Challenge, game and simulation
+// from one page. It reads the registry (lessons, Challenges, games) and
+// /data/simulations.json (simulations) at runtime and filters out retired and hidden
+// modules; so what is checked here is that it still does, and that no module link was
+// typed into the page where a new module would silently be missing.
 const dash = read('public/dashboard/index.html');
-if (!/fetch\('\/data\/modules-registry\.json'/.test(dash)) fail('dashboard: no longer fetches /data/modules-registry.json — MODULE_REGISTRY must come from the shared registry');
+if (!/fetch\('\/data\/modules-registry\.json'/.test(dash)) fail('dashboard: no longer fetches /data/modules-registry.json — the catalog must come from the shared registry');
+if (!/\/data\/simulations\.json/.test(dash)) fail('dashboard: no longer reads /data/simulations.json — simulations must come from that list');
 if (/const MODULE_REGISTRY = \[/.test(dash)) fail('dashboard: MODULE_REGISTRY is a hardcoded array again — it must be derived from the shared registry');
-const plannedByPack = {};
-for (const [pack, cfg] of Object.entries(PACKS)) {
-  plannedByPack[pack] = [...((dash.match(new RegExp(`const ${cfg.plannedConst} = \\[([^\\]]*)\\]`)) || ['', ''])[1]).matchAll(/'([^']*)'/g)].map(x => x[1]);
-  if (!plannedByPack[pack].length) fail(`dashboard: ${cfg.plannedConst} not found or empty`);
-  if (!new RegExp(`'${pack}':\\s*\\{[^}]*planned:\\s*${cfg.plannedConst}`).test(dash)) fail(`dashboard: LAB_PACKS['${pack}'] does not use ${cfg.plannedConst}`);
+if (!/!m\.retired/.test(dash) || !/!m\.hidden/.test(dash)) fail('dashboard: the catalog no longer filters out retired AND hidden modules');
+for (const m of REGISTRY.filter((x) => x.url)) {
+  const linked = new RegExp(`href=["']${m.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`).test(dash.replace(/<!--[\s\S]*?-->/g, ''));
+  if (linked) fail(`dashboard: "${m.id}" is linked by hand (href="${m.url}") — cards are rendered from the registry`);
 }
+// Every simulation folder is on the simulations list, so it is on the dashboard.
+const SIMS_FILE = 'public/data/simulations.json';
+let sims = [];
+try { sims = JSON.parse(read(SIMS_FILE)).simulations || []; } catch (e) { fail(`${SIMS_FILE}: missing or not valid JSON (${e.message})`); }
+for (const s of sims) {
+  if (!s.id || !s.name || !s.url || !s.blurb) fail(`${SIMS_FILE}: "${s.id || '?'}" needs id, name, url and blurb`);
+  else if (!fs.existsSync(path.join(root, 'public', s.url, 'index.html'))) fail(`${SIMS_FILE}: "${s.id}" url ${s.url} has no index.html`);
+}
+for (const e of fs.readdirSync(path.join(root, 'public/simulations'), { withFileTypes: true })) {
+  if (e.isDirectory() && !sims.some((s) => s.url === `/simulations/${e.name}/`)) fail(`public/simulations/${e.name}/ is not in ${SIMS_FILE}, so no student can find it from the dashboard`);
+}
+// Every lab the pack will hold, shipped or not — the hub shows a Coming Soon placeholder
+// for any planned lab not yet live (checked under "hubs" below). These lists used to live
+// as constants on the old dashboard; they are a build-time fact, so they live here now.
+const plannedByPack = Object.fromEntries(Object.entries(PACKS).map(([pack, cfg]) => [pack, cfg.planned || []]));
 for (const lab of dashLabs) {
   const cfg = PACKS[lab.pack]; if (!cfg) continue;
-  if (!plannedByPack[lab.pack].includes(lab.name)) fail(`dashboard: live lab "${lab.name}" is not in ${cfg.plannedConst}`);
+  if (!plannedByPack[lab.pack].includes(lab.name)) fail(`check-modules: live lab "${lab.name}" is not in PACKS['${lab.pack}'].planned`);
   if (!new RegExp(`^${cfg.hubPrefix.replace(/\//g, '\\/')}[a-z0-9-]+\\/$`).test(lab.url)) fail(`registry: lab "${lab.name}" url "${lab.url}" is not under ${cfg.hubPrefix}`);
 }
-// Each Challenge's completion predicate lives in the dashboard's MODULE_COMPLETION map
-// (JSON cannot hold a function); its threshold must still be the registry's badgeThreshold.
+// A Challenge only shows Done at its registry badgeThreshold, so every Challenge needs one.
 for (const ch of registry.filter(r => r.category === 'challenge')) {
-  const entry = (dash.match(new RegExp(`'${ch.id}':\\s*\\(d\\) =>[^\\n]*`)) || [])[0];
-  if (!entry) { fail(`dashboard: MODULE_COMPLETION has no predicate for challenge "${ch.id}"`); continue; }
-  const predThreshold = Number((entry.match(/finalScore >= (\d+)/) || [])[1]);
-  const declared = byId[ch.id].badgeThreshold;
-  if (predThreshold && declared && predThreshold !== declared) fail(`dashboard: challenge "${ch.id}" isComplete uses >= ${predThreshold} but the registry badgeThreshold is ${declared}`);
-}
-if (/labpack-status-pill[^>]*>\s*Social Intelligence Live/.test(dash)) fail('dashboard: status pill still hardcodes "Social Intelligence Live"');
-for (const cfg of Object.values(PACKS)) {
-  // Each pack's card must exist on the dashboard with the ids LAB_PACKS wires up.
-  const m = dash.match(new RegExp(`planned:\\s*${cfg.plannedConst},\\s*pillId:\\s*'([^']+)',\\s*counterId:\\s*'([^']+)',\\s*durationId:\\s*'([^']+)'`));
-  if (!m) { fail(`dashboard: LAB_PACKS entry for ${cfg.plannedConst} not found`); continue; }
-  for (const id of [m[1], m[2], m[3]]) if (!dash.includes(`id="${id}"`)) fail(`dashboard: LAB_PACKS references #${id} but no element has that id`);
+  if (!byId[ch.id].badgeThreshold) fail(`registry: challenge "${ch.id}" has no badgeThreshold — the dashboard cannot tell when it is done`);
 }
 
 // --- insider
@@ -474,9 +483,8 @@ for (const [pack, cfg] of Object.entries(PACKS)) {
   }
 }
 
-// --- Challenge cards on the dashboard: every Challenge in the registry gets a standalone
-// card at the same level, and its numbers must match the Challenge page it represents.
-// (The Real World Ready Challenge shipped reachable only through its Lab Pack hub once.)
+// --- Challenges: the registry's numbers must match the Challenge page they describe (the
+// dashboard renders every Challenge from the registry, so a wrong number would be shown).
 for (const [pack, cfg] of Object.entries(PACKS)) {
   const ch = registry.find(r => r.id === cfg.challengeId);
   if (!ch) { fail(`registry: no entry for challenge "${cfg.challengeId}"`); continue; }
@@ -489,12 +497,6 @@ for (const [pack, cfg] of Object.entries(PACKS)) {
   else if (threshold !== pageThreshold) fail(`registry: challenge "${ch.id}" badgeThreshold ${threshold} != ${cfg.challengePage} BADGE_THRESHOLD ${pageThreshold}`);
   if (!maxScore) fail(`registry: challenge "${ch.id}" has no maxScore`);
   else if (maxScore !== pageMax) fail(`registry: challenge "${ch.id}" maxScore ${maxScore} != ${cfg.challengePage} MAX_SCORE ${pageMax}`);
-  // The standalone card: its own launchCourse call plus the elements the status loop writes.
-  if (!dash.includes(`window.launchCourse('${ch.name}', '${ch.url}'`)) fail(`dashboard: no standalone Challenges-tab card launching "${ch.name}" at "${ch.url}"`);
-  for (const id of [`${ch.id}-status-badge`, `${ch.id}-best-score`]) {
-    if (!dash.includes(`id="${id}"`)) fail(`dashboard: challenge "${ch.id}" card is missing #${id} (CHALLENGE_CARDS writes it)`);
-  }
-  if (!dash.includes(`data-duration-for="${ch.id}"`)) fail(`dashboard: challenge "${ch.id}" card has no data-duration-for="${ch.id}"`);
 }
 
 // --- docs table

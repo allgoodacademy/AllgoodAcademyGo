@@ -376,6 +376,28 @@
     font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700;
     padding: 9px 18px; border-radius: 20px; letter-spacing: 0.04em;
   }
+  button.screen-link { border: 0; cursor: pointer; }
+  button.screen-link:disabled { opacity: .5; cursor: not-allowed; }
+  .screen-error { font-size: 13px; color: var(--rose); max-width: 460px; }
+  .screen-ok { font-size: 13px; color: var(--teal); max-width: 460px; }
+  .signin-or { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 320px; color: var(--text-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .signin-or::before, .signin-or::after { content: ''; flex: 1; height: 1px; background: var(--navy-border); }
+  .email-form { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; }
+  .email-form input {
+    font: inherit; font-size: 16px; color: var(--text-primary); background: var(--navy-surface);
+    border: 1px solid var(--navy-border); border-radius: 8px; padding: 10px 12px;
+  }
+  .email-form input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+  .email-form .screen-link { text-align: center; }
+  .text-btn { background: none; border: 0; padding: 4px; color: var(--teal); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .consent {
+    text-align: left; max-width: 460px; font-size: 13px; line-height: 1.6; color: var(--text-secondary);
+    background: var(--navy-surface); border: 1px solid var(--navy-border); border-radius: 10px; padding: 14px 16px;
+  }
+  .consent p + p { margin-top: 8px; }
+  .consent strong { color: var(--text-primary); }
+  .consent-check { display: flex; gap: 10px; align-items: flex-start; text-align: left; max-width: 460px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+  .consent-check input { margin-top: 3px; }
   .spinner {
     width: 26px; height: 26px; border-radius: 50%;
     border: 2px solid var(--navy-border); border-top-color: var(--teal);
@@ -591,6 +613,48 @@
   <div class="screen-body" id="loading-note">Contacting Mission Control…</div>
 </div>
 
+<!-- TEACHER SIGN IN: the one place anyone signs in. Google, or email and password for a
+     teacher without Google. -->
+<div class="screen" id="screen-signin" hidden>
+  <div class="brand-label">MISSION CONTROL</div>
+  <div class="screen-title">Teacher sign in</div>
+  <div class="screen-body">Sign in to see your classes, rosters and what you've assigned. Students don't need to sign in. They join your class with your class code at allgoodacademy.com/join.</div>
+  <button class="screen-link" id="btn-teacher-google" type="button">Continue with Google</button>
+  <div class="signin-or">or</div>
+  <form class="email-form" id="email-form" novalidate>
+    <input type="email" id="teacher-email" autocomplete="email" placeholder="School email" aria-label="Email">
+    <input type="password" id="teacher-password" autocomplete="current-password" placeholder="Password" aria-label="Password">
+    <button class="screen-link" id="btn-email-submit" type="submit">Sign in with email</button>
+    <button class="text-btn" id="btn-email-mode" type="button">New here? Create a teacher account</button>
+    <button class="text-btn" id="btn-email-reset" type="button">Forgot your password?</button>
+  </form>
+  <div class="screen-error" id="signin-error" hidden></div>
+  <div class="screen-ok" id="signin-ok" hidden></div>
+</div>
+
+<!-- FIRST CLASS: a signed-in teacher with no class yet. The consent notice (text unchanged
+     from the dashboard, where this flow used to live) is shown once, before the first class
+     is created, and its acceptance is the compliance record (users/{uid}.teacherConsent). -->
+<div class="screen" id="screen-setup" hidden>
+  <div class="brand-label">MISSION CONTROL</div>
+  <div class="screen-title" id="setup-title">Before You Set Up Mission Control</div>
+  <div id="setup-consent">
+    <div class="consent">
+      <p><strong>What we collect from your students:</strong> a nickname they choose (never a real name or email), their scores, and their activity in the lessons you assign. That's it.</p>
+      <p><strong>Why:</strong> so you can see their progress and so we can run the lessons themselves.</p>
+      <p><strong>Retention:</strong> kept while the account is active; you or a parent can request deletion anytime.</p>
+      <p>Data is never sold, and never used for advertising.</p>
+    </div>
+    <label class="consent-check" style="margin-top:14px">
+      <input type="checkbox" id="teacher-consent-checkbox">
+      <span>I confirm I am a teacher or school staff member authorized to use this tool with my students under my school's policies.</span>
+    </label>
+  </div>
+  <div class="screen-body" id="setup-ready" hidden>Setting this up gives you Mission Control — a code to share with students, and a roster where you can see their progress.</div>
+  <button class="screen-link" id="btn-create-class" type="button" disabled>I Agree — Continue</button>
+  <div class="screen-error" id="setup-error" hidden></div>
+</div>
+
 <div class="screen" id="screen-gate" hidden>
   <div class="brand-label">MISSION CONTROL</div>
   <div class="screen-title" id="gate-title">Teachers only</div>
@@ -636,6 +700,7 @@
        student/app shell every account uses, including a teacher's own learner view. It is
        no longer where any teacher function lives. -->
   <button class="topbar-exit" onclick="window.location.href='/dashboard/'">EXIT</button>
+  <button class="topbar-exit" id="btn-signout" type="button">SIGN OUT</button>
 </div>
 
 <div class="layout">
@@ -704,9 +769,9 @@
       <div class="mc-note">
         <strong>Games work differently.</strong> A student can play any of these with no
         account and no Task Force code — that's deliberate, it's how they find you.
-        Assigning one puts it on your roster and theirs, but if a student plays signed-out,
-        that play won't show up under their name. Every count below assumes they're signed in,
-        so treat it as a floor, not a total.
+        Assigning one puts it on your roster and theirs, but a play only shows up under a
+        student's name from a device that has joined your class at allgoodacademy.com/join.
+        Every count below counts only those, so treat it as a floor, not a total.
       </div>
       <div class="assign-grid" id="assign-games"></div>
 
@@ -822,7 +887,7 @@
 <script type="module" src="/js/auth-core.js"></script>
 <script type="module">
 import {
-    doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where,
+    doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 import { MODULE_DATA } from './module-data.js';
 import {
@@ -958,6 +1023,155 @@ function showGate(title, body, linkText, linkHref) {
     document.getElementById('screen-gate').hidden = false;
 }
 
+/* ── teacher sign in and first-class setup ────────────────────────────────────
+   Sign-in lives here and nowhere else: the site nav's "Teacher sign in" points at this
+   page. Google (AuthCore.teacherGoogleSignIn) or, for a teacher without Google, email and
+   password (AuthCore.teacherEmailSignIn). */
+const SIGNIN_ERRORS = {
+    'auth/popup-blocked': 'Your browser blocked the sign-in popup. Allow popups for this site and try again.',
+    'auth/unauthorized-domain': "This site isn't authorized for Google sign-in yet. Contact the site admin.",
+    'auth/cancelled-popup-request': 'Sign-in was interrupted. Please try again.',
+    'auth/email-already-in-use': 'That email already has a teacher account. Sign in instead.',
+    'auth/credential-already-in-use': 'That email already has a teacher account. Sign in instead.',
+    'auth/invalid-email': "That email address doesn't look right.",
+    'auth/weak-password': 'Use a password of at least 6 characters.',
+    'auth/invalid-credential': "That email and password don't match an account.",
+    'auth/wrong-password': "That email and password don't match an account.",
+    'auth/user-not-found': "That email and password don't match an account.",
+    'auth/too-many-requests': 'Too many tries. Wait a minute, or reset your password.',
+};
+function showOnly(id) {
+    ['screen-loading', 'screen-signin', 'screen-setup', 'screen-gate'].forEach((s) => {
+        document.getElementById(s).hidden = s !== id;
+    });
+}
+function showSignIn() {
+    showOnly('screen-signin');
+    const btn = document.getElementById('btn-teacher-google');
+    const err = document.getElementById('signin-error');
+    const okNote = document.getElementById('signin-ok');
+    const emailEl = document.getElementById('teacher-email');
+    const pwEl = document.getElementById('teacher-password');
+    const submit = document.getElementById('btn-email-submit');
+    const modeBtn = document.getElementById('btn-email-mode');
+    let mode = 'signin';
+    const say = (el, text) => { el.textContent = text; el.hidden = !text; };
+    modeBtn.onclick = () => {
+        mode = mode === 'signin' ? 'create' : 'signin';
+        submit.textContent = mode === 'create' ? 'Create teacher account' : 'Sign in with email';
+        modeBtn.textContent = mode === 'create' ? 'Already have an account? Sign in' : 'New here? Create a teacher account';
+        pwEl.autocomplete = mode === 'create' ? 'new-password' : 'current-password';
+        say(err, ''); say(okNote, '');
+    };
+    document.getElementById('email-form').onsubmit = async (e) => {
+        e.preventDefault();
+        say(err, ''); say(okNote, '');
+        const email = emailEl.value.trim();
+        if (!email || !pwEl.value) return say(err, 'Type your email and a password.');
+        submit.disabled = true;
+        const label = submit.textContent;
+        submit.textContent = 'Connecting…';
+        try {
+            await window.AuthCore.teacherEmailSignIn(email, pwEl.value, mode);
+            showOnly('screen-loading');
+            await load();
+        } catch (e2) {
+            console.error('[Mission Control] email sign-in failed', e2);
+            say(err, SIGNIN_ERRORS[e2 && e2.code] || 'Sign-in failed. Please try again.');
+        } finally {
+            submit.disabled = false;
+            submit.textContent = label;
+        }
+    };
+    document.getElementById('btn-email-reset').onclick = async () => {
+        say(err, ''); say(okNote, '');
+        const email = emailEl.value.trim();
+        if (!email) return say(err, 'Type your email above first, then tap "Forgot your password?" again.');
+        try {
+            await window.AuthCore.teacherPasswordReset(email);
+        } catch (e2) {
+            if (e2 && e2.code === 'auth/invalid-email') return say(err, SIGNIN_ERRORS['auth/invalid-email']);
+            console.warn('[Mission Control] password reset', e2);
+        }
+        // Same message whether or not the address has an account, so this can't be used to
+        // find out who does.
+        say(okNote, `If ${email} has a teacher account, a reset link is on its way.`);
+    };
+    btn.onclick = async () => {
+        err.hidden = true;
+        btn.disabled = true;
+        btn.textContent = 'Connecting…';
+        try {
+            await window.AuthCore.teacherGoogleSignIn();
+            showOnly('screen-loading');
+            await load();
+        } catch (e) {
+            console.error('[Mission Control] Google sign-in failed', e);
+            if (e && e.code !== 'auth/popup-closed-by-user') {
+                err.textContent = SIGNIN_ERRORS[e && e.code] || 'Sign-in failed. Please try again.';
+                err.hidden = false;
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Continue with Google';
+        }
+    };
+}
+
+// No 0/O/1/I, the commonest misreadings of a code on a board.
+function generateClassroomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    return code;
+}
+
+async function showSetup(user) {
+    const accepted = await window.AuthCore.hasAcceptedTeacherConsent(user.uid);
+    showOnly('screen-setup');
+    const btn = document.getElementById('btn-create-class');
+    const box = document.getElementById('teacher-consent-checkbox');
+    const err = document.getElementById('setup-error');
+    document.getElementById('setup-consent').hidden = accepted;
+    document.getElementById('setup-ready').hidden = !accepted;
+    document.getElementById('setup-title').textContent = accepted ? 'Set Up Mission Control' : 'Before You Set Up Mission Control';
+    btn.textContent = accepted ? 'Create my class' : 'I Agree — Continue';
+    btn.disabled = !accepted;
+    box.onchange = () => { btn.disabled = !box.checked; };
+    btn.onclick = async () => {
+        err.hidden = true;
+        btn.disabled = true;
+        try {
+            if (!accepted) await window.AuthCore.recordTeacherConsent(user.uid);
+            // Classroom first, then the role: firestore.rules only lets a uid become a
+            // teacher of a classroom it demonstrably owns.
+            const ref = doc(db, 'artifacts', appId, 'users', user.uid);
+            const snap = await getDoc(ref);
+            const name = (snap.exists() && snap.data().displayName) || user.displayName || 'Teacher';
+            const code = generateClassroomCode();
+            await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), {
+                teacherUid: user.uid,
+                teacherName: name,
+                createdAt: serverTimestamp(),
+            });
+            await setDoc(ref, { role: 'teacher', classroomCode: code }, { merge: true });
+            showOnly('screen-loading');
+            await load();
+        } catch (e) {
+            console.error('[Mission Control] class setup failed', e);
+            err.textContent = "Couldn't create your class. Please try again.";
+            err.hidden = false;
+            btn.disabled = false;
+        }
+    };
+}
+
+document.getElementById('btn-signout').addEventListener('click', async () => {
+    window.AuthCore.clearSignedIn();
+    try { await window.AuthCore.signOut(auth); } catch (e) { console.error('[Mission Control] sign out failed', e); }
+    window.location.href = '/';
+});
+
 /* Reads everything Mission Control shows, for one classroom.
 
    Firestore rules decide what a teacher may see, and they are not uniform:
@@ -970,27 +1184,15 @@ function showGate(title, body, linkText, linkHref) {
    (module_progress and game_scores both carry lastUpdated) and the dashboard stays useful. */
 async function load() {
     const user = await waitForAuthReady();
-    if (!user) {
-        // Still points at /dashboard/, and that is correct after the teacher functions
-        // moved here: sign-in lives in the app shell, and always did.
-        showGate('Sign in first', 'Mission Control reads your Task Force roster, so it needs to know who you are.', 'Go to the dashboard', '/dashboard/');
-        return;
-    }
-
-    const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
-    const me = meSnap.exists() ? meSnap.data() : {};
+    const meSnap = user ? await getDoc(doc(db, 'artifacts', appId, 'users', user.uid)) : null;
+    const me = meSnap && meSnap.exists() ? meSnap.data() : {};
+    // An existing teacher gets in exactly as before, however they first signed in
+    // (including the pre-2026-09 anonymous Task Force Leaders on their own device).
     if (me.role !== 'teacher' || !me.classroomCode) {
-        // Reworded now that assignment, the code and the roster export live HERE: the
-        // dashboard is no longer "where the teacher tools are", it is the app shell, and
-        // creating a Task Force is the one teacher action that still starts there. Saying
-        // "from the dashboard" without that distinction now reads as "the teacher page is
-        // somewhere else", which is the opposite of true.
-        showGate(
-            'Teachers only',
-            'Mission Control is the teacher home — your roster, your Task Force code, and what you assign. Your account isn’t a Task Force Leader yet. Creating a Task Force is a one-time step in the app itself: open the System Menu there and choose “Set Up Mission Control”, and this page is where you land afterwards.',
-            'Set up a Task Force', '/dashboard/',
-        );
-        return;
+        // Everyone else who is not signed in with a real account is asked to, here. A
+        // signed-in teacher without a class yet gets the one-time setup.
+        if (!user || user.isAnonymous) return showSignIn();
+        return showSetup(user);
     }
 
     state.code = me.classroomCode;
@@ -1452,7 +1654,7 @@ function renderGameStrip() {
         const played = st ? st.players : 0;
 
         const playLine = !st
-            ? 'No signed-in plays yet'
+            ? 'No plays from this class yet'
             : `${played} of ${total} played${st.avgPct == null ? '' : ` · avg ${st.avgPct}%`}`;
 
         // Three distinct states, and the middle one is the honest refusal the ticket asks
@@ -1463,7 +1665,7 @@ function renderGameStrip() {
         } else if (st) {
             weakLine = `Not enough plays to call it yet — ${played} of the ${WEAK_SKILL_MIN_PLAYERS} players needed`;
         } else {
-            weakLine = 'Nothing to report until someone plays it signed in';
+            weakLine = 'Nothing to report until someone in this class plays it';
         }
 
         return `<div class="game-tile${isAssigned ? ' assigned' : ''}">
@@ -2415,7 +2617,7 @@ load().catch((err) => {
     showGate(
         'Could not load Mission Control',
         `Something went wrong reading your Task Force: ${err && err.message ? err.message : 'unknown error'}`,
-        'Back to the dashboard', '/dashboard/',
+        'Reload Mission Control', window.location.pathname,
     );
 });
 </script>

@@ -14,24 +14,18 @@
          module script below (module scripts execute in document order, same as defer). -->
     <script type="module" src="/js/auth-core.js"></script>
 
-    <!-- Shared identify gate (age question / Sign In / Recruit Code) — see
-         /js/identity-gate.js. Runs the same gate whether this module is reached from the
-         dashboard or opened directly by a bookmarked/shared link. -->
-    <script type="module" src="/js/identity-gate.js"></script>
     <!-- Shared learning-analytics telemetry (sessions + events for Insider) — see /js/telemetry.js. -->
     <script type="module" src="/js/telemetry.js"></script>
     <script src="/js/message-hq.js" data-message-source="Room to Think Challenge"></script>
 
     <!-- FIREBASE — Firestore query helpers only. Identity/init lives in auth-core.js. -->
     <script type="module">
-        import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { doc, setDoc, serverTimestamp, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const appId = window.AuthCore.appId;
         const auth = window.AuthCore.auth;
         const db = window.AuthCore.db;
-
-        window.authSignOut = () => signOut(auth);
 
         // Telemetry: one "step" here = one scenario answered (24 total), which is the
         // meaningful unit of progress for a scenario feed — not the 4 page containers.
@@ -179,29 +173,6 @@
     <main class="flex-grow flex items-center justify-center h-[100dvh] w-full">
         <div class="app-shell" id="screen">
 
-                <!-- 1. STARTUP SCREEN -->
-                <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-allgood-secondary to-gray-900">
-                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
-                        <div class="flex-grow flex flex-col items-center justify-center px-4">
-                            <div class="relative flex flex-col items-center">
-                                <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                                <div class="-translate-x-6"><i data-lucide="shuffle" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"></i></div>
-                                <h2 class="text-xl md:text-2xl font-heading font-bold text-gray-300 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
-                                <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tighter relative z-10 drop-shadow-sm leading-normal pb-4 max-w-4xl">Room to Think Challenge</h1>
-                                <div class="mt-2 flex items-baseline justify-center gap-2 relative z-10 opacity-90">
-                                    <span class="text-white/60 text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold font-body">Powered by</span>
-                                    <span class="text-allgood-primary text-2xl sm:text-3xl font-heading font-bold">GoodBlock</span>
-                                    <span class="text-white/60 text-[8px] sm:text-[10px] tracking-widest uppercase font-bold font-body self-start mt-1">TM</span>
-                                </div>
-                            </div>
-                            <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- The identify gate (age question, Sign In, Recruit Code) is injected here
-                     at runtime by /js/identity-gate.js. -->
-
                 <!-- 3. HEADER -->
                 <header class="bg-allgood-secondary shadow-md navbar-content flex items-center">
                     <div id="flex-progress-bar"><div id="flex-progress-fill"></div></div>
@@ -217,7 +188,7 @@
                             <button id="message-toggle" onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Comms">
                                 <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                             </button>
-                            <button onclick="var s=false;try{s=localStorage.getItem('ag_signed_in')==='1';}catch(e){} if(s){window.AuthGate.guardedLeave(function(){window.location.href='/dashboard/';});}else{window.AuthGate && window.AuthGate.signIn();}" title="Already have an account? Sign in" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="log-in" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                            <a href="/dashboard/" title="My dashboard" aria-label="My dashboard" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="layout-grid" stroke-width="2.25" class="w-[22px] h-[22px]"></i></a>
 
                             <button id="menu-toggle" title="Menu" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
                         </div>
@@ -417,7 +388,7 @@
                                         <div class="w-full max-w-md mx-auto mt-8 bg-allgood-dark p-6 rounded-lg shadow-xl border-t-4 border-allgood-primary text-center">
                                             <h3 class="font-heading font-bold text-white text-lg mb-2">Your Next Pragmatic Action</h3>
                                             <p class="text-sm text-gray-300 mb-6">Now keep building — explore the rest of the Room to Think Lab Pack.</p>
-                                            <button onclick="window.AuthGate.guardedLeave(() => { window.location.href = '/jsh/room-to-think-lab/'; })" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
+                                            <button onclick="window.location.href = '/jsh/room-to-think-lab/';" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
                                                 <i data-lucide="play-circle" class="w-5 h-5 mr-2"></i> Explore the Lab Pack
                                             </button>
                                             <button onclick="window.performHardReset()" class="w-full bg-transparent text-gray-400 font-bold py-2 mt-3 hover:text-white transition-colors text-xs uppercase tracking-wider">
@@ -1011,7 +982,6 @@
             const nextButton = document.getElementById('next-button');
             const backButton = document.getElementById('back-button');
             const progressBar = document.getElementById('flex-progress-fill');
-            const startupScreen = document.getElementById('startup-screen');
 
             // Called once auth resolves with real progress from Firestore (see the
             // module script's onAuthStateChanged). Hydrates in-memory state so
@@ -1348,70 +1318,26 @@
                 lucide.createIcons();
             }
 
-            // --- STARTUP LOGIC ---
-            if (startupScreen) {
-                const warmUp = () => { if(window.initAudio) window.initAudio(); };
-                startupScreen.addEventListener('mousedown', warmUp, { once: true });
-                startupScreen.addEventListener('touchstart', warmUp, { once: true, passive: true });
+            // No screen in front of the Challenge: the student's anonymous session starts
+            // now and nothing is asked.
+            if (window.AuthCore) window.AuthCore.startSession().then((user) => {
+                if (!user) return;
 
-                let startupTriggered = false;
-                const handleStartup = async (e, skipSound) => {
-                    if (e && e.type === 'touchend') e.preventDefault(); // Prioritize immediate touch
-                    if (startupTriggered) return;
-                    startupTriggered = true;
+                const finalName = user.displayName || "Agent Learner";
+                window.currentUserName = finalName;
+                window.currentUserEmail = user.email;
+                if (window.updateUserDisplay) window.updateUserDisplay(finalName);
+                localStorage.setItem('aa_username', finalName);
+                localStorage.setItem('aa_uid', user.uid);
+                localStorage.setItem('aa_is_guest', user.isAnonymous);
 
-                    if(!skipSound && window.sfx) window.sfx.powerOn();
-
-                    startupScreen.style.opacity = '0';
-                    setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
-
-                    // GUEST-FIRST ENTRY (founder decision, 2026-09-09): nobody signs in to
-                    // start anything. This establishes an anonymous session and a readable
-                    // auto-assigned name and gets out of the way — no modal, no age
-                    // question, nothing to dismiss — then mounts the always-available
-                    // "Save my progress" affordance. The identify gate now fires at the
-                    // END (see the completion write below), not here.
-                    const { user, account } = await window.AuthGate.startGuestSession();
-                    if (!user) return;
-
-                    // Sync local display state from what the gate just resolved — the
-                    // module's own onAuthStateChanged already fired once for this sign-in,
-                    // before the gate finished setting a real displayName, so it can't be
-                    // relied on to have the final name.
-                    const finalName = user.displayName || (account && account.displayName) || "Agent Learner";
-                    window.currentUserName = finalName;
-                    window.currentUserEmail = user.email;
-                    if (window.updateUserDisplay) window.updateUserDisplay(finalName);
-                    localStorage.setItem('aa_username', finalName);
-                    localStorage.setItem('aa_uid', user.uid);
-                    localStorage.setItem('aa_is_guest', user.isAnonymous);
-
-                    window.logFinalScoreToFirestore({
-                        finalScore: 0,
-                        rank: "Session Started",
-                        completed: false,
-                        sessionId: window.sessionId
-                    });
-                    window.showPage(0);
-                };
-
-                startupScreen.addEventListener('click', handleStartup);
-                startupScreen.addEventListener('touchend', handleStartup);
-
-                // Someone actively moving between pages within the last hour shouldn't
-                // see this screen again. Wait for the first real auth resolution (not
-                // just DOMContentLoaded) so the signed-in-vs-not branch above is
-                // actually correct instead of racing Firebase's async auth check.
-                if (window.AuthCore && window.AuthCore.skipPowerUp) {
-                    // NOT `const unsub = ...`: a synchronous callback would hit the TDZ before
-                    // unsub exists (see docs/goodblock-integration-checklist.md).
-                    let unsub;
-                    unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
-                        unsub();
-                        handleStartup(null, true);
-                    });
-                }
-            }
+                window.logFinalScoreToFirestore({
+                    finalScore: 0,
+                    rank: "Session Started",
+                    completed: false,
+                    sessionId: window.sessionId
+                });
+            });
 
             // --- SCENARIO LOGIC ---
             function getScenarioTemplate(type, title, icon, choicesHtml, feedbackHtml) {
@@ -1866,16 +1792,6 @@
                 });
                 if (window.Telemetry) window.Telemetry.complete({ finalScore: currentScore, maxScore: MAX_SCORE, percentage: percentage, rank: rank });
 
-                // Same shape as the GoodBlocks' revealCompletion(): the offer hangs off the
-                // completion reveal being on screen, once, and only when the run is actually
-                // finished — there is nothing to congratulate a half-done Challenge on, and
-                // nothing worth asking them to keep. The rating is optional here too and this
-                // does not depend on it. Declining hides nothing.
-                if (isComplete) window._agCompletionReached = true;
-                if (isComplete && !window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
-                    window._agSaveOffered = true;
-                    setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
-                }
             };
 
             // --- TOC LOGIC ---
@@ -2004,29 +1920,7 @@
                 window.performHardReset();
             };
 
-            window.handleLogOut = async () => {
-                if (window.authSignOut) await window.authSignOut();
-                localStorage.removeItem('aa_username');
-                localStorage.removeItem('aa_email');
-                localStorage.removeItem('aa_uid');
-                localStorage.removeItem('aa_is_guest');
-
-                totalChallengeScore = 0;
-                answeredScenarioScores = {};
-                window.currentUser = null;
-                window.currentUserName = "Anonymous";
-
-                window.closeSystemMenu();
-
-                const startup = document.getElementById('startup-screen');
-                startup.style.display = 'flex';
-                setTimeout(() => startup.style.opacity = '1', 10);
-
-                window.showPage(0);
-                sfx.powerOff();
-            };
-
-            window.handleSystemExit = () => window.AuthGate.guardedLeave(() => { window.location.href = '/dashboard/'; });
+            window.handleSystemExit = () => { window.location.href = '/dashboard/'; };
 
             document.getElementById('current-year').textContent = new Date().getFullYear();
 
@@ -2077,10 +1971,6 @@
                 const feedContainer = document.getElementById('scenario-feed-container');
                 if (feedContainer) feedContainer.innerHTML = '';
                 updateTOC();
-                // A retake never replays the power-up splash: that screen is for genuine
-                // first entry from /dashboard, and it already spent its one-shot dismiss
-                // handler on the way in — re-showing it here just leaves it stuck on
-                // screen with no way to close it.
                 window.showPage(0);
                 sfx.powerOff();
             }

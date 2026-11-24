@@ -13,6 +13,8 @@
      DELIBERATELY NOT LOADED: /js/skill-routing.js — this game has its own stream and does
      not route into a GoodBlock (scripts/check-modules.js asserts this). -->
 <script type="module" src="/js/auth-core.js"></script>
+<!-- Every visitor gets a silent anonymous session; nothing is asked before playing. -->
+<script type="module">if (window.AuthCore) window.AuthCore.startSession();</script>
 <script type="module" src="/js/telemetry.js"></script>
 <style>
 /* Short local names, sourced from /assets/css/design-tokens.css (no values restated here). */
@@ -197,9 +199,9 @@ async function saveGameScore(){
   try{
     const c=window.AuthCore,u=c&&c.auth&&c.auth.currentUser;if(!u)return;
     const acct=c.getAccount?await c.getAccount(u.uid):null;
-    // A signed-in student has a profile: a 13+ account, a Recruit Code, or a Task Force
-    // membership. A bare anonymous session (a guest) gets telemetry only.
-    if(!acct||!(!u.isAnonymous||acct.recruitCode||acct.classroomCode))return;
+    // A score is kept for a student in a class (their teacher reads it) or a real account.
+    // A session that has joined no class gets telemetry only.
+    if(!acct||!(!u.isAnonymous||acct.classroomCode))return;
     const {doc,setDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
     const v=TM.visit,won=[...v.won].sort((a,b)=>a-b);
     await setDoc(doc(c.db,"artifacts",c.appId,"users",u.uid,"game_scores",VISIT_ID),{

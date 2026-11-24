@@ -368,7 +368,7 @@ Standard chassis. Rating (submit-gated, not star-gated), badge on `briefcase-bus
 - **Every interactive Case carries one reset control**, consistent position, context-aware label. Labels are specified per Case above.
 - **No student-facing copy references another GoodBlock**, by character, structure, or comparison.
 - **Build on the live Digital Citizenship file** (`public/jsh/digital-decisions-lab/digital-citizenship/index.html`) — not a bundled snapshot. Read `docs/goodblock-integration-checklist.md` for the site-wiring half.
-- **Never re-implement a shared module.** `auth-core.js`, `identity-gate.js`, `telemetry.js`, `message-hq.js`, and Jodi's SVGs are single files loaded by script tag.
+- **Never re-implement a shared module.** `auth-core.js`, `telemetry.js`, `message-hq.js`, and Jodi's SVGs are single files loaded by script tag.
 
 ## Do-not-undo list
 

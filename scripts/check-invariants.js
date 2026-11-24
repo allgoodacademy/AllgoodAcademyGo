@@ -7,12 +7,13 @@
 //   1. completion-write coupling  — a student who skips the optional rating is never
 //      recorded complete on the teacher's roster (5 of 7 GoodBlocks, 2026-09-11)
 //   2. GA4 surface scope         — COPPA: the analytics library must never load
-//      unconditionally on a page an under-13 Learner Recruit can reach
+//      unconditionally on a page a student (always anonymous) can reach
 //   3. bundled CDN assets        — school firewalls block unpkg/cdn.tailwindcss
 //   4. standards claim backing   — marketing must not assert a CASEL mapping that no
 //      artifact in the repo supports
-//   5. recruit-code close guard  — a child must not be able to dismiss their only copy
-//      of their Recruit Code with an unguarded tap
+//   5. no gate before content    — nothing is asked before a lesson, and students never
+//      sign in: the identity gate and power-up screens stay deleted (a child who closed
+//      the Recruit Code screen lost their work, three passes running; reset 2026-11-23)
 //   6. retention promise backing — a published deletion deadline must have a scheduled
 //      job behind it. privacy.html promised a 90-day purge from the day it shipped and
 //      nothing ever ran it (2026-09-11)
@@ -122,9 +123,9 @@ for (const file of LEARNER_SURFACES) {
   const src = read(file);
   if (src.includes(GTAG_LIB)) {
     fail('ga4',
-      `${file}: loads the GA4 library. This surface is reachable by an anonymous / under-13 ` +
-      `Learner Recruit. GA4 is permitted only on the signed-out marketing pages and on ` +
-      `/dashboard/ behind the ag_account gate.`);
+      `${file}: loads the GA4 library. This surface is reachable by a student (always ` +
+      `anonymous). GA4 is permitted only on the marketing pages and on /dashboard/ behind ` +
+      `the ag_account gate (signed-in teachers only).`);
   }
 }
 if (exists('public/dashboard/index.html')) {
@@ -135,7 +136,7 @@ if (exists('public/dashboard/index.html')) {
     if (!preceding.includes("ag_account")) {
       fail('ga4',
         `public/dashboard/index.html: the GA4 library is loaded without an ag_account gate ` +
-        `immediately preceding it. Only a confirmed 13+ account may trigger analytics.`);
+        `immediately preceding it. Only a signed-in (teacher) account may trigger analytics.`);
     }
   }
 }
@@ -244,17 +245,37 @@ if (claimingPages.length) {
   }
 }
 
-// --- 5. The Recruit Code panel must not be dismissable without a guard -------------
-if (exists('public/js/identity-gate.js')) {
-  const gate = read('public/js/identity-gate.js');
-  const closeIdx = gate.indexOf("getElementById('ag-btn-close').onclick");
-  if (closeIdx !== -1) {
-    const handler = gate.slice(closeIdx, closeIdx + 500);
-    if (!/ag-recruit-new/.test(handler) && !/confirm/i.test(handler)) {
-      fail('recruit-code',
-        `public/js/identity-gate.js: the shared close button calls resolveAndClose() with no ` +
-        `check for the ag-recruit-new panel and no confirmation. A child can dismiss the only ` +
-        `copy of their Recruit Code and lose their work permanently.`);
+// --- 5. Nothing stands in front of content, and students never sign in ------------
+// Identity reset, 2026-11-23: every visitor gets a silent anonymous session and plays
+// immediately; teachers are the only people who sign in, with Google, on
+// /mission-control/. The old shared gate (age question, 13+ sign-in, Recruit Codes,
+// save offer) and the tap-to-power-up screens it sat behind are deleted, and this keeps
+// them deleted. The failure it guards against is the one that recurred three times: a
+// child closing a pre-play identity screen and losing their work.
+{
+  if (exists('public/js/identity-gate.js')) {
+    fail('no-gate', `public/js/identity-gate.js is back. Students never sign in and nothing is asked ` +
+      `before content (identity reset, 2026-11-23).`);
+  }
+  for (const file of walk('public').filter((f) => f.endsWith('.html') && !f.startsWith('public/insider/'))) {
+    const src = read(file);
+    if (/identity-gate\.js|window\.AuthGate/.test(src)) {
+      fail('no-gate', `${file}: loads or calls the deleted identity gate.`);
+    }
+    if (/id="startup-screen"/.test(src)) {
+      fail('no-gate', `${file}: has a #startup-screen in front of content. Content renders on load; ` +
+        `the student's session starts with AuthCore.startSession().`);
+    }
+    if (/\/dashboard\/\?signin=1/.test(src)) {
+      fail('no-gate', `${file}: links to /dashboard/?signin=1. The only sign-in is "Teacher sign in" ` +
+        `-> /mission-control/.`);
+    }
+  }
+  if (exists('public/js/auth-core.js')) {
+    const core = read('public/js/auth-core.js');
+    if (/recruitSignIn|claimGuestCode|claimRecruitCode|createAccountWithEmail|finalizeThirteenPlusAccount/.test(core)) {
+      fail('no-gate', `public/js/auth-core.js: a student sign-up or Recruit Code claim path is back. ` +
+        `Students never make an account; the only sign-ins are the teacher ones on /mission-control/.`);
     }
   }
 }
@@ -462,10 +483,14 @@ function isScheduled(file) {
   } else {
     const src = read(JOIN);
     if (!src.includes('/js/classroom-join.js')) {
-      fail('join', `${JOIN}: no longer uses /js/classroom-join.js. There is one copy of the join logic, ` +
-        `shared with the dashboard's Profile join box — do not fork it.`);
+      fail('join', `${JOIN}: no longer uses /js/classroom-join.js. There is one copy of the join logic ` +
+        `— do not fork it.`);
     }
-    if (src.includes(GTAG_LIB)) fail('join', `${JOIN}: loads GA4 on a page brand-new under-13 guests land on.`);
+    if (src.includes(GTAG_LIB)) fail('join', `${JOIN}: loads GA4 on a page brand-new students land on.`);
+    if (!/id="nickname"[^>]*maxlength="24"/.test(src) || !src.includes('Nickname or first name. No last names.')) {
+      fail('join', `${JOIN}: the join form must ask for exactly a class code and a nickname (1-24 ` +
+        `characters, hint "Nickname or first name. No last names.").`);
+    }
   }
   const MC = 'public/mission-control/index.html';
   if (exists(MC)) {

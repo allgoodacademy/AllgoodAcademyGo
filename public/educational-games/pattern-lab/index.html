@@ -12,26 +12,8 @@
      on a brand literal reappearing inside a <style> block. -->
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
 
-<!-- The shared Tailwind bundle. Pattern Lab's own layout uses none of it — this is here
-     because /js/identity-gate.js builds its modal markup out of Tailwind classes, and a
-     page that loads the gate without the bundle renders an unstyled modal (the exact bug
-     scripts/check-js-classes.js exists to catch). Same-origin and cached, not a CDN, so
-     the reason this page is one self-contained file — working behind a school content
-     filter — still holds. -->
-<link rel="stylesheet" href="/assets/css/tailwind.min.css">
-
 <!-- Shared identity module — see /js/auth-core.js. -->
 <script type="module" src="/js/auth-core.js"></script>
-<!-- Shared identify gate. Loading this does NOT put a login wall on Pattern Lab: the gate
-     only ever opens when something calls offerSave()/ensureIdentified(), and here that is
-     the report screen's save offer and nothing else. Nobody signs in to START — the whole
-     session runs on an anonymous uid with no name and no profile document (see
-     anonymousSessionOnly() in /js/auth-core.js). The offer comes once there is a result
-     worth keeping, which is also the only point at which a stranger has a reason to say
-     yes. It routes an under-13 learner to a Recruit Code rather than an email address,
-     which is why saving goes through this shared gate and not a form of its own — most of
-     grades 5-8 are under 13. -->
-<script type="module" src="/js/identity-gate.js"></script>
 <!-- Shared telemetry pipe, tagged stream: 'pattern-lab' so these sessions are excludable
      from Insider's funnel and conversion metrics. See TICKET 5 in the block below and the
      `stream` note in /js/telemetry.js. -->
@@ -61,13 +43,6 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 
-/* Required by /js/identity-gate.js's injected #ag-modal, which shows and hides itself
-   purely by toggling these two class names. They are NOT Tailwind utilities (see the
-   NOT_TAILWIND list in scripts/check-js-classes.js), so every page loading the gate
-   defines them itself. Copied verbatim from the four games. */
-.modal-transition{transition:opacity .2s ease-in-out,transform .2s ease-in-out;}
-.hidden-modal{opacity:0;pointer-events:none;transform:translateY(-10px);}
-.visible-modal{opacity:1;pointer-events:auto;transform:translateY(0);}
 /* Mobile hardening for the shared modal, same as the games: a blurred backdrop over a
    busy background is a known source of invisible full-screen pointer-event traps on
    mobile Safari, and a card taller than the real visible area has no way to scroll. */
@@ -203,14 +178,8 @@ p.lede{font-size:14px;line-height:1.6;margin-bottom:16px;}
 
 .foot{display:flex;gap:10px;margin-top:20px;align-items:center;}
 .foot .skip{margin-left:auto;font-size:11.5px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;}
-/* "Save my results", beside Practice again on the report. Deliberately a secondary
-   treatment next to the orange primary: the offer is real, and it is not the point of
-   the page. */
-.btn.save{background:#fff;color:var(--teal-deep);border:2px solid var(--teal);}
-.btn.save:hover{background:#eef5f7;}
-.saved-note{font-size:11.5px;color:var(--sage);font-weight:bold;align-self:center;}
-/* "Last time you were here" — shown on the start screen to a learner who saved a previous
-   session. The Challenge resumes a half-finished run; a 5-to-15-minute adaptive session
+/* "Last time you were here" — shown on the start screen to a learner who finished a
+   session before on this device. The Challenge resumes a half-finished run; a 5-to-15-minute adaptive session
    has nothing useful to resume, so what carries across a visit is the RESULT. */
 .lastrun{background:#fff;border:1px solid var(--line);border-left:4px solid var(--sage);border-radius:9px;padding:13px 16px;margin:0 0 20px;font-size:12px;color:var(--muted);line-height:1.6;}
 .lastrun b{color:var(--dark);}
@@ -315,9 +284,8 @@ p.lede{font-size:14px;line-height:1.6;margin-bottom:16px;}
     <div class="home-popover-wrap">
       <button type="button" id="nav-more" aria-haspopup="true" aria-expanded="false">More &#9662;</button>
       <div class="home-popover" id="home-popover">
-        <a href="/" data-leave="/">Allgood Academy home</a>
-        <a href="/educational-games/" data-leave="/educational-games/">Browse games</a>
-        <a href="/dashboard/?signin=1" data-leave="/dashboard/?signin=1">Sign in</a>
+        <a href="/">Allgood Academy home</a>
+        <a href="/educational-games/">Browse games</a>
       </div>
     </div>
   </div>
@@ -438,10 +406,10 @@ const SUBTEST_IDS = SUBS.map(s => s.id);
 /* HOW IT IS BEING USED — asked first on the start screen.
 
    'solo'  : one learner on their own device. Exactly the behaviour Pattern Lab always
-             had — telemetry, the results report, the save offer.
+             had — telemetry and the results report.
    'class' : a teacher projecting it and the room answering together. Plays identically
              but records NOTHING: no anonymous sign-in, no telemetry session, no events,
-             no save or Recruit Code offer. A whole class answering as one "learner" would
+             no saved result. A whole class answering as one "learner" would
              otherwise land in the level-calibration data as a single, very odd student —
              and that data is the reason Pattern Lab is free.
 
@@ -464,8 +432,8 @@ const tele = (fn, ...args) => {
 /* A uid, and nothing else.
  *
  * firestore.rules #10/#11 only accept a write that names request.auth.uid, so the pipe
- * needs a Firebase session. Every other module gets one from guestStart()/silentSignIn(),
- * which also write a users/{uid} profile with a nickname — for Pattern Lab that would
+ * needs a Firebase session. Every other module gets one from startSession(), which also
+ * writes a users/{uid} profile with a nickname — for Pattern Lab that would
  * both contradict "no account" and add a phantom learner to Insider's user counts, which
  * is the exact thing Ticket 5 exists to prevent. anonymousSessionOnly() signs in
  * anonymously and stops there: no profile document, no display name, no ag_account
@@ -482,15 +450,11 @@ async function patternLabSession() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   SAVING A RESULT
+   THE LAST RESULT
 
-   Same shape as the four games: no login wall, no sign-in to start, and one offer at
-   the end, when there is something worth keeping. Everything before the report runs on
-   an anonymous uid with no name and no profile document.
-
-   The offer goes through the SHARED gate rather than a form of its own, because most of
-   grades 5-8 are under 13: the gate routes them to a Recruit Code instead of asking a
-   learner for an email address. That is not a detail we can reimplement here correctly.
+   A solo session's result is kept automatically on this device's anonymous session, with
+   no step and no question, and shown back as "last time you were here". There is no
+   save offer: nobody signs in anywhere on Allgood Academy except teachers.
 
    Deliberately NOT borrowed from the Challenge: its cumulative-score HUD and its
    certification badge. Pattern Lab reports nine skills separately and produces no single
@@ -498,8 +462,7 @@ async function patternLabSession() {
    closest thing there is to a score promise — the one claim Ticket 4 exists to prevent.
    ───────────────────────────────────────────────────────────────────────────── */
 
-const gate = () => window.AuthGate || null;
-let lastRun = null;   // a saved learner's previous result, loaded once at start-up
+let lastRun = null;   // this device's previous result, loaded once at start-up
 
 // Persist the profile itself, not a half-finished queue. The Challenge resumes an
 // unfinished run because it is long and finish-once; a 5-to-15-minute adaptive session
@@ -521,40 +484,6 @@ async function loadLastRun(){
     const p = await core.loadModuleProgress('pattern-lab');
     return (p && p.lastRun) || null;
   }catch(e){ return null; }
-}
-
-/* The end-of-session save offer.
- *
- * Once per round, never re-nagging: offerSave() itself no-ops for a session that is
- * already identified, and _agSaveOffered guards the auto-offer within a round. Both are
- * the four games' own pattern. */
-async function offerSaveOnce(summary){
-  const g = gate();
-  if(!g || !g.offerSave || window._agSaveOffered) return;
-  window._agSaveOffered = true;
-  try{
-    const res = await g.offerSave({});
-    if(res && res.saved){
-      // A save is a real signup, and it belongs to the pattern-lab stream so it can be
-      // counted as one WITHOUT landing in the game->GoodBlock conversion rate. Recorded
-      // in telemetry only: no new field on the user document, nothing for the rules to
-      // allow, and the off-funnel export already carries it.
-      tele('summary', { saved: true });
-      tele('track', 'pattern_lab_save', { alreadySaved: !!res.alreadySaved });
-      await persistRun(summary);
-      const note = document.getElementById('save-state');
-      if(note) note.outerHTML = '<span class="saved-note">\u2713 Saved</span>';
-    }
-  }catch(e){ console.warn('[PatternLab] save offer failed', e); }
-}
-
-// Leaving the report before the auto-offer has fired abandons it. Every exit off that
-// screen goes through here instead, exactly as the games' exits do.
-function leave(url){
-  if(MODE === 'class'){ window.location.href = url; return; }
-  const g = gate();
-  if(g && g.guardedLeave){ g.guardedLeave(() => { window.location.href = url; }); }
-  else window.location.href = url;
 }
 
 // auth-core.js and telemetry.js are module scripts and have not necessarily run when this
@@ -947,9 +876,8 @@ function report(){
       <button class="btn orange" id="again">Another round \u2192</button>
     </div>` : `<div class="foot" style="margin-top:24px;flex-wrap:wrap">
       <button class="btn orange" id="again">Practice again \u2192</button>
-      <button class="btn save" id="save-state">Save my results</button>
     </div>
-    <p class="muted" style="margin-top:10px">Saving keeps this profile so you can see it next time. It takes one step and asks for no email address.</p>
+    <p class="muted" style="margin-top:10px">This profile is kept on this device, so you can see it next time.</p>
     <!-- TICKET 4 — word for word the same paragraph as public/pattern-lab/index.html.
          scripts/check-invariants.js compares the two and fails on any difference. Each
          clause does a specific job (names the mark's owner, disclaims sponsorship,
@@ -959,14 +887,14 @@ function report(){
 
   card().innerHTML=html;
 
-  // Class warm-up ends here: no save offer, no Recruit Code, no roll-up. Nothing below
+  // Class warm-up ends here: no saved result, no roll-up. Nothing below
   // this line runs for a class.
   if(CLS){
     document.getElementById('again').onclick=()=>start();
     return;
   }
 
-  // Strongest skill with enough behind it to name, for the save record and the
+  // Strongest skill with enough behind it to name, for the saved result and the
   // "last time you were here" line. Null when nothing cleared — never invented.
   const best=rows.filter(r=>r.answered&&r.top).sort((a,b)=>b.top-a.top)[0];
   const runSummary={
@@ -975,17 +903,8 @@ function report(){
     strongest: best?{name:best.s.name,level:lvName(best.top)}:null,
   };
 
-  document.getElementById('again').onclick=()=>{
-    // A new round gets its own chance to offer, exactly as Play Again does in the four
-    // games. offerSave() still no-ops for a session that is already saved.
-    window._agSaveOffered=false;
-    tele('restart'); start();
-  };
-  document.getElementById('save-state').onclick=()=>{ window._agSaveOffered=false; offerSaveOnce(runSummary); };
-
-  // The courtesy auto-offer, a beat after the report settles — the same timing the
-  // GoodBlocks and Challenges use. A learner who leaves first is covered by leave().
-  setTimeout(()=>offerSaveOnce(runSummary), 1200);
+  document.getElementById('again').onclick=()=>{ tele('restart'); start(); };
+  persistRun(runSummary);
 
   /* Roll-up for THIS visit. Merged onto the session document rather than only written as
      an event, so a later calibration pass can read a whole session in one document.
@@ -1026,20 +945,6 @@ document.addEventListener('click',e=>{
     morePop.classList.remove('show');
     moreBtn.setAttribute('aria-expanded','false');
   }
-});
-
-/* Every exit off this page routes through guardedLeave, so someone who finishes and
-   immediately taps "Browse games" is still offered the save the auto-offer had not
-   reached yet. The href stays real — a middle-click, a copied link and a crawler all get
-   an ordinary link — and only the plain left-click is intercepted. */
-morePop.querySelectorAll('a[data-leave]').forEach(a=>{
-  a.addEventListener('click',e=>{
-    if(e.metaKey||e.ctrlKey||e.shiftKey||e.button!==0) return;
-    e.preventDefault();
-    morePop.classList.remove('show');
-    moreBtn.setAttribute('aria-expanded','false');
-    leave(a.dataset.leave);
-  });
 });
 
 start();

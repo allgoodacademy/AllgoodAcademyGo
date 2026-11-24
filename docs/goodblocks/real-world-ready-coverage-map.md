@@ -298,7 +298,7 @@ This is the same class of collision the GoodBlock Builder skill documents from a
 Audited against the skill's Phase 3 checklist.
 
 **Correct, no action needed:**
-- All four shared modules loaded, none re-implemented: `auth-core.js`, `identity-gate.js`, `telemetry.js`, `message-hq.js`
+- All shared modules loaded, none re-implemented: `auth-core.js`, `telemetry.js`, `message-hq.js` (`identity-gate.js` was deleted in the 2026-11 identity reset)
 - Jodi's mood SVGs referenced by URL from `assets/jodi`, not re-embedded inline
 - Firestore completion writes `completed: true` with `gameName: "Money as a Skill"`, matching the module registry's `isComplete` predicate
 

@@ -8,12 +8,8 @@
 <script src="/assets/js/lucide.min.js"></script>
 <!-- Shared identity module — see /js/auth-core.js. -->
 <script type="module" src="/js/auth-core.js"></script>
-<!-- Shared identity gate (age question / Sign In / Recruit Code) — see /js/identity-gate.js.
-     Loading this does NOT put a login wall on the game: the gate only ever opens when
-     something explicitly calls window.AuthGate.offerSave()/ensureIdentified(), same as
-     every GoodBlock, Read the Signal, and Before You Send. Here that's the end-screen
-     save offer. -->
-<script type="module" src="/js/identity-gate.js"></script>
+<!-- Every visitor gets a silent anonymous session; nothing is asked before playing. -->
+<script type="module">if (window.AuthCore) window.AuthCore.startSession();</script>
 <!-- Shared telemetry pipe (artifacts/{appId}/sessions + /events) — the same one every
      GoodBlock and Challenge uses, replacing this game's own root-level game_sessions
      writer. See /js/telemetry.js. -->
@@ -24,18 +20,6 @@
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  /* Required by /js/identity-gate.js's injected #ag-modal — copied verbatim from
-     read-the-signal/index.html and before-you-send/index.html. */
-  .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
-  .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
-  .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
-
-  /* Mobile hardening for #ag-modal — same fix as the other two games (a backdrop-filter
-     over a busy background is a known cause of an invisible, fully-blocking overlay on
-     mobile Safari/Android WebViews). */
-  #ag-modal { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-  #ag-modal > div { max-height: 90dvh; max-height: 90vh; overflow-y: auto; }
 
   :root {
     --teal: var(--color-teal);
@@ -327,13 +311,13 @@
               <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
             </button>
             <div class="home-popover" id="home-popover">
-              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/'; })">Return to dashboard</button>
-              <button onclick="window.AuthGate.guardedLeave(handleRestartFromPopover)">Restart game</button>
-              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse games</button>
-              <button onclick="window.location.href='/dashboard/?signin=1'">Already have an account? Sign in</button>
+              <button onclick="window.location.href='/';">Return to dashboard</button>
+              <button onclick="handleRestartFromPopover()">Restart game</button>
+              <button onclick="window.location.href='/educational-games/';">Browse games</button>
+              <button onclick="window.location.href='/dashboard/';">My dashboard</button>
             </div>
           </div>
-          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">
+          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.location.href='/educational-games/';">
             <i data-lucide="gamepad-2" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
           </button>
         </div>
@@ -972,8 +956,6 @@ function recordSession(routingReason) {
 }
 
 function startGame() {
-  window._agSaveOffered = false;
-  window._agCompletionReached = false;
   session = buildRumorSession(scenarios);
   currentIdx = 0; score = 0;
   choiceTally = { forward: 0, verify: 0, stop: 0 };
@@ -1277,10 +1259,10 @@ function showEnd() {
     <div class="deeper-card">
       <div class="deeper-label">WANT TO GO DEEPER?</div>
       <div class="deeper-msg">${deeperMsg}</div>
-      <button class="deeper-btn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href = deeperLink; })">Open the lab →</button>
+      <button class="deeper-btn" onclick="markDeeperClicked(); window.location.href = deeperLink;">Open the lab →</button>
     </div>
-    <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
-    <button class="hub-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse more games</button>
+    <button class="play-again-btn" onclick="restartGame()">Play again</button>
+    <button class="hub-btn" onclick="window.location.href='/educational-games/';">Browse more games</button>
     <div class="wordmark" style="margin-top:16px">Allgood Academy · Free for all learners, always.</div>
   `;
 
@@ -1293,16 +1275,6 @@ function showEnd() {
       .catch(() => recordSession(routingReasonFrom(null, fallbackReason)));
   } else {
     recordSession(routingReasonFrom(null, fallbackReason));
-  }
-
-  // Same shared save/claim offer as the other two games (window.AuthGate.offerSave()) —
-  // one save flow across the site instead of a bespoke one for each game.
-  window._agCompletionReached = true;
-  if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
-    window._agSaveOffered = true;
-    setTimeout(() => {
-      window.AuthGate.offerSave().catch((e) => console.error('[TheRumorMill] offerSave failed', e));
-    }, 1200);
   }
 }
 

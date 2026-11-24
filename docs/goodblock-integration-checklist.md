@@ -11,24 +11,24 @@ add it here so the next one doesn't repeat it.
 
 ## Identity
 
-- [ ] Loads the shared modules, in this order, before any inline module script:
-  `<script type="module" src="/js/auth-core.js"></script>` then
-  `<script type="module" src="/js/identity-gate.js"></script>`.
-- [ ] The startup screen's click handler calls `await window.AuthGate.ensureIdentified()`.
-- [ ] The `skipPowerUp` fast-path (auto-continue for someone active in the last hour) uses:
+Students never sign in (identity reset, 2026-11-23). Nothing is asked before a lesson and
+there is no startup / power-up screen: the content is the first thing on the page.
+
+- [ ] Loads the shared modules before any inline module script:
+  `<script type="module" src="/js/auth-core.js"></script>`, then `telemetry.js` and
+  `message-hq.js`. There is no identity gate to load — `identity-gate.js` is deleted, and
+  `check:invariants` fails a page that references it.
+- [ ] Starts the student's session on load, with nothing in front of it:
   ```js
-  let unsub;
-  unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
-      unsub();
-      handleStartup();
-  });
+  if (window.AuthCore) window.AuthCore.startSession();
   ```
-  **Never `const unsub = onAuthStateChanged(...)` with `unsub()` called inside that same
-  callback.** Real Firebase defers the callback a tick so this usually doesn't crash, but a
-  test mock (or a fast enough browser) can invoke it synchronously, throwing
-  `ReferenceError`/`unsub is not a function` before the callback's own body finishes. This
-  exact bug shipped once already (fixed first in `identity-gate.js`, then found again and
-  fixed in Social Intelligence) — grep any new GoodBlock for `const unsub` before shipping.
+  Guarded, because a classic script's `DOMContentLoaded` handler must not die if the
+  Firebase SDK was blocked — the lesson still plays, it just can't save.
+- [ ] No save offer, no "Save my progress", no end-of-module sign-in. Progress saves itself
+  to the anonymous session (`AuthCore.saveModuleProgress`); a student who wants their work
+  to reach a teacher joins at `/join/` with a class code and a nickname.
+- [ ] The header has no sign-in button. Where older modules had one, there is a "My
+  progress" link to `/dashboard/` instead.
 
 ## Registry registration
 
@@ -112,7 +112,7 @@ This used to be ~100 lines of copy-pasted button/modal/JS in every single module
 which is exactly how Privacy & Security shipped with **no** Message HQ at all: nobody
 copied it forward. It's now standardized in `/js/message-hq.js`.
 
-- [ ] Add one script tag, after `identity-gate.js`:
+- [ ] Add one script tag, after `auth-core.js`:
   ```html
   <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: <Module Name>"></script>
   ```
@@ -137,9 +137,9 @@ copied it forward. It's now standardized in `/js/message-hq.js`.
   ```js
   document.addEventListener('messagehq:sent', () => { /* page-specific side effect */ });
   ```
-- [ ] The shared `openMessageModal` already gates on `window.AuthGate.ensureIdentified()`
-  when identity-gate.js is loaded (it is on every module) — a signed-out visitor is asked
-  to sign in before the modal opens, not after typing a message and hitting send.
+- [ ] Writing to the team is for signed-in teachers only; a student (always anonymous)
+  can read every Comms item but sees "Writing a note to the team is for teachers" on
+  compose. That check lives in `message-hq.js` — don't re-implement it.
 
 ## Firestore rules
 
@@ -251,8 +251,8 @@ disagree.
 
 ## Before calling a GoodBlock's integration done
 
-- [ ] Click through as a fresh Learner Recruit (never signed in before) — confirm the
-  identity gate appears, resolves, and the module actually starts.
+- [ ] Open it in a fresh browser profile (never visited before) — confirm the lesson is
+  playable on the first tap, with no screen, question or prompt in front of it.
 - [ ] Reach partway through, then simulate a return visit (reload after re-establishing the
   session) — confirm progress actually restores instead of restarting from the top.
 - [ ] Confirm every launch point (dashboard card, hub card, hub menu entry) opens in the
@@ -278,10 +278,10 @@ actually broke in production once:
 | Check | What it will fail you for |
 |---|---|
 | `[completion]` | Coupling the completion write to the optional star rating, or leaving the `Skip` path with no completion write at all. See the Completion tracking section above. |
-| `[ga4]` | Loading the GA4 library on any surface an anonymous or under-13 Learner Recruit can reach. COPPA, not preference. |
+| `[ga4]` | Loading the GA4 library on any surface a student (always anonymous) can reach. COPPA, not preference. |
 | `[cdn]` | Pulling layout or icons from `unpkg` / `cdn.tailwindcss.com`. School firewalls block both; bundle locally. |
 | `[standards]` | Adding a GoodBlock to a marketing standards table with no coverage map behind it, or with one that is DRAFT, unsigned, or has no readable Status line. |
-| `[recruit-code]` | Letting the gate's shared close button dismiss the Recruit Code panel without a guard. |
+| `[no-gate]` | Bringing back anything in front of content: `identity-gate.js`, `window.AuthGate`, a `#startup-screen`, a `/dashboard/?signin=1` link, or a student sign-up / Recruit Code claim path in `auth-core.js`. |
 
 **When you ship GoodBlock #8, two lists need it added, not one:**
 

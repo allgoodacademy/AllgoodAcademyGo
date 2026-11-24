@@ -111,9 +111,11 @@ service cloud.firestore {
 
     // What a client is allowed to do to the two privileged fields on its OWN profile.
     // Everything else on the profile stays freely writable by its owner.
-    //   role         : may be left alone, set to 'student', or set to 'teacher' ONLY for a
-    //                  classroom this uid demonstrably owns (the become-a-teacher flow
-    //                  creates the classroom first, then flips the role).
+    //   role         : may be left alone, set to 'student', or set to 'teacher' ONLY by a
+    //                  signed-in (Google or email) account for a classroom this uid owns
+    //                  (Mission Control's setup creates the classroom first, then flips
+    //                  the role). An existing teacher's role is "left alone", so teachers
+    //                  from before the teacher-sign-in rule keep working unchanged.
     //   classroomCode: may be left alone, cleared, or set to a classroom that exists
     //                  (the join-by-code flow — knowing the code is the trust model, as
     //                  for rule #5; joining someone else's classroom grants no read access).
@@ -129,10 +131,20 @@ service cloud.firestore {
         || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 60);
     }
 
+    // Only teachers sign in (identity reset, 2026-11-23), with Google or with an email and
+    // password. True when either is one of this account's linked providers — whether the
+    // session signed in with it or linked it onto an earlier anonymous session — and false
+    // for a purely anonymous session (a student). Read with get() defaults so a token
+    // without the claim is a plain false, never an error.
+    function hasTeacherSignIn() {
+      return request.auth.token.get('firebase', {}).get('identities', {}).keys().hasAny(['google.com', 'email']);
+    }
+
     function profileFieldsOk(appId, priorRole, priorCode) {
       return (request.resource.data.get('role', NONE()) == priorRole
               || request.resource.data.get('role', NONE()) == 'student'
               || (request.resource.data.get('role', NONE()) == 'teacher'
+                  && hasTeacherSignIn()
                   && classroomOwnedBy(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid)))
         && classroomCodeOk(appId, priorCode)
         && displayNameOk();
@@ -148,7 +160,7 @@ service cloud.firestore {
     //    anonymous guest, could merge {role:'teacher', classroomCode:'<someone-elses>'} onto
     //    their own profile in one write. Rules #4/#6 then read role and classroomCode back
     //    off that same self-written document to decide who was a teacher, so a single write
-    //    bought a full classroom roster: names, emails, ageTier, recruit codes and progress.
+    //    bought a full classroom roster: names, emails and progress.
     match /artifacts/{appId}/users/{userId} {
       allow get: if isOwner(userId) || isAllowlistedAdmin();
 
@@ -251,7 +263,11 @@ service cloud.firestore {
     //      codes are otherwise shared out-of-band, no student/teacher should browse all classrooms
     match /artifacts/{appId}/classrooms/{code} {
       allow get: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.teacherUid == request.auth.uid;
+      // Creating a class is the teacher step, so it needs a teacher sign-in (Google or email),
+      // never an anonymous student session. Updating your own class (assignments) does not:
+      // existing teachers keep working as they are.
+      allow create: if request.auth != null && hasTeacherSignIn()
+        && request.resource.data.teacherUid == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.teacherUid == request.auth.uid;
       allow list: if isAllowlistedAdmin();
     }
@@ -389,49 +405,31 @@ service cloud.firestore {
     //     to. `create` is pinned to the requester's own uid so one student cannot file a
     //     selection under another's name, exactly as the feedback rule does.
     //
-    //     Every document carries ageTier (stamped in auth-core.js recordTopicSelection),
-    //     so an under-13 row can be found for a parental deletion request without joining
-    //     back to the user document — the same property that made course_feedback
-    //     answerable. It is listed in scripts/prune-telemetry.js for the same reason.
+    //     Rows written before the 2026-11 identity reset carry ageTier; newer rows do not,
+    //     because every student is now treated as a child and a deletion request is answered
+    //     by uid. It is listed in scripts/prune-telemetry.js.
     match /artifacts/{appId}/topic_selections/{selectionId} {
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow read: if isAllowlistedAdmin();
       allow delete: if isAllowlistedAdmin();
     }
 
-    // 9. NEW — Recruit Codes: a Learner Recruit's memorable passphrase (e.g.
-    //    "arctic-fox-trot"), doubling as the portable copy of their identity + progress
-    //    used to reclaim their account on a different device (Firebase's anonymous auth
-    //    has no built-in way to resume a specific old anonymous session from a code alone).
-    //    Deliberately the SAME trust model as a classroom code above: knowing the exact
-    //    passphrase is treated as sufficient proof of ownership, not a cryptographic
-    //    secret — that's why `update` is open to any signed-in user rather than gated to
-    //    the current uid on the doc, unlike classroom's update rule. Redeeming a code on a
-    //    new device is *itself* a legitimate ownership change (the new device's uid isn't
-    //    the one already on the document), so an owner-gated update would block the exact
-    //    thing this collection exists to do.
-    //    - GET: anyone signed in can look up a code (needed to validate uniqueness when
-    //      generating a new one, and to redeem an existing one)
-    //    - CREATE: only naming yourself as the code's initial owner
-    //    - UPDATE: open to any signed-in user — covers both redemption (uid pointer moves
-    //      to the new device) and ongoing progress mirroring from whichever uid is active
-    //    - LIST: admin allowlist only, same as classrooms — codes aren't meant to be browsed
+    // 9. Recruit Codes — READ-ONLY, legacy (identity reset, 2026-11-23). The pre-2026-11
+    //    model gave each under-13 Learner Recruit a passphrase (e.g. "arctic-fox-trot-4821")
+    //    whose document held a portable copy of their progress. Nothing creates or updates
+    //    one any more. Until the sunset (2027-06-30) a returning student can type their
+    //    code on the dashboard ("Have an old code?") and AuthCore.restoreFromRecruitCode()
+    //    copies that progress into their anonymous session — which needs exactly one thing:
+    //    a single-document GET by the exact code. Knowing the code is the trust model, as
+    //    it always was.
+    //    - GET: any signed-in session, one document by its exact id
+    //    - LIST (any query or enumeration): admin allowlist only — codes are never browsable
+    //    - CREATE / UPDATE: nobody (falls to the catch-all deny)
+    //    - DELETE: admin only (Insider's deletion-request tool)
+    //    The data itself is kept; deleting it is a separate, later decision.
     match /artifacts/{appId}/recruit_codes/{code} {
       allow get: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      // Field-constrained (not field-open) update: the trust model above is deliberately
-      // "knowing the code is enough," but that should still only ever move the fields the
-      // real write paths in auth-core.js actually touch — uid + updatedAt (redemption,
-      // redeemRecruitCode / mirrorRecruitClassroom / mirrorRecruitProgress), progress
-      // (backfillRecruitProgress, mirrorRecruitProgress), classroomCode
-      // (mirrorRecruitClassroom, mirrorRecruitProgress), and displayName/avatar (kept in
-      // sync by _claimCode/redeemRecruitCode) — never createdAt or anything else.
-      allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['uid', 'updatedAt', 'progress', 'classroomCode', 'displayName', 'avatar']);
       allow list: if isAllowlistedAdmin();
-      // Deletion-request fulfilment: Insider removes the code doc along with the rest
-      // of a Learner Recruit's data, otherwise their mirrored progress would linger.
       allow delete: if isAllowlistedAdmin();
     }
 

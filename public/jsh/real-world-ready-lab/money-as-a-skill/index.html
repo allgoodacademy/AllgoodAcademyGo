@@ -19,7 +19,6 @@
          string on message-hq.js.
          ============================================================================ -->
     <script type="module" src="/js/auth-core.js"></script>
-    <script type="module" src="/js/identity-gate.js"></script>
     <script type="module" src="/js/telemetry.js"></script>
     <script src="/js/message-hq.js" data-message-source="Jodi's Schoolhouse: Money as a Skill"></script>
 
@@ -316,22 +315,6 @@
             Lucide library. Reused verbatim on the completion badge so what you see before you
             start and what you earn for finishing are one mark.
         -->
-        <div id="startup-screen" class="absolute inset-0 z-[300] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-gradient-to-br from-[#1a1000] via-[#2d1a00] to-[#0f0900]">
-            <div class="absolute inset-0 opacity-40" style="background: radial-gradient(circle at 50% 35%, rgba(201,125,26,0.4), transparent 60%);"></div>
-            <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
-                <div class="flex-grow flex flex-col items-center justify-center px-4">
-                    <div class="relative flex flex-col items-center">
-                        <div class="absolute inset-0 bg-white/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                        <i data-lucide="coins" class="w-24 h-24 text-white mb-6 relative z-10 drop-shadow-[0_0_15px_rgba(201,125,26,0.7)]"></i>
-                        <h2 class="text-xl md:text-2xl font-heading font-bold text-amber-200 mb-1 relative z-10 tracking-widest uppercase">Allgood Academy</h2>
-                        <h1 class="text-4xl md:text-6xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-amber-200 tracking-tighter relative z-10">Jodi's Schoolhouse</h1>
-                        <p class="mt-4 text-amber-300 font-bold text-lg relative z-10 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">GoodBlock: Money as a Skill</p>
-                        <p class="mt-2 text-white/50 text-[10px] tracking-[0.3em] uppercase font-bold relative z-10">Real World Ready Lab Pack</p>
-                    </div>
-                    <p class="mt-16 text-white/60 text-xs tracking-[0.4em] uppercase font-bold group-hover:text-white transition-colors animate-pulse">CLICK TO POWER UP</p>
-                </div>
-            </div>
-        </div>
 
         <!-- HEADER -->
         <header class="bg-allgood-secondary shadow-md navbar-content flex items-center shrink-0">
@@ -351,7 +334,7 @@
                     <button onclick="window.openMessageModal()" class="relative text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10" title="Comms">
                         <i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
                     </button>
-                            <button onclick="var s=false;try{s=localStorage.getItem('ag_signed_in')==='1';}catch(e){} if(s){window.AuthGate.guardedLeave(function(){window.location.href='/dashboard/';});}else{window.AuthGate && window.AuthGate.signIn();}" title="Already have an account? Sign in" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="log-in" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                            <a href="/dashboard/" title="My dashboard" aria-label="My dashboard" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="layout-grid" stroke-width="2.25" class="w-[22px] h-[22px]"></i></a>
                     <button id="menu-toggle" title="Jump to a Case" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
                 </div>
             </div>
@@ -1444,9 +1427,7 @@
 
         // The reward screen: badge, what it covered, where to go next. It is shown when the
         // student reaches it, whether or not they rated — the stars are optional feedback and
-        // always have been. The save offer hangs off THIS, so skipping the rating never costs
-        // a student the offer, and the offer never lands in front of the thing it is
-        // congratulating them on. Idempotent: Submit and Skip both route through here.
+        // always have been. Idempotent: Submit and Skip both route through here.
         // `rated` records whether the student actually left a star rating, on their OWN
         // module_progress document — the one place a student can read back about their own
         // run. course_feedback is create-only/admin-read (firestore.rules), so a skip
@@ -1471,11 +1452,6 @@
             if (window.AuthCore && window.AuthCore.saveModuleProgress) {
                 window.AuthCore.saveModuleProgress('money-as-a-skill', { rated: _agRated });
             }
-            window._agCompletionReached = true;
-            if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
-                window._agSaveOffered = true;
-                setTimeout(() => { window.AuthGate.offerSave(); }, 1200);
-            }
         };
 
         window.finalizeCaseRating = () => {
@@ -1491,13 +1467,13 @@
             setTimeout(() => { window.revealCompletion(); }, 400);
         };
 
-        window.launchRealWorldReadyChallenge = () => window.AuthGate.guardedLeave(() => { window.location.href = '/educational-games/real-world-ready/'; });
+        window.launchRealWorldReadyChallenge = () => { window.location.href = '/educational-games/real-world-ready/'; };
         // Primary destination: back to the Real World Ready hub, not straight into the Challenge.
-        window.returnToLabPack = () => window.AuthGate.guardedLeave(() => { window.location.href = '/jsh/real-world-ready-lab/'; });
+        window.returnToLabPack = () => { window.location.href = '/jsh/real-world-ready-lab/'; };
         // The dashboard moved to /dashboard/ when the marketing site took the site root.
         // Relative on purpose: an absolute production URL would throw a student off a
         // preview channel and onto the live site.
-        window.handleSystemExit = () => window.AuthGate.guardedLeave(() => { window.location.href = '/dashboard/'; });
+        window.handleSystemExit = () => { window.location.href = '/dashboard/'; };
         window.closeSystemMenu = () => {
             document.getElementById('system-menu-modal').classList.add('hidden-modal');
             document.getElementById('system-menu-modal').classList.remove('visible-modal');
@@ -1510,36 +1486,8 @@
             });
             window.addEventListener('load', () => { if (window.lucide) window.lucide.createIcons(); });
 
-            const startup = document.getElementById('startup-screen');
-            if (startup) {
-                let startupTriggered = false;
-                const handleStartup = async () => {
-                    if (startupTriggered) return;
-                    startupTriggered = true;
-                    if (window.sfx) window.sfx.powerOn();
-                    startup.style.opacity = '0';
-                    setTimeout(() => { startup.style.display = 'none'; }, 700);
-                    // Same gate the dashboard uses.
-                    // GUEST-FIRST ENTRY (founder decision, 2026-09-09): nobody signs in to
-                    // start anything. This establishes an anonymous session and a readable
-                    // auto-assigned name and gets out of the way — no modal, no age
-                    // question, nothing to dismiss — then mounts the always-available
-                    // "Save my progress" affordance. The identify gate now fires at the
-                    // END (see the completion write below), not here.
-                    await window.AuthGate.startGuestSession();
-                };
-                startup.addEventListener('click', handleStartup);
-
-                // NOT `const unsub = ...` — see docs/goodblock-integration-checklist.md (a
-                // synchronous callback would hit the TDZ before unsub exists).
-                if (window.AuthCore && window.AuthCore.skipPowerUp) {
-                    let unsub;
-                    unsub = window.AuthCore.onAuthStateChanged(window.AuthCore.auth, () => {
-                        unsub();
-                        handleStartup();
-                    });
-                }
-            }
+            // No screen in front of the lesson: the student's anonymous session starts now.
+            if (window.AuthCore) window.AuthCore.startSession();
 
             document.getElementById('home-toggle').addEventListener('click', () => {
                 document.getElementById('system-menu-modal').classList.remove('hidden-modal');

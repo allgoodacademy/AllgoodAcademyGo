@@ -26,7 +26,7 @@ const SHARED_BANNER =
     'JIT-purged against the content globs in tailwind/. Removes the runtime ' +
     'cdn.tailwindcss.com dependency (district content filters block that CDN and it is a ' +
     'dev-only shim, not a production build). Content scanning covers public/js/**/*.js as ' +
-    'well as markup: the shared modals in identity-gate.js and message-hq.js are built as ' +
+    'well as markup: the shared modal in message-hq.js is built from ' +
     'JS strings, and scanning .html alone silently dropped every utility used only there. ' +
     'Do not hand-edit — regenerate.';
 

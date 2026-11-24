@@ -1,5 +1,12 @@
 # Privacy document audit — two live policies, and they disagree
 
+> **OUT OF DATE AGAIN, 2026-11-24 — identity reset.** Students no longer sign in at any age,
+> no Recruit Codes are issued, there is no age question and no 13+ student account path;
+> teachers sign in with Google or an email and password. `public/privacy.html` and `public/terms.html` still
+> describe Learner Recruits, Recruit Codes and 13+ student sign-in. Per this document's own
+> rule, that legal copy was **not** edited by the engineering change; it is an open
+> follow-up for a human to rewrite (see the PR for the identity reset).
+
 **Status:** Findings only. **No privacy copy was edited in producing this document, and none should be edited on the strength of it alone.** This is legal copy; the differences below are reported for a human to reconcile.
 **Audited:** 2026-09-11, against `claude/retention-infrastructure` (branched from `claude/hopeful-gates-vezwqu`).
 **Author:** Claude Code, Retention Infrastructure sprint, Goal 1.

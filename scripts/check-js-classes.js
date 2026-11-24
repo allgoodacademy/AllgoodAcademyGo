@@ -3,7 +3,7 @@
 // that a page loading that JS actually ships.
 //
 // This is the check that would have caught the Message HQ modal rendering behind the
-// tablet screen. /js/message-hq.js and /js/identity-gate.js build their markup as
+// tablet screen. /js/message-hq.js (and the since-deleted identity-gate.js) build markup as
 // strings; the bundles in public/assets/css/ are purged; and when the content globs
 // scanned .html only, every class appearing nowhere but a .js file compiled to nothing.
 // `z-[9999]` was in no bundle at all, the modal computed to z-index:auto, and it painted
@@ -138,6 +138,21 @@ for (const js of jsFiles) {
       if (!css[b].includes(sel)) {
         problems.push(`${webPath}: "${cls}" is not in ${b} (${BUNDLES[b]}) — a page loading this script would render without it`);
       }
+    }
+  }
+}
+
+// The exempt modal classes above are exempt from the BUNDLE, not from existing at all:
+// /js/message-hq.js shows and hides its modal only by toggling .hidden-modal / .visible-modal,
+// so every page that loads it must define both in its own CSS. A page that doesn't has an
+// invisible full-screen layer swallowing every tap (it happened on mobile once, and again on
+// the rebuilt dashboard before this check existed).
+for (const page of pages) {
+  const html = read(page);
+  if (!html.includes('src="/js/message-hq.js"')) continue;
+  for (const cls of ['hidden-modal', 'visible-modal']) {
+    if (!new RegExp(`\\.${cls}\\s*\\{[^}]*pointer-events`).test(html)) {
+      problems.push(`${page}: loads /js/message-hq.js but defines no .${cls} { pointer-events: ... } rule — Comms' closed modal would block every tap`);
     }
   }
 }

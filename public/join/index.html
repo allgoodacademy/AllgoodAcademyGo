@@ -15,11 +15,11 @@
   address; if the site is ever restructured, /join/ and /join/?c=CODE must keep working.
   scripts/check-invariants.js fails the build if this file disappears.
 
-  One job: a student types the class code from the board and ends up in the class, then
-  sees what to do. Works for a guest with no account (most students are under-13 Learner
-  Recruits): a guest session is created only once the code has been checked, via the same
-  AuthCore.guestStart() any lesson would call. The join itself is /js/classroom-join.js,
-  shared with the dashboard's Profile join box — there is one copy of that logic.
+  One job: a student types the class code from the board and a nickname, ends up in the
+  class, then sees what to do. That is all a student is ever asked: no account, no email,
+  no age. Their anonymous session (AuthCore.startSession) is what joins, so anything they
+  already did on this device shows up for their teacher. The join itself is
+  /js/classroom-join.js.
 
   Learner-reachable surface: no GA4, no third-party script beyond the Firebase SDK that
   every lesson already loads (see check-invariants.js LEARNER_SURFACES).
@@ -58,7 +58,12 @@ p{font-size:15px;line-height:1.6;color:var(--ink-soft);margin:0 0 20px}
   padding:16px 8px;margin:0 0 14px;outline:none}
 .code-input::placeholder{color:var(--hairline);letter-spacing:.18em}
 .code-input:focus{border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-wash)}
-.code-input[aria-invalid="true"]{border-color:var(--orange)}
+.code-input[aria-invalid="true"],.nick-input[aria-invalid="true"]{border-color:var(--orange)}
+.nick-label{display:block;font-size:15px;font-weight:700;color:var(--ink);margin:0 0 6px}
+.nick-input{display:block;width:100%;font-family:var(--font-ui);font-size:20px;color:var(--ink);
+  background:var(--surface);border:2px solid var(--hairline);border-radius:12px;padding:12px 14px;margin:0 0 6px;outline:none}
+.nick-input:focus{border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-wash)}
+.nick-hint{font-size:13px;color:var(--ink-faint);margin:0 0 14px}
 .btn{display:block;width:100%;font-family:var(--font-ui);font-size:17px;font-weight:700;
   background:var(--teal-deep);color:#fff;border:0;border-radius:12px;padding:16px;cursor:pointer}
 .btn:hover{background:var(--teal)}
@@ -103,7 +108,7 @@ p{font-size:15px;line-height:1.6;color:var(--ink-soft);margin:0 0 20px}
   <!-- STEP 1: the code. Nothing else competes with it. -->
   <section id="step-code">
     <h1>Join your class</h1>
-    <p>Type the class code your teacher gave you.</p>
+    <p>Type the class code your teacher gave you, and the name your teacher will see.</p>
     <!-- method=get with the input named "c": if this is submitted before the script below has
          loaded, the browser itself navigates to /join/?c=CODE, which then joins on load. -->
     <form id="join-form" action="/join/" method="get" novalidate>
@@ -111,6 +116,10 @@ p{font-size:15px;line-height:1.6;color:var(--ink-soft);margin:0 0 20px}
       <input id="code" name="c" class="code-input" type="text" inputmode="text"
              autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
              maxlength="12" placeholder="ABC234" aria-describedby="join-error" autofocus>
+      <label for="nickname" class="nick-label">Your name in this class</label>
+      <input id="nickname" name="n" class="nick-input" type="text" autocomplete="off"
+             autocorrect="off" spellcheck="false" maxlength="24" aria-describedby="nick-hint join-error">
+      <p id="nick-hint" class="nick-hint">Nickname or first name. No last names.</p>
       <p id="join-error" class="error" role="alert" hidden></p>
       <button id="join-btn" class="btn" type="submit">Join class</button>
     </form>
@@ -142,18 +151,19 @@ import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-
 
 const { auth, db, appId, waitForAuthReady } = window.AuthCore;
 const $ = (id) => document.getElementById(id);
-const input = $('code'), btn = $('join-btn'), err = $('join-error');
+const input = $('code'), nick = $('nickname'), btn = $('join-btn'), err = $('join-error');
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function showError(message) {
+function showError(message, field) {
     err.textContent = message;
     err.hidden = false;
-    input.setAttribute('aria-invalid', 'true');
+    field.setAttribute('aria-invalid', 'true');
 }
 function clearError() {
     err.hidden = true;
     input.removeAttribute('aria-invalid');
+    nick.removeAttribute('aria-invalid');
 }
 function setBusy(busy) {
     btn.disabled = busy;
@@ -196,24 +206,25 @@ async function showJoined({ code, name, alreadyMember }) {
     }
 }
 
-async function submit(raw) {
+async function submit() {
     clearError();
-    const code = normalizeClassCode(raw);
+    const code = normalizeClassCode(input.value);
     input.value = code;
     setBusy(true);
-    const result = await joinClassroom(code, { createGuest: true });
+    const result = await joinClassroom(code, { nickname: nick.value });
     setBusy(false);
     if (!result.ok) {
-        showError(result.message);
-        input.focus();
-        input.select();
+        const field = result.reason === 'nickname' ? nick : input;
+        showError(result.message, field);
+        field.focus();
+        field.select();
         return;
     }
     await showJoined(result);
 }
 
-$('join-form').addEventListener('submit', (e) => { e.preventDefault(); submit(input.value); });
-input.addEventListener('input', () => { if (!err.hidden) clearError(); });
+$('join-form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+[input, nick].forEach((el) => el.addEventListener('input', () => { if (!err.hidden) clearError(); }));
 $('other-code').addEventListener('click', () => {
     $('step-joined').hidden = true;
     $('step-code').hidden = false;
@@ -222,11 +233,12 @@ $('other-code').addEventListener('click', () => {
     input.focus();
 });
 
-// /join/?c=CODE — the QR code on the printed poster. Pre-fill and join straight away.
+// /join/?c=CODE — the QR code on the printed poster. Pre-fill the code; the nickname is
+// the one thing left to type.
 const prefill = normalizeClassCode(new URLSearchParams(location.search).get('c'));
 if (prefill) {
     input.value = prefill;
-    submit(prefill);
+    nick.focus();
 } else {
     // No code in the link: if this browser is already in a class, offer a way straight
     // back to its list. Never creates a session — a visitor with none just sees the box.
