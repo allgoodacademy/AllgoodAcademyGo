@@ -29,6 +29,7 @@
 // flag it as the one you are on.
 const LINKS = [
     { label: 'Games',        href: () => '/educational-games/', current: 'games' },
+    { label: 'Simulations',  href: () => '/simulations/',       current: 'simulations' },
     { label: 'For teachers', href: () => '/for-teachers/',      current: 'for-teachers' },
     { label: 'About',        href: () => '/about/',             current: 'about' },
     { label: 'Contact',      href: page => (page === 'about' ? '#contact' : '/about/#contact') },

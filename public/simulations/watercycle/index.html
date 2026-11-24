@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where rain comes from · Allgood Academy</title>
+<meta name="description" content="A guided water cycle simulation for grades 6–8. Predict, test, and explain why one side of a mountain gets rain and the other stays dry.">
+<meta name="standards" content="NGSS MS-ESS2-4">
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+<style>
+/* Page roles. Every value is a brand token, or a token mixed with another token. */
+:root{
+  --bg:var(--color-canvas); --card:var(--color-surface); --panel:var(--color-cream); --panel-b:var(--color-cream-border);
+  --ink:var(--color-ink); --ink2:var(--color-ink-soft); --line:var(--color-hairline);
+  --accent:var(--color-teal); --accent-text:var(--color-teal-deep); --accent-wash:var(--color-teal-wash);
+  --cta:var(--color-orange); --cta-d:var(--color-orange-deep); --on-cta:var(--color-surface);
+  --header:var(--color-teal); --on-header:var(--color-surface); --focus:var(--color-teal-deep);
+  --sel:var(--color-teal-wash);
+  /* canvas */
+  --sky-top:var(--color-teal-wash); --sky-bot:var(--color-cream); --terrain:var(--color-cream-border); --terrain-edge:var(--color-ink-faint);
+  --vapor:var(--color-teal); --rain:var(--color-teal-deep); --cloud:var(--color-surface); --cloud-edge:var(--color-hairline);
+  --sun:var(--color-orange); --cl-line:var(--color-orange); --cl-text:var(--color-orange-deep); --label:var(--color-ink-soft); --label-strong:var(--color-ink);
+  --ocean-cold:var(--color-teal-deep); --ocean-warm:var(--color-teal); --grid:var(--color-ink-faint);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme=light]){
+    /* No brand dark tokens exist yet, so dark mode is built from the game-chassis tokens. */
+    --bg:var(--color-dark); --card:var(--color-dark-card); --panel:var(--color-dark-card);
+    --panel-b:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+    --ink:var(--color-warm-white); --ink2:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted));
+    --line:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+    --accent:var(--color-teal); --accent-text:var(--color-teal-wash); --accent-wash:color-mix(in srgb, var(--color-teal) 28%, var(--color-dark-card));
+    --focus:var(--color-teal-wash); --sel:color-mix(in srgb, var(--color-teal) 30%, var(--color-dark-card));
+    --sky-top:var(--color-dark); --sky-bot:var(--color-dark-card);
+    --terrain:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card)); --terrain-edge:var(--color-muted);
+    --vapor:var(--color-teal-wash); --rain:var(--color-teal-wash); --cloud:var(--color-warm-white); --cloud-edge:var(--color-muted);
+    --cl-text:var(--color-warm-white); --label:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted)); --label-strong:var(--color-warm-white);
+    --grid:var(--color-muted);
+    color-scheme: dark;
+  }
+}
+:root[data-theme=dark]{
+    /* No brand dark tokens exist yet, so dark mode is built from the game-chassis tokens. */
+    --bg:var(--color-dark); --card:var(--color-dark-card); --panel:var(--color-dark-card);
+    --panel-b:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+    --ink:var(--color-warm-white); --ink2:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted));
+    --line:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+    --accent:var(--color-teal); --accent-text:var(--color-teal-wash); --accent-wash:color-mix(in srgb, var(--color-teal) 28%, var(--color-dark-card));
+    --focus:var(--color-teal-wash); --sel:color-mix(in srgb, var(--color-teal) 30%, var(--color-dark-card));
+    --sky-top:var(--color-dark); --sky-bot:var(--color-dark-card);
+    --terrain:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card)); --terrain-edge:var(--color-muted);
+    --vapor:var(--color-teal-wash); --rain:var(--color-teal-wash); --cloud:var(--color-warm-white); --cloud-edge:var(--color-muted);
+    --cl-text:var(--color-warm-white); --label:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted)); --label-strong:var(--color-warm-white);
+    --grid:var(--color-muted);
+    color-scheme: dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;line-height:1.2;margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:-1px;padding:0;border:0}
+a{color:var(--accent-text)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px}
+
+/* Header: same pattern as the Digital Decisions Lab Pack header */
+.top{background:var(--header);color:var(--on-header);position:sticky;top:0;z-index:30;box-shadow:0 2px 6px color-mix(in srgb, var(--color-ink) 18%, transparent)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.wordmark{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--on-header);text-decoration:none;white-space:nowrap}
+.pill{background:var(--color-orange);color:var(--color-surface);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.top-right{display:flex;align-items:center;gap:6px;flex:none}
+.time{font-size:12px;color:var(--color-teal-wash);white-space:nowrap}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:999px;color:var(--color-teal-wash);text-decoration:none}
+.iconbtn:hover{background:color-mix(in srgb, var(--color-surface) 12%, transparent);color:var(--color-surface)}
+.iconbtn:focus-visible{outline-color:var(--color-surface);outline-offset:-3px}
+.iconbtn svg{width:22px;height:22px}
+button.iconbtn{appearance:none;border:0;background:transparent;cursor:pointer;padding:0}
+.wm-sub{font-family:var(--font-ui);font-size:12px;font-weight:400;opacity:.7;letter-spacing:.5px}
+.navbtn{appearance:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:999px;border:1px solid color-mix(in srgb, var(--color-surface) 45%, transparent);background:transparent;color:var(--color-surface);font-weight:700;font-size:13px;cursor:pointer;margin-right:4px}
+.navbtn svg{width:18px;height:18px}
+.navbtn:hover,.navbtn[aria-pressed="true"]{background:var(--color-surface);color:var(--color-teal-deep)}
+.navbtn:focus-visible{outline-color:var(--color-surface)}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:50;background:var(--card);color:var(--ink);border:1px solid var(--panel-b);border-radius:12px;padding:10px 14px;font-size:14px;box-shadow:0 6px 18px color-mix(in srgb, var(--color-ink) 22%, transparent);max-width:calc(100vw - 24px)}
+.choice{display:flex;gap:10px;align-items:flex-start}
+.choice .ltr{flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;border:1.5px solid var(--accent);color:var(--accent-text);font-weight:700;font-size:13px;line-height:1}
+.choice[aria-pressed="true"] .ltr{background:var(--accent);color:var(--color-surface)}
+.choice .ct{flex:1}
+.introbtns{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.teachnote{font-size:13px;color:var(--ink2);margin:10px 0 0}
+.vote{border:1px dashed var(--panel-b);border-radius:12px;padding:10px 12px;margin:0 0 12px;background:var(--card)}
+.vote summary{cursor:pointer;font-weight:700;font-size:14px}
+.vote .vrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+.vote label{display:flex;align-items:center;gap:6px;font-weight:700}
+.vote input{width:100%;min-width:0;min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:4px 8px;font-size:16px}
+/* Present mode: projector-friendly */
+body.present{font-size:19px}
+body.present .wrap{max-width:none;padding:0 22px}
+body.present .layout{grid-template-columns:minmax(0,1.45fr) minmax(380px,1fr)}
+body.present .guide h2{font-size:34px}
+body.present .kicker{font-size:15px}
+body.present .choice{font-size:20px;padding:14px 16px;min-height:56px}
+body.present .choice[aria-pressed="true"]{padding:13px 15px}
+body.present .choice .ltr{width:34px;height:34px;font-size:17px}
+body.present .jodi img{width:76px;height:76px}
+body.present .btn.cta{font-size:22px;padding:12px 26px}
+body.present .gauge b{font-size:15px}
+body.present .ctl label,body.present .ctl legend{font-size:16px}
+body.present .stage-bar p,body.present .desc{font-size:15px}
+body.present .q{font-size:21px}
+body.present .wm-sub,body.present .pill{display:none}
+
+.linkbtn{font-weight:700;color:var(--accent-text);white-space:nowrap}
+
+/* Layout */
+main .wrap{padding-top:18px;padding-bottom:40px}
+.layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,1fr);gap:18px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+
+/* Stage */
+.cvwrap{position:relative}
+.sim-cv{width:100%;aspect-ratio:2/1;display:block}
+.stage-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid var(--line)}
+.stage-bar p{margin:0;font-size:12.5px;color:var(--ink2)}
+.gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 14px;border-top:1px solid var(--line)}
+.gauges h2{grid-column:1/-1;font-family:var(--font-ui);font-size:13px;font-weight:700;margin:0;color:var(--ink)}
+.gauge b{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700}
+.gauge b span{font-weight:400;color:var(--ink2);font-variant-numeric:tabular-nums}
+.gauge .bar{height:10px;border-radius:6px;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin-top:4px}
+.gauge .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .35s}
+.gauge.hot .bar i{background:var(--cta)}
+.controls{display:grid;grid-template-columns:1.2fr 1fr 1.2fr;gap:14px 20px;padding:14px;border-top:1px solid var(--line);align-items:start}
+.ctl label,.ctl legend{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;font-weight:700;margin-bottom:6px;padding:0;width:100%}
+.ctl output{font-weight:400;color:var(--ink2);font-variant-numeric:tabular-nums}
+.ctl input[type=range]{width:100%;accent-color:var(--accent);height:28px;margin:0}
+fieldset.ctl{border:0;margin:0;padding:0;min-width:0}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.seg label{flex:1;margin:0;justify-content:center;padding:7px 4px;font-weight:400;cursor:pointer;border-left:1px solid var(--line);min-height:36px;align-items:center;font-size:13.5px}
+.seg label:first-child{border-left:0}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--accent);color:var(--color-surface);font-weight:700}
+.seg label:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:-3px}
+.ctl.locked{opacity:.55}
+.ctl.locked .seg label{cursor:not-allowed}
+.lock{display:block;font-size:11.5px;color:var(--ink2);margin-top:4px;min-height:1em}
+.desc{padding:10px 14px;border-top:1px solid var(--line);font-size:13px;color:var(--ink2);margin:0}
+.legend{font-size:12.5px;color:var(--ink2);padding:0 14px 12px;margin:0}
+
+/* Buttons */
+.btn{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:9px 16px;cursor:pointer;font-weight:700;min-height:44px}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn.small{min-height:36px;padding:6px 12px;font-size:13px}
+.btn.cta{background:var(--cta);color:var(--on-cta);border:0;box-shadow:0 4px 0 var(--cta-d);font-size:19px;padding:10px 22px}
+.btn.cta:hover:not(:disabled){filter:brightness(1.05)}
+.btn.cta:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 var(--cta-d)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* Guide */
+.guide{background:var(--panel);border:1px solid var(--panel-b);border-radius:16px;padding:20px}
+.steps{display:flex;gap:6px;list-style:none;padding:0;margin:0 0 16px}
+.steps li{flex:1;height:6px;border-radius:3px;background:var(--panel-b)}
+.steps li.done{background:var(--accent)}
+.steps li.now{background:var(--cta)}
+.kicker{font-size:12.5px;font-weight:700;color:var(--accent-text);margin:0 0 4px;letter-spacing:.3px}
+.guide h2{font-size:25px;margin-bottom:12px;outline:none}
+.guide p{margin:0 0 12px}
+.q{font-weight:700;margin:14px 0 8px}
+.jodi{display:flex;gap:12px;align-items:flex-start;margin:0 0 14px}
+.jodi img{width:60px;height:60px;flex:none;border-radius:50%;background:var(--card);border:1px solid var(--panel-b)}
+.bubble{background:var(--card);border:1px solid var(--panel-b);border-radius:4px 16px 16px 16px;padding:12px 14px;flex:1;min-width:0}
+.bubble .who{display:block;font-size:11.5px;font-weight:700;color:var(--accent-text);margin-bottom:3px;letter-spacing:.4px}
+.bubble p{margin:0 0 8px}.bubble p:last-child{margin-bottom:0}
+.choices{display:grid;gap:8px;margin:0 0 14px}
+.choice{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 13px;cursor:pointer;min-height:44px;line-height:1.4}
+.choice:hover:not(:disabled){border-color:var(--accent)}
+.choice[aria-pressed="true"]{border:2px solid var(--accent);padding:10px 12px;background:var(--sel)}
+.choice:disabled{cursor:default}
+.choice:disabled:not([aria-pressed="true"]){opacity:.62}
+.choice .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-left:6px;background:var(--accent);color:var(--color-surface);vertical-align:1px}
+.callout{border-left:4px solid var(--accent);background:var(--card);padding:11px 14px;border-radius:0 12px 12px 0;margin:12px 0}
+.callout.wait{border-left-color:var(--cta)}
+.callout b{color:var(--ink)}
+.fb{margin:14px 0}
+.fb h3{font-family:var(--font-ui);font-size:15px;margin:0 0 8px;outline:none}
+.terms{background:var(--card);border:1px solid var(--panel-b);border-radius:12px;padding:10px 14px;margin:10px 0;font-size:14px}
+.terms dt{font-weight:700;margin-top:6px}.terms dt:first-child{margin-top:0}
+.terms dd{margin:0}
+.hints{margin:6px 0 10px;padding-left:22px}
+.hints li{margin-bottom:6px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.attempts{list-style:none;padding:0;margin:10px 0;font-size:14px}
+.attempts li{background:var(--card);border:1px solid var(--panel-b);border-radius:10px;padding:8px 12px;margin-bottom:6px}
+.attempts li b{display:block}
+.island{width:100%;aspect-ratio:16/8;display:block;border-radius:12px;border:1px solid var(--panel-b);margin:4px 0 12px;background:var(--card)}
+.summary dl{margin:6px 0 14px}
+.summary dt{font-weight:700;margin-top:10px;font-family:var(--font-display);font-size:16px}
+.summary dd{margin:2px 0 0}
+.yours{list-style:none;padding:0;margin:8px 0 14px;font-size:14px}
+.yours li{background:var(--card);border:1px solid var(--panel-b);border-radius:10px;padding:9px 12px;margin-bottom:6px}
+.note{font-size:13px;color:var(--ink2)}
+.term{appearance:none;background:none;border:0;padding:0;margin:0;font:inherit;font-weight:700;color:var(--accent-text);text-decoration:underline dotted;text-underline-offset:3px;text-decoration-thickness:2px;cursor:help;display:inline}
+.term:hover,.term[aria-expanded="true"]{text-decoration-style:solid}
+.tip{position:absolute;z-index:40;max-width:min(280px,calc(100vw - 24px));background:var(--card);color:var(--ink);border:1px solid var(--panel-b);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.45;box-shadow:0 6px 18px color-mix(in srgb, var(--color-ink) 22%, transparent)}
+.tip b{display:block;font-family:var(--font-display);font-size:15px;margin-bottom:2px}
+
+/* Footer / teachers */
+footer{border-top:1px solid var(--line);color:var(--ink2);font-size:13px;background:var(--card)}
+footer .wrap{padding-top:20px;padding-bottom:28px;max-width:640px}
+footer h2{font-size:17px;color:var(--ink);margin-bottom:8px}
+footer p{margin:0 0 8px}
+.check{display:flex;gap:8px;align-items:flex-start;font-weight:400 !important;color:var(--ink2) !important}
+.check input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);flex:none}
+.tmsg{font-weight:700;color:var(--accent-text);min-height:1.2em;margin:0}
+
+/* Preview tools (never rendered on allgoodacademy.com) */
+.preview{max-width:1200px;margin:0 auto 30px;padding:0 16px}
+.preview details{border:2px dashed var(--line);border-radius:12px;background:var(--card);padding:10px 14px;font-size:13px}
+.preview summary{cursor:pointer;font-weight:700}
+.preview ol{max-height:260px;overflow:auto;padding-left:24px;margin:8px 0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.preview .row{margin-top:6px}
+
+@media (min-width:901px) and (min-height:700px){ #stage{position:sticky;top:72px} }
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .guide{order:-1}
+  footer .wrap{grid-template-columns:1fr}
+  .controls{grid-template-columns:1fr 1fr}
+  .controls .ctl:last-child{grid-column:1/-1}
+}
+@media (max-width:700px){
+  .navbtn span{display:none}.navbtn{padding:0 9px}
+  .wm-sub{display:none}
+  .sim-cv{aspect-ratio:4/3}
+  .gauges{grid-template-columns:1fr 1fr}
+  .controls{grid-template-columns:1fr}
+  .time{display:none}
+  .wordmark{font-size:16px}
+  .guide{padding:16px}
+  .guide h2{font-size:22px}
+}
+@media (max-width:420px){ .wordmark{display:none} .pill{max-width:70vw} }
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;scroll-behavior:auto !important} }
+</style>
+<style>
+/* Comms (/js/message-hq.js) host styles. message-hq.js builds its inbox from Tailwind
+   class names and expects the host page to define .hidden-modal / .visible-modal. These
+   pages ship no Tailwind bundle (its preflight reset would restyle them), so the classes
+   the inbox actually uses are defined here, scoped to #message-modal. Without this block
+   the inbox renders open, unstyled, over the page on every load. */
+.modal-transition{transition:opacity .2s ease-in-out,transform .2s ease-in-out}
+#message-modal.hidden-modal{opacity:0;pointer-events:none;transform:translateY(-10px)}
+#message-modal.visible-modal{opacity:1;pointer-events:auto;transform:none}
+#message-modal{padding:24px;font:14px/1.5 Verdana,Geneva,Tahoma,sans-serif;color:var(--color-ink);text-align:left;color-scheme:light}
+#message-modal *{box-sizing:border-box} #message-modal .relative{position:relative}
+#message-modal h3,#message-modal p{margin:0}
+#message-modal button{font:inherit;cursor:pointer;background:none;border:0;color:inherit;padding:0}
+#message-modal svg.w-5{width:20px;height:20px} #message-modal svg.w-3{width:12px;height:12px}
+#message-modal .bg-white{background:var(--color-surface)}
+#message-modal .rounded-lg{border-radius:10px} #message-modal .rounded{border-radius:6px} #message-modal .rounded-full{border-radius:999px} #message-modal .rounded-r{border-radius:0 6px 6px 0}
+#message-modal .shadow-2xl{box-shadow:0 24px 48px rgba(0,0,0,.3)}
+#message-modal .border-t-4{border-top:4px solid var(--color-orange)}
+#message-modal .px-6{padding-left:24px;padding-right:24px} #message-modal .pt-6{padding-top:24px} #message-modal .pb-3{padding-bottom:12px} #message-modal .py-4{padding-top:16px;padding-bottom:16px} #message-modal .py-6{padding-top:24px;padding-bottom:24px} #message-modal .py-2{padding-top:8px;padding-bottom:8px} #message-modal .py-3{padding-top:12px;padding-bottom:12px} #message-modal .p-3{padding:12px} #message-modal .px-3{padding-left:12px;padding-right:12px} #message-modal .py-1\.5{padding-top:6px;padding-bottom:6px}
+#message-modal .mt-1{margin-top:4px} #message-modal .mt-2{margin-top:8px} #message-modal .mt-3{margin-top:12px} #message-modal .mt-4{margin-top:16px} #message-modal .mb-1{margin-bottom:4px} #message-modal .mb-2{margin-bottom:8px} #message-modal .mb-3{margin-bottom:12px} #message-modal .mt-1\.5{margin-top:6px}
+#message-modal .border-t{border-top:1px solid var(--color-hairline)}
+#message-modal .border-l-4{border-left:4px solid var(--color-hairline)}
+#message-modal .border-l-4.border-allgood-primary{border-left-color:var(--color-orange)} #message-modal .border-l-4.border-allgood-secondary{border-left-color:var(--color-teal)}
+#message-modal .border{border:1px solid var(--color-hairline)}
+#message-modal .bg-gray-50{background:var(--color-light)} #message-modal .hover\:bg-gray-100:hover{background:var(--color-hairline)}
+#message-modal .w-full{width:100%} #message-modal .text-left{text-align:left} #message-modal .text-center{text-align:center}
+#message-modal .flex{display:flex} #message-modal .flex-wrap{flex-wrap:wrap} #message-modal .items-start{align-items:flex-start} #message-modal .items-center{align-items:center} #message-modal .justify-center{justify-content:center} #message-modal .gap-2{gap:8px} #message-modal .shrink-0{flex-shrink:0} #message-modal .min-w-0{min-width:0}
+#message-modal .h-2{height:8px} #message-modal .w-2{width:8px} #message-modal .bg-allgood-primary{background:var(--color-orange)} #message-modal .bg-transparent{background:transparent}
+#message-modal .text-xl{font-size:20px;line-height:1.3} #message-modal .text-sm{font-size:14px} #message-modal .text-xs{font-size:12px} #message-modal .text-\[10px\]{font-size:10px}
+#message-modal .font-heading{font-family:Georgia,"Times New Roman",serif} #message-modal .font-bold{font-weight:700}
+#message-modal .uppercase{text-transform:uppercase} #message-modal .tracking-wide{letter-spacing:.025em} #message-modal .tracking-widest{letter-spacing:.1em} #message-modal .italic{font-style:italic} #message-modal .leading-snug{line-height:1.375} #message-modal .leading-relaxed{line-height:1.625} #message-modal .break-words{overflow-wrap:break-word}
+#message-modal .text-allgood-dark{color:var(--color-ink)} #message-modal .text-gray-600,#message-modal .text-gray-500{color:var(--color-ink-soft)} #message-modal .text-gray-400{color:var(--color-ink-soft)}
+#message-modal .text-white{color:var(--color-surface)} #message-modal .underline{text-decoration:underline}
+#message-modal .bg-allgood-primary.text-white:hover,#message-modal .hover\:bg-allgood-hover:hover{background:var(--color-orange-deep)}
+#message-modal .bg-emerald-600{background:var(--color-teal)}
+#message-modal .hover\:text-red-500:hover{color:var(--color-orange-deep)}
+#message-modal .hover\:border-allgood-primary:hover{border-color:var(--color-orange);color:var(--color-orange-deep)}
+#message-modal textarea{display:block;width:100%;border:1px solid var(--color-hairline);border-radius:6px;padding:12px;margin-bottom:12px;background:var(--color-light);color:var(--color-ink);font-family:inherit;resize:none}
+#message-modal textarea:focus{outline:2px solid var(--color-teal-deep);outline-offset:1px}
+#message-modal button:focus-visible{outline:2px solid var(--color-teal-deep);outline-offset:2px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <a class="wordmark" href="/">Allgood Academy <span class="wm-sub">| SIMULATIONS</span></a>
+      <span class="pill">Where rain comes from</span>
+    </div>
+    <nav class="top-right" aria-label="Site">
+      <button class="navbtn" type="button" id="presentBtn" aria-pressed="false" title="Present to your class">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg>
+        <span id="presentLabel">Present</span>
+      </button>
+      <a class="iconbtn" href="/" title="Home" aria-label="Home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+      </a>
+      <a class="iconbtn" href="/educational-games/" title="Games" aria-label="Games">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h4M8 9v4"/><path d="M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-3.98 3.6l-.7 6.9A3 3 0 0 0 5 19c1 0 1.5-.5 2-1l1.4-1.4a2 2 0 0 1 1.4-.6h4.4a2 2 0 0 1 1.4.6L17 18c.5.5 1 1 2 1a3 3 0 0 0 2.98-3.5l-.7-6.9A4 4 0 0 0 17.3 5z"/></svg>
+      </a>
+      <button class="iconbtn" type="button" id="commsBtn" title="Comms" aria-label="Comms">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<div class="toast" id="toast" role="status" hidden></div>
+
+
+<main>
+  <div class="wrap">
+    <h1 class="sr-only">Where rain comes from: a water cycle simulation</h1>
+    <div class="layout">
+      <section class="card" id="stage" aria-label="Simulation">
+        <div class="cvwrap">
+          <canvas class="sim-cv" id="cv" role="img" aria-label="Weather simulation: an ocean on the left, a coast, a mountain, and a valley on the right" aria-describedby="desc"></canvas>
+        </div>
+        <div class="stage-bar">
+          <p>Faint dots are water vapor (invisible in real life). White shapes are clouds. Blue lines are rain.</p>
+          <button class="btn small" type="button" id="pause" aria-pressed="false">Pause</button>
+        </div>
+        <div class="gauges" id="gauges" role="group" aria-labelledby="gaugeTitle">
+          <h2 id="gaugeTitle">Rain gauges · last 8 seconds</h2>
+        </div>
+        <div class="controls">
+          <div class="ctl" id="ctl-T">
+            <label for="inT">Ocean temperature <output id="outT" for="inT">50°F</output></label>
+            <input type="range" id="inT" min="40" max="90" step="1" value="50" aria-describedby="lockT">
+            <span class="lock" id="lockT"></span>
+          </div>
+          <fieldset class="ctl" id="ctl-W">
+            <legend>Wind toward the mountain</legend>
+            <div class="seg" aria-describedby="lockW">
+              <label><input type="radio" name="wind" value="0" checked><span>Off</span></label>
+              <label><input type="radio" name="wind" value="1"><span>Light</span></label>
+              <label><input type="radio" name="wind" value="2"><span>Strong</span></label>
+            </div>
+            <span class="lock" id="lockW"></span>
+          </fieldset>
+          <div class="ctl" id="ctl-M">
+            <label for="inM">Mountain height <output id="outM" for="inM">8,000 ft</output></label>
+            <input type="range" id="inM" min="1000" max="10000" step="500" value="8000" aria-describedby="lockM">
+            <span class="lock" id="lockM"></span>
+          </div>
+        </div>
+        <p class="desc" id="desc">The simulation is starting.</p>
+      </section>
+
+      <section class="guide" id="guide" aria-label="Lesson guide"></section>
+    </div>
+  </div>
+</main>
+
+<p class="sr-only" id="announce" aria-live="polite"></p>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+
+
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s);};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+var REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* Jodi, from the repo at assets/jodi/. Never redraw her. */
+var JODI = {
+  neutral: "/assets/jodi/jodi-neutral.svg",   
+  happy: "/assets/jodi/jodi-happy.svg",       
+  thinking: "/assets/jodi/jodi-thinking.svg", 
+  concerned: "/assets/jodi/jodi-concerned.svg"
+};
+
+var STANDARDS_LINE = "Aligned to NGSS MS-ESS2-4 (water cycle model). The rain shadow step also supports MS-ESS2-5 (winds, landforms and ocean temperature shape local weather).";
+
+
+/* ================= Telemetry =================
+   Production: first-party pipeline only (/js/auth-core.js + /js/telemetry.js),
+   stream 'water-cycle', off-funnel. Anonymous session only: no name, email, or free text.
+   If anything fails to load (filters, offline), the lesson runs exactly the same. */
+var IS_PROD = true; // served only by allgoodacademy.com and its staging channels
+var TEL = {ready:false, queue:[], log:[]};
+function telInit(tries){
+  if(window.Telemetry && window.AuthCore){
+    if(TEL.ready) return; TEL.ready = true;
+    try{
+      window.Telemetry.init({ module:'water-cycle', gameName:'Water Cycle', stepsTotal:6, stream:'water-cycle' });
+      var c = window.AuthCore; if(c.anonymousSessionOnly) c.anonymousSessionOnly().catch(function(){});
+    }catch(e){}
+    var q = TEL.queue; TEL.queue = []; q.forEach(dispatch);
+    return;
+  }
+  if((tries||0) > 200) return; setTimeout(function(){ telInit((tries||0)+1); }, 50);
+}
+if(IS_PROD){
+  ["/js/auth-core.js","/js/telemetry.js"].forEach(function(src){
+    var s=document.createElement("script"); s.type="module"; s.src=src; s.async=false; document.head.appendChild(s);
+  });
+  telInit(0);
+}
+function dispatch(e){
+  var T = TEL.ready ? window.Telemetry : null; if(!T) return;
+  try{
+    if(e.kind==="track" && T.track) T.track(e.name, e.meta);
+    else if(e.kind==="step" && T.step) T.step(e.meta.step);
+    else if(e.kind==="complete" && T.complete) T.complete(e.meta);
+    else if(e.kind==="restart" && T.restart) T.restart();
+  }catch(err){}
+}
+function send(kind, name, meta){
+  var e = {kind:kind, name:name, meta:meta||{}, t:Date.now()};
+  TEL.log.push(e); renderPreviewLog();
+  if(!IS_PROD) return;
+  if(TEL.ready) dispatch(e); else TEL.queue.push(e);
+}
+function track(name, meta){ send("track", name, meta); }
+
+/* ================= Model =================
+   Same engine as the demo. Units inside: °C and km. */
+var SEA=0.32, ALT_MAX=4, MAX_PARTICLES=420;
+var REG=[
+  {k:"ocean", a:0, b:0.32, label:"Ocean"},
+  {k:"coast", a:0.32, b:0.45, label:"Coast"},
+  {k:"mountain", a:0.45, b:0.75, label:"Mountain"},
+  {k:"valley", a:0.75, b:1.01, label:"Valley"}
+];
+var WIND=[0, 0.06, 0.11], WIND_WORD=["off","light","strong"];
+function terrain(x,H){ if(x<SEA) return 0; return 0.08 + H*Math.exp(-Math.pow((x-0.6)/0.075,2)); }
+function lcl(T){ return Math.min(2.2, Math.max(0.7, 2.2 - 0.04*T)); }   // cloud level, km
+function capAlt(T){ return 0.3 + 0.03*T; }                              // how high air rises on its own, km
+function regionOf(x){ for(var i=0;i<REG.length;i++){ if(x>=REG[i].a && x<REG[i].b) return REG[i].k; } return x<0 ? "ocean" : "valley"; }
+function regLabel(k){ for(var i=0;i<REG.length;i++) if(REG[i].k===k) return REG[i].label; return k; }
+function fToC(f){ return (f-32)*5/9; }
+function cToF(c){ return c*9/5+32; }
+function fmtF(c){ return String(Math.round(cToF(c))).replace("-","−") + "°F"; }
+var FT_PER_KM = 3280.84;
+function peakToH(ft){ return ft/FT_PER_KM - 0.08; }
+function fmtFt(ft){ return (Math.round(ft/100)*100).toLocaleString("en-US") + " ft"; }
+
+function Model(){ this.T=fToC(50); this.wind=0; this.H=peakToH(8000); this.reset(); }
+Model.prototype.reset=function(){ this.ps=[]; this.drops=[]; this.splashes=[]; this.rainLog=[]; this.acc=0; this.time=this.time||0; };
+Model.prototype.step=function(dt){
+  this.time += dt;
+  var L=lcl(this.T), ws=WIND[this.wind], H=this.H, self=this;
+  this.acc += (2 + 0.4*this.T)*dt;
+  while(this.acc>=1){ this.acc-=1;
+    if(this.ps.length<MAX_PARTICLES) this.ps.push({x:0.02+Math.random()*0.29, alt:0.02, free:0.02, cap:capAlt(this.T)+(Math.random()-0.5)*0.2, st:"v", ct:0, age:0, ph:Math.random()*6.28});
+  }
+  for(var i=0;i<this.ps.length;i++){
+    var p=this.ps[i];
+    p.age += dt;
+    var vx = ws>0 ? ws*(0.85+0.3*Math.sin(p.ph+p.age)) : 0.006*Math.sin(p.ph+p.age*0.7);
+    p.x += vx*dt;
+    if(p.free<p.cap) p.free=Math.min(p.cap, p.free+0.3*dt);
+    var t=terrain(p.x,H), target=Math.max(p.free, t>0 ? t+0.2 : 0);
+    p.alt += (target-p.alt)*Math.min(1, dt*3);
+    if(p.st==="v"){ if(p.alt>=L){ p.st="c"; p.ct=0; } }
+    else if(p.alt < L-0.05){ p.st="v"; }
+    else { p.ct += dt; var ex=Math.max(0, p.alt-L-0.25); if(p.ct>0.6 && Math.random()<(0.12+1.6*ex)*dt){ p.dead=true; self.rainOut(p); } }
+    if(p.x>1.03 || p.x<-0.03 || p.age>40) p.dead=true;
+    if(ws===0 && p.st==="v" && p.age>12) p.dead=true;
+  }
+  this.ps=this.ps.filter(function(p){return !p.dead;});
+  for(var j=0;j<this.drops.length;j++){
+    var d=this.drops[j];
+    d.alt -= 1.6*dt; d.x += ws*0.5*dt;
+    var g=terrain(d.x,H);
+    if(d.alt<=g){ d.dead=true; if(d.first) self.rainLog.push({t:self.time, r:regionOf(d.x)}); if(!REDUCED) self.splashes.push({x:d.x, alt:g, life:.3}); }
+  }
+  this.drops=this.drops.filter(function(d){return !d.dead;});
+  for(var k=0;k<this.splashes.length;k++) this.splashes[k].life -= dt;
+  this.splashes=this.splashes.filter(function(s){return s.life>0;});
+  var cut=this.time-14; this.rainLog=this.rainLog.filter(function(e){return e.t>cut;});
+};
+Model.prototype.rainOut=function(p){ for(var i=0;i<3;i++) this.drops.push({x:p.x+(Math.random()-0.5)*0.015, alt:p.alt-Math.random()*0.15, first:i===0}); };
+Model.prototype.countsSince=function(from){
+  var out={ocean:0,coast:0,mountain:0,valley:0};
+  this.rainLog.forEach(function(e){ if(e.t>=from) out[e.r]++; }); return out;
+};
+Model.prototype.counts=function(win){ return this.countsSince(this.time-(win||8)); };
+Model.prototype.fastForward=function(sec){ for(var t=0;t<sec;t+=1/60) this.step(1/60); };
+
+/* ================= Colors ================= */
+var C={};
+var probe=document.createElement("span"); probe.style.display="none"; document.body.appendChild(probe);
+function resolve(v){ probe.style.color="var("+v+")"; return getComputedStyle(probe).color; }
+function loadColors(){
+  ["sky-top","sky-bot","terrain","terrain-edge","vapor","rain","cloud","cloud-edge","sun","cl-line","cl-text","label","label-strong","ocean-cold","ocean-warm","grid","card","ink","ink2","accent","panel-b","line"].forEach(function(k){ C[k]=resolve("--"+k); });
+  C.white = resolve("--color-surface");
+}
+function rgbOf(s){ var m=String(s).match(/[\d.]+/g)||[0,0,0]; return [+m[0],+m[1],+m[2]]; }
+function mix(a,b,t){ var x=rgbOf(a), y=rgbOf(b); return "rgb("+x.map(function(v,i){return Math.round(v+(y[i]-v)*t);}).join(",")+")"; }
+loadColors();
+
+/* ================= Drawing ================= */
+var FONT = getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim() || "Verdana, Geneva, sans-serif";
+function circle(c,x,y,r){ c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); }
+function arrow(c,x1,y1,x2,y2,color,width){
+  c.strokeStyle=color; c.fillStyle=color; c.lineWidth=width||2.5; c.lineCap="round";
+  c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+  var ang=Math.atan2(y2-y1,x2-x1), s=9;
+  c.beginPath(); c.moveTo(x2,y2);
+  c.lineTo(x2-s*Math.cos(ang-0.45), y2-s*Math.sin(ang-0.45));
+  c.lineTo(x2-s*Math.cos(ang+0.45), y2-s*Math.sin(ang+0.45));
+  c.closePath(); c.fill();
+}
+function sun(c,x,y,r){
+  c.fillStyle=C.sun; circle(c,x,y,r);
+  c.strokeStyle=C.sun; c.lineWidth=2; c.lineCap="round";
+  for(var i=0;i<8;i++){ var a=i*Math.PI/4; c.beginPath(); c.moveTo(x+Math.cos(a)*(r+4),y+Math.sin(a)*(r+4)); c.lineTo(x+Math.cos(a)*(r+9),y+Math.sin(a)*(r+9)); c.stroke(); }
+}
+
+function View(canvas, model){ this.k=1; this.cv=canvas; this.c=canvas.getContext("2d"); this.m=model; this.showTemps=false; this.showCloud=true; this.showSunLabel=false; this.resize(); }
+View.prototype.resize=function(){
+  var r=this.cv.getBoundingClientRect(), d=Math.min(2, window.devicePixelRatio||1);
+  if(r.width<10) return false;
+  this.w=r.width; this.h=r.height;
+  this.cv.width=Math.round(r.width*d); this.cv.height=Math.round(r.height*d);
+  this.c.setTransform(d,0,0,d,0,0); return true;
+};
+View.prototype.geo=function(){
+  var w=this.w, h=this.h, top=12, base=h-30, left=w<520?44:56, right=w-8;
+  return {w:w,h:h,top:top,base:base,left:left,right:right,
+    x:function(v){return left+v*(right-left);},
+    y:function(a){return base-a/ALT_MAX*(base-top);}};
+};
+View.prototype.draw=function(){
+  if(!this.w) return;
+  var c=this.c, G=this.geo(), m=this.m, small=G.w<520, k=this.k, i, x, y, a;
+  // sky
+  var g=c.createLinearGradient(0,0,0,G.base); g.addColorStop(0,C["sky-top"]); g.addColorStop(1,C["sky-bot"]);
+  c.fillStyle=g; c.fillRect(0,0,G.w,G.h);
+  // height lines
+  c.font="700 "+Math.round((small?10:11)*k)+"px "+FONT;
+  for(var ft=3000; ft<=12000; ft+=3000){
+    a=ft/FT_PER_KM; y=G.y(a);
+    c.strokeStyle=C.grid; c.globalAlpha=.45; c.setLineDash([2,5]); c.lineWidth=1;
+    c.beginPath(); c.moveTo(G.left,y); c.lineTo(G.right,y); c.stroke(); c.setLineDash([]); c.globalAlpha=1;
+    c.fillStyle=C.label; c.textAlign="left"; c.fillText((ft/1000)+"k ft", 6, y+4);
+    if(this.showTemps){ c.textAlign="right"; c.fillText("Outside air "+fmtF(m.T-6.5*a), G.right-4, y+Math.round(15*k)); }
+  }
+  // sun over the ocean
+  var sx=G.x(0.05), sy=G.y(3.55), sr=(small?9:12)*k;
+  sun(c,sx,sy,sr);
+  if(this.showSunLabel){ c.fillStyle=C["label-strong"]; c.textAlign="left"; c.font="700 "+Math.round((small?11:12)*k)+"px "+FONT; c.fillText("Sun warms the ocean", sx+sr+12, sy+4); }
+  // ocean
+  c.fillStyle=mix(C["ocean-cold"], C["ocean-warm"], Math.min(1,Math.max(0,(cToF(m.T)-40)/50)));
+  c.fillRect(0,G.y(0),G.x(SEA)+1,G.h-G.y(0));
+  // land
+  c.beginPath(); c.moveTo(G.x(SEA),G.h); c.lineTo(G.x(SEA),G.y(0.08));
+  for(i=0;i<=160;i++){ x=SEA+(1-SEA)*i/160; c.lineTo(G.x(x),G.y(terrain(x,m.H))); }
+  c.lineTo(G.w,G.y(terrain(1,m.H))); c.lineTo(G.w,G.h); c.closePath();
+  c.fillStyle=C.terrain; c.fill();
+  c.beginPath(); c.moveTo(G.x(SEA),G.y(0.08));
+  for(i=0;i<=160;i++){ x=SEA+(1-SEA)*i/160; c.lineTo(G.x(x),G.y(terrain(x,m.H))); }
+  c.strokeStyle=C["terrain-edge"]; c.lineWidth=1.5; c.stroke();
+  // runoff: rain on the wind side runs downhill back to the ocean (gravity closes the cycle)
+  var rc=m.counts(6), wet=rc.mountain+rc.coast;
+  if(wet>0){
+    var ra=Math.min(1, wet/14);
+    c.globalAlpha=ra; c.strokeStyle=C.rain; c.lineWidth=3; c.lineCap="round"; c.beginPath();
+    for(i=0;i<=40;i++){ x=0.585-(0.585-SEA-0.004)*i/40; y=G.y(terrain(x,m.H))+2; var xx=G.x(x)+Math.sin(i*0.9)*1.5; if(i===0) c.moveTo(xx,y); else c.lineTo(xx,y); }
+    c.stroke(); c.globalAlpha=1;
+    if(ra>0.5){ c.fillStyle=C["label-strong"]; c.font="700 "+Math.round((small?10:11)*k)+"px "+FONT; c.textAlign="left";
+      var lx=G.x(0.39), ly=G.y(terrain(0.5,m.H))-10; if(!small) c.fillText("Runoff flows back to the ocean", lx-10, Math.min(ly, G.y(0.5))); }
+  }
+  // cloud level
+  if(this.showCloud){
+    y=G.y(lcl(m.T));
+    c.strokeStyle=C["cl-line"]; c.lineWidth=1.6; c.setLineDash([7,5]);
+    c.beginPath(); c.moveTo(G.left,y); c.lineTo(G.right,y); c.stroke(); c.setLineDash([]);
+  }
+  // vapor
+  c.fillStyle=C.vapor; c.globalAlpha=.5;
+  var vr = (small?1.4:1.8)*k;
+  for(i=0;i<m.ps.length;i++){ var p=m.ps[i]; if(p.st==="v"){ c.beginPath(); c.arc(G.x(p.x),G.y(p.alt),vr,0,6.283); c.fill(); } }
+  c.globalAlpha=1;
+  // clouds
+  var cr = Math.max(6, Math.min(12*k, G.w/80));
+  c.fillStyle=C["cloud-edge"];
+  for(i=0;i<m.ps.length;i++){ p=m.ps[i]; if(p.st==="c") circle(c,G.x(p.x),G.y(p.alt),cr+1.5); }
+  c.fillStyle=C.cloud;
+  for(i=0;i<m.ps.length;i++){ p=m.ps[i]; if(p.st==="c") circle(c,G.x(p.x),G.y(p.alt),cr); }
+  // rain
+  c.strokeStyle=C.rain; c.lineWidth=1.8*k; c.lineCap="round";
+  var ws=WIND[m.wind];
+  c.beginPath();
+  for(i=0;i<m.drops.length;i++){ var d=m.drops[i], dx=G.x(d.x), dy=G.y(d.alt); c.moveTo(dx,dy); c.lineTo(dx-2+ws*20,dy+9*k); }
+  c.stroke();
+  // splashes
+  c.lineWidth=1.2;
+  for(i=0;i<m.splashes.length;i++){ var s=m.splashes[i]; c.globalAlpha=s.life/.3; c.beginPath(); c.arc(G.x(s.x),G.y(s.alt)-1,3+(.3-s.life)*12,Math.PI,2*Math.PI); c.stroke(); }
+  c.globalAlpha=1;
+  // cloud level label, drawn on top of the clouds so it stays readable
+  if(this.showCloud){
+    var ly=G.y(lcl(m.T)), fs=Math.round((small?11:12)*k);
+    c.font="700 "+fs+"px "+FONT; var tw=c.measureText("Cloud level").width, lx=G.right-tw-14*k;
+    c.globalAlpha=.9; c.fillStyle=C.card; c.fillRect(lx-6, ly-fs-8, tw+12, fs+8); c.globalAlpha=1;
+    c.fillStyle=C["cl-text"]; c.textAlign="left"; c.fillText("Cloud level", lx, ly-7);
+  }
+  // region labels
+  c.font="700 "+Math.round((small?11:12)*k)+"px "+FONT; c.textAlign="center";
+  REG.forEach(function(r){
+    var cx=G.x((r.a+Math.min(r.b,1))/2), txt=r.label;
+    if(r.k==="ocean"){ txt = small ? fmtF(m.T) : "Ocean · "+fmtF(m.T); c.fillStyle=C.white; }
+    else c.fillStyle=C["label-strong"];
+    c.fillText(txt,cx,G.h-10);
+  });
+  // wind
+  if(m.wind>0){
+    y=G.y(3.0); var n=m.wind+1;
+    for(i=0;i<n;i++){ x=G.x(0.11+i*0.055); arrow(c,x,y,x+(small?18:26),y,C["label-strong"],2); }
+    c.fillStyle=C["label-strong"]; c.textAlign="left"; c.font="700 "+Math.round((small?11:12)*k)+"px "+FONT;
+    c.fillText(m.wind===1?"Light wind":"Strong wind", G.x(0.11+n*0.055)+(small?2:6), y+4);
+  }
+};
+
+/* ================= Wiring ================= */
+var model=new Model(), view=new View($("#cv"), model);
+var paused=false, pageVisible=!document.hidden, onScreen=true, rafId=null, lastTs=null, simAcc=0;
+function running(){ return !paused && pageVisible && onScreen; }
+function frame(ts){
+  rafId=null;
+  if(lastTs==null) lastTs=ts;
+  var dt=Math.min(0.1,(ts-lastTs)/1000); lastTs=ts; simAcc+=dt;
+  var n=0; while(simAcc>=1/60 && n<4){ model.step(1/60); simAcc-=1/60; n++; } if(n===4) simAcc=0;
+  view.draw(); tick();
+  schedule();
+}
+function schedule(){ if(rafId==null && running()) rafId=requestAnimationFrame(frame); if(!running()) lastTs=null; }
+document.addEventListener("visibilitychange", function(){ pageVisible=!document.hidden; activeClock(); schedule(); });
+if("IntersectionObserver" in window){ new IntersectionObserver(function(es){ onScreen=es[0].isIntersecting; schedule(); },{threshold:0.05}).observe($("#cv")); }
+var roT=null;
+if("ResizeObserver" in window){ new ResizeObserver(function(){ clearTimeout(roT); roT=setTimeout(function(){ view.resize(); view.draw(); drawIsland(); },60); }).observe($("#cv")); }
+else window.addEventListener("resize", function(){ clearTimeout(roT); roT=setTimeout(function(){ view.resize(); view.draw(); drawIsland(); },60); });
+new MutationObserver(function(){ loadColors(); view.draw(); drawIsland(); }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(window.matchMedia){ var mq=matchMedia("(prefers-color-scheme: dark)"); var onScheme=function(){ loadColors(); view.draw(); drawIsland(); }; if(mq.addEventListener) mq.addEventListener("change",onScheme); else if(mq.addListener) mq.addListener(onScheme); }
+$("#pause").addEventListener("click", function(){ paused=!paused; this.setAttribute("aria-pressed",String(paused)); this.textContent=paused?"Play":"Pause"; schedule(); });
+
+// gauges
+var gaugeEls={};
+REG.forEach(function(r){
+  var d=document.createElement("div"); d.className="gauge";
+  d.innerHTML='<b>'+r.label+' <span>0</span></b><div class="bar" aria-hidden="true"><i></i></div>';
+  $("#gauges").appendChild(d); gaugeEls[r.k]=d;
+});
+function renderGauges(){
+  var ct=model.counts(8), mx=Math.max(24, ct.ocean, ct.coast, ct.mountain, ct.valley), top=null, tv=0;
+  REG.forEach(function(r){ if(ct[r.k]>tv){ tv=ct[r.k]; top=r.k; } });
+  REG.forEach(function(r){
+    var el=gaugeEls[r.k], v=ct[r.k];
+    el.querySelector("span").textContent = v===1 ? "1 drop" : v+" drops";
+    el.querySelector("i").style.width = Math.round(v/mx*100)+"%";
+    el.classList.toggle("hot", r.k===top && tv>0);
+  });
+}
+var lastDesc=0;
+function renderDesc(){
+  var ct=model.counts(8), parts=[], best=null, bv=0;
+  REG.forEach(function(r){ parts.push(r.label.toLowerCase()+" "+ct[r.k]); if(ct[r.k]>bv){bv=ct[r.k];best=r.label.toLowerCase();} });
+  $("#desc").textContent = "Ocean "+fmtF(model.T)+", wind "+WIND_WORD[model.wind]+", mountain "+fmtFt(+$("#inM").value)+". " +
+    (bv ? "Rain in the last 8 seconds: "+parts.join(", ")+". Most rain is falling on the "+best+"." : "No rain is falling right now.");
+}
+
+// controls
+var inT=$("#inT"), inM=$("#inM"), winds=$$('input[name="wind"]');
+function syncOutputs(){ $("#outT").textContent=inT.value+"°F"; $("#outM").textContent=fmtFt(+inM.value); }
+function applyControls(){ model.T=fToC(+inT.value); model.H=peakToH(+inM.value); var w=0; winds.forEach(function(r){ if(r.checked) w=+r.value; }); model.wind=w; syncOutputs(); view.draw(); }
+inT.addEventListener("input", applyControls); inM.addEventListener("input", applyControls);
+winds.forEach(function(r){ r.addEventListener("change", applyControls); });
+function setControls(o){
+  if(o.T!=null) inT.value=o.T; if(o.mt!=null) inM.value=o.mt;
+  if(o.wind!=null) winds.forEach(function(r){ r.checked=(+r.value===o.wind); });
+  applyControls();
+}
+var LOCK_MSG={};
+function lockControls(map){ // map: {T:"msg"|null, W:..., M:...}; null = unlocked
+  [["T",[inT]],["W",winds],["M",[inM]]].forEach(function(pair){
+    var k=pair[0], msg=map[k], locked=msg!=null;
+    pair[1].forEach(function(el){ el.disabled=locked; });
+    $("#ctl-"+k).classList.toggle("locked", locked);
+    $("#lock"+k).textContent = locked ? msg : "";
+  });
+}
+function currentWind(){ return model.wind; }
+
+/* ================= Active time per step (visibility-aware) ================= */
+var stepClock={ms:0, since:null};
+function activeClock(){ var now=performance.now(); if(stepClock.since!=null) stepClock.ms+=now-stepClock.since; stepClock.since = document.hidden ? null : now; }
+function resetClock(){ stepClock.ms=0; stepClock.since=document.hidden?null:performance.now(); }
+
+/* ================= Lesson ================= */
+var S, guide=$("#guide"), PRESENT=false, LTR=["A","B","C","D"];
+function freshState(){ return {step:0, pred:null, locked:false, revealed:false, hints:0, waitStart:null, outcome:null,
+  attempts:[], testing:null, solved:false, firstExplain:null, picked:null, firstTransfer:null, history:{}}; }
+S=freshState();
+
+function esc(s){ return String(s).replace(/[&<>"]/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch];}); }
+function jodi(mood, html){ return '<div class="jodi"><img src="'+JODI[mood]+'" alt="" width="60" height="60"><div class="bubble"><span class="who">JODI</span>'+html+'</div></div>'; }
+function announce(t){ var a=$("#announce"); a.textContent=""; setTimeout(function(){ a.textContent=t; },30); }
+function progress(n){ var h='<ol class="steps" aria-hidden="true">'; for(var i=1;i<=5;i++) h+='<li class="'+(i<n?"done":i===n?"now":"")+'"></li>'; return h+'</ol>'; }
+function isNarrow(){ return window.matchMedia && matchMedia("(max-width:900px)").matches; }
+function toStage(){ if(isNarrow()) $("#stage").scrollIntoView({behavior:REDUCED?"auto":"smooth", block:"start"}); }
+function focusEl(sel){ var el=$(sel,guide); if(el){ el.setAttribute("tabindex","-1"); el.focus({preventScroll:isNarrow()?false:true}); } }
+
+var GLOSSARY = {
+  vapor:["Water vapor","Water in the form of an invisible gas. It forms when liquid water evaporates. You can't see it, but it's in the air all around you."],
+  evaporate:["Evaporate","When liquid water turns into water vapor, an invisible gas. Warmth makes it happen faster."],
+  condense:["Condense","When water vapor cools and turns back into tiny drops of liquid water. Billions of those drops make a cloud."],
+  shadow:["Rain shadow","The dry side of a mountain, away from the wind. The air dropped most of its rain on the other side first."]
+};
+function term(key,label){ return '<button type="button" class="term" data-term="'+key+'" aria-expanded="false" aria-describedby="tip">'+label+'</button>'; }
+var TERMS = '<dl class="terms">'+
+  '<dt>Evaporation</dt><dd>Liquid water turns into an invisible gas called water vapor.</dd>'+
+  '<dt>Condensation</dt><dd>Water vapor cools and turns back into tiny drops. Billions of them make a cloud.</dd>'+
+  '<dt>Precipitation</dt><dd>Drops get big enough that gravity pulls them down as rain or snow.</dd></dl>';
+
+var STEPS = {
+  1:{ kicker:"Step 1 of 5 · Evaporation", title:"Warm up the ocean",
+      setup:{T:50, wind:0, mt:8000}, temps:true, sunLabel:true,
+      intro:'<p>This ocean is <b>50°F</b>, pretty cold. See the faint dots? That\'s '+term("vapor","water vapor")+': water that has turned into an invisible gas. You\'d never see it in real life.</p>',
+      q:"What do you think will happen if you warm the ocean to 85°F?",
+      choices:[
+        {id:"more_rain_ocean", t:"More vapor rises, and clouds and rain form over the ocean.", best:true},
+        {id:"needs_wind", t:"Nothing changes. Vapor needs wind to go anywhere."},
+        {id:"less_vapor", t:"Less vapor. Heat dries the air out."},
+        {id:"needs_mountain", t:"Clouds form, but it can't rain without a mountain."}
+      ],
+      act:'<b>Now drag Ocean temperature to 85°F or warmer.</b> Then watch for a few seconds.',
+      hints:["The Ocean temperature slider is the first control under the picture.","Give it a few seconds. Watch the faint dots climb toward the dashed Cloud level line."] },
+  2:{ kicker:"Step 2 of 5 · Wind and land", title:"Add wind and a mountain",
+      setup:{T:77, wind:0, mt:8000}, temps:false,
+      intro:'<p>The ocean is set to <b>77°F</b>. At this temperature the air can\'t rise high enough to make clouds on its own. Check the gauges: no rain.</p>',
+      q:"The wind is about to blow from the ocean toward the mountain. Where will most of the rain fall?",
+      choices:[
+        {id:"ocean", t:"Over the ocean"},
+        {id:"coast", t:"On the coast"},
+        {id:"mountain", t:"On the mountain", best:true},
+        {id:"valley", t:"In the valley behind the mountain"}
+      ],
+      act:'<b>Now set the wind to Strong.</b> Watch where the white clouds show up, and check the rain gauges.',
+      hints:["Wind is the middle control. Pick Strong.","Follow the dots as they climb the mountain's left side. Where do the clouds appear?"] },
+  3:{ kicker:"Step 3 of 5 · Your turn", title:"Get rain to the valley",
+      setup:{T:70, wind:0, mt:9000},
+      hints:["Think about what the mountain does to the air before it reaches the valley.",
+             "A tall mountain squeezes the rain out on the near side. Try making the mountain shorter.",
+             "Try this: ocean at 88°F or warmer, Strong wind, and a mountain 4,000 ft or lower. Then run a test."] },
+  4:{ kicker:"Step 4 of 5 · Explain it", title:"Why is the valley dry?",
+      setup:{T:85, wind:2, mt:9000},
+      q:"Which explanation fits best?",
+      choices:[
+        {id:"rained_out", t:"The air rose up the mountain, cooled, and dropped most of its water as rain. Little was left for the valley.", best:true},
+        {id:"blocks_wind", t:"The mountain blocks the wind, so no air reaches the valley."},
+        {id:"too_warm", t:"The valley is too warm for rain to fall."},
+        {id:"cant_cross", t:"Clouds can't float over mountains."}
+      ] },
+  5:{ kicker:"Step 5 of 5 · Somewhere new", title:"An island you've never seen",
+      setup:{T:85, wind:2, mt:9000},
+      q:"One town has a rainforest. The other has dry grass. Which town has the rainforest?",
+      choices:[
+        {id:"town_a_east", t:"Town A, on the east side", best:true},
+        {id:"town_b_west", t:"Town B, on the west side"},
+        {id:"same", t:"Both get about the same rain. It's a small island."},
+        {id:"neither", t:"Neither. Island rain comes from the ocean, not mountains."}
+      ] }
+};
+
+/* ---------- feedback copy (Jodi reframes; she never grades) ---------- */
+var FB1_CORE = '<p>Here\'s what happened. Energy from the Sun warms the ocean, and warm water '+term("evaporate","evaporates")+' faster. Warm, wet air also rises on its own. As it rises, it cools. At the cloud level, the vapor '+term("condense","condenses")+' into tiny drops. That\'s a cloud. When the drops get heavy, gravity pulls them down as rain.</p>';
+var FB1 = {
+  more_rain_ocean:{mood:"happy", lead:'<p>That\'s just what happened. Nice call.</p>'},
+  needs_wind:{mood:"thinking", lead:'<p>I can see why you\'d think that. Wind does move vapor around. But look: no wind, and you still got rain.</p>'},
+  less_vapor:{mood:"thinking", lead:'<p>That\'s a fair hunch. A hot day can feel dry. But heat actually speeds evaporation up, so warm water puts <i>more</i> vapor in the air, not less.</p>'},
+  needs_mountain:{mood:"thinking", lead:'<p>Hold that thought. Mountains do matter, and you\'ll see how in step 2. But warm air can rise high enough to make rain all by itself.</p>'}
+};
+var FB2_CORE = '<p>The wind pushes the air up the side of the mountain. <b>Rising air cools</b>, about 5½°F for every 1,000 feet it climbs. Once it cools to the cloud level, clouds form and rain falls on the side facing the wind.</p>'+
+  '<p>See the stream on the slope? Gravity pulls that rain downhill, back to the ocean. Ocean, vapor, cloud, rain, and back to the ocean. That\'s the <b>water cycle</b>.</p>';
+var FB2_VALLEY = '<p>Now look at the valley gauge. Almost nothing. Hang on to that. It\'s the puzzle for the rest of the lesson.</p>';
+var FB2 = {
+  mountain:{mood:"happy", lead:'<p>Right where you guessed.</p>'},
+  ocean:{mood:"thinking", lead:'<p>Good thinking, since that\'s where the water starts. But at 77°F the air over the ocean can\'t rise high enough to cool into clouds. The mountain does the lifting.</p>'},
+  coast:{mood:"thinking", lead:'<p>Close. The coast is on the way. But flat land doesn\'t lift the air. The rain starts where the land starts to climb.</p>'},
+  valley:{mood:"thinking", lead:'<p>Interesting guess. The wind does carry air all the way to the valley. But the valley gauge shows almost nothing. By the time the air gets past the mountain, most of its water has already fallen. We\'ll dig into why.</p>'}
+};
+var FAIL = {
+  no_wind:'<p>No wind, no trip. Without wind, the air over the ocean just sits there. Nothing carries it to the valley.</p>',
+  too_cold:'<p>Hardly any rain fell anywhere. At this ocean temperature there isn\'t much vapor, and the air doesn\'t rise high enough to make clouds. Think back to step 1.</p>',
+  wind_too_light:'<p>The clouds made it partway, then rained out before they reached the valley. A light wind moves them too slowly. What could get them there faster?</p>',
+  mountain_too_tall:'<p>Lots of rain fell, but on the mountain. A mountain this tall lifts the air so high that it drops nearly all its water on the near side. The valley gets what\'s left, which isn\'t much.</p>',
+  valley_short:'<p>Some rain reached the valley, just not enough to help the farmers. You\'re close. Which control could you push a little further?</p>'
+};
+var FB3_WIN = '<p>There it is, rain in the valley! A shorter mountain doesn\'t lift the air as high, so the clouds don\'t lose all their water on the way up. The warm ocean adds plenty of vapor, and the strong wind carries the clouds over before they rain out.</p>'+
+  '<p>Now flip it around: a <b>tall</b> mountain makes a <b>dry</b> valley. Scientists call that a '+term("shadow","rain shadow")+'. It\'s like the shade behind a tree, except what\'s missing is rain, not sunlight.</p>';
+var FB4_CORE = '<p>One more piece. After the air crosses the top, it <b>sinks</b> into the valley. Sinking air gets squeezed and warms up, so any leftover clouds dry out. Less water, plus warming air: that\'s a rain shadow.</p>';
+var FB4 = {
+  rained_out:{mood:"happy", lead:'<p>That\'s the heart of it.</p>'},
+  blocks_wind:{mood:"thinking", lead:'<p>Let\'s look closer. Watch the faint dots: they do make it over the top and into the valley. The air gets there. Its water doesn\'t. Most of it fell on the way up, as the air rose and cooled.</p>'},
+  too_warm:{mood:"thinking", lead:'<p>You\'re onto something. The air does warm up as it sinks into the valley, and that helps clear the clouds. But the bigger reason is that most of the water already fell on the climb up the mountain.</p>'},
+  cant_cross:{mood:"thinking", lead:'<p>Clouds drift over mountains all the time. You can watch them do it in the simulation. The problem is what happens on the climb: the rising air cools and drops most of its water on the near side.</p>'}
+};
+var FB5_REAL = '<p>This happens in real life. On the Big Island of Hawaiʻi, the trade winds usually blow from the northeast. The Hilo side, facing the wind, is lush and rainy. The Kona side, in the lee of the big volcanoes, is much drier and sunnier.</p>';
+var FB5 = {
+  town_a_east:{mood:"happy", lead:'<p>You flipped it around and still got it. This time the wind comes from the other direction. Town A faces the wind, so air climbs the volcano there, cools, and rains. Town B sits in the rain shadow.</p>'},
+  town_b_west:{mood:"thinking", lead:'<p>Let\'s sit with that a second. In the simulation, rain fell on the left side, but only because the wind came from the left. Here the wind comes from the east, the right side. Rain falls on whichever side faces the wind. That\'s Town A. Town B is in the rain shadow.</p>'},
+  same:{mood:"thinking", lead:'<p>Small islands can still have big differences. What matters is the tall volcano in the middle. Air climbing the east side cools and rains on Town A. By the time it sinks down to Town B, most of the water is gone.</p>'},
+  neither:{mood:"thinking", lead:'<p>The ocean does supply the water. You saw that in step 1. But the mountain decides where it falls. Air rising up the east side rains on Town A, and Town B ends up in the rain shadow.</p>'}
+};
+
+/* ---------- render ---------- */
+function render(){
+  var n=S.step, h="";
+  if(n===0){
+    h += '<p class="kicker">Simulation · Grades 6–8 · About 10–15 min</p><h2 id="stitle">Where does rain come from?</h2>';
+    h += jodi("neutral", PRESENT
+      ? '<p>Well hey there, everybody. Here\'s a question that sounds easy until you think about it: why does one side of a mountain get soaked while the other side stays dry?</p><p>At each step you\'ll guess first. Write your guess down, then vote A, B, C or D with your fingers. Then we test it together. No grades, I promise.</p>'
+      : '<p>Well hey there. Here\'s a question that sounds easy until you think about it: why does one side of a mountain get soaked while the other side stays dry?</p><p>You\'ll make a guess, test it, and see what happens. Five short steps. No grades, I promise.</p>');
+    if(PRESENT){
+      h += '<div class="row introbtns"><button class="btn cta" data-act="start">Let\'s go</button><button class="btn" data-act="present-off">Exit Present mode</button></div>';
+    } else {
+      h += '<div class="row introbtns"><button class="btn cta" data-act="start">Let\'s go</button><button class="btn" data-act="present-on">Teaching this? Present to your class</button></div>';
+      h += '<p class="teachnote">Present mode is built for a projector or smartboard: full screen, bigger text, and A–D choices for class votes.</p>';
+    }
+  }
+  else if(n===1 || n===2){ h += renderPredictStep(n); }
+  else if(n===3){ h += renderChallenge(); }
+  else if(n===4){ h += renderChoiceStep(4); }
+  else if(n===5){ h += renderChoiceStep(5); }
+  else if(n===6){ h += renderSummary(); }
+  hideTip();
+  guide.innerHTML = h;
+  if(n===5) drawIsland();
+}
+function choiceButtons(st, lockedAll){
+  var h='<div class="choices" role="group" aria-label="Choices">';
+  st.choices.forEach(function(ch,ix){
+    h += '<button class="choice" data-act="pick" data-id="'+ch.id+'" aria-pressed="'+(S.pred===ch.id)+'"'+(lockedAll?' disabled':'')+'><span class="ltr" aria-hidden="true">'+LTR[ix]+'</span><span class="ct">'+esc(ch.t)+'</span></button>';
+  });
+  return h+'</div>';
+}
+function voteBlock(n){
+  if(!PRESENT) return "";
+  var v=S.votes||{};
+  return '<details class="vote"><summary>Record the class vote (optional)</summary><div class="vrow">'+
+    LTR.map(function(l){ return '<label>'+l+' <input type="number" min="0" max="99" inputmode="numeric" data-vote="'+l+'" value="'+(v[l]!=null?v[l]:'')+'" aria-label="Votes for '+l+'"></label>'; }).join('')+
+    '</div></details>';
+}
+function sendVote(n){
+  if(!PRESENT || !S.votes) return;
+  var c={}, any=false; LTR.forEach(function(l){ var x=+S.votes[l]; if(x>0){ c[l]=Math.min(99,Math.round(x)); any=true; } });
+  if(any && !S.voteSent){ S.voteSent=true; track("wc_class_vote",{step:n, counts:c}); }
+}
+function hintsBlock(st){
+  if(!st.hints) return "";
+  var h="";
+  if(S.hints>0){ h+='<ol class="hints">'; for(var i=0;i<S.hints;i++) h+='<li>'+esc(st.hints[i])+'</li>'; h+='</ol>'; }
+  var more=S.hints<st.hints.length;
+  h += '<button class="btn small" data-act="hint"'+(more?'':' disabled')+'>'+(S.hints===0?"Need a hint?":more?"Another hint":"That's all my hints")+'</button>';
+  return h;
+}
+function renderPredictStep(n){
+  var st=STEPS[n], h='', fbmap = n===1?FB1:FB2;
+  h += progress(n)+'<p class="kicker">'+st.kicker+'</p><h2 id="stitle">'+st.title+'</h2>';
+  h += jodi("neutral", st.intro);
+  h += '<p class="q" id="q'+n+'">'+esc(st.q)+'</p>';
+  h += choiceButtons(st, S.locked);
+  if(!S.locked){
+    h += voteBlock(n);
+    h += '<div class="row"><button class="btn cta" data-act="lock"'+(S.pred?'':' disabled')+'>'+(PRESENT?'Lock in the class guess':'Lock in my guess')+'</button></div>';
+    h += '<p class="note" style="margin-top:10px">'+(PRESENT?'Everyone writes a guess first. Then vote, and pick the class answer.':'Guess first, then you\'ll test it.')+'</p>';
+  } else if(!S.revealed){
+    h += '<div class="callout wait" id="act">'+st.act+'</div>';
+    h += '<div class="row">'+hintsBlock(st)+'</div>';
+  } else {
+    var f = fbmap[S.pred] || fbmap[S.outcome];
+    var outcomeTxt = n===1 ? "" : '<p class="note">Most rain fell on the <b>'+esc(regLabel(S.outcome).toLowerCase())+'</b>.</p>';
+    var lead = f.lead;
+    if(n===2 && S.outcome!=="mountain") lead = '<p>Most of the rain landed on the '+esc(regLabel(S.outcome).toLowerCase())+' this time. Here\'s what\'s going on.</p>';
+    h += '<div class="fb"><h3 id="fbh">What happened</h3>'+outcomeTxt+jodi(f.mood, lead + (n===1?FB1_CORE:FB2_CORE+FB2_VALLEY))+'</div>';
+    if(n===1) h += TERMS;
+    h += '<div class="row"><button class="btn cta" data-act="next">Next step</button></div>';
+  }
+  return h;
+}
+function renderChallenge(){
+  var st=STEPS[3], h='';
+  h += progress(3)+'<p class="kicker">'+st.kicker+'</p><h2 id="stitle">'+st.title+'</h2>';
+  if(!S.solved){
+    h += jodi("neutral",'<p>The farmers in the valley need rain. All three controls are yours now. Find a setup that gets rain to fall in the valley.</p><p>Set the controls, then press <b>Run a test</b>. A test fast-forwards a few seconds, then counts the rain that lands in the valley for 8 seconds. The farmers need <b>10 drops</b>.</p>');
+    if(S.testing){
+      h += '<div class="callout wait" id="act"><b>Testing…</b> <span id="tcount">8</span> seconds left. Watch the valley gauge.</div>';
+    }
+    h += '<div class="row"><button class="btn cta" data-act="test"'+(S.testing?' disabled':'')+'>Run a test</button>'+hintsBlock(st)+'</div>';
+    if(S.attempts.length){
+      var last=S.attempts[S.attempts.length-1];
+      h += '<div class="fb"><h3 id="fbh">Test '+S.attempts.length+': the valley got '+last.valley+(last.valley===1?' drop':' drops')+'</h3>'+jodi("thinking", FAIL[last.failReason])+'</div>';
+      if(S.attempts.length>1){
+        h += '<ul class="attempts" aria-label="Earlier tests">';
+        for(var i=S.attempts.length-2;i>=0;i--){ var a=S.attempts[i]; h+='<li><b>Test '+(i+1)+': '+a.valley+' in the valley</b>'+a.oceanF+'°F ocean · '+WIND_WORD[a.wind]+' wind · '+fmtFt(a.mountainFt)+' mountain</li>'; }
+        h += '</ul>';
+      }
+    }
+  } else {
+    var w=S.attempts[S.attempts.length-1];
+    h += '<div class="fb"><h3 id="fbh">Test '+S.attempts.length+': the valley got '+w.valley+' drops</h3>'+jodi("happy", FB3_WIN)+'</div>';
+    h += '<div class="row"><button class="btn cta" data-act="next">Next step</button></div>';
+  }
+  return h;
+}
+function renderChoiceStep(n){
+  var st=STEPS[n], h='', map = n===4?FB4:FB5, first = n===4?S.firstExplain:S.firstTransfer;
+  h += progress(n)+'<p class="kicker">'+st.kicker+'</p><h2 id="stitle">'+st.title+'</h2>';
+  if(n===4) h += jodi("neutral",'<p>I put the tall mountain back. Watch the gauges: the mountain gets soaked, and the valley stays dry.</p>');
+  else {
+    h += jodi("neutral",'<p>Here\'s an island with a tall volcano in the middle. The wind almost always blows from the <b>east</b>.</p>');
+    h += '<canvas class="island" id="island" role="img" aria-label="An island with a tall volcano in the middle. Wind blows from the east, on the right side. Town A is on the east shore, facing the wind. Town B is on the west shore."></canvas>';
+  }
+  h += '<p class="q">'+esc(st.q)+'</p>';
+  if(!S.picked) h += voteBlock(n);
+  h += '<div class="choices" role="group" aria-label="Choices">';
+  st.choices.forEach(function(ch,ix){
+    h += '<button class="choice" data-act="pick" data-id="'+ch.id+'" aria-pressed="'+(S.picked===ch.id)+'"><span class="ltr" aria-hidden="true">'+LTR[ix]+'</span><span class="ct">'+esc(ch.t)+(first===ch.id?'<span class="tag">'+(PRESENT?'first pick':'your first pick')+'</span>':'')+'</span></button>';
+  });
+  h += '</div>';
+  if(S.picked){
+    var f=map[S.picked];
+    h += '<div class="fb"><h3 id="fbh">Jodi\'s take</h3>'+jodi(f.mood, f.lead + (n===4?FB4_CORE:FB5_REAL))+'</div>';
+    h += '<p class="note">Tap another answer to see how it compares.</p>';
+    h += '<div class="row"><button class="btn cta" data-act="next">'+(n===4?"Next step":"See what you figured out")+'</button></div>';
+  }
+  return h;
+}
+function renderSummary(){
+  var h='<ol class="steps" aria-hidden="true"><li class="done"></li><li class="done"></li><li class="done"></li><li class="done"></li><li class="done"></li></ol>';
+  h += '<p class="kicker">All done</p><h2 id="stitle">What you figured out</h2>';
+  h += jodi("happy",'<p>Look at you. You can explain where rain comes from, and why some places hardly get any.</p>');
+  h += '<div class="summary"><dl>'+
+    '<dt>1. Evaporation</dt><dd>The Sun warms the ocean. Warm water evaporates faster, putting more water vapor in the air.</dd>'+
+    '<dt>2. Condensation</dt><dd>Air cools as it rises. At the cloud level, vapor turns into tiny drops: clouds.</dd>'+
+    '<dt>3. Precipitation</dt><dd>When the drops get heavy, gravity pulls them down as rain.</dd>'+
+    '<dt>4. Collection</dt><dd>Rain runs downhill in streams back to the ocean, and the cycle starts again.</dd>'+
+    '<dt>Rain shadow</dt><dd>A tall mountain makes air drop its rain on the side facing the wind. The far side stays dry.</dd>'+
+  '</dl></div>';
+  var H=S.history, items=[];
+  if(H[1]) items.push('<b>Step 1.</b> You guessed: "'+esc(H[1].guess)+'" What happened: warm water sent up more vapor, and rain fell over the ocean.');
+  if(H[2]) items.push('<b>Step 2.</b> You guessed the '+esc(H[2].guessShort)+'. What happened: most rain fell on the '+esc(H[2].outcome)+'.');
+  if(H[3]) items.push('<b>Step 3.</b> You got rain to the valley in '+H[3].tests+(H[3].tests===1?' test':' tests')+'.');
+  if(H[5]) items.push('<b>Step 5.</b> Your first pick: '+esc(H[5].guess)+'. The rainforest is in Town A, on the side facing the wind.');
+  if(items.length) h += '<h3 style="font-size:17px;margin:4px 0 6px">Your guesses vs. what happened</h3><ul class="yours"><li>'+items.join('</li><li>')+'</li></ul>';
+  h += jodi("neutral",'<p>That\'s enough out of me for today. The controls are all yours now, so play as long as you like. And next time you see clouds piled up on one side of a mountain, you\'ll know exactly what they\'re up to.</p>');
+  h += '<div class="row"><button class="btn" data-act="restart">Start over</button></div>';
+  return h;
+}
+
+/* ---------- island (transfer) ---------- */
+function drawIsland(){
+  var cv=$("#island"); if(!cv) return;
+  var r=cv.getBoundingClientRect(); if(r.width<10) return;
+  var d=Math.min(2,window.devicePixelRatio||1), w=r.width, h=r.height, c=cv.getContext("2d");
+  cv.width=Math.round(w*d); cv.height=Math.round(h*d); c.setTransform(d,0,0,d,0,0);
+  var g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,C["sky-top"]); g.addColorStop(1,C["sky-bot"]); c.fillStyle=g; c.fillRect(0,0,w,h);
+  var sea=h*0.78;
+  c.fillStyle=C["ocean-warm"]; c.fillRect(0,sea,w,h-sea);
+  // island with a volcano
+  function iy(x){ return sea - (h*0.07*Math.sin(Math.PI*(x-0.1)/0.8) + h*0.52*Math.exp(-Math.pow((x-0.5)/0.13,2))); }
+  c.beginPath(); c.moveTo(w*0.1,sea);
+  for(var i=0;i<=120;i++){ var x=0.1+0.8*i/120; c.lineTo(w*x,iy(x)); }
+  c.lineTo(w*0.9,sea); c.closePath(); c.fillStyle=C.terrain; c.fill(); c.strokeStyle=C["terrain-edge"]; c.lineWidth=1.5; c.stroke();
+  // towns
+  function town(fx,label,sub){
+    var x=w*fx, y=iy(fx)+1; c.fillStyle=C["label-strong"];
+    c.fillRect(x-7,y-10,14,10); c.beginPath(); c.moveTo(x-9,y-10); c.lineTo(x,y-18); c.lineTo(x+9,y-10); c.closePath(); c.fill();
+    c.textAlign="center"; c.font="700 13px "+FONT; c.fillText(label, x, y-38);
+    c.font="400 11px "+FONT; c.fillStyle=C.label; c.fillText(sub, x, y-24);
+  }
+  town(0.81,"Town A","east shore");
+  town(0.19,"Town B","west shore");
+  // wind from the east
+  var wy=h*0.2;
+  for(var k=0;k<3;k++){ var x0=w*(0.97-k*0.07); arrow(c,x0,wy,x0-26,wy,C["label-strong"],2); }
+  c.fillStyle=C["label-strong"]; c.font="700 12px "+FONT; c.textAlign="right"; c.fillText("Wind from the east", w*0.97, wy-12);
+  // compass
+  c.fillStyle=C.white; c.font="700 12px "+FONT; c.textAlign="left"; c.fillText("\u2190 West", 8, h-8); c.textAlign="right"; c.fillText("East \u2192", w-8, h-8);
+}
+
+/* ---------- step flow ---------- */
+function setOverlays(n){
+  view.showTemps = n===1; view.showSunLabel = n===1; view.showCloud = true;
+}
+function enterStep(n){
+  if(S.step>=1 && S.step<=6 && S.step!==n){ activeClock(); track("wc_step_end",{step:S.step, activeMs:Math.round(stepClock.ms)}); }
+  var hist=S.history, attemptsKeep=S.attempts;
+  S.step=n; S.votes={}; S.voteSent=false; S.pred=null; S.locked=false; S.revealed=false; S.hints=0; S.waitStart=null; S.outcome=null; S.testing=null; S.picked=null;
+  if(n!==3){ /* keep attempts for summary */ }
+  resetClock();
+  var st=STEPS[n];
+  if(st && st.setup){ setControls(st.setup); model.reset(); }
+  setOverlays(n);
+  var all="Unlocks in step 3";
+  if(n===0) lockControls({T:"Unlocks in step 1", W:"Unlocks in step 2", M:all});
+  else if(n===1) lockControls({T:"Unlocks after you guess", W:"Unlocks in step 2", M:all});
+  else if(n===2) lockControls({T:"Set for this step", W:"Unlocks after you guess", M:all});
+  else if(n===3) lockControls({T:null, W:null, M:null});
+  else if(n===4||n===5) lockControls({T:"Set for this step", W:"Set for this step", M:"Set for this step"});
+  else if(n===6) lockControls({T:null, W:null, M:null});
+  if(n===4||n===5){ model.fastForward(9); }
+  if(n>=1 && n<=6){ track("wc_step_start",{step:n, mode:PRESENT?"class":"solo"}); send("step",null,{step:n}); }
+  if(n===6){
+    var a3=S.attempts;
+    send("complete",null,{ summary:{
+      predictionsMatched:(hist[1]&&hist[1].matched?1:0)+(hist[2]&&hist[2].matched?1:0),
+      hintsUsed:(hist.hints||0), attemptsStep3:a3.length,
+      explanationBest: hist[4]?hist[4].best:false, transferBest: hist[5]?hist[5].best:false } });
+  }
+  render(); view.draw();
+  if(n>0) focusEl("#stitle");
+}
+function reveal(outcome){
+  var n=S.step; S.revealed=true; S.outcome=outcome;
+  var st=STEPS[n], best=null; st.choices.forEach(function(c){ if(c.best) best=c.id; });
+  var matched = n===1 ? (S.pred==="more_rain_ocean") : (S.pred===outcome);
+  track("wc_reveal",{step:n, outcome:outcome, prediction:S.pred, matched:matched});
+  var pc=null; st.choices.forEach(function(c){ if(c.id===S.pred) pc=c; });
+  S.history[n]={guess:pc?pc.t:"", guessShort:pc?pc.t.replace(/^(Over|On|In) (the )?/,"").replace(/ behind the mountain$/,""):"", outcome:regLabel(outcome).toLowerCase(), matched:matched};
+  lockControls(n===1?{T:null, W:"Unlocks in step 2", M:"Unlocks in step 3"}:{T:"Unlocks in step 3", W:null, M:"Unlocks in step 3"});
+  render(); announce("Jodi explains what happened.");
+  focusEl("#fbh");
+}
+function tick(){
+  var now=model.time, n=S.step;
+  if(now-lastDesc>1.2){ lastDesc=now; renderGauges(); renderDesc(); }
+  if(n===1 && S.locked && !S.revealed){
+    if(+inT.value>=80){ if(S.waitStart==null) S.waitStart=now;
+      if(model.countsSince(S.waitStart).ocean>=3 || now-S.waitStart>12) reveal("ocean"); }
+    else S.waitStart=null;
+  }
+  if(n===2 && S.locked && !S.revealed){
+    if(model.wind>0){ if(S.waitStart==null) S.waitStart=now;
+      if(now-S.waitStart>=9){ var ct=model.countsSince(S.waitStart+2), top=null, tv=0; REG.forEach(function(r){ if(ct[r.k]>tv){tv=ct[r.k]; top=r.k;} }); if(top) reveal(top); } }
+    else S.waitStart=null;
+  }
+  if(n===3 && S.testing){
+    var left=Math.max(0, Math.ceil(S.testing.start+8-now)), el=$("#tcount");
+    if(el && el.textContent!==String(left)) el.textContent=left;
+    if(now>=S.testing.start+8) finishTest();
+  }
+}
+function startTest(){
+  var oceanF=+inT.value, wind=model.wind, mountainFt=+inM.value;
+  lockControls({T:"Locked during the test", W:"Locked during the test", M:"Locked during the test"});
+  model.reset(); model.fastForward(5);
+  S.testing={start:model.time, oceanF:oceanF, wind:wind, mountainFt:mountainFt};
+  if(paused){ $("#pause").click(); }
+  render(); toStage(); announce("Test running for 8 seconds.");
+}
+function finishTest(){
+  var t=S.testing; S.testing=null;
+  var ct=model.countsSince(t.start), total=ct.ocean+ct.coast+ct.mountain+ct.valley, valley=ct.valley;
+  var success = valley>=10, reason=null;
+  if(!success){
+    if(t.wind===0) reason="no_wind";
+    else if(total<6) reason="too_cold";
+    else if(t.mountainFt>=6000) reason="mountain_too_tall";
+    else if(t.wind===1) reason="wind_too_light";
+    else reason="valley_short";
+  }
+  var a={oceanF:t.oceanF, wind:t.wind, mountainFt:t.mountainFt, valley:valley, total:total, failReason:reason, success:success};
+  S.attempts.push(a);
+  track("wc_attempt",{step:3, attempt:S.attempts.length, success:success, failReason:reason, valley:valley, oceanF:t.oceanF, wind:WIND_WORD[t.wind], mountainFt:t.mountainFt});
+  if(success){ S.solved=true; S.history[3]={tests:S.attempts.length}; lockControls({T:null,W:null,M:null}); }
+  else lockControls({T:null,W:null,M:null});
+  render(); announce(success?"Rain reached the valley.":"Test done. The valley got "+valley+" drops.");
+  focusEl("#fbh");
+}
+
+guide.addEventListener("click", function(e){
+  var b=e.target.closest("[data-act]"); if(!b || b.disabled) return;
+  var act=b.getAttribute("data-act"), n=S.step, st=STEPS[n];
+  if(act==="start"){ enterStep(1); }
+  else if(act==="present-on"){ setPresent(true); }
+  else if(act==="present-off"){ setPresent(false); }
+  else if(act==="pick"){
+    var id=b.getAttribute("data-id");
+    if(n===1||n===2){ if(S.locked) return; S.pred=id; render(); var nb=$('[data-id="'+id+'"]',guide); if(nb) nb.focus(); }
+    else if(n===4||n===5){
+      var ch=null; st.choices.forEach(function(c){ if(c.id===id) ch=c; });
+      if(n===4 && S.firstExplain==null){ S.firstExplain=id; S.history[4]={best:!!ch.best}; track("wc_explanation",{step:4, choiceId:id, isBest:!!ch.best, firstTry:true}); }
+      if(n===5 && S.firstTransfer==null){ S.firstTransfer=id; S.history[5]={guess:ch.t, best:!!ch.best}; track("wc_transfer",{step:5, choiceId:id, isBest:!!ch.best, firstTry:true}); }
+      if(!S.picked) sendVote(n);
+      var wasPicked=!!S.picked; S.picked=id; render();
+      if(!wasPicked){ announce("Jodi responds."); focusEl("#fbh"); } else { var pb=$('[data-id="'+id+'"]',guide); if(pb) pb.focus(); }
+    }
+  }
+  else if(act==="lock"){
+    if(!S.pred) return; S.locked=true;
+    track("wc_prediction",{step:n, choiceId:S.pred, mode:PRESENT?"class":"solo"});
+    sendVote(n);
+    if(n===1) lockControls({T:null, W:"Unlocks in step 2", M:"Unlocks in step 3"});
+    if(n===2) lockControls({T:"Set for this step", W:null, M:"Unlocks in step 3"});
+    render(); focusEl("#act"); toStage();
+  }
+  else if(act==="hint"){
+    if(!st.hints || S.hints>=st.hints.length) return;
+    S.hints++; S.history.hints=(S.history.hints||0)+1;
+    track("wc_hint",{step:n, hint:S.hints});
+    render(); var hb=$('[data-act="hint"]',guide); if(hb && !hb.disabled) hb.focus(); else focusEl(".hints");
+  }
+  else if(act==="test"){ if(!S.testing) startTest(); }
+  else if(act==="next"){ enterStep(n+1); }
+  else if(act==="restart"){
+    send("restart",null,{});
+    S=freshState(); lastDesc=0; enterStep(0); focusEl("#stitle");
+    window.scrollTo({top:0, behavior:REDUCED?"auto":"smooth"});
+  }
+});
+
+/* ---------- glossary tooltips: hover to peek, click or tap to pin, Esc to close ---------- */
+var tipEl=$("#tip"), tipFor=null, tipPinned=false;
+function showTip(btn){
+  var g=GLOSSARY[btn.getAttribute("data-term")]; if(!g) return;
+  if(tipFor && tipFor!==btn) tipFor.setAttribute("aria-expanded","false");
+  tipFor=btn; btn.setAttribute("aria-expanded","true");
+  tipEl.innerHTML="<b>"+esc(g[0])+"</b>"+esc(g[1]); tipEl.hidden=false;
+  var r=btn.getBoundingClientRect(), tw=tipEl.offsetWidth, th=tipEl.offsetHeight;
+  var left=Math.max(12, Math.min(r.left+window.scrollX, window.scrollX+document.documentElement.clientWidth-tw-12));
+  var top=r.bottom+window.scrollY+8; if(r.bottom+th+16>window.innerHeight && r.top>th+16) top=r.top+window.scrollY-th-8;
+  tipEl.style.left=left+"px"; tipEl.style.top=top+"px";
+}
+function hideTip(){ if(tipFor) tipFor.setAttribute("aria-expanded","false"); tipFor=null; tipPinned=false; tipEl.hidden=true; }
+document.addEventListener("click", function(e){
+  var b=e.target.closest(".term");
+  if(b){ if(tipFor===b && tipPinned){ hideTip(); return; } showTip(b); tipPinned=true; return; }
+  if(!e.target.closest("#tip")) hideTip();
+});
+document.addEventListener("mouseover", function(e){ var b=e.target.closest&&e.target.closest(".term"); if(b && !tipPinned) showTip(b); });
+document.addEventListener("mouseout", function(e){ var b=e.target.closest&&e.target.closest(".term"); if(b && !tipPinned && !(e.relatedTarget&&b.contains(e.relatedTarget))) hideTip(); });
+document.addEventListener("keydown", function(e){ if(e.key==="Escape" && !tipEl.hidden){ var f=tipFor; hideTip(); if(f) f.focus(); } });
+window.addEventListener("scroll", function(){ if(!tipEl.hidden && !tipPinned) hideTip(); }, {passive:true});
+
+function renderPreviewLog(){}
+
+/* ---------- class vote inputs ---------- */
+guide.addEventListener("input", function(e){ var l=e.target.getAttribute&&e.target.getAttribute("data-vote"); if(l){ S.votes=S.votes||{}; S.votes[l]=e.target.value; } });
+
+/* ---------- Present mode (projector / smartboard) ---------- */
+function setPresent(on){
+  if(PRESENT===on) return; PRESENT=on;
+  document.body.classList.toggle("present", on);
+  var b=$("#presentBtn"); b.setAttribute("aria-pressed", String(on)); $("#presentLabel").textContent = on ? "Exit present" : "Present";
+  view.k = on ? 1.45 : 1;
+  track("wc_mode",{mode:on?"class":"solo", step:S.step});
+  try{
+    if(on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){});
+    if(!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
+  }catch(e){}
+  render();
+  setTimeout(function(){ view.resize(); view.draw(); drawIsland(); }, 120);
+  announce(on ? "Present mode on." : "Present mode off.");
+}
+$("#presentBtn").addEventListener("click", function(){ setPresent(!PRESENT); });
+
+/* ---------- Comms: the shared student inbox on the live site (js/message-hq.js) ---------- */
+var toastT=null;
+function toast(msg){ var t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(function(){ t.hidden=true; }, 3200); }
+if(IS_PROD){ var mh=document.createElement("script"); mh.src="/js/message-hq.js"; mh.setAttribute("data-message-source","Simulations: Water Cycle"); document.body.appendChild(mh); }
+$("#commsBtn").addEventListener("click", function(){
+  if(window.openComms) window.openComms(); else if(window.openMessageModal) window.openMessageModal();
+  else toast("Comms opens your Allgood Academy inbox on allgoodacademy.com.");
+});
+
+/* ---------- keyboard: A–D picks a choice ---------- */
+document.addEventListener("keydown", function(e){
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  var tag=(e.target.tagName||"").toLowerCase(); if(tag==="input"||tag==="textarea") return;
+  var i=LTR.indexOf(String(e.key).toUpperCase()); if(i<0) return;
+  var btns=$$(".choice:not(:disabled)", guide); if(btns[i]){ btns[i].click(); }
+});
+
+/* ---------- go ---------- */
+setControls({T:50, wind:0, mt:8000});
+model.fastForward(3);
+enterStep(0);
+if(location.hash==="#present") setPresent(true);
+renderGauges(); renderDesc();
+schedule();
+})();
+</script>
+</body>
+</html>

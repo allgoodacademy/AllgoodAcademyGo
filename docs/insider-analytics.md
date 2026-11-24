@@ -42,6 +42,7 @@ which is what every figure on Insider is computed from. A module that passes `st
 | `core` | the four games, every GoodBlock, every Challenge | yes — this is the funnel |
 | `pattern-lab` | Pattern Lab (`/educational-games/pattern-lab/`) | **no** — held in `D.offFunnel` |
 | `take-the-bait` | Take the Bait (`/educational-games/takethebait/`) | **no** — its own Insider page, from its own queries |
+| `water-cycle` | Where rain comes from (`/simulations/watercycle/`) | **no** — partitioned out like any non-`core` stream; anonymous session only, no name or free text |
 
 **Take the Bait** is a Mob Control-style battle (fire your crew through multiplier gates, smash Scam HQ) followed by three Real or Bait? messages and Jodi's recap after every level. It is visible on the games hub and assignable
 in Mission Control, but on its own stream so holiday-scale play cannot skew the core funnel.

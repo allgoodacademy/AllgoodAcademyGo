@@ -25,6 +25,7 @@ public/
                                                     # cogat-verbal-practice, digital-asset-defense,
                                                     # testing, your-digital-identity
   jsh/                                             # finding-yourself, rage-revenue
+  simulations/                                     # Simulations hub (not linked from the homepage) + watercycle/
   404.html, privacy.html, terms.html, favicon.png
 ```
 
