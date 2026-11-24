@@ -4,6 +4,37 @@ Insider (`public/insider/index.html`) is the owner-facing BI view for Allgood Ac
 note explains the data behind it, so you know what each number means and how to take the
 same data further (Looker Studio, BigQuery, Sheets) when you want to.
 
+## 0. Cutover: the identity reset (2026-11-24)
+
+Read this before comparing any number across late November 2026. On this date students
+stopped signing in at all (founder decision, 2026-11-23, Decisions & Context Log
+"Identity model reset"). What changes in the data:
+
+- **When a session counts — kept comparable on purpose.** Lessons used to sit behind a
+  tap-to-power-up screen, so a telemetry session only began after a tap. That screen is
+  gone and content renders on load, so `telemetry.js` now opens the `sessions/{id}` doc at
+  the visitor's **first interaction** (first tap or keypress, a `step()` past step 1 — the
+  GoodBlocks report step 1 on load — a `choice()` or `complete()`), not on page load, and `AuthCore.startSession()` writes
+  the `users/{uid}` profile at that same moment. A visit that never touches the page is
+  neither a session nor a user, exactly as before. `module_open` events are still queued
+  from page load and only written once the session opens.
+- **The Challenges' "Session Started" `game_scores` row** is likewise written at the first
+  interaction, not on load.
+- **No new `ageTier`.** Nothing asks a student's age any more, so new `users`, `sessions`,
+  `events`, `course_feedback` and `topic_selections` rows carry no `ageTier`. Every student
+  is treated as a child. Older rows keep theirs.
+- **User mix freezes.** Insider's "Learner Recruit" and "13+ Account" counts stop growing;
+  every new student is a "Guest" (anonymous) — in a classroom if they joined one. "Teacher"
+  is unchanged.
+- **No new Recruit Codes.** `recruit_codes` is read-only (rule #9) and only read by the legacy
+  restore until 2027-06-30. A restore copies old progress into the student's current
+  anonymous uid, so a restored student appears as a new Guest row with the old work, and
+  their teacher's roster can show both the old and the new row.
+- **Fewer split sessions.** Nobody signs in or links an account mid-visit any more, so a
+  visit no longer splits into two session docs when the uid changed.
+- **GA4 is stricter.** `telemetry.js` forwards to GA only for a non-anonymous (teacher)
+  session; it used to skip only `ageTier == 'under13'`.
+
 ## 1. What every module records
 
 All data lives in Firestore under `artifacts/allgood-academy/…`. Two kinds of records exist:
@@ -12,14 +43,15 @@ All data lives in Firestore under `artifacts/allgood-academy/…`. Two kinds of 
 
 | Path | Written by | What it holds |
 |---|---|---|
-| `users/{uid}` | auth-core.js | displayName, email (13+ only), role, ageTier, recruitCode, classroomCode, lastLogin |
+| `users/{uid}` | auth-core.js | displayName (a student's nickname), email (teachers only), role, isGuest, classroomCode, lastLogin. Pre-2026-11 rows may also carry ageTier, recruitCode, avatar |
 | `users/{uid}/launches/{id}` | dashboard launch button | courseName, targetUrl, timestamp. Only dashboard launches. Lab Pack hub launches are not written here. |
 | `users/{uid}/game_scores/{sessionId}` | both Challenges, Jolene's, every lab | gameName, finalScore / percentage / rank (games), completed flag (labs), lastUpdated. Real World Ready labs also write `narrativeStyle` (`'second-person'` for Money as a Skill, `'character'` for Conflict Has a Winner and Reading the Room) — the tag for the Lab Pack's narrative-style A/B test. Compare per-category Real World Ready Challenge scores (Judgment ← money, Composure ← conflict, Perspective ← reading_room) against it. |
 | `users/{uid}/game_scores/{sessionId}/scenario_attempts/{n}` | DDC, Jolene's | scenarioIndex, choiceIndex, score (0 to 3), effectiveness, question |
 | `users/{uid}/module_progress/{slug}` | every module | resume state: answered scenarios (games) or highestUnlocked case (labs) |
 | `course_feedback/{id}` | DDC only today | rating 1 to 5 plus free text |
 | `messages/{id}` | Message HQ on every portal | free-text messages with source portal |
-| `classrooms/{code}`, `recruit_codes/{code}` | dashboard / auth-core | roster and recruit passphrases |
+| `classrooms/{code}` | Mission Control | a teacher's class and what it is assigned |
+| `recruit_codes/{code}` | legacy (pre-2026-11), read-only | old Learner Recruit passphrases and their progress copy, read only by the legacy restore until 2027-06-30 |
 
 What this could NOT answer: time spent, where in a module people quit, how they arrived,
 what device they used, or anything about a lab visit that did not end in completion.
@@ -28,7 +60,7 @@ what device they used, or anything about a lab visit that did not end in complet
 
 | Path | What it holds |
 |---|---|
-| `sessions/{sessionId}` | One doc per module visit: uid, module, gameName, **stream**, startedAt, lastSeenAt, **activeMs** (only while the tab is visible), **maxStep / stepsTotal**, completed, **device**, **entry** (dashboard, lab-hub, direct, external), role / ageTier / isGuest copied from the account |
+| `sessions/{sessionId}` | One doc per module visit: uid, module, gameName, **stream**, startedAt, lastSeenAt, **activeMs** (only while the tab is visible), **maxStep / stepsTotal**, completed, **device**, **entry** (dashboard, lab-hub, direct, external), role / isGuest copied from the account (pre-2026-11 rows also ageTier). Opened at the first interaction — see section 0 |
 | `events/{id}` | Append-only stream: `module_open`, `step`, `choice`, `module_complete`, plus any custom `Telemetry.track()` call. Each has uid, module, **stream**, sessionId, step, meta, ts |
 
 #### Streams: which numbers a product belongs in
@@ -67,9 +99,9 @@ Like Pattern Lab it never writes `category` on a choice (techniques are not in t
 vocabulary; the field is `technique`) and never loads `/js/skill-routing.js`. The session
 `summary` uses the four games' shape (`scenariosPlayed`/`correct` = Real or Bait answers / right,
 `categories` = bait seen/spotted per technique) plus a `ttb` block, which is what Mission
-Control's Agent Detail reads. A signed-in student (a profile with a 13+ account, Recruit Code
-or Task Force membership) also gets `users/{uid}/game_scores/{visitId}`; a guest gets
-telemetry only, with no name and no free text.
+Control's Agent Detail reads. A student in a class (a Task Force membership) also gets
+`users/{uid}/game_scores/{visitId}`; any other session gets telemetry only, with no name
+and no free text.
 
 Pattern Lab is a free CogAT-style practice diagnostic published for parents arriving from
 search. It is not a step toward a GoodBlock and its visitors did not come from the dashboard,
@@ -172,14 +204,14 @@ so somebody has to run it (`--dry-run` first reports what would go without delet
 student typed, and the students typing it are often under 13. Two things make a parental
 deletion request answerable:
 
-- Every document carries **`ageTier`** (`under13`, `13plus`, or `null` when the account lookup
-  failed — `null` means unknown, never "13 or older"). An under-13 comment can be found
-  without joining back to any other collection.
+- Rows from before 2026-11-24 carry **`ageTier`**; newer rows don't, because every student is
+  treated as a child. Either way the row carries the student's **`uid`**, which is how a
+  request is answered.
 - **Nobody but an allowlisted admin can read or delete this collection** — not teachers, not
   the public (`firestore.rules` #8). That has not changed and should not.
 
-So: a parent writes in, an admin filters `course_feedback` by that child's `uid` or by
-`ageTier == 'under13'`, finds the comment, and deletes it. Past 90 days the prune job has
+So: a parent writes in, an admin filters `course_feedback` by that child's `uid`, finds the
+comment, and deletes it. Past 90 days the prune job has
 already removed it.
 
 ### Who owns this — and who is allowed to delete
@@ -231,7 +263,8 @@ deletion run is `node scripts/prune-telemetry.js` with no `--dry-run` flag, invo
 
 - **Overview**: accounts, active learners, module visits, completions, activity by day, user
   mix, courses at a glance, latest messages, live event feed.
-- **Users**: filter by type (Learner Recruit, 13+ Account, Teacher, Guest, in a classroom,
+- **Users**: filter by type (Learner Recruit and 13+ Account are legacy types and no longer
+  grow; Teacher, Guest, in a classroom,
   active 7d, completed something), sort by last active / most visits / most completions /
   most time on task / name, search by name, email, uid or recruit code. Click a row for the
   full profile: per-course status and progress, best score, time, recent sessions, score
@@ -268,7 +301,7 @@ Three options, in order of effort:
 
    | Property | Loads on | Gate |
    |---|---|---|
-   | `G-EN4M7T3BLQ` (product) | `/dashboard/` only | `ag_account === '1'` (confirmed 13+ account) |
+   | `G-EN4M7T3BLQ` (product) | `/dashboard/` only | `ag_account === '1'` (a signed-in teacher; students never are) |
    | `G-P6DZJ685W6` (public marketing) | `/`, `/for-teachers/`, `/about/` | none needed — signed-out pages |
 
    The product property fires `launch_module` from the dashboard. `telemetry.js` forwards
@@ -282,10 +315,11 @@ Three options, in order of effort:
    carry no learner identity. Do not add `G-P6DZJ685W6` to `/dashboard/`, `/jsh/`,
    `/educational-games/` or `/mission-control/`.
 
-   **COPPA note before enabling GA on modules:** Learner Recruits are under 13. GA4 sets
-   cookies and collects device identifiers, which is a different privacy posture from the
-   uid-only telemetry above. If you turn it on, either gate it to 13+ / teacher accounts
-   (telemetry.js already knows `ageTier`) or turn on GA4's child-directed treatment. The
+   **COPPA note before enabling GA on modules:** every student is anonymous and may be under
+   13. GA4 sets cookies and collects device identifiers, which is a different privacy posture
+   from the uid-only telemetry above. `telemetry.js` already forwards to GA only for a
+   non-anonymous (teacher) session; keep it that way, or turn on GA4's child-directed
+   treatment. The
    Lab Pack hub calls `gtag` today but never loads it, so those launch events are dropped.
 
 ## 5. Things worth adding next
@@ -302,7 +336,8 @@ Three options, in order of effort:
 ## 6. Deploy checklist
 
 - `firestore.rules` gained rules for `sessions`, `events`, collection-group reads and
-  recruit-code deletion. They deploy automatically on merge to `main` (see
+  recruit-code deletion (and, on 2026-11-24, made `recruit_codes` read-only and required a
+  Google sign-in to create a class). They deploy automatically on merge to `main` (see
   `.github/workflows/firebase-firestore-rules.yml`). They went live on 2026-09-06 (run #2
   of that workflow, re-run after a service-account permission fix). If a later rules deploy
   fails, Insider shows an amber "some data sources didn't load" strip naming the affected

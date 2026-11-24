@@ -8,12 +8,8 @@
 <script src="/assets/js/lucide.min.js"></script>
 <!-- Shared identity module — see /js/auth-core.js. -->
 <script type="module" src="/js/auth-core.js"></script>
-<!-- Shared identify gate (age question / Sign In / Recruit Code) — see /js/identity-gate.js.
-     Loading this does NOT put a login wall on the game: the gate only ever opens when
-     something explicitly calls window.AuthGate.offerSave()/ensureIdentified(), same as
-     every GoodBlock. Here that's the end-screen save offer, so a finished run has
-     somewhere to go instead of vanishing when the tab closes. -->
-<script type="module" src="/js/identity-gate.js"></script>
+<!-- Every visitor gets a silent anonymous session; nothing is asked before playing. -->
+<script type="module">if (window.AuthCore) window.AuthCore.startSession();</script>
 <!-- Shared telemetry pipe (artifacts/{appId}/sessions + /events) — the same one every
      GoodBlock and Challenge uses. Replaces this game's own root-level game_sessions
      writer; see /js/telemetry.js. -->
@@ -24,26 +20,6 @@
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  /* Required by /js/identity-gate.js's injected #ag-modal, which shows/hides itself
-     purely by toggling these two class names (see open()/resolveAndClose() there) —
-     every other page loading the gate defines them itself; this page didn't, so the
-     modal had no defined hidden state at all. Copied verbatim from dashboard/index.html. */
-  .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
-  .hidden-modal { opacity: 0; pointer-events: none; transform: translateY(-10px); }
-  .visible-modal { opacity: 1; pointer-events: auto; transform: translateY(0); }
-
-  /* Mobile hardening for the shared #ag-modal (identity-gate.js), scoped to this page only.
-     Reported symptom: on mobile the screen "freezes" — nothing visible, but every
-     subsequent tap is swallowed. That's the signature of an invisible full-screen
-     pointer-events:auto layer, not an actual hang. Two likely causes:
-     1) backdrop-filter/blur over this page's busy space-image background is a known
-        source of invisible/broken compositing on mobile Safari & some Android WebViews.
-     2) The inner card could in principle render taller than a phone's real visible
-        area (address-bar chrome eats into 100vh-based layouts) with no way to scroll
-        to the rest of it. */
-  #ag-modal { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-  #ag-modal > div { max-height: 90dvh; max-height: 90vh; overflow-y: auto; }
 
   :root {
     --teal: var(--color-teal);
@@ -676,13 +652,13 @@
               <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
             </button>
             <div class="home-popover" id="home-popover">
-              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/'; })">Return to dashboard</button>
-              <button onclick="window.AuthGate.guardedLeave(handleRestartFromPopover)">Restart game</button>
-              <button onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">Browse games</button>
-              <button onclick="window.location.href='/dashboard/?signin=1'">Already have an account? Sign in</button>
+              <button onclick="window.location.href='/';">Return to dashboard</button>
+              <button onclick="handleRestartFromPopover()">Restart game</button>
+              <button onclick="window.location.href='/educational-games/';">Browse games</button>
+              <button onclick="window.location.href='/dashboard/';">My progress</button>
             </div>
           </div>
-          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/educational-games/'; })">
+          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.location.href='/educational-games/';">
             <i data-lucide="gamepad-2" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
           </button>
         </div>
@@ -758,11 +734,11 @@
   <div class="deeper-card" id="deeperCard" style="display:none">
     <div class="deeper-label">WANT TO GO DEEPER?</div>
     <div class="deeper-msg" id="deeperMsg"></div>
-    <button class="deeper-btn" id="deeperBtn" onclick="window.AuthGate.guardedLeave(() => { markDeeperClicked(); window.location.href = deeperLink; })">Open the lab →</button>
+    <button class="deeper-btn" id="deeperBtn" onclick="markDeeperClicked(); window.location.href = deeperLink;">Open the lab →</button>
   </div>
   <div class="end-actions">
-    <button class="play-again-btn" onclick="window.AuthGate.guardedLeave(restartGame)">Play again</button>
-    <button class="lab-btn" onclick="window.AuthGate.guardedLeave(() => { window.location.href='/jsh/digital-decisions-lab/'; })">Try the full Digital Decisions Lab →</button>
+    <button class="play-again-btn" onclick="restartGame()">Play again</button>
+    <button class="lab-btn" onclick="window.location.href='/jsh/digital-decisions-lab/';">Try the full Digital Decisions Lab →</button>
   </div>
   <div class="wordmark">Allgood Academy · Free for all learners, always.</div>
 </div>
@@ -1687,12 +1663,6 @@ function recordSession(outcome, routingReason) {
 }
 
 function startGame() {
-  // Unlike a Challenge (finish-once, retake-rarely), Play Again is this game's core
-  // loop — so unlike the Challenges' one-shot guard, each fresh round gets its own
-  // chance to offer a save. offerSave() itself still no-ops quietly once a session
-  // is actually saved/identified, so this never re-nags someone who already said yes.
-  window._agSaveOffered = false;
-  window._agCompletionReached = false;
   round = buildSession(scenarios);
   currentIndex = 0;
   score = 0;
@@ -1848,25 +1818,6 @@ function showEnd(outcome) {
       .catch(() => recordSession(outcome, routingReasonFrom(null, fallbackReason)));
   } else {
     recordSession(outcome, routingReasonFrom(null, fallbackReason));
-  }
-
-  // Lets any exit button (Home, Browse games, Play again, the Lab Pack link) trigger
-  // the save offer immediately if the timer below hasn't fired yet — see
-  // window.AuthGate.guardedLeave() in identity-gate.js. Set unconditionally, on every
-  // outcome, regardless of whether the auto-offer immediately below also fires.
-  window._agCompletionReached = true;
-
-  // Same shape as the GoodBlocks' end-of-module offer: hangs off the completion
-  // screen being on screen, once per page load, regardless of win/loss outcome —
-  // a finished round is a real run worth keeping either way. Never blocks the
-  // reveal above, and declining hides nothing.
-  if (!window._agSaveOffered && window.AuthGate && window.AuthGate.offerSave) {
-    window._agSaveOffered = true;
-    setTimeout(() => {
-      window.AuthGate.offerSave().catch((e) => console.error('[ReadTheSignal] offerSave failed', e));
-    }, 1200);
-  } else if (!window.AuthGate) {
-    console.warn('[ReadTheSignal] window.AuthGate not available — identity-gate.js may have failed to load.');
   }
 }
 

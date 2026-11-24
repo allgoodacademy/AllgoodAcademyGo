@@ -9,12 +9,9 @@
     <link rel="stylesheet" href="/assets/css/tailwind.min.css">
     <script src="/assets/js/lucide.min.js"></script>
 
-    <!-- Shared identity/login module + identify gate — see /js/auth-core.js and
-         /js/identity-gate.js. Needed here only for the Comms icon,
-         which requires a real signed-in session to write; launching a lab from one of
-         the cards below hands off to that lab's own gate, same as every other module. -->
+    <!-- Shared identity module — see /js/auth-core.js. The student's anonymous session
+         starts on load (no screen), so this hub's progress badges have something to read. -->
     <script type="module" src="/js/auth-core.js"></script>
-    <script type="module" src="/js/identity-gate.js"></script>
     <script src="/js/message-hq.js" data-message-source="Real World Ready Hub"></script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
@@ -43,7 +40,7 @@
             <div class="flex items-center space-x-1 shrink-0">
                 <a href="/dashboard/" title="Dashboard" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 inline-flex"><i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i></a>
                 <button onclick="window.openMessageModal()" title="Comms" class="text-gray-200 hover:text-allgood-primary transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="message-square" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
-                            <button onclick="var s=false;try{s=localStorage.getItem('ag_signed_in')==='1';}catch(e){} if(s){window.AuthGate.guardedLeave(function(){window.location.href='/dashboard/';});}else{window.AuthGate && window.AuthGate.signIn();}" title="Already have an account? Sign in" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="log-in" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
+                            <a href="/dashboard/" title="My progress" aria-label="My progress" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="layout-grid" stroke-width="2.25" class="w-[22px] h-[22px]"></i></a>
                 <button onclick="window.openLabMenu()" title="Jump to a Lab" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><i data-lucide="menu" stroke-width="2.25" class="w-[22px] h-[22px]"></i></button>
             </div>
         </div>
@@ -142,18 +139,14 @@
             document.getElementById('lab-menu-modal').classList.remove('visible-modal');
         };
 
-        // GUEST-FIRST ENTRY (founder decision, 2026-09-09): clicking a card opens the
-        // GoodBlock, full stop — no age question in front of it. Establishing the guest
-        // session here rather than only in the lab means this hub's own progress badges
-        // have a session to read from; the lab calls startGuestSession() again at its
-        // power-up moment and passes straight through on an established session.
-        window.launchLab = async (name, url) => {
-            try { await window.AuthGate.startGuestSession(); } catch (e) { console.error('[Hub] guest session failed', e); }
+        // Clicking a card opens the lesson, full stop. Nothing is asked first.
+        window.launchLab = (name, url) => {
             if (typeof gtag === 'function') gtag('event', 'launch_module', { module_name: name });
             window.location.href = url;
         };
 
         document.addEventListener('DOMContentLoaded', () => {
+            if (window.AuthCore) window.AuthCore.startSession();
             if (window.lucide) window.lucide.createIcons();
             [100, 400, 1000].forEach((delay) => setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, delay));
         });

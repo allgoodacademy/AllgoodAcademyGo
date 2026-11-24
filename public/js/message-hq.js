@@ -306,13 +306,15 @@
 
     // ------------------------------------------------------------------------ compose
 
-    function isThirteenPlus() {
+    // Only a signed-in account (a teacher) may write to the team. Every student session is
+    // anonymous, and a note is a child's free text leaving the device for a real person.
+    function canWrite() {
         var u = window.AuthCore && window.AuthCore.auth && window.AuthCore.auth.currentUser;
-        return !!(u && !u.isAnonymous && state.account && state.account.ageTier === '13plus');
+        return !!(u && !u.isAnonymous);
     }
 
     window.commsCompose = function () {
-        if (!isThirteenPlus()) return showAccountNeeded();
+        if (!canWrite()) return showAccountNeeded();
         showPanel(
             '<p class="text-sm font-bold text-allgood-dark font-heading mb-1">Write to the team</p>' +
             '<p class="text-xs text-gray-500 mb-3 leading-relaxed">A real person reads every one of these. They can’t write back here, so you won’t get a reply in Comms.</p>' +
@@ -327,15 +329,14 @@
         }, 100);
     };
 
-    // Under-13 copy leads with what still works, not with the refusal. A Learner Recruit
-    // reads every other item in Comms exactly as a 13+ student does; the only thing
-    // behind the account is writing TO the team, because that is the one path that
-    // carries a child's free text off the device.
+    // Leads with what still works, not with the refusal. A student reads every item in
+    // Comms; the only thing they can't do is write TO the team, because that is the one
+    // path that carries a child's free text off the device.
     function showAccountNeeded() {
         showPanel(
             '<p class="text-sm font-bold text-allgood-dark font-heading mb-2">Everything else in Comms works the same for you</p>' +
             '<p class="text-xs text-gray-500 leading-relaxed">You can open and read every message here, and pick a topic to jump into a lab — all of it, same as anyone.</p>' +
-            '<p class="text-xs text-gray-500 leading-relaxed mt-2">Writing a note to the team is the one part that needs an account, because a note goes off this device to a real person. You can set one up when you’re 13.</p>'
+            '<p class="text-xs text-gray-500 leading-relaxed mt-2">Writing a note to the team is for teachers, because a note goes off this device to a real person. If something’s wrong, tell your teacher.</p>'
         );
     }
 
@@ -347,7 +348,7 @@
         if (!text) return;
         // Belt and braces: the compose view is unreachable without this, but the gate is
         // re-checked at submit so a console call or a stale panel cannot post as a minor.
-        if (!isThirteenPlus()) return showAccountNeeded();
+        if (!canWrite()) return showAccountNeeded();
 
         var originalText = btn.innerHTML;
         btn.disabled = true;

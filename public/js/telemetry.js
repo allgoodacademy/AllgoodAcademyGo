@@ -53,11 +53,17 @@
 // which numbers a product belongs in, so add one deliberately — and tell Insider about it.
 //
 // Privacy: nothing here writes a name or email — only the uid already used by every
-// other per-user collection, plus role/ageTier/isGuest flags copied from the account
-// so Insider can segment without a join. Events are forwarded to Google Analytics
-// too, but ONLY if the page itself already loaded gtag (today: the dashboard).
-// Module pages deliberately don't get GA injected here — see the COPPA note in
-// docs/insider-analytics.md before turning that on.
+// other per-user collection, plus role/isGuest flags copied from the account so Insider
+// can segment without a join. Events are forwarded to Google Analytics only for a real
+// (non-anonymous) account on a page that already loaded gtag — never for a student, who
+// is always anonymous. See the COPPA note in docs/insider-analytics.md.
+//
+// WHEN A SESSION COUNTS. The session document is opened at the visitor's FIRST
+// INTERACTION (first tap or keypress, a step() past step 1, a choice() or complete()), not on
+// page load. Until 2026-11 a tap-to-power-up screen stood in front of every lesson and a
+// session only began after it; content now renders immediately, and counting page loads
+// would fill Insider with bounces. Gating on the first interaction keeps "a session" the
+// same population on both sides of the cutover (docs/insider-analytics.md).
 
 import {
     doc, setDoc, addDoc, collection, serverTimestamp,
@@ -76,8 +82,9 @@ const state = {
     sessionId: null,
     sessionSeq: 0,
     uid: null,
-    account: null,        // { role, ageTier, isGuest }
+    account: null,        // { role, isGuest }
     sessionOpen: false,   // session doc exists for the current uid
+    engaged: false,       // the visitor has interacted — see WHEN A SESSION COUNTS
     activeMs: 0,
     lastVisibleAt: null,
     lastFlushAt: 0,
@@ -140,13 +147,12 @@ function accountFlags() {
     const a = state.account || {};
     return {
         role: a.role || 'student',
-        ageTier: a.ageTier || null,
         isGuest: !!a.isGuest,
     };
 }
 
 async function openSession() {
-    if (!state.uid || !state.configured || state.sessionOpen) return;
+    if (!state.uid || !state.configured || !state.engaged || state.sessionOpen) return;
     state.sessionId = newSessionId();
     try {
         await setDoc(sessionRef(), {
@@ -219,10 +225,10 @@ async function writeEvent(evt) {
 
 function forwardToGA(event, meta) {
     if (typeof window.gtag !== 'function') return;
-    // Never forward analytics for an under-13 Learner Recruit, on any page — GA/gtag
-    // is outside this module's control once fired (cookies, IP-derived geo), which is
-    // not acceptable for a COPPA-covered session regardless of which page loaded gtag.
-    if (state.account && state.account.ageTier === 'under13') return;
+    // Never forward analytics for an anonymous session, on any page. Every student is
+    // anonymous, and GA/gtag is outside this module's control once fired (cookies,
+    // IP-derived geo). An unknown account counts as anonymous.
+    if (!state.account || state.account.isGuest !== false) return;
     try {
         window.gtag('event', event, { module_name: state.gameName || state.module, ...(meta || {}) });
     } catch (e) { /* ignore */ }
@@ -283,12 +289,22 @@ async function handleUser(user) {
     try {
         const c = core();
         const acct = c && c.getAccount ? await c.getAccount(user.uid) : null;
-        state.account = acct ? { role: acct.role, ageTier: acct.ageTier, isGuest: !!user.isAnonymous } : { isGuest: !!user.isAnonymous };
+        state.account = acct ? { role: acct.role, isGuest: !!user.isAnonymous } : { isGuest: !!user.isAnonymous };
     } catch (e) {
         state.account = { isGuest: !!user.isAnonymous };
     }
     await openSession();
     await drainPending();
+}
+
+// The first interaction: the session document opens now (if the uid is known) or as soon
+// as it is. Also tells AuthCore, which writes the student's profile at the same moment.
+function engage() {
+    if (state.engaged) return;
+    state.engaged = true;
+    const c = core();
+    if (c && c.markEngaged) c.markEngaged();
+    openSession().then(drainPending);
 }
 
 function listenForAuth() {
@@ -310,6 +326,9 @@ function init({ module: moduleSlug, gameName, stepsTotal, stream } = {}) {
     state.entry = detectEntry();
     state.device = detectDevice();
     enqueue('module_open', { entry: state.entry, device: state.device });
+    ['pointerdown', 'keydown'].forEach((type) => {
+        document.addEventListener(type, engage, { once: true, capture: true, passive: true });
+    });
     startClock();
     listenForAuth();
 }
@@ -364,6 +383,9 @@ function track(event, meta) {
 
 function step(n, meta) {
     if (!state.configured || typeof n !== 'number') return;
+    // Step 1 is "the page opened at its first step" — every GoodBlock reports it on load —
+    // so only a step past the first is evidence of a person.
+    if (n > 1) engage();
     if (n > state.maxStep) {
         state.maxStep = n;
         state.dirty = true;
@@ -381,6 +403,7 @@ function choice(meta) {
     const m = { ...(meta || {}) };
     if (m.skillTag != null && m.category == null) m.category = m.skillTag;
     delete m.skillTag;
+    engage();
     track('choice', m);
 }
 
@@ -402,6 +425,7 @@ function summary(fields) {
 
 function complete(meta) {
     if (!state.configured || state.completed) return;
+    engage();
     state.completed = true;
     if (state.stepsTotal && state.maxStep < state.stepsTotal) state.maxStep = state.stepsTotal;
     state.dirty = true;

@@ -97,19 +97,25 @@ await it('guest CANNOT self-promote by writing role alone, without a classroomCo
 });
 
 console.log('\nSTILL WORKS — the flows auth-core.js and the dashboard actually use');
-await it('guest CAN write its own guest profile (guestStart shape)', async () => {
+await it('guest CAN write its own profile (startSession shape: a nickname, nothing else)', async () => {
   await assertSucceeds(setDoc(U(guest, 'guest_1'),
-    { displayName: 'Sunny Bear Glide', email: null, isGuest: true, role: 'student', guestCode: 'sunny-bear-glide' }, { merge: true }));
-});
-await it('guest CAN claim a recruit code (claimRecruitCode shape: ageTier + recruitCode)', async () => {
-  await assertSucceeds(setDoc(U(guest, 'guest_1'),
-    { displayName: 'Sunny Bear Glide', avatar: 'owl', email: null, isGuest: true, role: 'student', ageTier: 'under13', recruitCode: 'sunny-bear-glide' }, { merge: true }));
+    { displayName: 'Swift Otter 42', email: null, isGuest: true, role: 'student', lastLogin: 1 }, { merge: true }));
 });
 await it('guest CAN write its own module_progress', async () => {
   await assertSucceeds(setDoc(PROGRESS(guest, 'guest_1', 'social-intelligence'), { highestUnlocked: 3 }));
 });
 await it('student CAN join a real classroom by code', async () => {
   await assertSucceeds(setDoc(U(student, 'student_1'), { classroomCode: 'KM7QPD' }, { merge: true }));
+});
+await it('an anonymous session CAN join with a class code + nickname (/join/ shape)', async () => {
+  const nick = env.authenticatedContext('nick_1', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await assertSucceeds(setDoc(MEMBER(nick, 'KM7QPD', 'nick_1'), { classroomCode: 'KM7QPD', uid: 'nick_1', joinedAt: 1 }));
+  await assertSucceeds(setDoc(U(nick, 'nick_1'), { displayName: 'Maya', email: null, isGuest: true, role: 'student', classroomCode: 'KM7QPD' }, { merge: true }));
+});
+await it('...and CANNOT join a class code that does not exist', async () => {
+  const nick = env.authenticatedContext('nick_2', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await assertFails(setDoc(MEMBER(nick, 'NOPE99', 'nick_2'), { classroomCode: 'NOPE99', uid: 'nick_2', joinedAt: 1 }));
+  await assertFails(setDoc(U(nick, 'nick_2'), { displayName: 'Maya', role: 'student', classroomCode: 'NOPE99' }, { merge: true }));
 });
 await it('teacher CAN read a student profile in their own classroom', async () => {
   await assertSucceeds(getDoc(U(teacher, 'student_1')));
@@ -122,15 +128,44 @@ await it('teacher CAN read a student\'s module_progress in their own classroom',
   await assertSucceeds(getDoc(PROGRESS(teacher, 'student_1', 'social-intelligence')));
 });
 
-console.log('\nBECOME-A-TEACHER — allowed, but only classroom-first');
-await it('user CAN become teacher of a classroom they just created (dashboard order)', async () => {
-  await assertSucceeds(setDoc(CLASS(guest, 'NEWCODE'), { teacherUid: 'guest_1', teacherName: 'Sunny', createdAt: 2 }));
-  await assertSucceeds(setDoc(U(guest, 'guest_1'), { role: 'teacher', classroomCode: 'NEWCODE' }, { merge: true }));
+console.log('\nBECOME-A-TEACHER — Google sign-in only, and only classroom-first');
+// Google signed in directly, and Google linked onto an earlier anonymous session (what
+// AuthCore.teacherGoogleSignIn does when the browser already has one): both carry
+// google.com in firebase.identities, which is what the rule reads.
+const googleTeacher = env.authenticatedContext('gteach_1', { email: 'g@school.org', firebase: { sign_in_provider: 'google.com', identities: { 'google.com': ['1001'], email: ['g@school.org'] } } }).firestore();
+const linkedTeacher = env.authenticatedContext('gteach_2', { email: 'l@school.org', firebase: { sign_in_provider: 'google.com', identities: { 'google.com': ['1002'] } } }).firestore();
+const passwordUser = env.authenticatedContext('pw_1', { email: 'pw@school.org', firebase: { sign_in_provider: 'password', identities: { email: ['pw@school.org'] } } }).firestore();
+await it('a Google-signed-in user CAN become teacher of a classroom they just created (Mission Control order)', async () => {
+  await assertSucceeds(setDoc(CLASS(googleTeacher, 'NEWCODE'), { teacherUid: 'gteach_1', teacherName: 'Ms Google', createdAt: 2 }));
+  await assertSucceeds(setDoc(U(googleTeacher, 'gteach_1'), { role: 'teacher', classroomCode: 'NEWCODE' }, { merge: true }));
+});
+await it('...and so CAN an anonymous session that linked Google first', async () => {
+  await assertSucceeds(setDoc(CLASS(linkedTeacher, 'LINK01'), { teacherUid: 'gteach_2', teacherName: 'Mr Linked', createdAt: 2 }));
+  await assertSucceeds(setDoc(U(linkedTeacher, 'gteach_2'), { role: 'teacher', classroomCode: 'LINK01' }, { merge: true }));
 });
 await it('...and that new teacher STILL cannot read the other classroom\'s roster', async () => {
-  await assertFails(getDocs(query(collection(guest, 'artifacts', APP, 'users'),
+  await assertFails(getDocs(query(collection(googleTeacher, 'artifacts', APP, 'users'),
     where('classroomCode', '==', 'KM7QPD'), where('role', '==', 'student'))));
-  await assertFails(getDoc(U(guest, 'student_1')));
+  await assertFails(getDoc(U(googleTeacher, 'student_1')));
+});
+await it('an anonymous session CANNOT create a classroom', async () => {
+  await assertFails(setDoc(CLASS(guest, 'ANON01'), { teacherUid: 'guest_1', teacherName: 'Sunny', createdAt: 2 }));
+});
+await it('an email/password account CANNOT create a classroom', async () => {
+  await assertFails(setDoc(CLASS(passwordUser, 'PASS01'), { teacherUid: 'pw_1', teacherName: 'Pw', createdAt: 2 }));
+});
+await it('an anonymous session CANNOT become teacher even of a classroom it owns', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(CLASS(ctx.firestore(), 'ANON02'), { teacherUid: 'guest_1', teacherName: 'Sunny', createdAt: 2 });
+  });
+  await assertFails(setDoc(U(guest, 'guest_1'), { role: 'teacher', classroomCode: 'ANON02' }, { merge: true }));
+});
+await it('an EXISTING teacher who never used Google still works: profile writes and assigning', async () => {
+  // teacher_1's token has no google.com identity (they predate the Google-only rule).
+  await assertSucceeds(setDoc(U(teacher, 'teacher_1'), { displayName: 'Ms Real', lastLogin: 2 }, { merge: true }));
+  await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { lastReviewedAt: 2 }, { merge: true }));
+  await assertSucceeds(getDocs(query(collection(teacher, 'artifacts', APP, 'users'),
+    where('classroomCode', '==', 'KM7QPD'), where('role', '==', 'student'))));
 });
 await it('user CANNOT hijack an existing classroom by overwriting its teacherUid', async () => {
   await assertFails(setDoc(CLASS(guest, 'KM7QPD'), { teacherUid: 'guest_1' }, { merge: true }));
@@ -551,42 +586,66 @@ await it('a signed-in non-admin CANNOT read the telemetry sources', async () => 
   await assertFails(getDocs(collectionGroup(guest, 'game_scores')));
 });
 
-// RECRUIT CODE ENTROPY (Ticket 1) — the code doc's `update` used to be open to any
-// signed-in user with no field constraint at all; it is now field-constrained to exactly
-// what auth-core.js's real write paths touch. Also exercises the new suffixed
-// (word-word-word-####) format alongside an old-format (word-word-word, no suffix) code
-// that must keep working — real codes already exist in production and won't be
-// regenerated.
-console.log('\nRECRUIT CODES — update is field-constrained, old and new code formats both work');
+// RECRUIT CODES (identity reset, 2026-11-23) — read-only until the 2027-06-30 sunset.
+// The one thing the legacy restore needs is a single-document get by the exact code;
+// nothing may create or change a code, and only the admin may enumerate them.
+console.log('\nRECRUIT CODES — read-only: exact-code get only, no list, no writes');
 const CODE = (db, code) => doc(db, 'artifacts', APP, 'recruit_codes', code);
+const CODES = (db) => collection(db, 'artifacts', APP, 'recruit_codes');
 await env.withSecurityRulesDisabled(async (ctx) => {
   const db = ctx.firestore();
-  await setDoc(CODE(db, 'arctic-fox-trot-4821'), { uid: 'recruit_new', displayName: 'Arctic Fox Trot 4821', avatar: 'owl', progress: {}, createdAt: 1, updatedAt: 1 });
+  await setDoc(CODE(db, 'arctic-fox-trot-4821'), { uid: 'recruit_new', displayName: 'Arctic Fox Trot 4821', avatar: 'owl', progress: { 'social-intelligence': { highestUnlocked: 4 } }, classroomCode: 'KM7QPD', createdAt: 1, updatedAt: 1 });
   await setDoc(CODE(db, 'sunny-bear-glide'), { uid: 'recruit_old', displayName: 'Sunny Bear Glide', avatar: 'bee', progress: {}, createdAt: 1, updatedAt: 1 });
 });
-const recruitNew = env.authenticatedContext('recruit_new').firestore();
-const recruitOld = env.authenticatedContext('recruit_old').firestore();
-const anyoneElse = env.authenticatedContext('some_other_uid').firestore();
+const recruitNew = env.authenticatedContext('recruit_new', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+const freshDevice = env.authenticatedContext('fresh_device', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
 
-await it('a NEW-format (word-word-word-####) code accepts an allowed-field update (progress mirroring)', async () => {
-  await assertSucceeds(setDoc(CODE(recruitNew, 'arctic-fox-trot-4821'),
-    { progress: { 'social-intelligence': { highestUnlocked: 2 } }, updatedAt: 2 }, { merge: true }));
+await it('a signed-in session CAN get one code by its exact id (the restore read), new format', async () => {
+  await assertSucceeds(getDoc(CODE(freshDevice, 'arctic-fox-trot-4821')));
 });
-await it('an OLD-format (word-word-word, no suffix) code STILL accepts redemption-shaped update (backward compatibility)', async () => {
-  await assertSucceeds(setDoc(CODE(recruitOld, 'sunny-bear-glide'),
-    { uid: 'recruit_old', updatedAt: 3 }, { merge: true }));
+await it('...and an OLD-format (word-word-word, no suffix) code too', async () => {
+  await assertSucceeds(getDoc(CODE(freshDevice, 'sunny-bear-glide')));
 });
-await it('any signed-in user CAN update a code they do not own (knowing-the-code trust model, unchanged)', async () => {
-  await assertSucceeds(setDoc(CODE(anyoneElse, 'sunny-bear-glide'),
-    { classroomCode: 'KM7QPD', updatedAt: 4 }, { merge: true }));
+await it('a signed-out visitor CANNOT get a code', async () => {
+  await assertFails(getDoc(CODE(env.unauthenticatedContext().firestore(), 'sunny-bear-glide')));
 });
-await it('update is DENIED when it touches a field outside the allowed set', async () => {
+await it('a non-admin CANNOT list the recruit_codes collection', async () => {
+  await assertFails(getDocs(CODES(freshDevice)));
+  await assertFails(getDocs(CODES(teacher)));
+});
+await it('a non-admin CANNOT query recruit_codes, even for codes that point at themselves', async () => {
+  await assertFails(getDocs(query(CODES(recruitNew), where('uid', '==', 'recruit_new'))));
+  await assertFails(getDocs(query(CODES(freshDevice), limit(1))));
+});
+await it('nobody CAN create a code any more, even naming themselves as its owner', async () => {
+  await assertFails(setDoc(CODE(freshDevice, 'brave-owl-dash-1234'), { uid: 'fresh_device', displayName: 'Brave Owl Dash 1234', progress: {}, createdAt: 2, updatedAt: 2 }));
+});
+await it('the code\'s own owner CANNOT update it (no more progress mirroring)', async () => {
   await assertFails(setDoc(CODE(recruitNew, 'arctic-fox-trot-4821'),
-    { createdAt: 999 }, { merge: true }));
+    { progress: { 'social-intelligence': { highestUnlocked: 5 } }, updatedAt: 2 }, { merge: true }));
 });
-await it('update is DENIED when a disallowed field rides along with allowed ones', async () => {
-  await assertFails(setDoc(CODE(recruitNew, 'arctic-fox-trot-4821'),
-    { updatedAt: 5, notAllowed: 'nope' }, { merge: true }));
+await it('another session CANNOT move a code\'s uid pointer (the old redemption write)', async () => {
+  await assertFails(setDoc(CODE(freshDevice, 'sunny-bear-glide'), { uid: 'fresh_device', updatedAt: 3 }, { merge: true }));
+});
+await it('a non-admin CANNOT delete a code; the admin CAN (deletion requests)', async () => {
+  await assertFails(deleteDoc(CODE(freshDevice, 'sunny-bear-glide')));
+  await assertSucceeds(deleteDoc(CODE(admin, 'sunny-bear-glide')));
+});
+
+// THE RESTORE WRITES — what AuthCore.restoreFromRecruitCode / restoreFromAccount do with
+// what they read: all of it lands under the CURRENT session's own uid, so it needs no rule
+// beyond the ones a normal student already has.
+console.log('\nLEGACY RESTORE — copies land under the current session only');
+await it('a fresh session CAN copy restored progress into its own module_progress', async () => {
+  await assertSucceeds(setDoc(PROGRESS(freshDevice, 'fresh_device', 'social-intelligence'), { highestUnlocked: 4, lastUpdated: 2 }));
+});
+await it('...rejoin the class the code pointed at, and take the restored name', async () => {
+  await assertSucceeds(setDoc(MEMBER(freshDevice, 'KM7QPD', 'fresh_device'), { classroomCode: 'KM7QPD', uid: 'fresh_device', joinedAt: 2 }));
+  await assertSucceeds(setDoc(U(freshDevice, 'fresh_device'),
+    { displayName: 'Arctic Fox Trot 4821', email: null, isGuest: true, role: 'student', classroomCode: 'KM7QPD' }, { merge: true }));
+});
+await it('...but CANNOT write into the old account it restored from', async () => {
+  await assertFails(setDoc(PROGRESS(freshDevice, 'student_1', 'social-intelligence'), { highestUnlocked: 1 }));
 });
 
 // DISPLAY NAME LENGTH (Ticket 2) — displayName on the profile doc is otherwise

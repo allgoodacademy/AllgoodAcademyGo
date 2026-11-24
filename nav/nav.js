@@ -7,7 +7,7 @@
 // copy, and they drifted: "Games" was added to the homepage in 9fe4d19 and to
 // nowhere else, so a visitor on /about/ or /for-teachers/ had no route to the
 // games hub at all, and /privacy.html and /terms.html had no route to a lesson
-// or to sign in from anywhere. That is the same failure scripts/build-css.js was
+// from anywhere. That is the same failure scripts/build-css.js was
 // written to stop — a hand-maintained copy that nothing could notice, review or
 // correct — so this follows the same shape: one definition here, generated into
 // the pages, and `npm run check:nav` in CI to fail a build where the committed
@@ -35,61 +35,42 @@ const LINKS = [
     { label: 'Contact',      href: page => (page === 'about' ? '#contact' : '/about/#contact') },
 ];
 
-// The nav's one button. Points at a real lesson, not at /dashboard/ and not at a
-// menu: the product needs no account to start, and this is the same GoodBlock
-// the homepage hero's "I'm a student" CTA has always used. Sign in sits beside
-// it as a plain text link — available, not advertised.
+// The nav's one button. Points at a real lesson, not at a menu: students never
+// sign in or make an account, and this is the same GoodBlock the homepage
+// hero's "I'm a student" CTA has always used. For a browser that already has a
+// session the session script turns it into "My progress" (/dashboard/).
+//
+// "Teacher sign in" is the ONLY sign-in anywhere on the site (founder decision,
+// 2026-11-23): teachers sign in with Google on /mission-control/. It sits beside
+// the button as a plain text link — available, not advertised, and labelled so
+// no student mistakes it for something they need.
 const CTA = { label: 'Try a lesson', href: '/jsh/digital-decisions-lab/social-intelligence/' };
-const SIGNIN = { label: 'Sign in', href: '/dashboard/?signin=1' };
+const SIGNIN = { label: 'Teacher sign in', href: '/mission-control/' };
 
 // --- The session script, emitted inline directly under the bar. -------------
 //
-// One control, two states. A visitor who already has a session should never be
-// told to sign in — they press Home on their dashboard, land here, and the
-// top-right still said "Sign in", which reads as "your session is gone".
+// Two words change, nothing else:
+//   - a browser with a session (ag_signed_in — every student who has played
+//     anything) gets "My progress" in place of "Try a lesson", so a student on a
+//     phone always has the way back to their own work;
+//   - a signed-in teacher (ag_account) sees "Mission Control" in place of
+//     "Teacher sign in", since that is where the link already goes.
 //
-// Deliberately synchronous and deliberately HERE, immediately after the markup
-// rather than at the end of the body: this runs during parse, before first
-// paint, so a slow Chromebook never shows a beat of the wrong label.
+// Deliberately synchronous and deliberately HERE, immediately after the markup:
+// it runs during parse, before first paint, so a slow Chromebook never shows a
+// beat of the wrong label. The flags are routing hints, never access: nothing is
+// shown on /dashboard/ or /mission-control/ until Firebase resolves a session.
+// These pages load no Firebase themselves (zero third-party requests by design).
 //
-// Keyed on ag_signed_in (any session, guests included) and NOT ag_account,
-// because a guest mid-way through a Lab Pack is exactly who needs the way back.
-//
-// The flag only ever changes a WORD and one destination. It grants no access and
-// reveals nothing — the dashboard enforces its own entry either way — so reading
-// the looser of the two flags is safe here in a way it would not be for a gate.
-//
-// Known, accepted: on a shared Chromebook a stale flag can offer "Your dashboard"
-// to the next student, pointing at someone else's progress. It costs one tap and
-// self-corrects; it is not a disclosure, since nothing is shown until /dashboard/
-// resolves a real session. Do not "fix" this by naming the student here.
-//
-// Sign in carries a real href, so its destination and the dashboard's graceful
-// return-to-homepage fallback both survive with JS off. The handler below only
-// ever intercepts to send an existing session straight to /dashboard/ instead.
-//
-// Sign in deliberately hands off to the real identity gate (/js/identity-gate.js),
-// which lives on the dashboard with the styles it was built against. Do NOT load
-// auth-core.js from these pages to do it here: that pulls Firebase from gstatic.com
-// on first paint, and these pages ship with zero third-party requests by design.
-// /dashboard/?signin=1 opens that gate and returns the visitor here if they dismiss
-// it, so someone without an account is never stranded.
-//
-// One more thing not to undo: the responsive rules in each page's CSS collapse
-// .nav-link but exempt .nav-signin (`.nav-link:not(.nav-signin)`). Before that
-// exemption the way back in simply did not exist on a phone. Keep it.
+// Do not undo: each page's responsive CSS collapses .nav-link but exempts
+// .nav-signin, so Teacher sign in stays reachable on a phone.
 const SESSION_SCRIPT = `<script>
 (function(){
-  var a=document.querySelector('.nav-signin');
-  if(!a)return;
-  var signedIn=false;
-  try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){/* storage blocked - stays "Sign in", the safe default */}
-  if(signedIn)a.textContent='Your dashboard';
-  a.addEventListener('click',function(e){
-    var now=false;
-    try{now=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    if(now){e.preventDefault();location.href='/dashboard/';}
-  });
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta){cta.textContent='My progress';cta.href='/dashboard/';}
+  if(a&&signin)signin.textContent='Mission Control';
 })();
 <\/script>`;
 
@@ -103,9 +84,9 @@ const SKINS = {
     // /, /about/, /for-teachers/, /privacy.html, /terms.html
     light: {
         activeClass: 'here',
-        // One flex row: links, then Sign in, then the button. The responsive
-        // rules that collapse .nav-link exempt .nav-signin, so Sign in stays
-        // reachable on a phone.
+        // One flex row: links, then Teacher sign in, then the button. The
+        // responsive rules that collapse .nav-link exempt .nav-signin, so it
+        // stays reachable on a phone.
         render(links, actions) {
             return `<div class="nav-shell">
   <div class="wrap">
@@ -129,7 +110,7 @@ ${actions}
     dark: {
         activeClass: 'active',
         // The four page links sit in .nav-links, which collapses below 960px.
-        // Sign in and the CTA sit outside it in .nav-right so they survive that
+        // Teacher sign in and the CTA sit outside it in .nav-right so they survive that
         // breakpoint — losing the way into a lesson on a phone is the opposite
         // of the point.
         render(links, actions) {

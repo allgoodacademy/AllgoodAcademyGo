@@ -160,7 +160,7 @@ footer{background:var(--surface);padding:0 0 44px}
   /* The bar now carries two controls, not one. Tighten the pill and its gutters so
      "Sign in" + "Try a lesson" fit a 390px viewport with no horizontal scroll. */
   .nav{padding:9px 9px 9px 16px;gap:6px}
-  .nav-signin{padding:10px 9px}
+  .nav-signin{padding:6px 2px;white-space:normal;line-height:1.15;max-width:5.6em;text-align:center} /* "Teacher sign in" wraps to two lines so the button still fits */
   .nav-cta{padding:10px 15px;margin-left:0}
 }
 </style>
@@ -181,7 +181,7 @@ footer{background:var(--surface);padding:0 0 44px}
         <a class="nav-link" href="/for-teachers/">For teachers</a>
         <a class="nav-link here" href="/about/">About</a>
         <a class="nav-link" href="#contact">Contact</a>
-        <a class="nav-link nav-signin" href="/dashboard/?signin=1">Sign in</a>
+        <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
         <a class="nav-cta" href="/jsh/digital-decisions-lab/social-intelligence/">Try a lesson</a>
       </div>
     </nav>
@@ -189,16 +189,11 @@ footer{background:var(--surface);padding:0 0 44px}
 </div>
 <script>
 (function(){
-  var a=document.querySelector('.nav-signin');
-  if(!a)return;
-  var signedIn=false;
-  try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){/* storage blocked - stays "Sign in", the safe default */}
-  if(signedIn)a.textContent='Your dashboard';
-  a.addEventListener('click',function(e){
-    var now=false;
-    try{now=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    if(now){e.preventDefault();location.href='/dashboard/';}
-  });
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta){cta.textContent='My progress';cta.href='/dashboard/';}
+  if(a&&signin)signin.textContent='Mission Control';
 })();
 </script>
 <!-- END GENERATED NAV -->

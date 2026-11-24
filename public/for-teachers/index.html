@@ -220,7 +220,7 @@ footer{background:var(--surface);padding:0 0 44px}
   /* The bar now carries two controls, not one. Tighten the pill and its gutters so
      "Sign in" + "Try a lesson" fit a 390px viewport with no horizontal scroll. */
   .nav{padding:9px 9px 9px 16px;gap:6px}
-  .nav-signin{padding:10px 9px}
+  .nav-signin{padding:6px 2px;white-space:normal;line-height:1.15;max-width:5.6em;text-align:center} /* "Teacher sign in" wraps to two lines so the button still fits */
   .nav-cta{padding:10px 15px;margin-left:0}
 }
 </style>
@@ -241,7 +241,7 @@ footer{background:var(--surface);padding:0 0 44px}
         <a class="nav-link here" href="/for-teachers/">For teachers</a>
         <a class="nav-link" href="/about/">About</a>
         <a class="nav-link" href="/about/#contact">Contact</a>
-        <a class="nav-link nav-signin" href="/dashboard/?signin=1">Sign in</a>
+        <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
         <a class="nav-cta" href="/jsh/digital-decisions-lab/social-intelligence/">Try a lesson</a>
       </div>
     </nav>
@@ -249,16 +249,11 @@ footer{background:var(--surface);padding:0 0 44px}
 </div>
 <script>
 (function(){
-  var a=document.querySelector('.nav-signin');
-  if(!a)return;
-  var signedIn=false;
-  try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){/* storage blocked - stays "Sign in", the safe default */}
-  if(signedIn)a.textContent='Your dashboard';
-  a.addEventListener('click',function(e){
-    var now=false;
-    try{now=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    if(now){e.preventDefault();location.href='/dashboard/';}
-  });
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta){cta.textContent='My progress';cta.href='/dashboard/';}
+  if(a&&signin)signin.textContent='Mission Control';
 })();
 </script>
 <!-- END GENERATED NAV -->
@@ -467,8 +462,8 @@ footer{background:var(--surface);padding:0 0 44px}
     </div>
     <div class="pgrid">
       <div class="pcard">
-        <h3>No email from anyone under 13</h3>
-        <p>Younger students get a recruit code instead of an account. It's the only thing tying their progress to them, and they write it down themselves. We never ask for a name, an email, or a birthday.</p>
+        <h3>No student accounts, at any age</h3>
+        <p>Students never sign in and never make an account. Their progress stays on the device they play on, and the only thing they ever type is your class code and a nickname. We never ask a student for a name, an email, or a birthday.</p>
       </div>
       <div class="pcard">
         <h3>No advertising, ever</h3>
@@ -476,7 +471,7 @@ footer{background:var(--surface);padding:0 0 44px}
       </div>
       <div class="pcard">
         <h3>Student data isn't sold or shared</h3>
-        <p>Completion records exist so you can see who finished. We also record how the lesson itself went — which case a student reached, how long they were active, which options they picked — because that's how we find out which lessons work and fix the ones that don't. All of it is keyed to the same anonymous ID as their progress, never to a name or an email, and for under-13 Recruits there is no name or email on file at all. None of it is sold, licensed, or handed to a partner.</p>
+        <p>Completion records exist so you can see who finished. We also record how the lesson itself went — which case a student reached, how long they were active, which options they picked — because that's how we find out which lessons work and fix the ones that don't. All of it is keyed to the same anonymous ID as their progress, never to a name or an email, and no student has a name or email on file at all. None of it is sold, licensed, or handed to a partner.</p>
       </div>
       <div class="pcard">
         <h3>Free means free</h3>
@@ -492,7 +487,7 @@ footer{background:var(--surface);padding:0 0 44px}
 
     <details>
       <summary>Do my students need accounts?</summary>
-      <p>No. A student can open a lesson and work through the whole thing without signing in. We ask about saving progress at the end, once there's something worth saving. For completions to reach your Task Force, students go to <strong>allgoodacademy.com/join</strong> and type your class code — no account needed. Have them do it at the start of class, before the first lesson, and their work shows up on your roster.</p>
+      <p>No, and they never sign in. A student opens a lesson and plays; their progress stays on that device. For their work to reach your Task Force, students go to <strong>allgoodacademy.com/join</strong> and type your class code and a nickname. Have them do it at the start of class, before the first lesson, and their work shows up on your roster. You sign in with Google from &ldquo;Teacher sign in&rdquo; at the top of any page.</p>
     </details>
 
     <details>
@@ -502,7 +497,7 @@ footer{background:var(--surface);padding:0 0 44px}
 
     <details>
       <summary>Will it work on our school network?</summary>
-      <p>It runs in a browser with nothing to install. If your district filters aggressively, allgoodacademy.com on its own isn't enough — the lessons also load from gstatic.com and googleapis.com (sign-in and saved progress) and, on some Lab Pack pages, from cdnjs.cloudflare.com (icon fonts) and fonts.googleapis.com (type). Layout and icons now ship from allgoodacademy.com itself, so cdn.tailwindcss.com and unpkg.com are no longer in the list. If something's blocked, tell us what and we'll work around it — that feedback is genuinely useful to us.</p>
+      <p>It runs in a browser with nothing to install. If your district filters aggressively, allgoodacademy.com on its own isn't enough — the lessons also load from gstatic.com and googleapis.com (saved progress) and, on some Lab Pack pages, from cdnjs.cloudflare.com (icon fonts) and fonts.googleapis.com (type). Layout and icons now ship from allgoodacademy.com itself, so cdn.tailwindcss.com and unpkg.com are no longer in the list. If something's blocked, tell us what and we'll work around it — that feedback is genuinely useful to us.</p>
     </details>
 
     <details>

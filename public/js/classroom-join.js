@@ -1,8 +1,8 @@
 // Shared "join a Task Force by its code" logic, and the list of what that Task Force has
 // assigned. One copy, used by:
 //   - /join/ (public/join/index.html) — the permanent join page printed on classroom walls
-//     and in the TPT facilitation guide. Most students arrive here as guests with no session.
-//   - /dashboard/ — the Profile page's join box and its "Assigned to me" tab.
+//     and in the TPT facilitation guide.
+//   - /dashboard/ — the "Assigned to me" list.
 //
 // Before this file existed the only join logic was window.joinClassroom inline in the
 // dashboard, five clicks deep, and the wall poster told students a lesson would ask for the
@@ -10,6 +10,7 @@
 // second copy of the membership rules drifting away from the first.
 //
 // Requires /js/auth-core.js to have loaded first (window.AuthCore), same as every page.
+// Joining is a class code plus a nickname — the only thing a student is ever asked.
 //
 // Data model — unchanged by this file, see firestore.rules #5, #6b, #6c:
 //   classrooms/{code}                  get: any signed-in user (so a code can be checked)
@@ -55,13 +56,12 @@ function notFoundMessage(code) {
         : `We couldn't find a class with the code ${code}. Check the board and try again, or ask your teacher.`;
 }
 
-async function ensureSession({ createGuest }) {
-    const existing = auth.currentUser || (await window.AuthCore.waitForAuthReady());
-    if (existing) return existing;
-    if (!createGuest) return null;
-    // A session with no profile yet: nothing is written until the code is proven real, so
-    // a mistyped code never leaves a phantom learner behind in users/.
-    return window.AuthCore.anonymousSessionOnly();
+// What a student calls themselves in a class. Shown to their teacher in Mission Control
+// and nowhere else. 1-24 characters; the hint on /join/ asks for a nickname or first name
+// and no last names.
+export const NICKNAME_MAX = 24;
+export function normalizeNickname(raw) {
+    return String(raw || '').replace(/\s+/g, ' ').trim();
 }
 
 // Every Task Force code this uid belongs to. A list query on uid == me is what rule #6b
@@ -75,41 +75,31 @@ export async function myMemberships(uid) {
 }
 
 /**
- * Joins the Task Force with this code.
- *
- * options.createGuest — /join/ passes true: a visitor with no session at all gets a guest
- *   session and profile (the same one any lesson would give them via guestStart), because a
- *   roster row needs a users/{uid} document to exist. The dashboard passes false: anyone on
- *   its Profile page already has both.
+ * Joins the Task Force with this code, under this nickname. The student's anonymous
+ * session (and everything they have already done in it) is what joins — nothing else is
+ * asked and no account is made.
  *
  * Returns { ok: true, code, classroom, name, alreadyMember, user }
- *      or { ok: false, reason: 'empty' | 'format' | 'not_found' | 'no_session' | 'error', message }.
+ *      or { ok: false, reason: 'empty' | 'format' | 'nickname' | 'not_found' | 'error', message }.
  */
-export async function joinClassroom(rawCode, { createGuest = false } = {}) {
+export async function joinClassroom(rawCode, { nickname } = {}) {
     const code = normalizeClassCode(rawCode);
     if (!code) return { ok: false, reason: 'empty', message: 'Type the class code from the board first.' };
     if (!CODE_SHAPE.test(code)) {
         return { ok: false, reason: 'format', message: 'Class codes are just letters and numbers — check the board and try again.' };
     }
+    const name = normalizeNickname(nickname);
+    if (!name || name.length > NICKNAME_MAX) {
+        return { ok: false, reason: 'nickname', message: `Type a nickname or first name (up to ${NICKNAME_MAX} letters).` };
+    }
 
     try {
-        let user = await ensureSession({ createGuest });
-        if (!user) {
-            return { ok: false, reason: 'no_session', message: 'Please sign in first, then try the code again.' };
-        }
+        const user = await window.AuthCore.startSession();
+        if (!user) throw new Error('no session');
 
         const classroomSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', code));
         if (!classroomSnap.exists()) return { ok: false, reason: 'not_found', message: notFoundMessage(code) };
         const classroom = classroomSnap.data();
-
-        if (createGuest) {
-            // Non-destructive: an identified account (13+ or a Recruit with a code) passes
-            // straight through untouched; a guest gets the profile every lesson would give
-            // them anyway. Without this, a brand-new visitor would be a member with no
-            // users/ document and Mission Control would drop them from the roster.
-            const started = await window.AuthCore.guestStart();
-            user = started.user || user;
-        }
 
         let alreadyMember = false;
         try { alreadyMember = (await myMemberships(user.uid)).includes(code); } catch (e) { /* treat as new */ }
@@ -124,19 +114,12 @@ export async function joinClassroom(rawCode, { createGuest = false } = {}) {
             }, { merge: true });
         }
 
-        // The legacy classroomCode field means "the class I teach" for a Task Force Leader
-        // and "the class I'm in" for a student, so it is only ever mirrored for a student —
-        // overwriting a teacher's would break their own roster. For a student it still
-        // drives "Assigned to me" on the dashboard (the most recently joined class wins, a
-        // known single-class limitation).
+        // The profile carries the nickname the teacher sees, and the legacy single-class
+        // classroomCode mirror that drives "Assigned to me". A teacher's own classroomCode
+        // means "the class I teach", so a teacher joining someone else's class keeps theirs.
         const meSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
-        const myRole = meSnap.exists() ? meSnap.data().role : null;
-        if (myRole !== 'teacher') {
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: code }, { merge: true });
-            // Mirror onto the Recruit Code so membership follows a device switch. No-op for
-            // anyone without a code.
-            if (window.AuthCore.mirrorRecruitClassroom) await window.AuthCore.mirrorRecruitClassroom(code);
-        }
+        const isTeacher = meSnap.exists() && meSnap.data().role === 'teacher';
+        if (!isTeacher) await window.AuthCore.writeStudentProfile(user, { displayName: name, classroomCode: code });
 
         return { ok: true, code, classroom, name: classroomDisplayName(classroom), alreadyMember, user };
     } catch (e) {
@@ -209,5 +192,5 @@ export async function loadAssignedItems(rawCode, uid) {
 }
 
 window.ClassroomJoin = {
-    normalizeClassCode, classroomDisplayName, joinClassroom, loadAssignedItems, myMemberships,
+    normalizeClassCode, normalizeNickname, NICKNAME_MAX, classroomDisplayName, joinClassroom, loadAssignedItems, myMemberships,
 };

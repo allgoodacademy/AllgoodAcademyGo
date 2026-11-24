@@ -7,56 +7,22 @@
     <!-- ADDED: Favicon for professional branding -->
     <link rel="icon" type="image/png" href="/favicon.png">
 
-    <!-- Routing hint, never an auth check (the real check stays in identity-gate.js).
-         Read synchronously before anything renders so a signed-out visitor never sees a
-         frame of dashboard: no ag_signed_in flag means bounce to the marketing site.
-         ?signin=1 is the one exception - that is the marketing site's Sign in button
-         handing off to the identity gate, which lives on this page. -->
-    <script>
-      (function(){
-        try{
-          if(/[?&]signin=1/.test(location.search))return;
-          if(localStorage.getItem('ag_signed_in')!=='1'){location.replace('/');}
-        }catch(e){/* storage blocked - fall through and let the real gate decide */}
-      })();
-    </script>
-
     <!--
-    GA4 / UNDER-13 COMPLIANCE NOTE — 2026-09-10 (coverage updated 2026-09-11)
+    GA4 / CHILDREN'S PRIVACY NOTE (updated 2026-11-24, identity reset)
     Two separate GA4 properties are in play, and they never share a page:
       - G-EN4M7T3BLQ (product) loads on /dashboard/ only — this page — and only behind
         the ag_account gate below.
-      - G-P6DZJ685W6 (public marketing) loads on the three signed-out marketing pages
-        only: /, /for-teachers/ and /about/. Those pages load no auth, no identity gate
-        and no telemetry.js, so they cannot attach a learner identity to a hit. It is
-        deliberately absent from /dashboard/, /jsh/, /educational-games/ and
-        /mission-control/; do not add it to an authenticated surface.
-      No other page in public/ loads the googletagmanager.com/gtag/js library; two Lab
-      Pack hub pages call gtag() defensively but never load it, so those calls are
-      inert no-ops.
-    Fires for anonymous sessions: previously YES (unconditional in <head>, before any
-      auth/identity check ran) — NOW NO. The GA4 library and the initial pageview hit
-      are gated below on ag_account === '1', the flag auth-core.js's markAccount()
-      sets only from finalizeThirteenPlusAccount(), i.e. only for a confirmed,
-      non-anonymous 13+ account. A Learner Recruit (isAnonymous === true, even one
-      holding a claimed Recruit Code) never has ag_account set and will not load or
-      fire GA4. Caveat: the check is a synchronous localStorage read at page load, so
-      a 13+ visitor completing sign-up for the first time in this same session won't
-      retroactively enable GA4 until their next page load — that visitor is 13+, not
-      a COPPA-covered Recruit, so this is a missed pageview, not a compliance gap.
-    COPPA/school DPA exposure: eliminated for Learner Recruits — GA4 (cookies, IP-
-      derived geo, Google-side processing) no longer runs for any anonymous/under-13
-      session on the page they land on after completing a GoodBlock.
-    Founder decision needed: NO — this closes the gap flagged in
-      docs/insider-analytics.md (GA4 was live on /dashboard/ with no age gate on the
-      snippet itself, only telemetry.js's forwarded custom events were gated). No
-      further decision is required unless GA4's own child-directed-treatment setting
-      also needs to be enabled as defense in depth.
+      - G-P6DZJ685W6 (public marketing) loads on the three marketing pages only: /,
+        /for-teachers/ and /about/. Those pages load no auth and no telemetry.js, so they
+        cannot attach a learner identity to a hit. Do not add it to any other surface.
+    ag_account is set only by AuthCore.markAccount(), i.e. only for a real, non-anonymous
+      account: a teacher who signed in with Google. Every student is anonymous, so GA4
+      never loads or fires for a student session here. Fails closed if storage is blocked.
     -->
     <script>
       (function(){
         try {
-          if (localStorage.getItem('ag_account') !== '1') return; // not a confirmed 13+ account — skip GA4 entirely
+          if (localStorage.getItem('ag_account') !== '1') return; // not a signed-in account (students never are) — skip GA4 entirely
         } catch (e) { return; } // storage blocked — fail closed, no GA4
         var s = document.createElement('script');
         s.async = true;
@@ -77,10 +43,6 @@
          (module scripts execute in document order, same as defer). -->
     <script type="module" src="/js/auth-core.js"></script>
 
-    <!-- Shared identify gate (age question / Sign In / Recruit Code) — see
-         /js/identity-gate.js. Loads after auth-core.js for the same reason, and injects
-         its own modal markup, so this page carries no copy of that UI itself. -->
-    <script type="module" src="/js/identity-gate.js"></script>
     <script src="/js/message-hq.js" data-message-source="Dashboard"></script>
 
     <!-- Firebase SDKs (Firestore query helpers only — identity/init lives in auth-core.js
@@ -118,12 +80,6 @@
         // that rename and stay as-is on purpose, to avoid a data migration for what's
         // purely a display-string change. Every "Classroom" you see below is that same
         // underlying concept.
-        function generateClassroomCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
-            let code = '';
-            for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-            return code;
-        }
 
         // --- MODULE REGISTRY ---
         // Read from the SHARED registry at public/data/modules-registry.json — see the note
@@ -423,184 +379,16 @@
             return { status: sawAttempt ? 'in_progress' : 'not_started', badgeSvg: null };
         }
 
-        // Applies the post-sign-in UI/session state (localStorage, listeners, navbar) that used
-        // to live inside writeUserDataToFirestore — the actual Firestore identity write now
-        // happens in AuthCore (see /js/auth-core.js) and the identify gate itself (see
-        // /js/identity-gate.js), which is also what every other module page uses, so there's
-        // one place that decides what gets stored for a Learner Recruit vs. an Agent Learner.
-        function applyIdentityToUI(user, account) {
-            const role = account.role;
-            const name = user.displayName || 'Agent Learner';
-
-            localStorage.setItem('aa_is_guest', user.isAnonymous);
-            localStorage.setItem('aa_username', name);
-            localStorage.setItem('aa_uid', user.uid);
-            localStorage.setItem('aa_role', role);
-            if (account.ageTier) localStorage.setItem('aa_age_tier', account.ageTier);
-            else localStorage.removeItem('aa_age_tier');
-            if (account.avatar) localStorage.setItem('aa_avatar', account.avatar);
-            else localStorage.removeItem('aa_avatar');
-
-            window.updateUI(name);
-            document.getElementById('page-dashboard').classList.add('active');
-            document.getElementById('page-dashboard').style.display = 'block';
-
-            document.querySelector('.navbar-content').classList.remove('opacity-0');
-
-            window.applyRoleUI(role);
-
-            window.startLaunchListener(user.uid);
-            window.startDecisionsStatusListener(user.uid);
-            window.startIntelListener(user.uid);
-        }
-
-        // Called the instant someone powers up with no existing session — creates a real,
-        // trackable anonymous identity (a randomly generated nickname, never a real name or
-        // email) behind the scenes with zero visible form. Nobody is "identified" yet in the
-        // real sense (see /js/identity-gate.js) until they actually launch something.
-        window.silentSignIn = async () => {
-            try {
-                // Same guest-first entry every GoodBlock uses, so a student who walks in
-                // from a lesson keeps the passphrase name they already have rather than
-                // being handed a second, different one by the dashboard.
-                const { user, account } = await window.AuthGate.startGuestSession();
-                if (!user) return;
-                applyIdentityToUI(user, account);
-            } catch (error) {
-                console.error("Silent sign-in failed:", error);
-                showStatusMessage("Connection failed. Check network or rules.", 'error');
-            }
-        };
-
-        // Updates the classroom menu entry's label based on current role — always visible,
-        // but reads differently depending on whether you're already a teacher.
+        // Shows the teacher-only ways into Mission Control (the System Menu item and the
+        // banner) for a signed-in teacher who visits their own learner view. A student
+        // never sees either: sign-in lives in exactly one place, the nav's "Teacher sign
+        // in", which goes to Mission Control.
         window.applyRoleUI = (role) => {
-            const label = document.getElementById('menu-classroom-label');
-            if (label) label.textContent = role === 'teacher' ? 'Mission Control' : 'Set Up Mission Control';
-            // The visible banner on the dashboard itself, not just the menu label — see the
-            // markup for why a teacher needs to be able to find Mission Control without
-            // having been told where it is.
+            const isTeacher = role === 'teacher';
+            const menuItem = document.getElementById('menu-btn-classroom');
+            if (menuItem) menuItem.style.display = isTeacher ? '' : 'none';
             const banner = document.getElementById('teacher-banner');
-            if (banner) banner.style.display = role === 'teacher' ? '' : 'none';
-        };
-
-        // Smart entry point: teachers land in their existing classroom, everyone else is
-        // offered the (entirely optional) chance to become one.
-        window.openClassroomEntry = async () => {
-            // Task Force setup is one of the surfaces the identify gate still guards after
-            // the guest-first change — an anonymous guest must not reach it, and the
-            // localStorage checks below are display state, not proof of anything. Ask the
-            // live session, and run the real gate if it doesn't clear the bar.
-            let identified = await window.AuthGate.ensureIdentified();
-            if (!identified.user || !identified.account) return;
-            applyIdentityToUI(identified.user, identified.account);
-            if (identified.user.isAnonymous || identified.account.ageTier !== '13plus') {
-                const menu = document.getElementById('menu-modal');
-                if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
-                showStatusMessage("Setting up a Task Force is available for Agent Learners (13+).", 'info');
-                return;
-            }
-
-            const uid = localStorage.getItem('aa_uid');
-            const role = localStorage.getItem('aa_role');
-            if (!uid) return;
-
-            if (role === 'teacher') {
-                window.openTeacherDashboard();
-                return;
-            }
-
-            // Task Force Leader is a 13+-only action — a Learner Recruit never sees the
-            // setup prompt, even though the menu item itself stays visible to everyone.
-            if (localStorage.getItem('aa_age_tier') === 'under13') {
-                const menu = document.getElementById('menu-modal');
-                if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
-                showStatusMessage("Setting up a Task Force is available for Agent Learners (13+).", 'info');
-                return;
-            }
-
-            const menu = document.getElementById('menu-modal');
-            if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
-            const modal = document.getElementById('become-teacher-modal');
-            if (modal) { modal.classList.remove('hidden-modal'); modal.classList.add('visible-modal'); }
-        };
-
-        window.closeBecomeTeacherModal = () => {
-            const modal = document.getElementById('become-teacher-modal');
-            if (modal) { modal.classList.add('hidden-modal'); modal.classList.remove('visible-modal'); }
-        };
-
-        // Gate in front of upgradeToTeacher: a teacher must accept the consent notice once,
-        // before their first classroom is created. Returning teachers who already accepted
-        // skip straight through.
-        window.beginClassroomSetup = async () => {
-            const uid = localStorage.getItem('aa_uid');
-            if (!uid) return;
-
-            const alreadyAccepted = await window.AuthCore.hasAcceptedTeacherConsent(uid);
-            if (alreadyAccepted) {
-                window.upgradeToTeacher();
-                return;
-            }
-
-            const modal = document.getElementById('become-teacher-modal');
-            if (modal) { modal.classList.add('hidden-modal'); modal.classList.remove('visible-modal'); }
-
-            const consentModal = document.getElementById('teacher-consent-modal');
-            const checkbox = document.getElementById('teacher-consent-checkbox');
-            const confirmBtn = document.getElementById('btn-confirm-teacher-consent');
-            checkbox.checked = false;
-            confirmBtn.disabled = true;
-            confirmBtn.className = 'w-full bg-gray-300 text-white font-bold py-2.5 rounded shadow-none text-xs uppercase tracking-wide cursor-not-allowed transition-all';
-            checkbox.onchange = () => {
-                confirmBtn.disabled = !checkbox.checked;
-                confirmBtn.className = checkbox.checked
-                    ? 'w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide transition-all'
-                    : 'w-full bg-gray-300 text-white font-bold py-2.5 rounded shadow-none text-xs uppercase tracking-wide cursor-not-allowed transition-all';
-            };
-
-            if (consentModal) { consentModal.classList.remove('hidden-modal'); consentModal.classList.add('visible-modal'); }
-        };
-
-        window.confirmTeacherConsent = async () => {
-            const uid = localStorage.getItem('aa_uid');
-            if (!uid) return;
-
-            await window.AuthCore.recordTeacherConsent(uid);
-
-            const consentModal = document.getElementById('teacher-consent-modal');
-            if (consentModal) { consentModal.classList.add('hidden-modal'); consentModal.classList.remove('visible-modal'); }
-
-            window.upgradeToTeacher();
-        };
-
-        // Deliberate, separate upgrade action — never triggered as part of normal signup.
-        window.upgradeToTeacher = async () => {
-            const uid = localStorage.getItem('aa_uid');
-            if (!uid) return;
-            const userRef = doc(db, 'artifacts', appId, 'users', uid);
-
-            try {
-                const userSnap = await getDoc(userRef);
-                const name = (userSnap.exists() && userSnap.data().displayName) || localStorage.getItem('aa_username') || 'Teacher';
-
-                const code = generateClassroomCode();
-                await setDoc(doc(db, 'artifacts', appId, 'classrooms', code), {
-                    teacherUid: uid,
-                    teacherName: name,
-                    createdAt: serverTimestamp()
-                });
-                await setDoc(userRef, { role: 'teacher', classroomCode: code }, { merge: true });
-
-                localStorage.setItem('aa_role', 'teacher');
-                window.applyRoleUI('teacher');
-                window.closeBecomeTeacherModal();
-                showStatusMessage("Task Force created!", 'info');
-                setTimeout(() => window.openTeacherDashboard(), 400);
-            } catch (e) {
-                console.error("Failed to create classroom:", e);
-                showStatusMessage("Couldn't create your Task Force — please try again.", 'error');
-            }
+            if (banner) banner.style.display = isTeacher ? '' : 'none';
         };
 
         // LAUNCH TRANSITIONS: each named module gets its signature "power-in" cover
@@ -635,22 +423,14 @@
         }
 
         window.launchCourse = async (courseName, url, element) => {
-            // Dashboard module launch: anonymous guests can launch modules.
-            // ensureIdentified() is only for save/claim/roster — not for starting a lesson.
-            // It used to guard this path, which silently dead-ended every guest who walked
-            // in from a GoodBlock: the gate never cleared for an anonymous session, so the
-            // card click resolved to no user and returned before navigating.
-            let user = window.AuthCore.auth.currentUser;
-            if (!user) {
-                const result = await window.AuthGate.startGuestSession();
-                user = result.user;
-            }
-            if (!user) return; // Firebase completely unavailable — bail
+            // Never blocks the launch: with no session (Firebase unreachable) the lesson
+            // still opens, it just can't save.
+            const user = window.AuthCore.auth.currentUser || await window.AuthCore.startSession();
 
             let finalUrl = url;
             try {
                 const urlObj = new URL(url, window.location.origin);
-                urlObj.searchParams.append('dashboard_uid', auth.currentUser.uid);
+                if (user) urlObj.searchParams.append('dashboard_uid', user.uid);
                 finalUrl = urlObj.toString();
             } catch (e) { console.log("URL append failed", e); }
 
@@ -704,140 +484,7 @@
         // modal opened — it signalled nothing about whether anything was actually waiting.
         // The key is gone; nothing reads or writes it anymore.
 
-        window.handleLogout = async () => {
-            sfx.powerOff();
-            localStorage.removeItem('aa_username');
-            localStorage.removeItem('aa_is_guest'); 
-            localStorage.removeItem('aa_launch_count');
-            localStorage.removeItem('aa_uid');
-            localStorage.removeItem('aa_ddc_complete');
-            localStorage.removeItem('aa_jlc_complete');
-            localStorage.removeItem('aa_intel_sent');
-            localStorage.removeItem('aa_finding_complete'); // NEW: Clear Finding status
-            localStorage.removeItem('aa_age_tier');
-            localStorage.removeItem('aa_avatar');
-            // Clear BOTH routing flags. ag_signed_in stops a refresh bouncing a signed-out
-            // person straight back here; ag_account stops the homepage bouncing them the
-            // other way. Leaving ag_account set while clearing ag_signed_in puts the two
-            // guards in a redirect loop: / sends them to /dashboard/, which sends them
-            // back to /, forever.
-            localStorage.removeItem('ag_signed_in');
-            localStorage.removeItem('ag_account');
-
-            launchCount = 0; 
-            
-            if (auth.currentUser) {
-                try { await signOut(auth); } catch(e) { console.log("Signout error", e); }
-            }
-            
-            if (unsubscribeLaunches) {
-                unsubscribeLaunches();
-                unsubscribeLaunches = null;
-            }
-
-            if (unsubscribeDecisions) {
-                unsubscribeDecisions();
-                unsubscribeDecisions = null;
-            }
-
-            if (unsubscribeLabPackProgress) {
-                unsubscribeLabPackProgress();
-                unsubscribeLabPackProgress = null;
-            }
-            _labPackCompletedGameNames = new Set();
-            _labPackStartedModuleIds = new Set();
-            Object.values(LAB_PACKS).forEach(cfg => {
-                const labPackPill = document.getElementById(cfg.pillId);
-                if (labPackPill) {
-                    labPackPill.textContent = 'Not Started';
-                    labPackPill.className = 'bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide';
-                }
-            });
-
-            if (unsubscribeIntel) { // NEW: Cleanup Intel Listener
-                unsubscribeIntel();
-                unsubscribeIntel = null;
-            }
-            
-            // Reset badges
-            document.querySelectorAll('.mission-file span.rounded').forEach(badge => {
-                if (badge.textContent === "LAUNCHED") {
-                    badge.textContent = "Ready";
-                    const parent = badge.closest('.mission-file');
-                    if (parent.classList.contains('status-active')) {
-                         badge.className = "bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
-                         badge.textContent = "Active";
-                    } else if (parent.classList.contains('status-ready')) {
-                         badge.className = "bg-gray-100 text-gray-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide"; 
-                         badge.textContent = "Ready";
-                    }
-                }
-            });
-
-            CHALLENGE_CARDS.forEach(card => {
-                const badge = document.getElementById(card.badgeId);
-                if (badge) {
-                    badge.textContent = "Not Started";
-                    badge.className = "bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide";
-                }
-                const best = document.getElementById(card.bestScoreId);
-                if (best) best.textContent = '';
-            });
-            
-            window.initModuleElements();
-
-            document.querySelectorAll('.visible-modal').forEach(el => {
-                el.classList.remove('visible-modal');
-                el.classList.add('hidden-modal');
-            });
-
-            const dashboard = document.getElementById('page-dashboard');
-            if (dashboard) {
-                dashboard.classList.remove('active');
-                dashboard.style.display = 'none';
-            }
-            
-            // Hide Navbar
-            document.querySelector('.navbar-content').classList.add('opacity-0');
-            
-            window.updateUI('Agent'); 
-            window.updateBadges(); 
-
-            const startup = document.getElementById('startup-screen');
-            if(startup) {
-                document.getElementById('startup-message').textContent = "CLICK TO POWER UP";
-                startup.style.display = 'flex';
-                setTimeout(() => { startup.style.opacity = '1'; }, 10);
-            }
-
-            // Signing out lands on the marketing site, not on a dashboard shell nobody
-            // is signed in to. replace() rather than assign() so Back doesn't return
-            // here to a page the head guard would immediately bounce again.
-            window.location.replace('/');
-        };
-
         // --- MOVED PROFILE FUNCTIONS TO MODULE SCOPE TO FIX REFERENCE ERROR ---
-
-        // Op-Squad avatar icon set (replaces the old plain-animal emoji set) — stroke-only
-        // SVGs on a 24x24 grid, keyed by window.AuthCore.AVATARS. Kept here (not in
-        // auth-core.js) since this is the only page that renders an avatar visually.
-        const AVATAR_ICONS = {
-            frog: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.2" cy="8" r="2.9"></circle><circle cx="16.8" cy="8" r="2.9"></circle><path d="M12 20.6 c-5 0 -8.4 -3.2 -8.4 -6.8 0 -3.4 3 -5.4 8.4 -5.4 s8.4 2 8.4 5.4 c0 3.6 -3.4 6.8 -8.4 6.8 Z"></path><path d="M9 17.4 c1.8 1.2 4.2 1.2 6 0"></path><circle cx="7.2" cy="8" r="0.9" stroke="#D34716"></circle><circle cx="16.8" cy="8" r="0.9" stroke="#D34716"></circle><path d="M4.6 12.2 h14.8" stroke="#D34716"></path></svg>',
-            owl: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.6 c-4.5 0 -7 -3 -7 -7 v-2 a7 7 0 0 1 14 0 v2 c0 4 -2.5 7 -7 7 Z"></path><path d="M7 6 L8.6 3.4 M17 6 L15.4 3.4"></path><circle cx="9.3" cy="11.4" r="2.2" stroke="#D34716"></circle><circle cx="14.7" cy="11.4" r="2.2" stroke="#D34716"></circle><path d="M11.5 11.4 h1" stroke="#D34716"></path><path d="M12 14.2 l-1.2 1.8 h2.4 Z"></path></svg>',
-            wolf: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 9 L6.2 3.6 L9.6 6.6 M18.8 9 L17.8 3.6 L14.4 6.6"></path><path d="M12 20.6 C7 19 5 15 5.4 9 h13.2 C19 15 17 19 12 20.6 Z"></path><path d="M7 12.2 h10" stroke="#D34716"></path><circle cx="9.4" cy="12.2" r="0.85" stroke="#D34716"></circle><circle cx="14.6" cy="12.2" r="0.85" stroke="#D34716"></circle><path d="M12 15.8 v2"></path></svg>',
-            panda: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.4" cy="6.6" r="2.3"></circle><circle cx="17.6" cy="6.6" r="2.3"></circle><circle cx="12" cy="13.2" r="6.9"></circle><circle cx="9.2" cy="12" r="2" stroke="#D34716"></circle><circle cx="14.8" cy="12" r="2" stroke="#D34716"></circle><path d="M11.2 12 h1.6" stroke="#D34716"></path><path d="M12 15.4 v1.4"></path></svg>',
-            koala: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="8.2" r="2.8"></circle><circle cx="18.6" cy="8.2" r="2.8"></circle><circle cx="12" cy="13.4" r="6.6"></circle><path d="M7.2 11.4 h9.6" stroke="#D34716"></path><circle cx="9.6" cy="11.4" r="0.85" stroke="#D34716"></circle><circle cx="14.4" cy="11.4" r="0.85" stroke="#D34716"></circle><path d="M12 13.6 c-1.3 0 -2 0.9 -2 1.9 s0.9 1.9 2 1.9 2 -0.9 2 -1.9 -0.7 -1.9 -2 -1.9 Z"></path></svg>',
-            bee: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.8 C9 20.8 7 18.2 7 14.8 S9 8.8 12 8.8 s5 2.6 5 6 -2 5 -5 5 Z"></path><path d="M7.6 13.4 h8.8 M7.5 16.8 h9"></path><path d="M8.6 8.2 C5.2 4.8 8.4 3 10.4 6 M15.4 8.2 C18.8 4.8 15.6 3 13.6 6"></path><circle cx="10" cy="10.6" r="1.2" stroke="#D34716"></circle><circle cx="14" cy="10.6" r="1.2" stroke="#D34716"></circle></svg>',
-            turtle: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 15.6 a7.6 7.6 0 0 1 15.2 0 Z"></path><path d="M12 8 v7.6 M6.4 11.4 l4 2 M17.6 11.4 l-4 2"></path><path d="M3.9 15.6 l-1.5 2.8 M20.1 15.6 l1.5 2.8"></path><circle cx="12" cy="19" r="2.4"></circle><path d="M9.9 18.4 h4.2" stroke="#D34716"></path></svg>',
-            hedgehog: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 18.4 C4 11 8.4 8 12 8 s8 3 8.4 10.4 Z"></path><path d="M6.4 12.6 L4.6 10 M9.2 10 L8.2 7.2 M12 9.2 V6.2 M14.8 10 L15.8 7.2 M17.6 12.6 L19.4 10"></path><path d="M8.6 15.6 h6.8" stroke="#D34716"></path><circle cx="10.4" cy="15.6" r="0.8" stroke="#D34716"></circle><circle cx="13.6" cy="15.6" r="0.8" stroke="#D34716"></circle></svg>',
-            octopus: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4 a6 6 0 0 1 12 0 v3 H6 Z"></path><path d="M7.2 15.4 c0 3 -2 3.2 -2.2 5 M10.2 15.4 c0 3 -1 4 -1.4 5 M13.8 15.4 c0 3 1 4 1.4 5 M16.8 15.4 c0 3 2 3.2 2.2 5"></path><circle cx="9.8" cy="11.4" r="1.5" stroke="#D34716"></circle><circle cx="14.2" cy="11.4" r="1.5" stroke="#D34716"></circle><path d="M11.3 11.4 h1.4" stroke="#D34716"></path></svg>',
-            eagle: '<svg viewBox="0 0 24 24" fill="none" stroke="#4C4C4C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.4 C8 18.4 6.5 14.4 7 9.6 C9 8.2 15 8.2 17 9.6 C17.5 14.4 16 18.4 12 20.4 Z"></path><path d="M7 9.6 L5 6 M17 9.6 L19 6"></path><circle cx="9.6" cy="11.6" r="1.6" stroke="#D34716"></circle><circle cx="14.4" cy="11.6" r="1.6" stroke="#D34716"></circle><path d="M12 14.4 l-1.5 1.2 1.5 2.2 1.5 -2.2 Z"></path></svg>',
-        };
-
-        function renderAvatarIcon(key) {
-            const normalized = window.AuthCore.normalizeAvatar(key);
-            return normalized ? (AVATAR_ICONS[normalized] || '') : '';
-        }
 
         window.openProfileModal = () => {
             // Close menu if open
@@ -871,30 +518,6 @@
             const nameInput = document.getElementById('profile-name-input');
             if(nameDisplay) nameDisplay.textContent = storedName;
             if(nameInput) nameInput.value = storedName;
-
-            // Sign-in prompt: only for a session that hasn't been through the identify
-            // gate yet (no ageTier on file means still the invisible power-up placeholder).
-            const signinPrompt = document.getElementById('profile-signin-prompt');
-            if (signinPrompt) {
-                const ageTier = localStorage.getItem('aa_age_tier');
-                signinPrompt.classList.toggle('hidden', !!ageTier);
-            }
-
-            // Avatar (Learner Recruit / any guest account — auto-assigned at sign-in,
-            // customizable here). Task Force Leaders sign in with Google and never get one.
-            const storedAvatar = window.AuthCore.normalizeAvatar(localStorage.getItem('aa_avatar'));
-            const avatarDisplay = document.getElementById('profile-avatar-display');
-            const avatarFallback = document.getElementById('profile-avatar-fallback-icon');
-            if (avatarDisplay && avatarFallback) {
-                if (storedAvatar) {
-                    avatarDisplay.innerHTML = renderAvatarIcon(storedAvatar);
-                    avatarDisplay.classList.remove('hidden');
-                    avatarFallback.classList.add('hidden');
-                } else {
-                    avatarDisplay.classList.add('hidden');
-                    avatarFallback.classList.remove('hidden');
-                }
-            }
 
             // Stats
             const statLaunches = document.getElementById('profile-stat-launches');
@@ -946,16 +569,6 @@
             window.toggleProfileEdit(false);
             if(window.sfx) window.sfx.click();
         }
-
-        // Lets someone reach the identify gate straight from their Profile — the only
-        // proactive path to it now that a course launch isn't the sole trigger.
-        window.openSignInFromProfile = async () => {
-            const { user, account } = await window.AuthGate.ensureIdentified();
-            if (user && account) {
-                applyIdentityToUI(user, account);
-                window.openProfileModal();
-            }
-        };
 
         // --- PROFILE PAGE: TABS ---
         window.switchProfileTab = (tab) => {
@@ -1301,119 +914,32 @@
             lucide.createIcons();
         };
 
-        window._selectedAvatar = null;
-
-        window.selectProfileAvatar = (key) => {
-            window._selectedAvatar = key;
-            document.querySelectorAll('#profile-avatar-picker button').forEach(btn => {
-                btn.classList.toggle('ring-2', btn.dataset.key === key);
-                btn.classList.toggle('ring-allgood-secondary', btn.dataset.key === key);
-            });
-        }
-
         window.toggleProfileEdit = (isEditing) => {
-            const viewMode = document.getElementById('profile-view-name');
-            const editMode = document.getElementById('profile-edit-name');
-            const picker = document.getElementById('profile-avatar-picker');
-
-            if (isEditing) {
-                viewMode.classList.add('hidden');
-                editMode.classList.remove('hidden');
-
-                // Avatar picker only makes sense for a guest (anonymous) account.
-                const user = auth.currentUser;
-                if (picker && user && user.isAnonymous) {
-                    window._selectedAvatar = window.AuthCore.normalizeAvatar(localStorage.getItem('aa_avatar'));
-                    picker.innerHTML = window.AuthCore.AVATARS.map(key => `
-                        <button type="button" data-key="${key}" onclick="window.selectProfileAvatar('${key}')"
-                            class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center p-1.5 hover:border-allgood-secondary transition-all [&>svg]:w-full [&>svg]:h-full ${key === window._selectedAvatar ? 'ring-2 ring-allgood-secondary' : ''}">${renderAvatarIcon(key)}</button>
-                    `).join('');
-                    picker.classList.remove('hidden');
-                    picker.classList.add('flex');
-                } else if (picker) {
-                    picker.classList.add('hidden');
-                    picker.classList.remove('flex');
-                }
-
-                const input = document.getElementById('profile-name-input');
-                if(input) input.focus();
-            } else {
-                viewMode.classList.remove('hidden');
-                editMode.classList.add('hidden');
-                if (picker) { picker.classList.add('hidden'); picker.classList.remove('flex'); }
-            }
+            document.getElementById('profile-view-name').classList.toggle('hidden', isEditing);
+            document.getElementById('profile-edit-name').classList.toggle('hidden', !isEditing);
+            if (isEditing) document.getElementById('profile-name-input').focus();
         }
 
+        // Renames the student's nickname — the name their teacher sees in Mission Control.
         window.saveProfileIdentity = async () => {
             const input = document.getElementById('profile-name-input');
-            const newName = input.value.trim();
-
+            const newName = input.value.replace(/\s+/g, ' ').trim().slice(0, 24);
             if (!newName) return;
-
-            if(window.sfx) window.sfx.confirm();
-
-            // 1. Update UI immediately
-            const nameDisplay = document.getElementById('profile-name-display');
-            if(nameDisplay) nameDisplay.textContent = newName;
+            if (window.sfx) window.sfx.confirm();
+            document.getElementById('profile-name-display').textContent = newName;
             localStorage.setItem('aa_username', newName);
             window.updateUI(newName);
-
-            const newAvatar = window._selectedAvatar;
-            if (newAvatar) {
-                localStorage.setItem('aa_avatar', newAvatar);
-                const avatarDisplay = document.getElementById('profile-avatar-display');
-                const avatarFallback = document.getElementById('profile-avatar-fallback-icon');
-                if (avatarDisplay && avatarFallback) {
-                    avatarDisplay.innerHTML = renderAvatarIcon(newAvatar);
-                    avatarDisplay.classList.remove('hidden');
-                    avatarFallback.classList.add('hidden');
-                }
-            }
-
-            // 2. Update Firebase (NOW HAS ACCESS TO IMPORTS)
             const user = auth.currentUser;
             if (user) {
                 try {
                     await updateProfile(user, { displayName: newName });
-                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
-                        displayName: newName,
-                        ...(newAvatar ? { avatar: newAvatar } : {})
-                    }, { merge: true });
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { displayName: newName }, { merge: true });
                 } catch (e) {
-                    console.error("Failed to save identity to cloud", e);
+                    console.error("Failed to save the new name", e);
                 }
             }
-            
             window.toggleProfileEdit(false);
         }
-
-        // Lets a student (or a Task Force Leader acting as one) join a classroom anytime
-        // from their Profile. The join itself — membership in classroom_members/{code}_{uid}
-        // (firestore.rules #6b), the legacy classroomCode mirror for students only, and the
-        // Recruit Code mirror — lives in /js/classroom-join.js, shared with /join/, so the
-        // two ways in can never disagree about what joining means. See that file for why a
-        // Task Force Leader's own classroomCode is never overwritten.
-        window.joinClassroom = async () => {
-            const input = document.getElementById('profile-classroom-input');
-            const statusEl = document.getElementById('profile-classroom-status');
-            if (!(input?.value || '').trim()) return;
-
-            let result;
-            try {
-                result = await (await classroomJoin()).joinClassroom(input.value, { createGuest: false });
-            } catch (e) {
-                console.error("Couldn't load the join module:", e);
-                result = { ok: false, message: "Something went wrong — please try again." };
-            }
-            if (!result.ok) {
-                if (statusEl) { statusEl.textContent = result.message; statusEl.className = "text-[10px] text-red-500 mt-1"; }
-                return;
-            }
-            if (input) input.value = '';
-            if (statusEl) { statusEl.textContent = `Joined ${result.name}! Your Task Force Leader can now see your progress.`; statusEl.className = "text-[10px] text-emerald-600 mt-1"; }
-            if (window.sfx) window.sfx.confirm();
-            window.loadProfilePageData();
-        };
 
         // Leaves one specific classroom (a student, or a Task Force Leader acting as one, may
         // be in several at once now) — deletes that classroom_members doc. Confirmed first,
@@ -1433,7 +959,6 @@
                 const meData = meSnap.exists() ? meSnap.data() : {};
                 if (meData.role !== 'teacher' && meData.classroomCode === code) {
                     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { classroomCode: deleteField() }, { merge: true });
-                    if (window.AuthCore.mirrorRecruitClassroom) window.AuthCore.mirrorRecruitClassroom(null);
                 }
                 if (window.sfx) window.sfx.click();
                 window.loadProfilePageData();
@@ -1986,18 +1511,15 @@
                     const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
                     const docSnap = await getDoc(userRef);
 
-                    let displayName = user.displayName || 'Agent';
-                    let isGuest = true; 
-
-                    if (docSnap.exists()) {
-                        const userData = docSnap.data();
-                        displayName = userData.displayName || user.displayName || 'Agent';
-                        isGuest = userData.isGuest || false;
-                    }
+                    const userData = docSnap.exists() ? docSnap.data() : {};
+                    const displayName = userData.displayName || user.displayName || 'Agent';
+                    const role = userData.role || 'student';
 
                     localStorage.setItem('aa_username', displayName);
                     localStorage.setItem('aa_uid', user.uid);
-                    localStorage.setItem('aa_is_guest', isGuest);
+                    localStorage.setItem('aa_is_guest', user.isAnonymous);
+                    localStorage.setItem('aa_role', role);
+                    window.applyRoleUI(role);
 
                     window.updateUI(displayName);
                     dashboard.classList.add('active');
@@ -2009,10 +1531,6 @@
                     window.startLaunchListener(user.uid);
                     window.startDecisionsStatusListener(user.uid); 
                     window.startIntelListener(user.uid); // NEW: Start check on fresh login
-                } else {
-                    if (dashboard.style.display === 'block') {
-                         window.handleLogout(); 
-                    }
                 }
             });
         }
@@ -2042,24 +1560,10 @@
             }
         }
 
-        // Everything a teacher does now lives in Mission Control (public/mission-control/).
-        // What used to be here — the inline Task Force page (#page-admin), its roster
-        // renderer and status filter, the student drill-down, the assignment picker, the
-        // Task Force code copy and the roster CSV export — is gone rather than kept as a
-        // second copy. Two places to assign a module is two places for the answer to be
-        // different, and the dashboard's picker read its own MODULE_REGISTRY copy, so a new
-        // GoodBlock had to be added twice to become assignable.
-        //
-        // What deliberately STAYS in this file is the student/app shell (profile, badges,
-        // launchCourse, joinClassroom, leaveClassroom), sign-in, and the become-a-teacher
-        // flow below (beginClassroomSetup / upgradeToTeacher / confirmTeacherConsent). A
-        // user becomes a teacher from the app shell and then goes to Mission Control —
-        // that order is correct and openTeacherDashboard() is the door.
-
-        // The teacher's Task Force view is Mission Control (public/mission-control/) now.
-        // It re-checks role and classroom ownership against Firestore on its own and shows
-        // its own explanation if either fails, so there is deliberately no lookup here —
-        // duplicating that check would only add a round trip before the redirect.
+        // Everything a teacher does lives in Mission Control (public/mission-control/),
+        // including signing in, the consent notice and creating a class. This page is the
+        // student's own "My progress" view; for a signed-in teacher it is their learner view,
+        // with the banner and menu item below as the door back.
         window.openTeacherDashboard = async () => {
             const menu = document.getElementById('menu-modal');
             if (menu) { menu.classList.add('hidden-modal'); menu.classList.remove('visible-modal'); }
@@ -2067,94 +1571,86 @@
             window.location.href = '/mission-control/';
         };
 
-        const startupScreen = document.getElementById('startup-screen');
-        if(startupScreen) {
-            const powerUp = (skipSound) => {
-                if (!skipSound) {
-                    if(window.sfx && window.sfx.powerOn) {
-                        window.sfx.powerOn();
-                    } else if (window.initAudio) {
-                        window.initAudio();
-                    }
-                }
-
-                startupScreen.style.opacity = '0';
-
-                const storedUID = localStorage.getItem('aa_uid');
-                const storedName = localStorage.getItem('aa_username');
-
-                if (storedName && storedUID) {
-                    window.restoreSessionState();
-                    window.initDashboard();
-                } else {
-                    // New visitor: no form, no interruption — sign in silently and go
-                    // straight to the dashboard. Their real name is asked for later,
-                    // only when they actually launch something.
-                    window.silentSignIn();
-                    window.initDashboard();
-                }
-
-                setTimeout(() => { startupScreen.style.display = 'none'; }, 700);
-            };
-
-            // The click listener is always attached — not just when the initial
-            // auto-skip below doesn't fire — since logging out re-shows this screen
-            // later in the SAME page load, and it needs to still be clickable then.
-            startupScreen.addEventListener('click', () => powerUp(false));
-
-            // "Already have an account? Sign in" on the power-up screen. Deliberately does
-            // NOT power up first: doing so would mint the anonymous guest this path exists
-            // to avoid. The gate is opened on its returning-user panel instead, and only a
-            // successful sign-in dismisses the screen — cancelling leaves the visitor
-            // exactly where they were, still able to power up as a guest.
-            window.startupSignIn = async () => {
-                const { user, account } = await window.AuthGate.signIn();
-                if (!user || !account) return;
-                startupScreen.style.display = 'none';
-                applyIdentityToUI(user, account);
-                window.initDashboard();
-            };
-
-            // Arriving from the marketing site's Sign in button. Those three pages
-            // deliberately load no Firebase (zero third-party requests on first paint),
-            // so they hand off to the gate here, where its markup and styles already are.
-            const wantsSignIn = /[?&]signin=1/.test(window.location.search);
-
-            // Someone actively moving between pages within the last hour shouldn't
-            // see this screen again — it's a one-time-per-session thing, not a
-            // per-page ritual.
-            if (window.AuthCore && window.AuthCore.skipPowerUp && !wantsSignIn) {
-                powerUp(true);
+        // --- OLD PROGRESS (legacy restore; delete with AuthCore's legacy section after
+        // AuthCore.LEGACY_RESTORE_UNTIL). A student from before the 2026-11 identity reset
+        // copies their old work into this device's session with a Recruit Code, their old
+        // Google sign-in, or their old email and password. They stay anonymous afterwards.
+        const RESTORE_ERRORS = {
+            empty: 'Type your code first.',
+            not_found: "We couldn't find that. Check it and try again.",
+            teacher: 'That is a teacher account. Teachers sign in from "Teacher sign in" on the homepage.',
+            error: 'Something went wrong. Check your internet connection and try again.',
+        };
+        function restoreMessage(text, ok) {
+            const el = document.getElementById('restore-status');
+            el.textContent = text;
+            el.className = 'text-xs mt-3 ' + (ok ? 'text-emerald-600 font-bold' : 'text-red-500');
+        }
+        window.openRestore = () => {
+            const modal = document.getElementById('restore-modal');
+            document.getElementById('restore-status').textContent = '';
+            document.getElementById('restore-email-form').classList.add('hidden');
+            modal.classList.remove('hidden-modal');
+            modal.classList.add('visible-modal');
+        };
+        window.closeRestore = () => {
+            const modal = document.getElementById('restore-modal');
+            modal.classList.add('hidden-modal');
+            modal.classList.remove('visible-modal');
+        };
+        window.showRestoreEmail = () => {
+            document.getElementById('restore-email-form').classList.remove('hidden');
+            document.getElementById('restore-email').focus();
+        };
+        async function runRestore(btn, action) {
+            const label = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Checking…';
+            let result;
+            try {
+                result = await action();
+            } catch (e) {
+                console.error('[Dashboard] restore failed', e);
+                const wrongPassword = e && /wrong-password|invalid-credential|user-not-found|invalid-email/.test(e.code || '');
+                const closed = e && /popup-closed-by-user|cancelled-popup-request/.test(e.code || '');
+                result = { ok: false, reason: closed ? null : (wrongPassword ? 'not_found' : 'error') };
+            } finally {
+                btn.disabled = false;
+                btn.textContent = label;
             }
-
-            if (wantsSignIn) {
-                // Deliberately NOT powerUp(true) here. powerUp() calls silentSignIn() when
-                // the browser has no stored session, which mints an anonymous guest — so
-                // someone who came here by pressing "Sign in" was handed a throwaway
-                // identity before being asked who they were, and landed on the dashboard as
-                // a guest. It also pushed googleSignIn() down its linkWithPopup() branch,
-                // linking a real Google account onto that throwaway uid instead of simply
-                // signing in. Show the gate against the power-up screen instead, and only
-                // power up if they back out.
-                startupScreen.style.opacity = '0';
-                startupScreen.style.display = 'none';
-                (async () => {
-                    // signIn(), not ensureIdentified(): arriving via the marketing site's
-                    // "Sign in" button says plainly that this person already has an account,
-                    // so opening on the age question was asking the wrong thing first.
-                    const { user, account } = await window.AuthGate.signIn();
-                    if (user && account) {
-                        applyIdentityToUI(user, account);
-                        window.initDashboard();
-                        history.replaceState(null, '', '/dashboard/');
-                    } else {
-                        // Dismissed the gate — back to the marketing page rather than
-                        // stranded on a dashboard they haven't signed in to.
-                        window.location.replace('/');
-                    }
-                })();
+            if (!result.ok) {
+                if (result.reason) restoreMessage(RESTORE_ERRORS[result.reason] || RESTORE_ERRORS.error, false);
+                return;
+            }
+            if (window.sfx) window.sfx.confirm();
+            const name = result.displayName || 'you';
+            const n = result.restoredModules;
+            restoreMessage(`Welcome back, ${name}. ${n === 1 ? '1 lesson' : n + ' lessons'} of progress restored on this device.`, true);
+            if (result.displayName) {
+                localStorage.setItem('aa_username', result.displayName);
+                window.updateUI(result.displayName);
             }
         }
+        window.restoreWithCode = (btn) => runRestore(btn, () => window.AuthCore.restoreFromRecruitCode(document.getElementById('restore-code').value));
+        window.restoreWithGoogle = (btn) => runRestore(btn, () => window.AuthCore.restoreWithGoogle());
+        window.restoreWithEmail = (btn) => runRestore(btn, () => window.AuthCore.restoreWithEmail(
+            document.getElementById('restore-email').value.trim(), document.getElementById('restore-password').value));
+        if (window.AuthCore.legacyRestoreOpen()) {
+            const link = document.getElementById('restore-link');
+            if (link) link.classList.remove('hidden');
+        }
+
+        // No screen in front of the dashboard: the student's anonymous session starts on
+        // load and the page renders.
+        window.restoreSessionState();
+        window.initDashboard();
+        window.AuthCore.startSession().then((user) => {
+            if (user) return;
+            // Firebase unreachable: show the page anyway, every lesson on it still opens.
+            document.getElementById('page-dashboard').style.display = 'block';
+            document.querySelector('.navbar-content').classList.remove('opacity-0');
+            showStatusMessage("Couldn't connect. Your progress will show when you're back online.", 'error');
+        });
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
@@ -2547,40 +2043,6 @@
         <div class="tablet-frame">
             <div class="screen-container" id="screen">
 
-                <!-- 1. STARTUP SCREEN -->
-                <div id="startup-screen" class="absolute inset-0 z-[5000] flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700 ease-in-out bg-slate-900">
-                    <div class="group flex flex-col items-center justify-center text-center h-full w-full relative">
-                        <div class="relative">
-                            <div class="absolute inset-0 bg-allgood-primary/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                            <h2 class="text-xl md:text-2xl font-heading text-slate-400 mb-2 uppercase">WELCOME TO THE</h2>
-                            <h1 class="text-4xl md:text-6xl font-heading font-bold text-allgood-primary tracking-tighter relative z-10 drop-shadow-md static-neon-glow uppercase">ALLGOOD<span class="text-white">ACADEMY</span></h1>
-                        </div>
-                        
-                        <!-- ADDED: Power Icon Flare -->
-                        <div class="mt-8 mb-4 relative transition-transform duration-500 group-hover:scale-110">
-                            <div class="absolute inset-0 bg-allgood-primary/50 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <i data-lucide="power" class="w-16 h-16 text-slate-600 group-hover:text-white transition-colors duration-300 relative z-10"></i>
-                        </div>
-
-                        <p id="startup-message" class="text-slate-500 text-xs tracking-[0.3em] uppercase font-medium group-hover:text-allgood-primary transition-colors animate-pulse font-body">CLICK TO POWER UP</p>
-
-                        <!-- Powering up creates a NEW anonymous session. For a first-time
-                             visitor that is exactly right; for someone who already has an
-                             account it was the only control on the screen, so getting back
-                             in and starting over were the same click. This is the other
-                             door. It stops propagation so it never doubles as a power-up. -->
-                        <button id="startup-signin"
-                                class="mt-10 text-slate-400 hover:text-white text-[11px] font-body underline decoration-dotted underline-offset-4 transition-colors relative z-20 px-4 py-2"
-                                onclick="event.stopPropagation(); window.startupSignIn();">
-                            Already have an account? Sign in
-                        </button>
-                    </div>
-                </div>
-
-                <!-- The identify gate (age question, Sign In, Recruit Code) is injected here
-                     at runtime by /js/identity-gate.js — one shared implementation used by
-                     the dashboard and every module, instead of a copy per page. -->
-
                 <!-- 2.5 STATUS MODAL -->
                 <div id="status-modal" class="hidden-modal absolute top-16 right-4 z-[500] flex items-center justify-center p-4 modal-transition pointer-events-none">
                     <div class="bg-white rounded-lg shadow-xl p-4 max-w-xs w-full text-left border-l-4 border-blue-500 flex items-center space-x-3 modal-content-base">
@@ -2589,34 +2051,27 @@
                     </div>
                 </div>
 
-                <!-- BECOME A TEACHER MODAL: deliberate, separate confirmation - never bundled into signup -->
-                <div id="become-teacher-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeBecomeTeacherModal()">
-                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-center border-t-4 border-allgood-secondary relative" onclick="event.stopPropagation()">
-                        <button onclick="window.closeBecomeTeacherModal()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
-                        <i data-lucide="graduation-cap" class="w-10 h-10 text-allgood-secondary mx-auto mb-3"></i>
-                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Set Up Mission Control?</h3>
-                        <p class="text-xs text-gray-500 mb-5">Setting this up gives you Mission Control — a code to share with students, and a roster where you can see their progress. You can do this anytime — no rush.</p>
-                        <button onclick="window.beginClassroomSetup()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide mb-2">Yes, Set It Up</button>
-                        <button onclick="window.closeBecomeTeacherModal()" class="w-full text-gray-400 hover:text-gray-600 text-xs font-bold uppercase py-2">Not Right Now</button>
-                    </div>
-                </div>
+                <!-- OLD PROGRESS: the legacy restore panel (see window.openRestore). Deleted
+                     at the sunset, with AuthCore's legacy section. -->
+                <div id="restore-modal" class="hidden-modal absolute inset-0 z-[3600] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="if(event.target === this) window.closeRestore()">
+                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-left border-t-4 border-allgood-secondary relative max-h-full overflow-y-auto">
+                        <button onclick="window.closeRestore()" class="absolute top-2 right-2 w-11 h-11 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors" aria-label="Close"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-1">Get your old progress back</h3>
+                        <p class="text-xs text-gray-500 mb-4 leading-relaxed">Used Allgood Academy before? Your old work is copied onto this device. Nothing else changes, and you don't need to sign in again after this.</p>
 
-                <!-- TEACHER CONSENT MODAL: shown once, before a teacher's first classroom is
-                     created. Records a timestamped acceptance — this is the compliance record. -->
-                <div id="teacher-consent-modal" class="hidden-modal absolute inset-0 z-[3700] bg-slate-900/60 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
-                    <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full text-left border-t-4 border-allgood-secondary relative">
-                        <h3 class="text-lg font-heading font-bold text-allgood-dark mb-3 text-center">Before You Set Up Mission Control</h3>
-                        <div class="text-xs text-gray-600 leading-relaxed space-y-2 mb-4 bg-slate-50 border border-slate-100 rounded p-3">
-                            <p><strong class="text-allgood-dark">What we collect from your students:</strong> a nickname they choose (never a real name or email), their scores, and their activity in the lessons you assign. That's it.</p>
-                            <p><strong class="text-allgood-dark">Why:</strong> so you can see their progress and so we can run the lessons themselves.</p>
-                            <p><strong class="text-allgood-dark">Retention:</strong> kept while the account is active; you or a parent can request deletion anytime.</p>
-                            <p>Data is never sold, and never used for advertising.</p>
+                        <label for="restore-code" class="block text-xs font-bold text-allgood-dark mb-1">I have a Recruit Code</label>
+                        <input type="text" id="restore-code" autocomplete="off" placeholder="e.g. arctic-fox-trot-4821" class="w-full border border-gray-300 rounded p-2.5 mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;" onkeydown="if(event.key==='Enter')document.getElementById('restore-code-btn').click()">
+                        <button id="restore-code-btn" onclick="window.restoreWithCode(this)" class="w-full bg-allgood-secondary hover:bg-allgood-accent text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide">Get my progress back</button>
+
+                        <div class="border-t border-slate-100 my-4"></div>
+                        <button onclick="window.restoreWithGoogle(this)" class="w-full bg-white border border-gray-300 hover:shadow-md font-bold py-2.5 rounded text-xs text-allgood-dark uppercase tracking-wide">Signed in with Google before?</button>
+                        <button onclick="window.showRestoreEmail()" class="w-full text-xs text-allgood-secondary font-bold underline decoration-dotted mt-3">Used an email and password?</button>
+                        <div id="restore-email-form" class="hidden mt-3">
+                            <input type="email" id="restore-email" autocomplete="email" placeholder="Email" class="w-full border border-gray-300 rounded p-2.5 mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;">
+                            <input type="password" id="restore-password" autocomplete="current-password" placeholder="Password" class="w-full border border-gray-300 rounded p-2.5 mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;" onkeydown="if(event.key==='Enter')document.getElementById('restore-email-btn').click()">
+                            <button id="restore-email-btn" onclick="window.restoreWithEmail(this)" class="w-full bg-allgood-secondary hover:bg-allgood-accent text-white font-bold py-2.5 rounded shadow-md text-xs uppercase tracking-wide">Get my progress back</button>
                         </div>
-                        <label class="flex items-start gap-2 mb-5 cursor-pointer">
-                            <input type="checkbox" id="teacher-consent-checkbox" class="mt-0.5">
-                            <span class="text-xs text-gray-700">I confirm I am a teacher or school staff member authorized to use this tool with my students under my school's policies.</span>
-                        </label>
-                        <button id="btn-confirm-teacher-consent" onclick="window.confirmTeacherConsent()" disabled class="w-full bg-gray-300 text-white font-bold py-2.5 rounded shadow-none text-xs uppercase tracking-wide cursor-not-allowed transition-all">I Agree — Continue</button>
+                        <p id="restore-status" class="text-xs mt-3" role="status" aria-live="polite"></p>
                     </div>
                 </div>
 
@@ -2669,10 +2124,9 @@
                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openProfileModal()">
                                 <i data-lucide="user" class="w-4 h-4 mr-3 text-allgood-secondary"></i>My Profile
                             </button>
-                            <!-- CLASSROOM ENTRY: always visible. Smart destination - teachers land in their
-                                 classroom, everyone else gets the option to set one up. -->
-                            <button id="menu-btn-classroom" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openClassroomEntry()">
-                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i><span id="menu-classroom-label">Set Up Mission Control</span>
+                            <!-- Teachers only (see applyRoleUI). -->
+                            <button id="menu-btn-classroom" style="display:none;" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openTeacherDashboard()">
+                                <i data-lucide="graduation-cap" class="w-4 h-4 mr-3 text-allgood-primary"></i>Mission Control
                             </button>
                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.openAboutModal()">
                                 <i data-lucide="info" class="w-4 h-4 mr-3 text-slate-500"></i>About Us
@@ -2680,12 +2134,8 @@
                             <!-- The navbar Home icon now steps back to the dashboard from
                                  Profile/Admin instead of leaving the app, so this is the exit
                                  to the public site — the capability Home used to carry alone. -->
-                            <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.location.href='/?home=1'">
+                            <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 text-slate-600 font-bold flex items-center transition-colors uppercase" onclick="window.location.href='/'">
                                 <i data-lucide="external-link" class="w-4 h-4 mr-3 text-slate-500"></i>Visit Homepage
-                            </button>
-                            <div class="border-t border-slate-100 my-2"></div>
-                             <button class="w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 text-red-600 font-bold flex items-center transition-colors uppercase" onclick="window.handleLogout()">
-                                <i data-lucide="log-out" class="w-4 h-4 mr-3"></i>Log Out
                             </button>
                         </div>
                         <div class="mt-auto p-4 bg-slate-50 border-t border-slate-200 text-center">
@@ -2725,6 +2175,7 @@
                                     <span class="text-[10px] uppercase text-gray-400 font-normal">| VIEW COLLECTION</span>
                                 </button>
                             </div>
+                            <button id="restore-link" onclick="window.openRestore()" class="hidden mt-2 text-xs text-allgood-secondary font-bold underline decoration-dotted">Have an old code? Get your progress back</button>
                         </div>
                         <div class="flex gap-6 md:gap-4 text-center md:text-right w-full md:w-auto justify-center md:justify-end">
                             <div>
@@ -3068,8 +2519,7 @@
                     <div class="w-full md:w-72 shrink-0 bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center text-center h-fit">
                         <div class="w-24 h-24 rounded-full bg-white border-4 border-white shadow-md mb-4 overflow-hidden relative group">
                             <div class="absolute inset-0 bg-allgood-secondary/10 flex items-center justify-center">
-                                <i id="profile-avatar-fallback-icon" data-lucide="user" class="w-10 h-10 text-allgood-secondary"></i>
-                                <span id="profile-avatar-display" class="w-12 h-12 hidden [&>svg]:w-full [&>svg]:h-full"></span>
+                                <i data-lucide="user" class="w-10 h-10 text-allgood-secondary"></i>
                             </div>
                         </div>
 
@@ -3079,20 +2529,9 @@
                             <button onclick="window.toggleProfileEdit(true)" class="text-[10px] uppercase font-bold text-allgood-primary hover:text-allgood-hover underline decoration-dotted mt-1">Edit Identity</button>
                         </div>
 
-                        <!-- SIGN-IN PROMPT: shown only when this session hasn't gone through
-                             the identify gate yet (still the invisible power-up placeholder) —
-                             reaching Profile directly from the navbar is the point where
-                             someone can start that without needing to launch a course first. -->
-                        <div id="profile-signin-prompt" class="w-full mt-3 hidden">
-                            <button onclick="window.openSignInFromProfile()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-2 rounded shadow-md text-xs uppercase tracking-wide">Sign In</button>
-                        </div>
-
-                        <!-- EDIT MODE: NAME + AVATAR. The avatar picker only matters for guest
-                             (anonymous) accounts — a Task Force Leader's real Google identity
-                             doesn't use an avatar. -->
+                        <!-- EDIT MODE: the nickname a teacher sees. Nickname or first name only. -->
                         <div id="profile-edit-name" class="w-full hidden">
-                            <input type="text" id="profile-name-input" class="w-full text-center border border-allgood-secondary rounded p-1 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;" placeholder="Enter Alias">
-                            <div id="profile-avatar-picker" class="hidden flex-wrap justify-center gap-1 mb-2"></div>
+                            <input type="text" id="profile-name-input" maxlength="24" class="w-full text-center border border-allgood-secondary rounded p-1 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;" placeholder="Nickname or first name">
                             <div class="flex gap-2 justify-center">
                                 <button onclick="window.saveProfileIdentity()" class="bg-allgood-secondary text-white px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent">Save</button>
                                 <button onclick="window.toggleProfileEdit(false)" class="bg-gray-200 text-gray-500 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-gray-300">Cancel</button>
@@ -3106,18 +2545,12 @@
                             </div>
                         </div>
 
-                        <!-- JOIN A CLASSROOM: optional, available anytime, not forced at signup,
-                             and always shown — a student (or a Task Force Leader acting as one)
-                             can belong to more than one classroom, so this never hides itself. -->
-                        <div class="mt-3 w-full" id="profile-join-box">
-                            <div class="bg-white border border-gray-200 rounded p-3 shadow-sm text-left">
-                                <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Have a class code?</p>
-                                <div class="flex gap-2">
-                                    <input type="text" id="profile-classroom-input" placeholder="e.g. 2RP878" maxlength="8" class="flex-1 min-w-0 border border-gray-300 rounded p-2 text-xs uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-allgood-secondary/50" style="font-size:16px;">
-                                    <button onclick="window.joinClassroom()" class="bg-allgood-secondary text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-allgood-accent shrink-0">Join</button>
-                                </div>
-                                <p id="profile-classroom-status" class="text-[10px] text-gray-400 mt-1">Type it here, or at <a href="/join/" class="underline">allgoodacademy.com/join</a>.</p>
-                            </div>
+                        <!-- JOIN A CLASS: one place to do it, /join/ (code + nickname). -->
+                        <div class="mt-3 w-full">
+                            <a href="/join/" class="block bg-white border border-gray-200 rounded p-3 shadow-sm text-left hover:border-allgood-secondary">
+                                <span class="block text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Have a class code?</span>
+                                <span class="text-xs font-bold text-allgood-secondary">Join your class &rarr;</span>
+                            </a>
                         </div>
 
                         <!-- JOINED TASK FORCES: one card per classroom_members doc, rendered
@@ -3317,13 +2750,7 @@
             // "Back" control. Only once page-dashboard is the one actually showing does Home
             // mean allgoodacademy.com. (The teacher page was the other such screen; it lives
             // in Mission Control now, which is a separate document with its own EXIT.)
-            //
-            // ?home=1 is required, not decoration. public/index.html sends an account
-            // holder (ag_account + ag_signed_in) straight back to /dashboard/, so a bare
-            // '/' would bounce them to the page they just left and the button would look
-            // broken. The param is that page's opt-out, the mirror of this page's own
-            // ?signin=1, and is deliberately left in the URL so a reload keeps them on
-            // the homepage instead of yanking them back.
+
             const homeBtn = document.getElementById('btn-home');
             if(homeBtn) {
                 homeBtn.addEventListener('click', () => {
@@ -3332,7 +2759,7 @@
                     if (profilePage && profilePage.classList.contains('active')) {
                         window.closeProfileModal();
                     } else {
-                        window.location.href = '/?home=1';
+                        window.location.href = '/';
                     }
                 });
             }

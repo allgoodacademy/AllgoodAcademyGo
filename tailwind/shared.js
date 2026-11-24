@@ -4,7 +4,7 @@ const theme = require('./theme');
 //
 // It did not always. The bundles were originally built by scanning .html only,
 // which silently dropped every utility that appears exclusively inside a JS
-// string — and the two shared UI modules (identity-gate.js, message-hq.js) build
+// string — and the shared UI modules (message-hq.js, and the since-deleted identity-gate.js) build
 // their entire modal markup that way. `z-[9999]` lives nowhere but those two
 // files, so it compiled into no bundle at all and both modals rendered at
 // `z-index:auto`, underneath the dashboard's .screen-container (z-index:1,

@@ -3,7 +3,7 @@
 // that a page loading that JS actually ships.
 //
 // This is the check that would have caught the Message HQ modal rendering behind the
-// tablet screen. /js/message-hq.js and /js/identity-gate.js build their markup as
+// tablet screen. /js/message-hq.js (and the since-deleted identity-gate.js) build markup as
 // strings; the bundles in public/assets/css/ are purged; and when the content globs
 // scanned .html only, every class appearing nowhere but a .js file compiled to nothing.
 // `z-[9999]` was in no bundle at all, the modal computed to z-index:auto, and it painted

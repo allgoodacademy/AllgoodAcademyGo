@@ -8,14 +8,33 @@ their output into the repo, so there is no build step between a commit and the d
 Mirrors the local `Allgood_OS_Host` Firebase Hosting folder, plus `insider/` (not part of the
 original local folder, added separately).
 
+## Who signs in (identity model, 2026-11-23)
+
+- **Students never sign in and never make an account.** Every page calls
+  `AuthCore.startSession()` (`public/js/auth-core.js`) on load: a silent anonymous Firebase
+  session, no screen, no question. Progress lives in that session on that device.
+- **A student joins a class** at `/join/` with the teacher's class code and a nickname
+  (`public/js/classroom-join.js`). Nothing else is asked.
+- **Teachers are the only people who sign in**, with Google only, from "Teacher sign in" in
+  the site nav, which goes to `/mission-control/`. A new teacher accepts the consent notice
+  once and creates their class there.
+- **Students from before the reset** (Recruit Codes, 13+ Google or email/password accounts)
+  use "Have an old code? Get your progress back" on `/dashboard/` until **2027-06-30**. It
+  copies their old progress into their anonymous session. Delete the `LEGACY RESTORE` section
+  of `auth-core.js`, the restore panel on the dashboard and rule #9's `get` after that date.
+- `npm run check:invariants` (`[no-gate]`) fails a build that brings back a pre-play screen, the
+  deleted `identity-gate.js`, or a student sign-in path.
+
 ## Structure
 
 ```
 public/
-  index.html                                     # Marketing landing page (signed-out home) — zero third-party requests
+  index.html                                     # Marketing landing page — zero third-party requests on the render path
   for-teachers/index.html                        # Marketing: teacher-facing page
   about/index.html                               # Marketing: about + contact
-  dashboard/index.html                           # Allgood Academy dashboard (signed-in home)
+  dashboard/index.html                           # "My progress" — a student's own dashboard (no sign-in)
+  join/index.html                                # Join a class: class code + nickname
+  mission-control/index.html                     # Teacher sign in (Google) and the teacher's class view
   insider/index.html                             # Insider (owner BI dashboard: users, courses, classrooms, inbox, tools)
   js/telemetry.js                                # Shared learning-analytics telemetry (sessions + events) — see docs/insider-analytics.md
   educational-games/                              # conflict-resolution, digital-decisions,
@@ -51,7 +70,8 @@ build when the committed markup no longer matches.
 
 This exists because the six navs used to be hand-maintained copies and they drifted: a "Games"
 link added to the homepage reached none of the other five, so a visitor on `/about/` had no route
-to the games hub at all, and the legal pages had no route to a lesson or to sign in.
+to the games hub at all, and the legal pages had no route to a lesson. The nav's only sign-in is
+"Teacher sign in" (`/mission-control/`); for a browser with a session its button reads "My progress".
 
 Two skins are deliberately kept separate — the light pill bar and the games hub's dark bar. They
 share the link set and the markup shape, not the CSS; each page still owns its own styling.

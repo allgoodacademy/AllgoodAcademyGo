@@ -249,7 +249,7 @@ The RWR coverage map records an open objection: *the intro page is a syllabus �
 - Header: **Room to Think**. Student-facing line: *"Four situations where doing more made it worse. And what to do instead."*
 - Four GoodBlock cards + the Challenge card. Status from `module_progress` reads. Honest coming-soon states.
 - **Challenge card is not gated.** Consistent with the 2026-09-11 dashboard decision: no lock on either existing Challenge, none here.
-- `launchLab()` must **not** call `ensureIdentified()`. Guest-first via `AuthGate.startGuestSession()`. Both hubs were fixed for exactly this in PR #13; do not reintroduce it.
+- `launchLab()` opens the lab and asks nothing. The hub starts the student's anonymous session on load with `AuthCore.startSession()` (identity reset, 2026-11-23: students never sign in).
 - Home icon → `/dashboard/`. Both hubs previously had `<a href="/" title="Dashboard">`; fixed in PR #19.
 - Teacher strip, collapsed by default: the MYP framing from §1 plus the non-affiliation disclaimer. **The only surface in the product carrying IB vocabulary.**
 

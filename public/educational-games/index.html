@@ -63,6 +63,7 @@ nav{
 /* Sign in is a plain text link now — available, not advertised. The class is the hook the
    session-aware relabel and the click handler below query; it carries no button styling. */
 .nav-signin{font-weight:700;color:rgba(255,255,255,0.8)}
+@media(max-width:480px){.nav-signin{white-space:normal;line-height:1.15;max-width:5.6em;text-align:center}} /* "Teacher sign in" wraps so the button still fits */
 .nav-right{display:flex;align-items:center;gap:4px}
 
 /* ── HERO ── */
@@ -396,22 +397,17 @@ footer{
     <a href="/about/#contact" class="nav-link">Contact</a>
   </div>
   <div class="nav-right">
-    <a href="/dashboard/?signin=1" class="nav-link nav-signin">Sign in</a>
+    <a href="/mission-control/" class="nav-link nav-signin">Teacher sign in</a>
     <a href="/jsh/digital-decisions-lab/social-intelligence/" class="nav-cta">Try a lesson</a>
   </div>
 </nav>
 <script>
 (function(){
-  var a=document.querySelector('.nav-signin');
-  if(!a)return;
-  var signedIn=false;
-  try{signedIn=localStorage.getItem('ag_signed_in')==='1';}catch(e){/* storage blocked - stays "Sign in", the safe default */}
-  if(signedIn)a.textContent='Your dashboard';
-  a.addEventListener('click',function(e){
-    var now=false;
-    try{now=localStorage.getItem('ag_signed_in')==='1';}catch(e){}
-    if(now){e.preventDefault();location.href='/dashboard/';}
-  });
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta){cta.textContent='My progress';cta.href='/dashboard/';}
+  if(a&&signin)signin.textContent='Mission Control';
 })();
 </script>
 <!-- END GENERATED NAV -->
@@ -568,11 +564,11 @@ footer{
     <div class="edu-strip-text">
       <div class="edu-strip-eyebrow">For educators</div>
       <div class="edu-strip-title">Assign it in 60 seconds.</div>
-      <p class="edu-strip-desc">Assigning takes a free teacher account. Create one, pick &ldquo;Set Up Mission Control&rdquo; in the System Menu, and you land in your own roster &mdash; assign any game or challenge from there and share one Task Force code with your class. Students go to allgoodacademy.com/join and type it &mdash; no account needed.<br><br>Mission Control shows a live roster, completion data, and a best score per game and challenge for every student who has joined with that code. Students can play with no account at all &mdash; that&rsquo;s how they find you &mdash; but a signed-out play won&rsquo;t show up under their name.<br><br>The games are diagnostics, not lessons: each one ends by routing a student into the Lab Pack lesson that teaches the skill it just tested. The Digital Decisions facilitation guide is free on <a href="https://www.teacherspayteachers.com/store/the-allgood-academy">Teachers Pay Teachers</a>, and guides for the other Lab Packs are available there too. New to all of this? <a href="/for-teachers/">Start with the explainer</a>.</p>
+      <p class="edu-strip-desc">Assigning takes a free teacher sign-in with Google. Choose &ldquo;Teacher sign in&rdquo;, set up your class, and you land in your own roster &mdash; assign any game or challenge from there and share one Task Force code with your class. Students go to allgoodacademy.com/join and type it with a nickname &mdash; no account, ever.<br><br>Mission Control shows a live roster, completion data, and a best score per game and challenge for every student who has joined with that code. Students play with no account at all; a play only shows up on your roster once that device has joined your class.<br><br>The games are diagnostics, not lessons: each one ends by routing a student into the Lab Pack lesson that teaches the skill it just tested. The Digital Decisions facilitation guide is free on <a href="https://www.teacherspayteachers.com/store/the-allgood-academy">Teachers Pay Teachers</a>, and guides for the other Lab Packs are available there too. New to all of this? <a href="/for-teachers/">Start with the explainer</a>.</p>
     </div>
-    <a href="/dashboard/?signin=1" class="edu-strip-btn">
+    <a href="/mission-control/" class="edu-strip-btn">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 7h12M7 1l6 6-6 6"/></svg>
-      Create your free teacher account
+      Teacher sign in
     </a>
   </div>
 
