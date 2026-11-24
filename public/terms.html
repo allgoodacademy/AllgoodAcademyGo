@@ -88,20 +88,41 @@ footer a{color:var(--ink-soft)}
      change a link in nav/nav.js and every page picks it up. -->
 <div class="nav-shell">
   <div class="wrap">
-    <nav class="nav">
+    <nav class="nav site-nav">
       <a class="wordmark" href="/">Allgood<em>Academy</em></a>
       <div class="nav-right">
-        <a class="nav-link" href="/educational-games/">Games</a>
-        <a class="nav-link" href="/simulations/">Simulations</a>
-        <a class="nav-link" href="/for-teachers/">For teachers</a>
-        <a class="nav-link" href="/about/">About</a>
-        <a class="nav-link" href="/about/#contact">Contact</a>
-        <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        <div class="nav-links">
+          <a class="nav-link" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
         <a class="nav-cta" href="/dashboard/">Start learning</a>
       </div>
     </nav>
   </div>
 </div>
+<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+}
+</style>
 <script>
 (function(){
   var s=false,a=false;

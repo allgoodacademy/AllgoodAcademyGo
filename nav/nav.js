@@ -75,6 +75,37 @@ const SESSION_SCRIPT = `<script>
 })();
 <\/script>`;
 
+// --- The phone and tablet layout, emitted with the bar. ------------------------
+//
+// Generated here, once, for BOTH skins, instead of living in seven page stylesheets.
+// Each page used to hide its section links below 960px and squeeze the wordmark,
+// "Teacher sign in" and the button into one row; on a phone the button overflowed
+// the bar (iPhone SE, iPhone 13) and Games / Simulations / For teachers were simply
+// not there. Below 960px the bar is now two rows: the wordmark and the button on
+// the first, every link (including Teacher sign in) below them, wrapping onto a
+// further line on a narrow phone rather than hiding any of them. Layout only — no colours — so
+// each skin keeps its own look. Selectors start at .site-nav so they outrank the
+// pages' own collapse rules without !important.
+const PHONE_STYLE = `<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+}
+</style>`;
+
 // --- Skins. -----------------------------------------------------------------
 //
 // Two visual treatments, deliberately kept apart. The drift this file fixes was
@@ -91,10 +122,12 @@ const SKINS = {
         render(links, actions) {
             return `<div class="nav-shell">
   <div class="wrap">
-    <nav class="nav">
+    <nav class="nav site-nav">
       <a class="wordmark" href="/">Allgood<em>Academy</em></a>
       <div class="nav-right">
+        <div class="nav-links">
 ${links}
+        </div>
 ${actions}
       </div>
     </nav>
@@ -102,20 +135,18 @@ ${actions}
 </div>`;
         },
         link: (href, label, active) =>
-            `        <a class="nav-link${active ? ' here' : ''}" href="${href}">${label}</a>`,
-        signin: href => `        <a class="nav-link nav-signin" href="${href}">${SIGNIN.label}</a>`,
+            `          <a class="nav-link${active ? ' here' : ''}" href="${href}">${label}</a>`,
+        signin: href => `          <a class="nav-link nav-signin" href="${href}">${SIGNIN.label}</a>`,
         cta: href => `        <a class="nav-cta" href="${href}">${CTA.label}</a>`,
     },
 
     // /educational-games/ — dark bar, its own class names, logo split in two.
     dark: {
         activeClass: 'active',
-        // The four page links sit in .nav-links, which collapses below 960px.
-        // Teacher sign in and the CTA sit outside it in .nav-right so they survive that
-        // breakpoint — losing the way into a lesson on a phone is the opposite
-        // of the point.
+        // The page links and Teacher sign in sit in .nav-links; the CTA sits in
+        // .nav-right. On a phone PHONE_STYLE below puts the links on a second row.
         render(links, actions) {
-            return `<nav>
+            return `<nav class="site-nav">
   <a href="/" class="nav-logo">Allgood<span>Academy</span></a>
   <div class="nav-links">
 ${links}
@@ -162,9 +193,10 @@ const PREAMBLE =
 function renderNav(page) {
     const skin = SKINS[page.skin];
     const links = LINKS.map(l => skin.link(l.href(page.slug), l.label, l.current === page.slug));
-    const actions = [skin.signin(SIGNIN.href), skin.cta(CTA.href)];
-    const body = skin.render(links.join('\n'), actions.join('\n'));
-    return `${PREAMBLE}${body}\n${SESSION_SCRIPT}\n${END}`;
+    // Teacher sign in rides with the page links (it is a link, not the button), so on a
+    // phone it lands on the same scrollable row and never competes with the button.
+    const body = skin.render([...links, skin.signin(SIGNIN.href)].join('\n'), skin.cta(CTA.href));
+    return `${PREAMBLE}${body}\n${PHONE_STYLE}\n${SESSION_SCRIPT}\n${END}`;
 }
 
 module.exports = { LINKS, CTA, SIGNIN, SKINS, PAGES, BEGIN, END, renderNav };
