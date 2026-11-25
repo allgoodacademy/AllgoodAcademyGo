@@ -70,10 +70,12 @@ jobs:
         run: npm ci
       - name: Write service account credentials
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}' > "${{ runner.temp }}/firebase-service-account.json"
-      - name: Deploy Firestore and Storage rules
-        run: node_modules/.bin/firebase deploy --only firestore:rules,storage --project allgood-academy --non-interactive
+      - name: Deploy Firestore rules
+        run: node_modules/.bin/firebase deploy --only firestore:rules --project allgood-academy --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
 
-  # storage.rules deploys with the Firestore rules (since 2026-11-25, second pass): the paid
-  # facilitator guides live in Storage at facilitator-guides/, readable only by Pro teachers.
+  # storage.rules is NOT deployed from here: the CLI's default-bucket lookup reports
+  # "Storage not set up" for this project's allgood-academy.firebasestorage.app bucket, so the
+  # rules were published in the Firebase console (Storage -> Rules) on 2026-11-25. If you
+  # change storage.rules, paste it there too. tests/storage-rules.test.mjs still tests it.
