@@ -65,8 +65,10 @@
   }
 
   .tablet-frame {
-    height: 88vh;
-    width: auto;
+    /* Sized like the dashboard's .dev: the site menu floats above the frame, so the frame
+       takes what is left of the screen height. */
+    width: min(1320px, calc(100vw - 32px), calc((100vh - 130px) * 1.6));
+    height: auto;
     aspect-ratio: 16/10;
     max-width: min(1700px, 94vw);
     max-height: 96vh;
@@ -85,7 +87,7 @@
         0 0 0 1px #111;
     border: 1px solid #333;
     position: relative;
-    margin: 20px auto;
+    margin: 0 auto;
     transition: width 0.3s, height 0.3s, padding 0.3s;
   }
 
@@ -106,6 +108,7 @@
 
   @media (max-width: 640px) {
     body {
+        overflow-y: auto;
         padding: 0;
         align-items: flex-start;
         background-image: none;
@@ -295,10 +298,6 @@
   <img id="bg-image" src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Orbital View">
 </div>
 
-<main class="flex-grow flex items-center justify-center py-8">
-  <div class="tablet-frame">
-    <div class="screen-container" id="screen">
-
 <!-- BEGIN GENERATED NAV -->
 <!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
      build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
@@ -400,30 +399,11 @@ body.present .nav-shell.activity{display:none}
 })();
 </script>
 <!-- END GENERATED NAV -->
-      <header class="navbar-content flex items-center justify-between px-6 shadow-md relative z-30">
-        <div class="flex items-center overflow-hidden">
-          <div class="flex shrink-0 items-center bg-allgood-primary rounded-full px-3 py-1 shadow-sm">
-            <span class="text-xs font-bold text-white font-heading tracking-tight truncate select-none">The Rumor Mill</span>
-          </div>
-        </div>
-        <div class="flex items-center space-x-1 shrink-0 relative">
-          <div class="home-popover-wrap">
-            <button id="btn-home" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Home" onclick="toggleHomePopover(event)">
-              <i data-lucide="home" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
-            </button>
-            <div class="home-popover" id="home-popover">
-              <button onclick="window.location.href='/';">Return to dashboard</button>
-              <button onclick="handleRestartFromPopover()">Restart game</button>
-              <button onclick="window.location.href='/educational-games/';">Browse games</button>
-              <button onclick="window.location.href='/dashboard/';">My dashboard</button>
-            </div>
-          </div>
-          <button id="btn-games" class="text-gray-200 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10" title="Browse games" onclick="window.location.href='/educational-games/';">
-            <i data-lucide="gamepad-2" stroke-width="2.25" class="w-[22px] h-[22px]"></i>
-          </button>
-        </div>
-      </header>
+<main class="flex justify-center" style="padding:14px 16px 24px">
+  <div class="tablet-frame">
+    <div class="screen-container" id="screen">
 
+      
       <div class="trm-page">
 
 <!-- INTRO -->
@@ -1383,11 +1363,11 @@ function restartGame() { startGame(); }
 
 function toggleHomePopover(event) {
   event.stopPropagation();
-  document.getElementById('home-popover').classList.toggle('show');
+  document.getElementById('home-popover')?.classList.toggle('show');
 }
 
 function closeHomePopover() {
-  document.getElementById('home-popover').classList.remove('show');
+  document.getElementById('home-popover')?.classList.remove('show');
 }
 
 document.addEventListener('click', (e) => {
