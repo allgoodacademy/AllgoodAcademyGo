@@ -1,0 +1,24 @@
+/* THE TABLET CHASSIS: the dashboard and the four funnel games (Read the Signal, Before You
+   Send, The Rumor Mill, Money Moves), which show the site menu floating above a tablet
+   frame on the space photo. Founder, 2026-11-25: a slimmer menu and a bigger tablet.
+
+   --tablet-w is the frame's width, the same on every one of these pages, so they match.
+   Above 960px the menu is the slim pill and lines up with the frame's edges; the frame
+   gets the height it gives back. Below 960px the menu is the phone bar (nav/nav.js), so
+   the frame keeps the older, roomier allowance for it.
+
+   `html body` outranks the generated nav's own rules (nav/nav.js NAV_STYLE) whatever
+   order the two load in, and only on the pages that link this file. */
+:root { --tablet-w: min(1320px, calc(100vw - 32px), calc((100vh - 130px) * 1.6)); }
+
+@media (min-width: 961px) {
+  :root { --tablet-w: min(1320px, calc(100vw - 32px), calc((100vh - 84px) * 1.6)); }
+  html body .nav-shell { padding-top: 10px; }
+  html body .nav-shell.activity { padding-bottom: 0; }
+  html body .nav-shell .wrap { max-width: var(--tablet-w); padding: 0; }
+  html body .nav-shell .nav { padding: 5px 5px 5px 20px; gap: 10px; }
+  html body .nav-shell .wordmark { font-size: 19px; line-height: 1.6; }
+  html body .nav-shell .nav-right { gap: 2px; }
+  html body .nav-shell .nav-link { font-size: 12.5px; padding: 6px 12px; }
+  html body .nav-shell .nav-cta { font-size: 12.5px; padding: 7px 18px; }
+}
