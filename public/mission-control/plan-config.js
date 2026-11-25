@@ -38,7 +38,7 @@ export const GUIDES = [
       downloadUrl: null, teacherSheet: '/for-teachers/digital-decisions-teacher-sheet/' },
     { id: 'real-world-ready', kind: 'Lab Pack', title: 'Real World Ready', sub: '3 lessons + the Challenge',
       tpt: '$4.95', tptUrl: 'https://www.teacherspayteachers.com/Product/Real-World-Ready-Facilitation-Guide-SEL-Money-Conflict-Perspective-Grades-17667976',
-      downloadUrl: '', teacherSheet: '/for-teachers/real-world-ready-teacher-sheet/' },
+      downloadUrl: '/guides/real-world-ready.pdf', teacherSheet: '/for-teachers/real-world-ready-teacher-sheet/' },
     { id: 'room-to-think', kind: 'Lab Pack', title: 'Room to Think', sub: '4 lessons + the Challenge',
       tpt: null, tptUrl: null,
       downloadUrl: null, teacherSheet: '/for-teachers/room-to-think-teacher-sheet/' },
@@ -47,13 +47,13 @@ export const GUIDES = [
       downloadUrl: null },
     { id: 'snowball', kind: 'Simulation', title: 'The Snowball', sub: 'Compound interest and saving',
       tpt: '$2.99', tptUrl: 'https://www.teacherspayteachers.com/Product/Compound-Interest-Simulation-Lesson-Plan-Saving-Financial-Literacy-18500508',
-      downloadUrl: '' },
+      downloadUrl: '/guides/the-snowball.pdf' },
     { id: 'seasons', kind: 'Simulation', title: 'Reasons for the Seasons', sub: "Earth's tilt · MS-ESS1-1",
       tpt: '$2.99', tptUrl: 'https://www.teacherspayteachers.com/Product/Seasons-Simulation-Lesson-Plan-Earths-Tilt-Facilitator-Guide-MS-ESS1-1-18500462',
-      downloadUrl: '' },
+      downloadUrl: '/guides/reasons-for-the-seasons.pdf' },
     { id: 'wolves-and-deer', kind: 'Simulation', title: 'Wolves & Deer', sub: 'Predator and prey · MS-LS2-2',
       tpt: '$2.99', tptUrl: 'https://www.teacherspayteachers.com/Product/Predator-Prey-Simulation-Lesson-Plan-Wolves-Deer-MS-LS2-2-Guide-18500493',
-      downloadUrl: '' },
+      downloadUrl: '/guides/wolves-and-deer.pdf' },
 ];
 
 // Shown under the grid on the free plan only.
