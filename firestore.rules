@@ -195,8 +195,8 @@ service cloud.firestore {
     }
 
     // THE PRO PLAN (2026-11-25). A teacher's plan lives in teacher_plans/{uid}, a document
-    // only the admin allowlist can write (rule #13) — set from Insider today, by the payment
-    // system later. Never a field on the teacher's own profile: that document is
+    // only the admin allowlist can write (rule #13) — set from Insider by hand, and by the Stripe
+    // webhook (functions/) after a payment. Never a field on the teacher's own profile: that document is
     // self-writable, so a plan there would be a plan anyone could grant themselves.
     // Pro means plan == 'pro' AND proUntil is still in the future; an expired plan is simply
     // free again, with nothing deleted.
@@ -614,8 +614,8 @@ service cloud.firestore {
 
     // 13. NEW (2026-11-25) — TEACHER PLANS. teacher_plans/{uid}: { plan: 'free' | 'pro',
     //     proUntil: timestamp, grantedBy, note, updatedAt }. ONLY the admin allowlist writes it
-    //     (Insider's Plan control today; the payment system later, which will write with the
-    //     Admin SDK and bypass rules altogether). A teacher may read their own — that is how
+    //     (Insider's Plan control, the manual override; and the stripeWebhook Cloud Function,
+    //     which writes with the Admin SDK and bypasses rules altogether, keeping this shape). A teacher may read their own — that is how
     //     Mission Control knows which plan to show — and nobody else's.
     match /artifacts/{appId}/teacher_plans/{uid} {
       allow get: if isOwner(uid) || isAllowlistedAdmin();
@@ -644,6 +644,24 @@ service cloud.firestore {
         && existsAfter(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(request.resource.data.firstClassCode))
         && getAfter(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(request.resource.data.firstClassCode)).data.teacherUid == uid;
       allow delete: if isAllowlistedAdmin();
+    }
+
+    // 15. NEW (2026-11-25) — STRIPE. Written ONLY by the stripeWebhook Cloud Function, with
+    //     the Admin SDK (which bypasses these rules). No client reads or writes any of them:
+    //       stripe_events/{eventId}       every event already applied (idempotency; Stripe retries)
+    //       stripe_customers/{customerId} Stripe customer -> uid, for subscription renewals
+    //       stripe_unmatched/{eventId}    payments no account could be found for
+    //     The one exception: the admin allowlist may READ stripe_unmatched, which is Insider's
+    //     "Payments to match" list. Nobody writes it from a browser, the admin included.
+    match /artifacts/{appId}/stripe_events/{eventId} {
+      allow read, write: if false;
+    }
+    match /artifacts/{appId}/stripe_customers/{customerId} {
+      allow read, write: if false;
+    }
+    match /artifacts/{appId}/stripe_unmatched/{eventId} {
+      allow read: if isAllowlistedAdmin();
+      allow write: if false;
     }
 
     // The root-level `game_sessions` collection is GONE (2026-09-13). All four standalone

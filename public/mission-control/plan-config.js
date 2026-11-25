@@ -16,7 +16,8 @@ export const PRO_PRICE_LABEL = '$49/year';
 // The LIVE Stripe Payment Link (founder, 2026-11-25). "Get Pro" opens it in a new tab with
 // two query parameters added by the page, so a payment can be matched to the teacher in
 // Insider: prefilled_email (their sign-in email, when they have one) and
-// client_reference_id (their uid). Pro is then turned on by hand in Insider. Set this to ''
+// client_reference_id (their uid). The Stripe webhook (functions/) then turns Pro on
+// automatically; Insider's Plan control is the manual override. Set this to ''
 // and "Get Pro" becomes "Email us to get Pro" with the mailto below. Never build card fields
 // into this page.
 export const PRO_CHECKOUT_URL = 'https://buy.stripe.com/6oUaEZafNdV1alkfZN2go00';
