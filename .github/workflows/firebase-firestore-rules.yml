@@ -70,10 +70,10 @@ jobs:
         run: npm ci
       - name: Write service account credentials
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}' > "${{ runner.temp }}/firebase-service-account.json"
-      - name: Deploy Firestore rules
-        run: node_modules/.bin/firebase deploy --only firestore:rules --project allgood-academy
+      - name: Deploy Firestore and Storage rules
+        run: node_modules/.bin/firebase deploy --only firestore:rules,storage --project allgood-academy --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
 
-  # storage.rules is no longer deployed (2026-11-25): Mission Control's guides are plain
-  # files in public/guides/, so Storage isn't used. The rules file stays in the repo, unused.
+  # storage.rules deploys with the Firestore rules (since 2026-11-25, second pass): the paid
+  # facilitator guides live in Storage at facilitator-guides/, readable only by Pro teachers.

@@ -22,7 +22,7 @@ the student panel; no "at risk", no class average.
 | **Overview** | four stat tiles (students, active this week, finished at least one, time on task this week), **Assigned work** (each row opens its drill-down), **Could use a check-in** with a plain reason. A class with no students shows the three setup steps instead. |
 | **Students** | one table: search, Everyone / Could use a check-in / All done, a checkbox per row. Ticking shows **Assign to these N**, which opens Assign scoped to them. CSV and the choice-level CSV (Pro). |
 | **Assign** | the full catalog from the registry: each Lab Pack, then Games, then Simulations. Tap to toggle; a sticky **Save assignments (N changes)** bar. Scoped to students, class-wide items show greyed as "Whole class". |
-| **Teacher guides** | every guide in `plan-config.js`: free guides on TPT for everyone; paid guides are a plain "Download facilitator guide" link on Pro (`downloadUrl`; empty = "coming soon"), or "Included with Pro / or $X on TPT" on Free. |
+| **Teacher guides** | every guide in `plan-config.js`: free guides → "Get it free on TPT" for everyone; paid guides → "Download facilitator guide" on Pro (a Storage download link), or "Included with Pro · Get Pro · or $X on TPT" on Free, with a Pro banner above and the TPT bundle below. |
 
 The header carries the class switcher, the class code with **Copy**, **Print poster** (the QR
 poster below) and **Show on screen** (a full-screen view of only the code and the join
@@ -70,10 +70,12 @@ records hold (rule #6); only simulation predictions need events.
   `prefilled_email` (the teacher's sign-in email, if any) and `client_reference_id` (their
   uid), which the Stripe webhook uses to find the teacher. Set it to '' and Get Pro becomes
   "Email us to get Pro" (a mailto).
-- Paid guides are plain links (`downloadUrl` in `plan-config.js`, e.g. Google Drive shares),
-  shown only to Pro teachers. Anyone who has a link can open the PDF. Nothing paid is under
-  `public/`. `storage.rules` and its deploy job are still in the repo but unused since
-  2026-11-25 (the project has no Storage bucket).
+- Paid guides live in Firebase Storage at `facilitator-guides/` (`storagePath` in
+  `plan-config.js`), uploaded in the Firebase console. `storage.rules` lets only an active Pro
+  teacher read them; Mission Control asks for a download link on click. The PDFs are not in
+  `public/` and not in this repo (the repo is public). `storage.rules` deploys with the
+  Firestore rules on every push to main.
+- On the free plan the plan chip reads "FREE · Upgrade $49/yr" and opens the Pro panel.
 
 ### Pro turns on automatically (the Stripe webhook)
 

@@ -30,34 +30,36 @@ export const PRO_AUTO_ON = true;  // webhook live 2026-11-25
  *   kind         'Lab Pack' | 'Simulation' — the small label above the title
  *   tpt          'FREE', a price like '$4.95', or null when the guide is not on TPT yet
  *   tptUrl       its Teachers Pay Teachers listing (opens in a new tab)
- *   file         the PDF in public/guides/. Every tile's one button downloads it (Pro, or a free
- *                guide). A paid guide on the free plan sends the button to tptUrl instead. No
- *                file and no tptUrl = the tile isn't shown. Anyone with a file's link can open it;
- *                the page only decides who is shown the button.
+ *   storagePath  for a PAID guide: the PDF in Firebase Storage. storage.rules lets only an
+ *                active Pro teacher read it; Mission Control asks Storage for a download link
+ *                when a Pro teacher clicks Download. On the free plan the tile shows
+ *                "Included with Pro" and the TPT price instead. The PDFs are NOT in public/
+ *                or anywhere in this (public) repo: upload them in the Firebase console
+ *                (Storage → facilitator-guides/). No storagePath and no tptUrl = not shown.
  *   teacherSheet not shown in Mission Control (kept for reference)
  */
 export const GUIDES = [
     { id: 'digital-decisions', kind: 'Lab Pack', title: 'Digital Decisions', sub: '4 lessons + the Challenge',
       tpt: 'FREE', tptUrl: 'https://www.teacherspayteachers.com/Product/Digital-Decisions-Lab-Pack-Free-Interactive-Digital-Citizenship-Unit-6-12-14345001',
-      file: null, teacherSheet: '/for-teachers/digital-decisions-teacher-sheet/' },
+      storagePath: null, teacherSheet: '/for-teachers/digital-decisions-teacher-sheet/' },
     { id: 'real-world-ready', kind: 'Lab Pack', title: 'Real World Ready', sub: '3 lessons + the Challenge',
       tpt: '$4.95', tptUrl: 'https://www.teacherspayteachers.com/Product/Real-World-Ready-Facilitation-Guide-SEL-Money-Conflict-Perspective-Grades-17667976',
-      file: '/guides/real-world-ready.pdf', teacherSheet: '/for-teachers/real-world-ready-teacher-sheet/' },
+      storagePath: 'facilitator-guides/real-world-ready.pdf', teacherSheet: '/for-teachers/real-world-ready-teacher-sheet/' },
     { id: 'room-to-think', kind: 'Lab Pack', title: 'Room to Think', sub: '4 lessons + the Challenge',
       tpt: null, tptUrl: null,
-      file: null, teacherSheet: '/for-teachers/room-to-think-teacher-sheet/' },
+      storagePath: null, teacherSheet: '/for-teachers/room-to-think-teacher-sheet/' },
     { id: 'water-cycle', kind: 'Simulation', title: 'Where Rain Comes From', sub: 'Water cycle and rain shadow',
       tpt: 'FREE', tptUrl: 'https://www.teacherspayteachers.com/Product/Water-Cycle-Rain-Shadow-Simulation-Free-Facilitator-Guide-Lesson-Plan-18500441',
-      file: null },
+      storagePath: null },
     { id: 'snowball', kind: 'Simulation', title: 'The Snowball', sub: 'Compound interest and saving',
       tpt: '$2.99', tptUrl: 'https://www.teacherspayteachers.com/Product/Compound-Interest-Simulation-Lesson-Plan-Saving-Financial-Literacy-18500508',
-      file: '/guides/the-snowball.pdf' },
+      storagePath: 'facilitator-guides/the-snowball.pdf' },
     { id: 'seasons', kind: 'Simulation', title: 'Reasons for the Seasons', sub: "Earth's tilt · MS-ESS1-1",
       tpt: '$2.99', tptUrl: 'https://www.teacherspayteachers.com/Product/Seasons-Simulation-Lesson-Plan-Earths-Tilt-Facilitator-Guide-MS-ESS1-1-18500462',
-      file: '/guides/reasons-for-the-seasons.pdf' },
+      storagePath: 'facilitator-guides/reasons-for-the-seasons.pdf' },
     { id: 'wolves-and-deer', kind: 'Simulation', title: 'Wolves & Deer', sub: 'Predator and prey · MS-LS2-2',
       tpt: '$2.99', tptUrl: 'https://www.teacherspayteachers.com/Product/Predator-Prey-Simulation-Lesson-Plan-Wolves-Deer-MS-LS2-2-Guide-18500493',
-      file: '/guides/wolves-and-deer.pdf' },
+      storagePath: 'facilitator-guides/wolves-and-deer.pdf' },
 ];
 
 // Shown under the grid on the free plan only.
