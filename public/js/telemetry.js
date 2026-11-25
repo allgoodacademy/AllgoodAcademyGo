@@ -289,7 +289,9 @@ async function handleUser(user) {
     try {
         const c = core();
         const acct = c && c.getAccount ? await c.getAccount(user.uid) : null;
-        state.account = acct ? { role: acct.role, isGuest: !!user.isAnonymous } : { isGuest: !!user.isAnonymous };
+        // A student who saved their progress signs in with a save code or Google but is
+        // still a guest (profile isGuest: true) — recorded, and kept away from GA, as before.
+        state.account = acct ? { role: acct.role, isGuest: !!user.isAnonymous || acct.isGuest } : { isGuest: !!user.isAnonymous };
     } catch (e) {
         state.account = { isGuest: !!user.isAnonymous };
     }
@@ -439,6 +441,13 @@ function complete(meta) {
     }
     enqueue('module_complete', { ...m, activeMs: Math.round(state.activeMs) });
     flushSession(true);
+    // The one-time "Save your progress?" offer after a student's first finished lesson
+    // (save-offer.js decides; it never shows for games, simulations or saved students).
+    // Never for Pattern Lab, which is outside the student product. Loaded only here, after
+    // completion, so it can never stand in front of content.
+    if (state.stream !== 'pattern-lab') {
+        import('/js/save-offer.js').then((o) => o.maybeOffer({ module: state.module, gameName: state.gameName })).catch(() => {});
+    }
 }
 
 window.Telemetry = {

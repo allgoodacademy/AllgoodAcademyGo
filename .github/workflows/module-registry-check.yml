@@ -16,6 +16,10 @@
 # nav/nav.js. Six public pages carry that bar; when each one was hand-written, a "Games"
 # link added to the homepage reached none of the other five and nobody noticed for days.
 # Edit nav/nav.js and run `npm run build:nav` — never hand-edit the region in a page.
+#
+# And the founder check: the founder's job line lives in nav/founder.js and is generated into
+# the homepage strip and the About page (`npm run build:founder`), so switching its wording
+# is one change in one file.
 name: Module registry check
 
 on:
@@ -34,3 +38,4 @@ jobs:
       - run: node scripts/check-challenge-copy.js
       - run: node scripts/check-tokens.js
       - run: node scripts/build-nav.js --check
+      - run: node scripts/build-founder.js --check

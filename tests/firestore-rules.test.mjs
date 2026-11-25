@@ -653,6 +653,34 @@ await it('...but CANNOT write into the old account it restored from', async () =
   await assertFails(setDoc(PROGRESS(freshDevice, 'student_1', 'social-intelligence'), { highestUnlocked: 1 }));
 });
 
+// STUDENT SAVE (2026-11-24) — a student who saves with a save code links an email/password
+// credential at save.allgoodacademy.com onto their anonymous uid (public/js/student-save.js).
+// That puts 'email' in the token's identities, so the rules must still treat them as a
+// student: same uid, same progress, same class, and no way to become a teacher.
+console.log('\nSTUDENT SAVE — a save code keeps the same student and is never a teacher sign-in');
+const SAVE_EMAIL = 's0123456789abcdef0123456789abcdef01234567@save.allgoodacademy.com';
+const saved = env.authenticatedContext('member_1', { email: SAVE_EMAIL, firebase: { sign_in_provider: 'password', identities: { email: [SAVE_EMAIL] } } }).firestore();
+await it('a save-code session (same uid) CAN still write its own profile name and progress', async () => {
+  await assertSucceeds(setDoc(U(saved, 'member_1'), { displayName: 'Maya' }, { merge: true }));
+  await assertSucceeds(setDoc(PROGRESS(saved, 'member_1', 'privacy-security'), { highestUnlocked: 3 }, { merge: true }));
+});
+await it('...and keeps its class membership: its teacher can still read its profile', async () => {
+  await assertSucceeds(getDoc(U(teacher, 'member_1')));
+});
+await it('a save-code session CANNOT create a classroom', async () => {
+  await assertFails(setDoc(CLASS(saved, 'SAVE01'), { teacherUid: 'member_1', teacherName: 'Maya', createdAt: 2 }));
+});
+await it('a save-code session CANNOT become teacher even of a classroom it owns', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(CLASS(ctx.firestore(), 'SAVE02'), { teacherUid: 'member_1', teacherName: 'Maya', createdAt: 2 });
+  });
+  await assertFails(setDoc(U(saved, 'member_1'), { role: 'teacher', classroomCode: 'SAVE02' }, { merge: true }));
+});
+await it('a look-alike domain is NOT excluded (only save.allgoodacademy.com is)', async () => {
+  const other = env.authenticatedContext('pw_2', { email: 'x@notsave.allgoodacademy.com.evil.org', firebase: { sign_in_provider: 'password', identities: { email: ['x@notsave.allgoodacademy.com.evil.org'] } } }).firestore();
+  await assertSucceeds(setDoc(CLASS(other, 'PASS02'), { teacherUid: 'pw_2', teacherName: 'Pw', createdAt: 2 }));
+});
+
 // DISPLAY NAME LENGTH (Ticket 2) — displayName on the profile doc is otherwise
 // unconstrained free text a student could put in front of their teacher in Mission
 // Control. 60 chars is well over the longest real value (a recruit-code-derived name).

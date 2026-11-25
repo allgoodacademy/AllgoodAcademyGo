@@ -6,8 +6,12 @@
 //   - STUDENTS NEVER SIGN IN. Every visitor gets a silent anonymous Firebase session the
 //     moment a page loads (startSession), and everything just plays. Progress lives in that
 //     session on that device. No name, email, age or code is asked before content.
-//   - A student joins a teacher's class with a class code + a nickname (/join/, see
-//     /js/classroom-join.js). That is the only thing a student is ever asked.
+//   - A student joins a teacher's class with a class code + a nickname (/join/ or the
+//     dashboard, see /js/classroom-join.js).
+//   - OPTIONAL SAVE (2026-11-24): from the dashboard, and only if they ask, a student can
+//     keep their progress across devices with a save code or (13+) Google. That LINKS a
+//     sign-in onto this same anonymous user — same uid, same progress — and lives in
+//     /js/student-save.js, not here. Nothing is ever asked before content.
 //   - TEACHERS ARE THE ONLY PEOPLE WHO SIGN IN — with Google (teacherGoogleSignIn) or, for a
 //     teacher without Google, an email and password (teacherEmailSignIn) — from one place:
 //     "Teacher sign in" -> /mission-control/. A teacher accepts the consent notice once
@@ -77,6 +81,13 @@ function markEngaged() { if (resolveEngaged) { resolveEngaged(); resolveEngaged 
 
 const ADJECTIVES = ['Swift', 'Brave', 'Clever', 'Quiet', 'Bold', 'Curious', 'Bright', 'Calm', 'Sharp', 'Steady'];
 const ANIMALS = ['Falcon', 'Otter', 'Panther', 'Fox', 'Owl', 'Wolf', 'Hawk', 'Lynx', 'Heron', 'Badger'];
+
+// True for a name startSession() made up ("Swift Falcon 42"), i.e. the student has not
+// told us what to call them yet. The dashboard asks once, for joining a class or saving.
+function isGeneratedNickname(name) {
+    const m = /^(\w+) (\w+) (\d{2})$/.exec(String(name || ''));
+    return !!m && ADJECTIVES.includes(m[1]) && ANIMALS.includes(m[2]);
+}
 
 function randomNickname() {
     const a = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
@@ -273,6 +284,10 @@ async function getAccount(uid) {
         role: data.role || 'student',
         displayName: data.displayName || null,
         classroomCode: data.classroomCode || null,
+        // A student who saved their progress (student-save.js) is no longer an anonymous
+        // Firebase user but is still a guest: their profile keeps isGuest: true, so
+        // telemetry and analytics treat them exactly as before they saved.
+        isGuest: data.isGuest === true,
     };
 }
 
@@ -587,7 +602,7 @@ async function loadModuleProgress(moduleSlug) {
 
 window.AuthCore = {
     auth, db, appId,
-    startSession, anonymousSessionOnly, waitForAuthReady, markEngaged, writeStudentProfile,
+    startSession, anonymousSessionOnly, waitForAuthReady, markEngaged, writeStudentProfile, isGeneratedNickname,
     whenEngaged: () => engaged,
     teacherGoogleSignIn, teacherEmailSignIn, teacherPasswordReset, getAccount,
     markSignedIn, markAccount, clearSignedIn,
