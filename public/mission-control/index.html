@@ -761,7 +761,6 @@ const state = {
     draft: null,             // { modules:Set, games:Set, sims:Set } while editing
     draftBase: null,         // what the draft started from, to count changes
     panelUid: null,
-    guideUrls: {},           // guide id -> { url } | 'missing' | 'error'; absent = loading (Pro only)
 };
 
 /* ── screens ──────────────────────────────────────────────────────────────── */
@@ -1086,7 +1085,6 @@ async function load() {
     paintHeader();
     showOnly('app');
     renderAll();
-    if (state.guideUrls.__for !== state.plan.pro) loadGuideUrls();
 }
 
 /* The free plan shows the first FREE_STUDENT_LIMIT students by join time. Nobody is ever
@@ -2039,91 +2037,23 @@ async function writeExtras(uid, { modules, games, sims }) {
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
-   TEACHER GUIDES (plan-config.js). Free guides free for everyone; paid guides download
-   from Firebase Storage on Pro (storage.rules), or one at a time on TPT.
+   TEACHER GUIDES (plan-config.js). Free guides free for everyone; paid guides are a plain
+   download link on Pro (downloadUrl), or one at a time on TPT on the free plan.
    ═════════════════════════════════════════════════════════════════════════════ */
-/* Each paid guide resolves to exactly one of three states, within GUIDE_TIMEOUT_MS:
-     { url }           the file is there and this teacher may read it → "Download facilitator guide"
-     'missing'         storage/object-not-found → "Facilitator guide coming soon"
-     'error'           anything else (permission denied, no network, timeout, a missing bucket
-                       that does not report as not-found) → "Couldn't load this guide" + retry,
-                       with the real error in the console.
-   No entry yet = still loading: the card shows a blank, button-sized space, never a word.
-   There is no listAll() first: it needs a separate list grant, and when it failed nothing ever
-   set a state, so every card read "Checking…" forever (2026-11-25, production). */
-const GUIDE_TIMEOUT_MS = 3000;
-let storageMod = null;
-async function storageApi() {
-    if (!storageMod) {
-        const m = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js');
-        const storage = m.getStorage(auth.app);
-        // The SDK's default is to retry for up to two minutes; the teacher waits three seconds.
-        storage.maxOperationRetryTime = GUIDE_TIMEOUT_MS;
-        storageMod = { storage, ref: m.ref, getDownloadURL: m.getDownloadURL };
-    }
-    return storageMod;
-}
-function withTimeout(promise, ms) {
-    let timer;
-    return Promise.race([
-        promise,
-        new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error(`timed out after ${ms} ms`), { code: 'timeout' })), ms); }),
-    ]).finally(() => clearTimeout(timer));
-}
-async function resolveGuide(g) {
-    try {
-        const { storage, ref, getDownloadURL } = await withTimeout(storageApi(), GUIDE_TIMEOUT_MS);
-        const url = await withTimeout(getDownloadURL(ref(storage, g.storagePath)), GUIDE_TIMEOUT_MS);
-        return { url };
-    } catch (e) {
-        if (e && e.code === 'storage/object-not-found') {
-            console.info(`[Mission Control] guide not uploaded yet: ${g.storagePath}`);
-            return 'missing';
-        }
-        console.error(`[Mission Control] couldn't load guide ${g.storagePath}:`, (e && e.code) || '', e);
-        return 'error';
-    }
-}
-async function loadGuideUrls(only = null) {
-    if (!only) state.guideUrls = { __for: state.plan.pro };
-    if (!state.plan.pro) return;
-    const want = GUIDES.filter((g) => g.storagePath && g.tpt !== 'FREE' && (!only || g.id === only));
-    for (const g of want) delete state.guideUrls[g.id];
-    if (state.tab === 'guides') renderGuides();
-    const forPlan = state.guideUrls;
-    await Promise.all(want.map(async (g) => {
-        const result = await resolveGuide(g);
-        if (state.guideUrls !== forPlan) return;   // the plan changed while this was in flight
-        state.guideUrls[g.id] = result;
-        if (state.tab === 'guides') renderGuides();
-    }));
-}
-$('pane-guides').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-guide-retry]');
-    if (t) { e.preventDefault(); loadGuideUrls(t.dataset.guideRetry); }
-});
 const tptLink = (url, label, cls = 'link') => `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
-function proGuideAction(g) {
-    const r = state.guideUrls[g.id];
-    if (r === undefined) {
-        // Loading: an invisible button holds the row's height, so nothing jumps when it resolves.
-        return `<span class="btn sm" aria-hidden="true" style="visibility:hidden">Download facilitator guide</span><span class="sr">Loading the guide</span>`;
-    }
-    if (r === 'missing') return '<span class="soon">Facilitator guide coming soon</span>';
-    if (r === 'error') return `<span class="soon">Couldn't load this guide.</span> <button class="text-btn" type="button" data-guide-retry="${esc(g.id)}">Try again</button>`;
-    return `<a class="btn sm" href="${esc(r.url)}" target="_blank" rel="noopener">Download facilitator guide</a>`;
-}
 function renderGuides() {
     const pro = state.plan.pro;
     const cards = GUIDES.map((g) => {
         const sheet = g.teacherSheet ? `<a class="text-btn" href="${esc(g.teacherSheet)}">Teacher sheet (free)</a>` : '';
         let row;
         if (g.tpt === 'FREE') row = tptLink(g.tptUrl, 'Free guide on TPT', 'btn sm');
-        else if (!g.tpt || !g.storagePath) row = '<span class="soon">Facilitator guide coming soon</span>';
+        else if (!g.tpt) row = '<span class="soon">Facilitator guide coming soon</span>';
         // Pro already has every paid guide, so no TPT link here.
-        else if (pro) row = proGuideAction(g);
+        else if (pro) row = g.downloadUrl
+            ? `<a class="btn sm" href="${esc(g.downloadUrl)}" target="_blank" rel="noopener">Download facilitator guide</a>`
+            : '<span class="soon">Facilitator guide coming soon</span>';
         else row = `<button class="btn sm" type="button" data-pro="guide">Included with Pro</button> ${tptLink(g.tptUrl, `or ${g.tpt} on TPT`, 'text-btn')}`;
-        return `<div class="gc"><div class="eyebrow">${esc(g.kind)}</div><h3>${esc(g.title)}</h3><div class="meta">${esc(g.sub)}</div>${sheet}<div class="row" aria-live="polite">${row}</div></div>`;
+        return `<div class="gc"><div class="eyebrow">${esc(g.kind)}</div><h3>${esc(g.title)}</h3><div class="meta">${esc(g.sub)}</div>${sheet}<div class="row">${row}</div></div>`;
     }).join('');
     $('pane-guides').innerHTML = `<p class="sub" style="font-size:13px;color:var(--soft)">Free guides are free for everyone. ${pro ? 'Every paid guide is included with your Pro plan.' : 'Paid guides are included with Pro, or you can buy them one at a time on Teachers Pay Teachers.'}</p>
       <div class="gl">${cards}</div>
