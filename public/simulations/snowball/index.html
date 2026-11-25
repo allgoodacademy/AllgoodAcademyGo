@@ -11,7 +11,7 @@
 <style>
 /* VOICE  quiet winter evening, a story you step into, not a worksheet
    IDEA   your life is a ski hill; money you pack is a snowball that rolls from your start age to 60
-   PICTURE one big dusk scene: hill, age flags, a growing snowball with a teal core (what you packed)
+   PICTURE one big dusk scene: hill, age flags, a growing snowball; its dark middle is money put in
    COLOUR dusk teal sky, cream snow, Allgood orange for flags and the one thing to look at
    LAYOUT  full-width scene first, one short story card under it, one action at a time */
 :root{
@@ -48,8 +48,6 @@ a{color:var(--accent-text)}
 .wrap{max-width:1180px;margin:0 auto;padding:0 16px}
 </style>
 <style>
-/* Header: same pattern as the Digital Decisions Lab Pack header */
-.time{font-size:12px;color:var(--color-teal-wash);white-space:nowrap}
 .choice{display:flex;gap:10px;align-items:flex-start}
 .choice .ltr{flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;border:1.5px solid var(--accent);color:var(--accent-text);font-weight:700;font-size:13px;line-height:1}
 .choice[aria-pressed="true"] .ltr{background:var(--accent);color:var(--color-surface)}
@@ -77,15 +75,19 @@ body.present .ctl label,body.present .ctl legend{font-size:16px}
 body.present .stage-bar p,body.present .desc{font-size:15px}
 body.present .q{font-size:21px}
 
-.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:50;background:var(--card);color:var(--ink);border:1px solid var(--panel-b);border-radius:12px;padding:10px 14px;font-size:14px;box-shadow:0 6px 18px color-mix(in srgb, var(--color-ink) 22%, transparent);max-width:calc(100vw - 24px)}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:50;background:var(--night2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px;max-width:calc(100vw - 24px)}
 .linkbtn{font-weight:700;color:var(--accent-text);white-space:nowrap}
 
 </style>
 <style>
 /* ===== Scene ===== */
-.scene-wrap{background:linear-gradient(var(--color-dark), var(--color-teal-deep));padding:18px 0 0}
-.scene{position:relative;border-radius:18px 18px 0 0;overflow:hidden;box-shadow:0 10px 30px color-mix(in srgb, var(--color-dark) 45%, transparent)}
-.scene canvas{display:block;width:100%;aspect-ratio:16/8.2;touch-action:pan-y}
+/* v1.2 layout: the scene and the story are always on screen together.
+   Wide or landscape screens: the scene fills the window and the story floats on it as a panel that scrolls by itself.
+   Narrow portrait screens (phones): the scene is pinned under the header and the story scrolls beneath it. */
+.app{position:relative;background:var(--color-dark)}
+.scene{position:relative;overflow:hidden}
+.scene canvas{display:block;width:100%;height:100%;touch-action:pan-y}
+
 .chip{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:10px;background:color-mix(in srgb, var(--color-dark) 55%, transparent);color:var(--color-warm-white);border-radius:999px;padding:6px 14px 6px 12px;font-size:13px;font-weight:700;backdrop-filter:blur(4px)}
 .flakes{display:flex;gap:4px}
 .flakes i{width:9px;height:9px;border-radius:50%;background:color-mix(in srgb, var(--color-warm-white) 28%, transparent)}
@@ -102,30 +104,28 @@ body.present .q{font-size:21px}
 .k-core{background:var(--color-teal)} .k-snow{background:var(--color-warm-white)}
 
 /* ===== Story card ===== */
-.story-wrap{background:linear-gradient(var(--color-teal-deep) 0 1px, var(--bg) 1px)}
-.story{background:var(--panel);border:1px solid var(--panel-b);border-top:0;border-radius:0 0 18px 18px;padding:22px 24px 24px;margin-bottom:30px}
-.story-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:22px 30px;align-items:start}
+.story-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
 .story-grid.one{grid-template-columns:minmax(0,1fr)}
 .kicker{font-size:12.5px;font-weight:700;color:var(--accent-text);margin:0 0 4px;letter-spacing:.3px}
-.story h2{font-size:clamp(26px,3vw,34px);margin:0 0 10px;outline:none;text-wrap:balance}
+.story h2{font-size:clamp(24px,2.4vw,30px);margin:0 0 10px;outline:none;text-wrap:balance}
 .story p{margin:0 0 10px}
-.narr{font-size:17px}
+.narr{font-size:16px}
 .guide-line{display:flex;gap:10px;align-items:flex-start;margin-top:6px}
 .guide-line img{width:44px;height:44px;border-radius:50%;flex:none;background:var(--card);border:1px solid var(--panel-b)}
 .guide-line .say{background:var(--card);border:1px solid var(--panel-b);border-radius:4px 14px 14px 14px;padding:10px 13px;flex:1}
 .guide-line .say p:last-child{margin-bottom:0}
 .who{display:block;font-size:11px;font-weight:700;color:var(--accent-text);letter-spacing:.5px;margin-bottom:2px}
-.q{font-family:var(--font-display);font-weight:700;font-size:21px;line-height:1.25;margin:0 0 12px;text-wrap:balance}
-.choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 14px}
-.choice{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:12px 14px;cursor:pointer;min-height:56px;line-height:1.35}
+.q{font-family:var(--font-display);font-weight:700;font-size:19px;line-height:1.25;margin:0 0 12px;text-wrap:balance}
+.choices{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0 0 14px}
+.choice{display:flex;gap:10px;align-items:center;text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:9px 12px;cursor:pointer;min-height:52px;line-height:1.3}
 .choice:hover:not(:disabled){border-color:var(--accent)}
-.choice[aria-pressed="true"]{border:2px solid var(--accent);padding:11.5px 13.5px;background:var(--sel)}
+.choice[aria-pressed="true"]{border:2px solid var(--accent);padding:8.5px 11.5px;background:var(--sel)}
 .choice:disabled{cursor:default}
 .choice:disabled:not([aria-pressed="true"]){opacity:.55}
 .choice .ltr{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent-text);font-weight:700;font-size:13px}
 .choice[aria-pressed="true"] .ltr{background:var(--accent);color:var(--color-surface)}
-.choice .big{display:block;font-family:var(--font-display);font-weight:700;font-size:18px}
-.choice .sm{display:block;font-size:14px;color:var(--ink2)}
+.choice .big{display:block;font-family:var(--font-display);font-weight:700;font-size:17px}
+.choice .sm{display:block;font-size:13.5px;color:var(--ink2)}
 .choice .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:4px;background:var(--accent);color:var(--color-surface)}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .btn{border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:9px 16px;cursor:pointer;font-weight:700;min-height:44px}
@@ -150,7 +150,7 @@ body.present .q{font-size:21px}
 .tests{list-style:none;padding:0;margin:8px 0 0;font-size:14px;display:flex;flex-wrap:wrap;gap:6px}
 .tests li{background:var(--card);border:1px solid var(--panel-b);border-radius:999px;padding:4px 12px}
 .hints{margin:6px 0 10px;padding-left:22px}
-.takeaways{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 14px}
+.takeaways{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));font-size:14px;gap:10px;margin:0 0 14px}
 .takeaways div{background:var(--card);border:1px solid var(--panel-b);border-radius:14px;padding:12px 14px}
 .takeaways b{display:block;font-family:var(--font-display);font-size:17px;margin-bottom:2px}
 .yours{list-style:none;padding:0;margin:6px 0 14px;font-size:14px}
@@ -169,9 +169,25 @@ footer p{margin:0 0 8px} footer ul{margin:6px 0 10px;padding-left:20px}
 footer summary{cursor:pointer;font-weight:700;color:var(--ink)}
 .ver{font-size:12px;color:var(--ink2)}
 
+@media (min-width:900px), (orientation:landscape) and (min-width:640px){
+  .app{height:calc(100svh - 60px);min-height:440px}
+  .scene{position:absolute;inset:0}
+  .story{position:absolute;top:14px;right:14px;bottom:14px;width:clamp(320px,36vw,470px);overflow-y:auto;overscroll-behavior:contain;
+    border-radius:18px;border:1px solid var(--panel-b);background:color-mix(in srgb, var(--panel) 95%, transparent);
+    backdrop-filter:blur(6px);box-shadow:0 12px 34px color-mix(in srgb, var(--color-dark) 45%, transparent);padding:20px 20px 22px;scroll-padding-top:12px}
+  .readout{left:14px;right:auto;top:54px;text-align:left}
+  .readout .ro-row{justify-content:flex-start}
+  .keyline{left:14px;right:auto;bottom:42px}
+}
+@media (max-width:899.98px) and (orientation:portrait), (max-width:639.98px){
+  .scene{position:sticky;top:60px;z-index:20;height:clamp(240px,44svh,420px);box-shadow:0 6px 16px color-mix(in srgb, var(--color-dark) 35%, transparent)}
+  .story{background:var(--panel);padding:18px 16px 24px;border-bottom:1px solid var(--panel-b);scroll-margin-top:calc(clamp(240px,44svh,420px) + 70px)}
+  .story [id]{scroll-margin-top:calc(clamp(240px,44svh,420px) + 72px)}
+  .keyline{display:none}
+}
 /* Present mode */
 body.present .wrap{max-width:none;padding:0 20px}
-body.present .scene canvas{aspect-ratio:16/7.4}
+body.present .story{width:clamp(380px,38vw,600px)}
 body.present .story h2{font-size:40px}
 body.present .narr,body.present .story p{font-size:21px}
 body.present .q{font-size:28px}
@@ -182,16 +198,9 @@ body.present .readout .ro-v{font-size:40px}
 body.present .readout .ro-k,body.present .readout .ro-s,body.present .chip{font-size:16px}
 body.present .btn.cta{font-size:23px;padding:13px 28px}
 
-@media (max-width:860px){
-  .story-grid{grid-template-columns:minmax(0,1fr)}
-  .scene canvas{aspect-ratio:4/3.4}
-  .readout{min-width:0;padding:7px 11px}.readout .ro-v{font-size:22px}.readout .ro-row{gap:10px}
-  .keyline{display:none}
-}
+@media (max-width:1100px){ .readout{min-width:0;padding:7px 11px}.readout .ro-v{font-size:22px}.readout .ro-row{gap:10px} }
 @media (max-width:600px){
   .choices,.takeaways{grid-template-columns:minmax(0,1fr)}
-  .story{padding:18px 16px 20px}
-  .scene-wrap{padding-top:10px}
   .chip .ctext{display:none}
   .readout .ro-v{font-size:19px}.readout .ro-k,.readout .ro-s{font-size:11px}
   .pretend{font-size:11px}
@@ -361,21 +370,15 @@ body.present .nav-shell.activity{display:none}
 
 <main>
   <h1 class="sr-only">The Snowball: a savings simulation</h1>
-  <div class="scene-wrap">
-    <div class="wrap">
+  <div class="app" id="app">
       <div class="scene" id="scene">
         <canvas id="cv" role="img" aria-describedby="desc"></canvas>
         <div class="chip" aria-hidden="true"><span class="flakes" id="flakes"></span><span class="ctext" id="chipText">The Snowball</span></div>
         <div class="readout" id="readout" aria-hidden="true"></div>
-        <div class="pretend">Pretend growth rate · not financial advice</div>
-        <div class="keyline" id="keyline" aria-hidden="true"><span><i class="k-core"></i>Core: money you packed</span><span><i class="k-snow"></i>Snow: growth</span></div>
+        <div class="pretend">Example growth rate · not financial advice</div>
+        <div class="keyline" id="keyline" aria-hidden="true"><span><i class="k-core"></i>Middle: money put in</span><span><i class="k-snow"></i>Snow around it: growth</span></div>
       </div>
-    </div>
-  </div>
-  <div class="story-wrap">
-    <div class="wrap">
       <section class="story" id="story" aria-label="Story"></section>
-    </div>
   </div>
   <p class="sr-only" id="desc" aria-live="off"></p>
 </main>
@@ -393,7 +396,7 @@ body.present .nav-shell.activity{display:none}
         <li>Background reading: <a href="https://www.investor.gov/additional-resources/specialized-resources/youth/teachers-classroom-resources/what-compound-interest" rel="noopener">Investor.gov: What is compound interest?</a> (U.S. SEC) and <a href="https://www.consumerfinance.gov/consumer-tools/educator-tools/youth-financial-education/" rel="noopener">CFPB youth financial education</a>.</li>
       </ul>
     </details>
-    <p>How to read the snowball: its size shows the money in it. The teal core is money put in; the white snow is growth. Every number uses a pretend, steady growth rate so the pattern is easy to see. People, cards, and amounts are made up. This is a math lesson, not investment advice.</p>
+    <p>How to read the snowball: its size shows the money in it. The dark middle is money put in; the white snow around it is growth. Every number uses a steady example growth rate (6%) so the pattern is easy to see. People, cards, and amounts are made up. This is a math lesson, not investment advice.</p>
   </div>
 </footer>
 
@@ -403,7 +406,7 @@ body.present .nav-shell.activity{display:none}
 const $=(s,r)=>(r||document).querySelector(s);
 const $$=(s,r)=>Array.prototype.slice.call((r||document).querySelectorAll(s));
 const REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-const VERSION = "1.1";
+const VERSION = "1.3";
 
 /* Jodi, from the repo at assets/jodi/. PRODUCTION: use the paths, not embedded copies. */
 const JODI = { neutral:"/assets/jodi/jodi-neutral.svg", happy:"/assets/jodi/jodi-happy.svg", thinking:"/assets/jodi/jodi-thinking.svg", concerned:"/assets/jodi/jodi-concerned.svg" };
@@ -483,7 +486,7 @@ N.debt6=finalOf(debtPts).bal; N.debt3=debtPts[3].bal;
 
 /* ================= Scene ================= */
 const cv=$("#cv"), ctx=cv.getContext("2d");
-let W=0,H=0;
+let W=0,H=0,WU=0; /* WU = usable width: the part of the scene not covered by the story panel */
 const COL={ skyTop:"#0F1923", skyMid:"#2D6473", skyLow:"#357889", glow:"#E9B48F", sun:"#F3C9A6",
   mtnFar:"#3F7484", mtnNear:"#2D5866", snow:"#FBF6EE", snowShade:"#DCE6E8", snowDeep:"#C9D6D9",
   core:"#357889", coreEdge:"#2D6473", orange:"#D34716", orangeD:"#B23A0F", ink:"#17272C", ink2:"#5C6E75",
@@ -492,15 +495,17 @@ const SC={ mode:"single", lanes:[], t:20, cut:null, rolling:null, flakes:[], pre
 function resize(){
   const r=cv.getBoundingClientRect(), d=Math.min(2, window.devicePixelRatio||1);
   if(r.width<10) return; W=r.width; H=r.height;
+  const st=$("#story"), floating=getComputedStyle(st).position==="absolute";
+  WU = floating ? Math.max(W*0.45, W - st.offsetWidth - 28) : W;
   cv.width=Math.round(W*d); cv.height=Math.round(H*d); ctx.setTransform(d,0,0,d,0,0);
   if(!SC.flakes.length) for(let i=0;i<90;i++) SC.flakes.push({x:Math.random(), y:Math.random(), s:0.6+Math.random()*1.8, v:0.02+Math.random()*0.05, ph:Math.random()*6.28});
 }
-function k(){ return SC.present ? 1.3 : (W<560 ? 0.82 : 1); }
+function k(){ return SC.present ? 1.3 : (WU<560 || H<330 ? 0.82 : 1); }
 function font(px,w,serif){ return (w||400)+" "+Math.round(px*k())+"px "+(serif?"Georgia, 'Times New Roman', serif":"Verdana, Geneva, sans-serif"); }
 
 /* A lane is one hill with one snowball on it. */
 function laneGeo(L){
-  const x0=W*0.07, x1=W*(L.x1f||0.74), y0=H*L.y0f, y1=H*L.y1f;
+  const x0=WU*0.06, x1=WU*(L.x1f||0.74), y0=H*L.y0f, y1=H*L.y1f;
   function u(t){ return (t-L.tMin)/(L.tMax-L.tMin); }
   function P(t){ const q=Math.max(0,Math.min(1,u(t))); return {x:x0+(x1-x0)*q, y:y0+(y1-y0)*(0.62*q+0.38*q*q)}; }
   function ang(t){ const q=Math.max(0,Math.min(1,u(t))); return Math.atan2((y1-y0)*(0.62+0.76*q), x1-x0); }
@@ -512,7 +517,7 @@ function drawSky(){
   const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,COL.skyTop); g.addColorStop(0.45,COL.skyMid); g.addColorStop(0.8,COL.skyLow); g.addColorStop(1,COL.glow);
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
   // low sun glow
-  const sx=W*0.83, sy=H*0.36, rg=ctx.createRadialGradient(sx,sy,2,sx,sy,H*0.42);
+  const sx=WU*0.8, sy=H*0.36, rg=ctx.createRadialGradient(sx,sy,2,sx,sy,H*0.42);
   rg.addColorStop(0,"rgba(243,201,166,.55)"); rg.addColorStop(1,"rgba(243,201,166,0)"); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
   ctx.fillStyle=COL.sun; ctx.beginPath(); ctx.arc(sx,sy,H*0.045,0,Math.PI*2); ctx.fill();
   // mountains
@@ -539,7 +544,7 @@ function drawGround(L,G,idx){
   ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=2; ctx.stroke();
   // trees on the plateau and valley
   if(idx===0 || SC.mode!=="compare"){ tree(W*0.035,P0.y+2,H*0.07); }
-  tree(W*0.95,P1.y+2,H*0.075); tree(W*0.985,P1.y+3,H*0.055);
+  tree(WU*0.95,P1.y+2,H*0.075); tree(WU*0.985,P1.y+3,H*0.055);
 }
 function drawFlags(L,G){
   (L.labels||[]).forEach(function(lb){
@@ -553,7 +558,7 @@ function drawFlags(L,G){
 function drawFinish(L,G){
   const p=G.P(L.tMax), s=H*0.13*k();
   if(L.cabin){
-    const cx=Math.min(W-s*0.75, p.x+W*0.17), cy=p.y+2;
+    const cx=Math.min(WU-s*0.75, p.x+WU*0.17), cy=p.y+2;
     ctx.fillStyle=COL.cabin; ctx.fillRect(cx-s*0.45,cy-s*0.5,s*0.9,s*0.5);
     ctx.fillStyle=COL.snow; ctx.beginPath(); ctx.moveTo(cx-s*0.58,cy-s*0.48); ctx.lineTo(cx,cy-s*0.92); ctx.lineTo(cx+s*0.58,cy-s*0.48); ctx.closePath(); ctx.fill();
     ctx.fillStyle=COL.window; ctx.fillRect(cx-s*0.12,cy-s*0.36,s*0.24,s*0.18);
@@ -610,7 +615,7 @@ function ball(L,G,t,opts){
   if(opts.label!==false){
     const txt=(opts.name?opts.name+" · ":"")+money(q.bal);
     ctx.font=font(13,700); const tw=ctx.measureText(txt).width+16, th=22*k();
-    let tx=cx-tw/2, ty=cy-r-th-8; tx=Math.max(6,Math.min(W-tw-6,tx)); if(ty<6) ty=6;
+    let tx=cx-tw/2, ty=cy-r-th-8; tx=Math.max(6,Math.min(WU-tw-6,tx)); if(ty<6) ty=6;
     ctx.fillStyle="rgba(255,255,255,.95)"; roundRect(tx,ty,tw,th,th/2); ctx.fill();
     ctx.fillStyle=opts.color||COL.ink; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(txt, tx+8, ty+th/2+0.5);
   }
@@ -618,7 +623,7 @@ function ball(L,G,t,opts){
 }
 function pill(txt,x,y,align,color,bg){
   ctx.font=font(12,700); const tw=ctx.measureText(txt).width+16, th=21*k();
-  let tx = align==="right" ? x-tw : align==="center" ? x-tw/2 : x; tx=Math.max(4,Math.min(W-tw-4,tx));
+  let tx = align==="right" ? x-tw : align==="center" ? x-tw/2 : x; tx=Math.max(4,Math.min(WU-tw-4,tx));
   ctx.fillStyle=bg||"rgba(255,255,255,.95)"; roundRect(tx,y-th/2,tw,th,th/2); ctx.fill();
   ctx.fillStyle=color||COL.ink; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(txt,tx+8,y+0.5);
 }
@@ -640,12 +645,12 @@ function drawFlakes(dt){
   });
 }
 function drawCut(){
-  const C=SC.cut, R=Math.min(H*0.37, W*0.28), cx=W*0.5, cy=H*0.88-R;
+  const C=SC.cut, R=Math.min(H*0.36, WU*0.27), cx=WU*0.5, cy=H*0.88-R;
   // ground
   const gy=cy+R; const gg=ctx.createLinearGradient(0,gy,0,H); gg.addColorStop(0,COL.snow); gg.addColorStop(1,COL.snowShade);
   ctx.fillStyle=gg; ctx.fillRect(0,gy,W,H-gy); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke();
   ctx.fillStyle="rgba(23,39,44,.16)"; ctx.beginPath(); ctx.ellipse(cx,gy+2,R*0.9,R*0.08,0,0,Math.PI*2); ctx.fill();
-  tree(W*0.08,gy+2,H*0.09); tree(W*0.12,gy+2,H*0.06); tree(W*0.93,gy+2,H*0.08);
+  tree(WU*0.08,gy+2,H*0.09); tree(WU*0.12,gy+2,H*0.06); tree(WU*0.93,gy+2,H*0.08);
   const pts=C.pts, F=finalOf(pts).bal;
   for(let i=pts.length-1;i>=1;i--){
     const rr=R*Math.sqrt(pts[i].bal/F);
@@ -658,7 +663,7 @@ function drawCut(){
   ctx.fillStyle=COL.orange; ctx.beginPath(); ctx.arc(cx,cy,Math.max(2,rFirst),0,Math.PI*2); ctx.fill();
   ctx.strokeStyle=COL.ink2; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
   // labels
-  const small=W<620;
+  const small=WU<620;
   ctx.strokeStyle="#FFFFFF"; ctx.lineWidth=1.5;
   const ly=cy-R*0.62, lx=cx+R+12;
   ctx.beginPath(); ctx.moveTo(cx+R*Math.cos(-0.9)*0.99,cy+R*Math.sin(-0.9)*0.99); ctx.lineTo(lx,ly); ctx.stroke();
@@ -718,10 +723,10 @@ function readout(force){
   const now=performance.now(); if(!force && now-lastRO<80) return; lastRO=now;
   const el=$("#readout"); let h="", d="";
   if(SC.mode==="cut"){
-    h='<span class="ro-k">Maya at 60</span><span class="ro-v">'+money(N.mayaF.bal)+'</span><span class="ro-s"><b>She packed '+money(N.mayaF.dep)+'</b></span>';
+    h='<span class="ro-k">Maya at 60</span><span class="ro-v">'+money(N.mayaF.bal)+'</span><span class="ro-s"><b>She put in '+money(N.mayaF.dep)+'</b></span>';
     d="A cut-open snowball with "+(N.maya.length-1)+" rings, one per year. The first ring added "+money(N.firstRing)+". The last ring added "+money(N.lastRing)+".";
   } else if(SC.mode==="compare"){
-    h='<div class="ro-row">'; SC.lanes.forEach(function(L){ const q=at(L.pts,Math.min(SC.t,L.tMax)); h+='<div><span class="ro-k">'+L.name+'</span><span class="ro-v">'+money(q?q.bal:0)+'</span><span class="ro-s"><b>packed '+money(q?q.dep:0)+'</b></span></div>'; d+=L.name+": "+money(q?q.bal:0)+" in the snowball, "+money(q?q.dep:0)+" packed. "; }); h+='</div>';
+    h='<div class="ro-row">'; SC.lanes.forEach(function(L){ const q=at(L.pts,Math.min(SC.t,L.tMax)); h+='<div><span class="ro-k">'+L.name+'</span><span class="ro-v">'+money(q?q.bal:0)+'</span><span class="ro-s"><b>put in '+money(q?q.dep:0)+'</b></span></div>'; d+=L.name+": "+money(q?q.bal:0)+" in the snowball, "+money(q?q.dep:0)+" packed. "; }); h+='</div>';
     d="Age "+Math.floor(SC.t)+". "+d;
   } else if(SC.lanes[0]){
     const L=SC.lanes[0], q=at(L.pts,Math.min(Math.max(SC.t,L.start),L.tMax))||{bal:0,dep:0};
@@ -730,7 +735,7 @@ function readout(force){
       h='<span class="ro-k">'+(yr===0?"Today":"After "+yr+(yr===1?" year":" years"))+' · Jordan owes</span><span class="ro-v">'+money(q.bal)+'</span><span class="ro-s"><b>borrowed '+money(q.dep)+'</b></span>';
       d=(yr===0?"Today":"After "+yr+" years")+", Jordan owes "+money(q.bal)+".";
     } else {
-      h='<span class="ro-k">Age '+Math.floor(Math.max(SC.t,L.start))+' · in the snowball</span><span class="ro-v">'+money(q.bal)+'</span><span class="ro-s"><b>packed '+money(q.dep)+'</b> · snow '+money(q.bal-q.dep)+'</span>';
+      h='<span class="ro-k">Age '+Math.floor(Math.max(SC.t,L.start))+' · in the snowball</span><span class="ro-v">'+money(q.bal)+'</span><span class="ro-s"><b>put in '+money(q.dep)+'</b> · growth '+money(q.bal-q.dep)+'</span>';
       d="Age "+Math.floor(Math.max(SC.t,L.start))+". The snowball holds "+money(q.bal)+": "+money(q.dep)+" packed by hand and "+money(q.bal-q.dep)+" of growth.";
     }
   }
@@ -740,7 +745,7 @@ function readout(force){
 /* lane presets */
 function ageLabels(from){ const out=[]; for(let a=20;a<=60;a+=10) if(a>from) out.push({t:a, text:String(a)}); return out; }
 function singleLane(pts, start, extra){
-  return Object.assign({pts:pts, start:start, tMin:10, tMax:END_AGE, y0f:0.36, y1f:0.86, rMaxF:0.17, balMax:finalOf(pts).bal, labels:ageLabels(start), cabin:"Age 60"}, extra||{});
+  return Object.assign({pts:pts, start:start, tMin:10, tMax:END_AGE, y0f:0.40, y1f:0.86, rMaxF:0.16, balMax:finalOf(pts).bal, labels:ageLabels(start), cabin:"Age 60"}, extra||{});
 }
 
 /* ================= Story / lesson ================= */
@@ -751,7 +756,20 @@ S=freshState();
 const esc=s=>String(s).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
 function say(mood, html){ return '<div class="guide-line"><img src="'+JODI[mood]+'" alt="" width="44" height="44"><div class="say"><span class="who">JODI</span>'+html+'</div></div>'; }
 function announce(t){ const a=$("#desc"); a.setAttribute("aria-live","polite"); a.textContent=t; setTimeout(function(){ a.setAttribute("aria-live","off"); }, 1200); }
-function focusEl(sel){ const el=$(sel,story); if(el){ el.setAttribute("tabindex","-1"); el.focus({preventScroll:true}); } }
+function focusEl(sel){
+  const el=$(sel,story); if(!el) return;
+  el.setAttribute("tabindex","-1"); el.focus({preventScroll:true});
+  const beh=REDUCED?"auto":"smooth";
+  if(getComputedStyle(story).position==="absolute"){
+    /* floating panel: scroll only the panel, never the page */
+    const top=el.getBoundingClientRect().top-story.getBoundingClientRect().top+story.scrollTop-12;
+    story.scrollTo({top:Math.max(0,top), behavior:beh});
+  } else {
+    /* pinned scene (phones): bring the element just under the scene */
+    const pin=$("#scene").getBoundingClientRect().bottom;
+    window.scrollTo({top:Math.max(0, window.scrollY+el.getBoundingClientRect().top-pin-12), behavior:beh});
+  }
+}
 const CHAPTERS=["","Pack it","Two hills","Your run","Cut it open","Avalanche","The lodge"];
 function setChip(n){
   let h=""; for(let i=1;i<=5;i++) h+='<i class="'+(i<n||n===6?"done":i===n?"now":"")+'"></i>';
@@ -864,9 +882,9 @@ function revealBlock(n, core){
 }
 function renderPack(){
   let left='<p class="kicker">Chapter 1 of 5</p><h2 id="stitle">Pack it</h2>';
-  left+='<p class="narr">Someone starts at <b>20</b> and packs <b>$25 a month</b> into the snowball. It grows a pretend <b>6% a year</b>. That growth is the snow it picks up rolling.</p>';
+  left+='<p class="narr">Someone starts at <b>20</b> and packs <b>$25 a month</b> into the snowball. It grows <b>6% a year</b>, an example rate. That growth is the snow it picks up as it rolls.</p>';
   if(S.phase==="watch") left+='<p class="note">Watching it roll from 20 to 40…</p>';
-  else left+='<p class="narr">At 40, it\'s worth <b>'+money(N.s40.bal)+'</b>. Only '+money(N.s40.dep)+' of that was packed by hand: that\'s the teal core.</p>';
+  else left+='<p class="narr">At 40, it\'s worth <b>'+money(N.s40.bal)+'</b>. Only '+money(N.s40.dep)+' of that is money they put in. The other '+money(N.s40.bal-N.s40.dep)+' is growth.</p>';
   let right='';
   if(S.phase!=="watch") right+=predictBlock(1);
   if(S.phase==="reveal") right+=revealBlock(1,'<p>From 20 to 40, the snowball picked up '+money(N.s40.bal)+'. From 40 to 60, it picked up <b>'+money(N.s60.bal-N.s40.bal)+'</b>, with the exact same $25 a month.</p><p>Why? It grows on <b>everything</b> in it, including last year\'s snow. Bigger snowball, more snow sticks on every turn. Grown-ups call that <b>compound growth</b>. Look at the trail, too: the track gets wider faster.</p>');
@@ -874,7 +892,7 @@ function renderPack(){
 }
 function renderTwo(){
   let left='<p class="kicker">Chapter 2 of 5</p><h2 id="stitle">Two hills</h2>'+
-    '<p class="narr"><b>Maya</b> starts at <b>15</b> and packs <b>$20 a month</b>. <b>Theo</b> waits until <b>30</b>, then packs double: <b>$40 a month</b>. Same pretend 6%. Both roll to 60.</p>';
+    '<p class="narr"><b>Maya</b> starts at <b>15</b> and packs <b>$20 a month</b>. <b>Theo</b> waits until <b>30</b>, then packs double: <b>$40 a month</b>. Same 6% growth. Both roll to 60.</p>';
   let right=predictBlock(2);
   if(S.phase==="reveal") right+=revealBlock(2,'<p>Maya: <b>'+money(N.mayaF.bal)+'</b> from '+money(N.mayaF.dep)+' packed. Theo: <b>'+money(N.theoF.bal)+'</b> from '+money(N.theoF.dep)+' packed. Theo packed <b>more</b> and still finished smaller.</p><p>Maya\'s 15-year head start gave her snow more years to pick up snow. To catch her, Theo would need about <b>$'+N.theoNeeds+' a month</b>, nearly three times what Maya packs.</p>');
   return '<div class="story-grid"><div>'+left+'</div><div>'+right+'</div></div>';
@@ -888,7 +906,7 @@ const FAIL={
 };
 function renderRun(){
   let left='<p class="kicker">Chapter 3 of 5</p><h2 id="stitle">Your run</h2>'+
-    '<p class="narr">Your turn. Roll a snowball worth <b>'+money(GOAL)+'</b> by 60, the dashed circle at the bottom. The catch: you can only pack <b>$'+BUDGET+' a month</b> or less. Growth stays at a pretend 6%.</p>';
+    '<p class="narr">Your turn. Roll a snowball worth <b>'+money(GOAL)+'</b> by 60, the dashed circle at the bottom. The catch: you can only pack <b>$'+BUDGET+' a month</b> or less. Growth stays at 6%.</p>';
   if(S.attempts.length) left+='<ul class="tests" aria-label="Your runs">'+S.attempts.map((a,i)=>'<li>Run '+(i+1)+': start '+a.start+', $'+a.monthly+' → '+money(a.bal)+'</li>').join('')+'</ul>';
   let right='';
   if(!S.solved){
@@ -914,7 +932,7 @@ function pickBlock(n){
   if(S.picked){
     const f=FB[n][S.picked];
     const core = n===4
-      ? '<p>Look at the rings. Her first year added about <b>'+money(N.firstRing)+'</b>. Her last year added about <b>'+money(N.lastRing)+'</b>, more than '+Math.floor(N.lastRing/(MAYA.monthly*12))+' years of her $20s in a single year. Same 6% the whole time. 6% of a big snowball is a lot of snow.</p><p>The dashed teal circle is everything she packed by hand. Everything outside it is snow on snow.</p>'
+      ? '<p>Look at the rings. Her first year added about <b>'+money(N.firstRing)+'</b>. Her last year added about <b>'+money(N.lastRing)+'</b>, more than '+Math.floor(N.lastRing/(MAYA.monthly*12))+' years of her $20s in a single year. Same 6% the whole time. 6% of a big snowball is a lot of snow.</p><p>The dashed circle in the middle is all the money she put in. Everything outside it is snow on snow.</p>'
       : '<p>Same math, rolling the other way. Interest gets added to what Jordan owes, then interest grows on <i>that</i>. At 24% a year, the Rule of 72 says it doubles about every 3 years: $1,000, then about '+money(N.debt3)+', then about <b>'+money(N.debt6)+'</b>.</p><p>Compound growth works <b>for</b> you in a savings snowball and <b>against</b> you in a debt one. Real cards ask for a payment every month. What happens if someone pays only the smallest payment allowed? That\'s a story for another day.</p>';
     h+='<div class="reveal"><h3 id="fbh">Jodi\'s take</h3>'+say(f[0],'<p>'+f[1]+'</p>'+core)+'</div><p class="note">Tap another answer to compare.</p><div class="row">'+(n===5?'<button class="btn small" data-act="replay">Watch again</button>':'')+'<button class="btn cta" data-act="next">'+(n===4?"Next chapter":"Head to the lodge")+'</button></div>';
   }
@@ -924,7 +942,7 @@ function renderCut(){
   return '<div class="story-grid"><div><p class="kicker">Chapter 4 of 5</p><h2 id="stitle">Cut it open</h2><p class="narr">We sliced Maya\'s snowball in half at 60. Like a tree, it has rings: <b>one for every year</b> it rolled.</p></div><div>'+pickBlock(4)+'</div></div>';
 }
 function renderAval(){
-  return '<div class="story-grid"><div><p class="kicker">Chapter 5 of 5</p><h2 id="stitle">Avalanche</h2><p class="narr">Now the snowball rolls the wrong way. Jordan puts <b>$1,000</b> on a FlexCard, a made-up credit card that charges <b>24% a year</b>, and makes no payments for 6 years. This snowball is what Jordan <b>owes</b>.</p>'+(S.picked?'':'<p class="note">It stays at the top until you guess.</p>')+'</div><div>'+pickBlock(5)+'</div></div>';
+  return '<div class="story-grid"><div><p class="kicker">Chapter 5 of 5</p><h2 id="stitle">Avalanche</h2><p class="narr">Now the snowball rolls the wrong way. Jordan puts <b>$1,000</b> on a credit card that charges <b>24% a year</b>, and makes no payments for 6 years. This snowball is what Jordan <b>owes</b>.</p>'+(S.picked?'':'<p class="note">It stays at the top until you guess.</p>')+'</div><div>'+pickBlock(5)+'</div></div>';
 }
 function renderLodge(){
   const H_=S.history, items=[];
@@ -940,7 +958,7 @@ function renderLodge(){
   right+='<h3 style="font-size:19px;margin:0 0 8px">Free roll</h3><p class="note" style="margin-bottom:10px">Everything is yours now, the growth rate too.</p><div class="ctls">'+
     '<div class="ctl"><label for="fA">Start age <output id="oA">'+S.A+'</output></label><input type="range" id="fA" min="10" max="40" step="1" value="'+S.A+'"></div>'+
     '<div class="ctl"><label for="fM">Pack each month <output id="oM">$'+S.M+'</output></label><input type="range" id="fM" min="5" max="200" step="5" value="'+S.M+'"></div>'+
-    '<div class="ctl"><label for="fR">Pretend growth per year <output id="oR">'+S.R+'%</output></label><input type="range" id="fR" min="0" max="10" step="0.5" value="'+S.R+'"></div></div>'+
+    '<div class="ctl"><label for="fR">Growth per year <output id="oR">'+S.R+'%</output></label><input type="range" id="fR" min="0" max="10" step="0.5" value="'+S.R+'"></div></div>'+
     '<div class="row"><button class="btn small" data-act="replay">Roll it again</button><button class="btn small" data-act="restart">Start over</button></div>';
   return '<div class="story-grid"><div>'+left+'</div><div>'+right+'</div></div>';
 }
@@ -948,21 +966,21 @@ function renderLodge(){
 /* ---------- scenes per chapter ---------- */
 function sceneFor(n){
   SC.cut=null; SC.cutReveal=false; SC.rolling=null; $("#keyline").hidden=false;
-  $("#keyline").innerHTML = n===5 ? '<span><i class="k-core"></i>Core: what Jordan borrowed</span><span><i class="k-snow" style="background:#EBA987"></i>Outside: interest</span>' : '<span><i class="k-core"></i>Core: money you packed</span><span><i class="k-snow"></i>Snow: growth</span>';
+  $("#keyline").innerHTML = n===5 ? '<span><i class="k-core"></i>Middle: what Jordan borrowed</span><span><i class="k-snow" style="background:#EBA987"></i>Around it: interest</span>' : '<span><i class="k-core"></i>Middle: money put in</span><span><i class="k-snow"></i>Snow around it: growth</span>';
   if(n===0){ SC.mode="single"; SC.lanes=[singleLane(N.one,20,{showAtStart:true})]; SC.t=END_AGE; }
   else if(n===1){ SC.mode="single"; SC.lanes=[singleLane(N.one,20)]; SC.t=20; }
   else if(n===2){
     SC.mode="compare";
-    const base={tMin:10, tMax:END_AGE, rMaxF:0.105, balMax:N.mayaF.bal, x1f:0.82};
-    SC.lanes=[ Object.assign({name:"Maya", pts:N.maya, start:15, y0f:0.20, y1f:0.47, labels:ageLabels(15), startText:"Maya starts at", tagColor:COL.coreEdge}, base),
-               Object.assign({name:"Theo", pts:N.theo, start:30, y0f:0.58, y1f:0.88, labels:ageLabels(30).concat([{t:20,text:"20"}]), startText:"Theo starts at", waiting:"Theo waits until 30", tagColor:COL.orangeD}, base) ];
+    const base={tMin:10, tMax:END_AGE, rMaxF:0.095, balMax:N.mayaF.bal, x1f:0.80};
+    SC.lanes=[ Object.assign({name:"Maya", pts:N.maya, start:15, y0f:0.34, y1f:0.58, labels:ageLabels(15), startText:"Maya starts at", tagColor:COL.coreEdge}, base),
+               Object.assign({name:"Theo", pts:N.theo, start:30, y0f:0.66, y1f:0.90, labels:ageLabels(30).concat([{t:20,text:"20"}]), startText:"Theo starts at", waiting:"Theo waits until 30", tagColor:COL.orangeD}, base) ];
     SC.t=15;
   }
   else if(n===3){ runLane(); SC.t=S.A; }
   else if(n===4){ SC.mode="cut"; SC.lanes=[]; SC.cut={pts:N.maya}; $("#keyline").hidden=true; }
   else if(n===5){
     SC.mode="debt";
-    SC.lanes=[{pts:debtPts, start:0, tMin:-0.8, tMax:6, y0f:0.36, y1f:0.86, rMaxF:0.17, balMax:N.debt6*1.02, slush:true, startLabel:"Today: $1,000 borrowed", showAtStart:true,
+    SC.lanes=[{pts:debtPts, start:0, tMin:-0.8, tMax:6, y0f:0.40, y1f:0.86, rMaxF:0.17, balMax:N.debt6*1.02, slush:true, startLabel:"Today", showAtStart:true,
       labels:[1,2,3,4,5,6].map(y=>({t:y, text:"Yr "+y})), cabin:"Jordan", ghostPts:linePts, ghostLabel:q=>q&&SC.t>=6?"Straight line: "+money(q.bal):null}];
     SC.t=0;
   }
@@ -991,7 +1009,7 @@ function enterStep(n){
   S.phase = n===1 ? "watch" : (n===2 ? "ask" : "");
   if(n===3){ S.A=30; S.M=25; S.attempts=[]; S.solved=false; }
   if(n===6){ S.R=RATE; if(S.history[3]){ S.A=S.history[3].start; S.M=S.history[3].monthly; } else { S.A=MAYA.start; S.M=MAYA.monthly; } }
-  resetClock(); sceneFor(n); render();
+  resetClock(); sceneFor(n); render(); story.scrollTop=0; if(n>=1) fitApp();
   if(n>=1){ track("sb_step_start",{step:n, mode:PRESENT?"class":"solo"}); send("step",null,{step:n}); focusEl("#stitle"); }
   if(n===1){
     setTimeout(function(){ if(S.step!==1) return; rollTo(40, speed()*0.8, function(){ if(S.step!==1) return; S.phase="ask"; render(); announce("At 40 the snowball is worth "+money(N.s40.bal)+". Make your guess."); }); }, REDUCED?0:600);
@@ -1014,7 +1032,8 @@ function doRoll(){
     render(); focusEl("#fbh"); announce("Jodi explains what happened.");
   });
 }
-function scrollToScene(){ const r=$("#scene").getBoundingClientRect(); if(r.top<0 || r.bottom>window.innerHeight) $("#scene").scrollIntoView({behavior:REDUCED?"auto":"smooth", block:"start"}); }
+function scrollToScene(){ /* v1.2: the scene is always on screen (floating panel or pinned scene), so nothing to scroll */ }
+function fitApp(){ const a=$("#app").getBoundingClientRect(); if(Math.abs(a.top-60)>4 && getComputedStyle($("#story")).position==="absolute") window.scrollTo({top:window.scrollY+a.top-60, behavior:REDUCED?"auto":"smooth"}); }
 function runTest(){
   const a=S.A, m=S.M; S.phase="rolling"; runLane(); SC.lanes[0].draggable=false; SC.t=a; render(); scrollToScene();
   rollTo(END_AGE, SC.present?13:17, function(){
@@ -1099,7 +1118,7 @@ function setPresent(on){
     if(on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){});
     if(!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
   }catch(e){}
-  render(); setTimeout(function(){ resize(); readout(true); }, 120);
+  render(); setTimeout(function(){ resize(); readout(true); fitApp(); }, 150);
 }
 $("#presentBtn").addEventListener("click", function(){ setPresent(!PRESENT); });
 
