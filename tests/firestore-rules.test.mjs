@@ -954,6 +954,18 @@ await it('the admin CAN read stripe_unmatched (Insider) but CANNOT write it, nor
   await assertFails(getDocs(collection(admin, 'artifacts', APP, 'stripe_customers')));
 });
 
+// PRODUCT UPDATES + WEEKLY REPORT (2026-11-25). Teacher email choices live on the teacher's
+// own profile: writable by them, by nobody else.
+await it('a teacher CAN set productUpdates and weeklyReport on their own profile', async () => {
+  await assertSucceeds(setDoc(U(teacher, 'teacher_1'), { productUpdates: { optedIn: true, source: 'setup', updatedAt: 1 }, weeklyReport: false }, { merge: true }));
+});
+await it('nobody else CAN set productUpdates on a teacher profile (not a student, not another teacher)', async () => {
+  const other = env.authenticatedContext('student_1').firestore();
+  await assertFails(setDoc(U(other, 'teacher_1'), { productUpdates: { optedIn: true, source: 'setup', updatedAt: 1 } }, { merge: true }));
+  const anon = env.authenticatedContext('anon_pu', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await assertFails(setDoc(U(anon, 'teacher_1'), { productUpdates: { optedIn: true, source: 'settings', updatedAt: 1 } }, { merge: true }));
+});
+
 await env.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

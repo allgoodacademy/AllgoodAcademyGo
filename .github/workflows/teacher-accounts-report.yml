@@ -1,0 +1,29 @@
+# Read-only count of real teacher accounts (scripts/report-teacher-accounts.js), runnable
+# from GitHub: Actions → "Teacher accounts report" → Run workflow. Prints counts only, never
+# email addresses (--no-csv), so the log is safe to read and share.
+name: Teacher accounts report
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install firebase-admin (not a repo dependency)
+        run: npm install firebase-admin@13 --no-save --no-package-lock
+      - name: Write the credential to a file
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}
+        run: printf '%s' "$SA" > "${RUNNER_TEMP}/sa.json"
+      - name: Report
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: node scripts/report-teacher-accounts.js --no-csv | tee -a "$GITHUB_STEP_SUMMARY"

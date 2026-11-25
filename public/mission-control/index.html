@@ -266,6 +266,9 @@ button.screen-link:disabled{opacity:.5;cursor:not-allowed}
 .consent p{margin:0 0 8px}.consent p:last-child{margin:0}
 .consent strong{color:var(--ink)}
 .consent-check{display:flex;gap:10px;align-items:flex-start;font-size:13px}
+.emailpref{margin:28px 0 8px;font-size:12.5px;color:var(--soft)}
+.emailpref label{display:inline-flex;gap:8px;align-items:center;cursor:pointer}
+.emailpref input{width:16px;height:16px;accent-color:var(--sage)}
 .consent-check input{margin-top:3px;width:18px;height:18px;accent-color:var(--sage)}
 .spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--teal-wash);border-top-color:var(--teal);animation:spin 1s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -463,6 +466,10 @@ body.present .nav-shell.activity{display:none}
     </label>
   </div>
   <div class="screen-body" id="setup-ready" hidden>Setting up gives you a class code to share with students, and a view of their progress.</div>
+  <label class="consent-check" style="margin:12px 0 4px">
+    <input type="checkbox" id="updates-checkbox">
+    <span>Email me occasional updates about new simulations and features. You can turn this off anytime. <em>(Optional)</em></span>
+  </label>
   <label class="field" style="margin:0">
     <span style="font-size:13px;font-weight:700">Class name</span>
     <input type="text" id="setup-class-name" maxlength="60" placeholder="e.g. Period 3 · Digital Citizenship" autocomplete="off">
@@ -512,6 +519,8 @@ body.present .nav-shell.activity{display:none}
   <section class="pane" id="pane-students" role="tabpanel" aria-labelledby="tab-students" hidden></section>
   <section class="pane" id="pane-assign" role="tabpanel" aria-labelledby="tab-assign" hidden></section>
   <section class="pane" id="pane-guides" role="tabpanel" aria-labelledby="tab-guides" hidden></section>
+
+  <p class="emailpref"><label><input type="checkbox" id="updates-toggle"> Email me occasional updates about new simulations and features</label><span id="updates-saved" role="status" aria-live="polite"></span></p>
 </main>
 
 <!-- THE STUDENT PANEL. Slides in from the right; closes with × or Escape. -->
@@ -922,6 +931,9 @@ async function showSetup(user) {
             // free class is known if Pro ever lapses.
             const marker = await getDoc(doc(db, 'artifacts', appId, 'teacher_free_class', user.uid)).catch(() => null);
             await createClass(user, $('setup-class-name').value.trim(), { needMarker: !(marker && marker.exists()) });
+            // Optional, never blocks setup: the product-updates choice (unchecked by default).
+            await window.AuthCore.setProductUpdates(user.uid, $('updates-checkbox').checked, 'setup')
+                .catch((e) => console.warn('[Mission Control] could not save the updates choice', e && e.code));
             showOnly('screen-loading');
             await load();
         } catch (e) {
@@ -1008,6 +1020,22 @@ async function load() {
     const meSnap = user ? await getDoc(doc(db, 'artifacts', appId, 'users', user.uid)) : null;
     const me = meSnap && meSnap.exists() ? meSnap.data() : {};
     state.me = me;
+    // The product-updates choice (opt-in). Missing field = not asked yet = off.
+    const upd = $('updates-toggle');
+    if (upd && user) {
+        upd.checked = !!(me.productUpdates && me.productUpdates.optedIn === true);
+        upd.onchange = async () => {
+            const said = $('updates-saved');
+            try {
+                await window.AuthCore.setProductUpdates(user.uid, upd.checked, 'settings');
+                said.textContent = upd.checked ? ' Saved — you\'ll get occasional updates.' : ' Saved — no update emails.';
+            } catch (e) {
+                console.warn('[Mission Control] could not save the updates choice', e && e.code);
+                upd.checked = !upd.checked;
+                said.textContent = " Couldn't save that. Try again.";
+            }
+        };
+    }
     // An existing teacher gets in exactly as before, however they first signed in.
     if (me.role !== 'teacher' || !me.classroomCode) {
         if (!user || user.isAnonymous) return showSignIn();
