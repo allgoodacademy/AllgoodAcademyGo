@@ -42,15 +42,29 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(code)).data.teacherUid == uid;
     }
 
-    // A teacher's OWN classroom code — read off their own profile, exactly the same field
-    // the become-a-teacher flow writes there. Unlike a student, a teacher still only ever
-    // teaches ONE classroom (creating a second would need a second flow that doesn't exist),
-    // so this is safe to treat as a single value even after multi-membership below: joining
-    // someone ELSE's Task Force as a member never touches this field (see classroom_members).
+    // A teacher's ACTIVE classroom code — read off their own profile, the field the
+    // become-a-teacher flow writes and Mission Control's class switcher rewrites. Since
+    // 2026-11-25 a teacher may own more than one class; this is the one they are looking at,
+    // and teacherCodeOk() below guarantees it can only ever name a class they own. Joining
+    // someone ELSE's class as a member never touches this field (see classroom_members).
     function myClassroomCode(appId, uid) {
       return exists(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid))
         ? get(/databases/$(database)/documents/artifacts/$(appId)/users/$(uid)).data.get('classroomCode', NONE())
         : NONE();
+    }
+
+    // The class this uid TEACHES right now: their active code, but only when the CLASSROOM
+    // document says they are its teacher; NONE otherwise.
+    //
+    // Fixed 2026-11-25. The grants below used myClassroomCode() directly, and a student's
+    // profile carries a classroomCode too (the join-by-code mirror). So for a student the
+    // "teacher's class" resolved to their OWN class, and isMemberOfClassroom() then let them
+    // read every classmate's profile (#4), subcollections (#6) and sessions (#10b) — the
+    // events grant added for Mission Control's drill-down would have inherited it. Pinning
+    // the code to classroomOwnedBy() closes that for all four. Teachers are unaffected: their
+    // active code always names a class they own (teacherCodeOk() guarantees it).
+    function myTaughtClassroomCode(appId, uid) {
+      return classroomOwnedBy(appId, myClassroomCode(appId, uid), uid) ? myClassroomCode(appId, uid) : NONE();
     }
 
     // Is `memberUid` a member of the classroom `code`? Membership is its own join-table
@@ -96,7 +110,7 @@ service cloud.firestore {
     // also joined another teacher's classroom as a member is exactly as visible there as any
     // other member, same as everywhere else this pivot is used (rules #4/#6).
     function sessionOwnerIsMyStudent(appId, uid, teacherUid) {
-      return isMemberOfClassroom(appId, uid, myClassroomCode(appId, teacherUid))
+      return isMemberOfClassroom(appId, uid, myTaughtClassroomCode(appId, teacherUid))
         || isLegacySingleClassroomStudent(appId, uid, teacherUid);
     }
 
@@ -150,6 +164,25 @@ service cloud.firestore {
              && request.auth.token.get('email', '').matches('.*@save[.]allgoodacademy[.]com$'));
     }
 
+    // A TEACHER'S ACTIVE CLASS (Mission Control, more than one class, 2026-11-25).
+    // users/{uid}.classroomCode on a teacher's profile means "the class I am looking at right
+    // now", and every teacher grant below (#4, #6, #10b, #11b) keys off it through
+    // myClassroomCode(). Switching classes in Mission Control's header writes the new code
+    // here, so every grant follows whichever class is active without a single rule learning
+    // about more than one class.
+    //
+    // That only holds if a teacher can point the field at THEIR OWN classes and nobody
+    // else's. classroomCodeOk() alone allows any class that exists (the student join-by-code
+    // model), which for a teacher would mean: set it to another teacher's code and read that
+    // class's roster. So for anyone who is or is becoming a teacher, the new code must be
+    // unchanged, cleared, or a class whose teacherUid is this uid.
+    function teacherCodeOk(appId, priorRole, priorCode) {
+      return !(priorRole == 'teacher' || request.resource.data.get('role', NONE()) == 'teacher')
+        || request.resource.data.get('classroomCode', NONE()) == priorCode
+        || request.resource.data.get('classroomCode', NONE()) == NONE()
+        || classroomOwnedBy(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid);
+    }
+
     function profileFieldsOk(appId, priorRole, priorCode) {
       return (request.resource.data.get('role', NONE()) == priorRole
               || request.resource.data.get('role', NONE()) == 'student'
@@ -157,7 +190,44 @@ service cloud.firestore {
                   && hasTeacherSignIn()
                   && classroomOwnedBy(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid)))
         && classroomCodeOk(appId, priorCode)
+        && teacherCodeOk(appId, priorRole, priorCode)
         && displayNameOk();
+    }
+
+    // THE PRO PLAN (2026-11-25). A teacher's plan lives in teacher_plans/{uid}, a document
+    // only the admin allowlist can write (rule #13) — set from Insider today, by the payment
+    // system later. Never a field on the teacher's own profile: that document is
+    // self-writable, so a plan there would be a plan anyone could grant themselves.
+    // Pro means plan == 'pro' AND proUntil is still in the future; an expired plan is simply
+    // free again, with nothing deleted.
+    function planPath(appId, uid) {
+      return /databases/$(database)/documents/artifacts/$(appId)/teacher_plans/$(uid);
+    }
+    function isProTeacher(appId, uid) {
+      return exists(planPath(appId, uid))
+        && get(planPath(appId, uid)).data.get('plan', 'free') == 'pro'
+        && get(planPath(appId, uid)).data.get('proUntil', null) is timestamp
+        && get(planPath(appId, uid)).data.proUntil > request.time;
+    }
+
+    // THE FREE CLASS MARKER (rule #14). Created alongside a teacher's first class and never
+    // deletable by the teacher. A free teacher may create a classroom only while no marker
+    // exists; the create must bring the marker into existence in the same batch (getAfter),
+    // naming the class being created. So the second create on the free plan is denied however
+    // the teacher edits their own profile — the profile is not consulted at all.
+    function freeMarkerPath(appId, uid) {
+      return /databases/$(database)/documents/artifacts/$(appId)/teacher_free_class/$(uid);
+    }
+
+    // May this teacher still CHANGE this class (assignments, extras)? Always while Pro. On
+    // the free plan, only the class the marker names: when Pro lapses, extra classes stay
+    // readable — nothing is deleted — but become read-only. A teacher with no marker at all
+    // (one whose class predates the plan) keeps full write access; Mission Control writes
+    // their marker the first time they load it.
+    function classWritable(appId, code, uid) {
+      return isProTeacher(appId, uid)
+        || !exists(freeMarkerPath(appId, uid))
+        || get(freeMarkerPath(appId, uid)).data.get('firstClassCode', NONE()) == code;
     }
 
     // 2. The user's own PROFILE document. Split out from its subcollections (2b) because
@@ -228,7 +298,7 @@ service cloud.firestore {
       //    role/classroomCode asserted some other way on the requester's own profile — those
       //    are self-written and were trivially forgeable (see rule #2).
       allow get: if request.auth != null
-        && (isMemberOfClassroom(appId, userId, myClassroomCode(appId, request.auth.uid))
+        && (isMemberOfClassroom(appId, userId, myTaughtClassroomCode(appId, request.auth.uid))
             || isLegacySingleClassroomStudent(appId, userId, request.auth.uid));
 
       //    The LIST grant is written against `resource`, never `userId`. `resource.data` IS
@@ -276,10 +346,27 @@ service cloud.firestore {
       // Creating a class is the teacher step, so it needs a teacher sign-in (Google or email),
       // never an anonymous student session. Updating your own class (assignments) does not:
       // existing teachers keep working as they are.
+      //
+      // THE CLASS LIMIT (Pro plan, 2026-11-25): a Pro teacher may create any number; a free
+      // teacher may create one, and that create must write their free-class marker (#14) in
+      // the same batch, naming this code. See freeMarkerPath() above.
       allow create: if request.auth != null && hasTeacherSignIn()
-        && request.resource.data.teacherUid == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.teacherUid == request.auth.uid;
-      allow list: if isAllowlistedAdmin();
+        && request.resource.data.teacherUid == request.auth.uid
+        && (isProTeacher(appId, request.auth.uid)
+            || (!exists(freeMarkerPath(appId, request.auth.uid))
+                && existsAfter(freeMarkerPath(appId, request.auth.uid))
+                && getAfter(freeMarkerPath(appId, request.auth.uid)).data.get('firstClassCode', NONE()) == code));
+      // Updating is the class's own teacher, and only while the class is writable on their
+      // plan: an extra class becomes read-only when Pro lapses (classWritable).
+      allow update, delete: if request.auth != null && resource.data.teacherUid == request.auth.uid
+        && classWritable(appId, code, request.auth.uid);
+      // LIST: the admin allowlist (Insider), or a teacher listing THEIR OWN classes for the
+      // class switcher — query classrooms where teacherUid == uid. Written against
+      // resource.data (populated per returned document on a list), never the {code}
+      // wildcard, which is null on a list (see #4). A query that is not filtered to the
+      // requester's own uid returns a document this denies, so the whole query fails.
+      allow list: if isAllowlistedAdmin()
+        || (request.auth != null && resource.data.teacherUid == request.auth.uid);
     }
 
     // 6. NEW — Teachers can READ (not write) a classroom member's subcollections too
@@ -295,7 +382,7 @@ service cloud.firestore {
       //    myClassroomCode + classroom_members, OR the legacy fallback), never by fields the
       //    requester wrote onto their own profile.
       allow read: if request.auth != null
-        && (isMemberOfClassroom(appId, userId, myClassroomCode(appId, request.auth.uid))
+        && (isMemberOfClassroom(appId, userId, myTaughtClassroomCode(appId, request.auth.uid))
             || isLegacySingleClassroomStudent(appId, userId, request.auth.uid));
     }
 
@@ -369,9 +456,16 @@ service cloud.firestore {
       //    looser than the first. The doc ID is pinned to the code+uid pair so a teacher
       //    cannot file one student's extras under another student's ID, and the field list is
       //    closed so this document can never grow a field that something else authorizes on.
+      //
+      //  `sims` (2026-11-25) holds assigned simulations, for the same reasons the classroom
+      //  keeps them in assignedSims beside assignedGames. Optional, so every extras document
+      //  written before it existed still validates on its next save.
       allow create, update: if request.auth != null
         && classroomOwnedBy(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid)
-        && request.resource.data.keys().hasOnly(['classroomCode', 'uid', 'modules', 'games', 'updatedAt'])
+        && classWritable(appId, request.resource.data.get('classroomCode', NONE()), request.auth.uid)
+        && request.resource.data.keys().hasOnly(['classroomCode', 'uid', 'modules', 'games', 'sims', 'updatedAt'])
+        && (!('sims' in request.resource.data)
+            || (request.resource.data.sims is list && request.resource.data.sims.size() <= 100))
         && request.resource.data.classroomCode is string
         && request.resource.data.classroomCode.matches('^[A-Za-z0-9_-]{1,64}$')
         && request.resource.data.uid is string
@@ -499,6 +593,57 @@ service cloud.firestore {
              'sessionId', 'event', 'step', 'meta', 'device', 'entry', 'ts', 'clientTs'
            ]);
       allow read, delete: if isAllowlistedAdmin();
+    }
+
+    // 11b. NEW (2026-11-25) — Mission Control's drill-down: a teacher reads the events of
+    //      students in their OWN class (each step, each choice, each prediction), so they can
+    //      see where the class got stuck and which answer each student picked. Exactly the
+    //      boundary rule 10b draws around sessions: the event's uid must be a member of the
+    //      class this teacher demonstrably owns (classroom document, via myClassroomCode +
+    //      classroom_members, or the legacy single-field fallback). Read-only. Students see
+    //      nothing new, and no name is ever written into an event.
+    //
+    //      Queried ONE UID AT A TIME (where('uid','==',studentUid)), for the reason 10b gives:
+    //      a query pinned to one uid resolves the same few paths for every document it
+    //      returns, so it stays inside Firestore's ten-document-access budget however many
+    //      events the student has. A class-wide query would not.
+    match /artifacts/{appId}/events/{eventId} {
+      allow read: if request.auth != null
+        && sessionOwnerIsMyStudent(appId, resource.data.get('uid', NONE()), request.auth.uid);
+    }
+
+    // 13. NEW (2026-11-25) — TEACHER PLANS. teacher_plans/{uid}: { plan: 'free' | 'pro',
+    //     proUntil: timestamp, grantedBy, note, updatedAt }. ONLY the admin allowlist writes it
+    //     (Insider's Plan control today; the payment system later, which will write with the
+    //     Admin SDK and bypass rules altogether). A teacher may read their own — that is how
+    //     Mission Control knows which plan to show — and nobody else's.
+    match /artifacts/{appId}/teacher_plans/{uid} {
+      allow get: if isOwner(uid) || isAllowlistedAdmin();
+      allow list: if isAllowlistedAdmin();
+      allow create, update: if isAllowlistedAdmin()
+        && request.resource.data.keys().hasOnly(['plan', 'proUntil', 'grantedBy', 'note', 'updatedAt'])
+        && request.resource.data.plan in ['free', 'pro']
+        && (request.resource.data.get('proUntil', null) == null || request.resource.data.proUntil is timestamp)
+        && (request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 500);
+      allow delete: if isAllowlistedAdmin();
+    }
+
+    // 14. NEW (2026-11-25) — THE FREE CLASS MARKER. teacher_free_class/{uid}: { firstClassCode,
+    //     createdAt }. Create-only, by the teacher it is about, and only naming a class they
+    //     own once the write lands (getAfter, so it works both in the same batch as the
+    //     class's create and on its own, when Mission Control backfills one for a teacher
+    //     whose class predates the plan). Never updated; deleted only by the admin. See the
+    //     class create rule in #5 for how it enforces the free plan's one class.
+    match /artifacts/{appId}/teacher_free_class/{uid} {
+      allow get: if isOwner(uid) || isAllowlistedAdmin();
+      allow list: if isAllowlistedAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['firstClassCode', 'createdAt'])
+        && request.resource.data.firstClassCode is string
+        && request.resource.data.firstClassCode.matches('^[A-Za-z0-9_-]{1,64}$')
+        && existsAfter(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(request.resource.data.firstClassCode))
+        && getAfter(/databases/$(database)/documents/artifacts/$(appId)/classrooms/$(request.resource.data.firstClassCode)).data.teacherUid == uid;
+      allow delete: if isAllowlistedAdmin();
     }
 
     // The root-level `game_sessions` collection is GONE (2026-09-13). All four standalone

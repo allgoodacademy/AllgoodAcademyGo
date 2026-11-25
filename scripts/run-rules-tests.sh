@@ -42,5 +42,7 @@ fi
 
 echo "Firestore emulator JAR v${ACTUAL_EMULATOR_JAR} (firebase-tools $(node -p 'require("firebase-tools/package.json").version'))"
 
-node_modules/.bin/firebase emulators:exec --only firestore --project allgood-rules-test \
-  "node tests/firestore-rules.test.mjs"
+# Firestore AND Storage together: storage.rules reads a teacher's plan from Firestore
+# (firestore.get), so the Storage suite needs both emulators up (2026-11-25).
+node_modules/.bin/firebase emulators:exec --only firestore,storage --project allgood-rules-test \
+  "node tests/firestore-rules.test.mjs && node tests/storage-rules.test.mjs"

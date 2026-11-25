@@ -1,11 +1,86 @@
 # Mission Control (the teacher home)
 
-`public/mission-control/` — a teacher's live view of their own Task Force (who is moving, who
-has stalled, and, per module, exactly which choice a student made on each step) and the only
-place they act on it.
+`public/mission-control/` — a teacher's live view of their own class (who is moving, who
+has stalled, and, per assignment, where the class got stuck and which choice each student made)
+and the only place they act on it.
 
-It shows one classroom: the one on the signed-in teacher's own profile, validated against that
-classroom's `teacherUid`.
+It shows one class at a time: the ACTIVE class, `users/{uid}.classroomCode` on the signed-in
+teacher's profile, validated against that classroom's `teacherUid`. Since 2026-11-25 a teacher
+may own more than one class (Mission Control Pro); the class name in the header is a switcher,
+and switching writes the new code to that same field. `firestore.rules` (`teacherCodeOk`) only
+accepts a class whose `teacherUid` is the teacher, so every existing teacher grant follows the
+active class without any rule learning about more than one.
+
+## Redesign (2026-11-25)
+
+The page sits under the shared pill nav (`nav/nav.js`, `npm run build:nav`) on the site's cream
+canvas, Georgia headings and Verdana body. Plain language throughout: students, class code,
+the student panel; no "at risk", no class average.
+
+| Tab | What it is |
+| --- | --- |
+| **Overview** | four stat tiles (students, active this week, finished at least one, time on task this week), **Assigned work** (each row opens its drill-down), **Could use a check-in** with a plain reason. A class with no students shows the three setup steps instead. |
+| **Students** | one table: search, Everyone / Could use a check-in / All done, a checkbox per row. Ticking shows **Assign to these N**, which opens Assign scoped to them. CSV and the choice-level CSV (Pro). |
+| **Assign** | the full catalog from the registry: each Lab Pack, then Games, then Simulations. Tap to toggle; a sticky **Save assignments (N changes)** bar. Scoped to students, class-wide items show greyed as "Whole class". |
+| **Teacher guides** | every guide in `plan-config.js`: free guides on TPT for everyone; paid guides download from Firebase Storage on Pro, or "Included with Pro / or $X on TPT" on Free. |
+
+The header carries the class switcher, the class code with **Copy**, **Print poster** (the QR
+poster below) and **Show on screen** (a full-screen view of only the code and the join
+address — never a student name). The student panel slides in from the right (× or Escape).
+
+### The drill-down (free on every plan)
+
+Pure functions in `derive.js` (`drillLesson`, `drillChallenge`, `drillGame`, `drillSim`,
+`worthFiveMinutes`), tested in `tests/mission-control.test.mjs`:
+
+- **Lessons:** the furthest step each student reached, with who stopped where (real step titles
+  from `module-data.js`), and the first-try rate per scored step.
+- **The Challenge:** progress in groups of seven; **where the class split** — the scenarios
+  with the highest share of risky picks, hardest first, the real scenario text, each option
+  tagged BEST / OK / RISKY by its score (3 / 1 / 0), the share who picked it, and who picked the
+  risky one. "Risky", never "wrong".
+- **Games:** the spread of best scores, who scored under 50%, and a one-tap **Assign [the lesson
+  the game points to] to these N** (per-student extras).
+- **Simulations:** steps reached (from the sim's own sessions), prediction-matched rate per step
+  and whether Present mode was used (from its own `<prefix>_*` events).
+- **Worth five minutes tomorrow:** one sentence from a template and real labels. No AI.
+
+Choices come from telemetry `events` (rule **11b**: a teacher may read the events of students in
+their own class, queried one uid at a time, exactly like sessions in 10b). Where events cannot
+be read, lessons and the Challenge fall back to the `scenario_attempts` each student's own
+records hold (rule #6); only simulation predictions need events.
+
+### The Pro plan
+
+- The plan lives in `artifacts/{appId}/teacher_plans/{uid}` (`plan`, `proUntil`, `grantedBy`,
+  `note`): only the admin allowlist writes it (Insider's Plan control in the user drawer;
+  later, the payment system). A teacher reads their own. Pro = `plan == 'pro' && proUntil > now`.
+- **Classes:** the free plan has one, enforced in the rules — a free teacher's class create must
+  write their create-only `teacher_free_class/{uid}` marker in the same batch (`getAfter`), and
+  can only do so while no marker exists. Pro creates any number.
+- **Students shown:** the first `FREE_STUDENT_LIMIT` (30) by join time on the free plan. This is
+  page-level by design: joining is never refused and every student's progress is recorded, so
+  upgrading shows everyone at once.
+- **When Pro lapses:** nothing is deleted. Extra classes stay visible and become read-only
+  (rules `classWritable`: only the marker's class takes assignment writes); the free class keeps
+  working.
+- Limits, price, checkout link and the guide list are in `public/mission-control/plan-config.js`.
+  `PRO_CHECKOUT_URL` is the live Stripe Payment Link; **Get Pro** opens it in a new tab with
+  `prefilled_email` (the teacher's sign-in email, if any) and `client_reference_id` (their
+  uid), so the founder can match the payment in Insider and turn Pro on by hand. Set it to ''
+  and Get Pro becomes "Email us to get Pro" (a mailto).
+- Paid guides are in Firebase Storage under `facilitator-guides/`, readable only by a Pro
+  teacher (`storage.rules`). Nothing paid is under `public/`.
+
+### Simulations are assignable
+
+The four simulations are `type: "sim"` entries in `modules-registry.json` (id = their
+`Telemetry.init({ module })`, plus `stream`, `eventPrefix`, `stepsTotal`, `simulationId`).
+Class-wide they are stored in `classrooms/{code}.assignedSims`, per student in
+`classroom_assignments` `.sims` — their own array, for the same reasons games got
+`assignedGames` (see below): `assignedModules` feeds a fixed-step model filtered through
+`MODULE_DATA`, where a simulation would sit untracked. The student dashboard's "Assigned by
+[teacher]" (`/js/classroom-join.js`) reads all three arrays.
 
 **It is no longer read-only.** Every teacher function used to be split between here and
 `/dashboard/`, which also held the only place to assign a module, see a Task Force code, or
@@ -18,20 +93,16 @@ notice and "I Agree — Continue"; an existing teacher goes straight to their cl
 they first signed in. `/dashboard/` is the student's own "My dashboard" page and asks nobody
 to sign in.
 
-## The three tabs
-
-| Tab | What it is |
-| --- | --- |
-| **Roster** | the Task Force code (copy / print / CSV), Needs-your-attention triage, the per-student grid, and the class-wide game strip |
-| **Agent Detail** | one student: step-by-step with per-step timing, the reteach signal, and game results |
-| **Assign** | what this class works through — every lab, Challenge and game, from the registry |
-
 ## What it writes
 
 | Target | Written by |
 | --- | --- |
 | `classrooms/{code}.assignedModules` | the Assign tab, class scope (rule #5 — only that classroom's own teacher) |
 | `classrooms/{code}.assignedGames` | the Assign tab, class scope — see below |
+| `classrooms/{code}.assignedSims` | the Assign tab, class scope (simulations) |
+| `classrooms/{code}.name` | the class switcher's create and rename |
+| `users/{uid}.classroomCode` (the teacher's own) | the class switcher (rule `teacherCodeOk`) |
+| `teacher_free_class/{uid}` | once, with the first class (or backfilled on first load for a class that predates the plan) |
 | `classroom_assignments/{code}_{uid}` | the Assign tab, per-student scope (rule #6c) |
 
 Nothing else. It never writes to a student's records.
@@ -124,7 +195,10 @@ which is indistinguishable from a failed write.
 | `users/{uid}/game_scores/{id}` | completion flag, `finalScore` / `percentage` (rule #6) |
 | `…/game_scores/{id}/scenario_attempts/{n}` | the per-step choice drill-down (rule #6) |
 | `users/{uid}/module_progress/{slug}` | in-progress position — the only such signal for a lab |
-| `sessions` where `uid == studentUid` | `activeMs` (time on task), most accurate `maxStep` |
+| `sessions` where `uid == studentUid` | `activeMs` (time on task), most accurate `maxStep`, simulation progress |
+| `events` where `uid == studentUid` | the drill-down's choices and simulation predictions (rule 11b) |
+| `classrooms` where `teacherUid == uid` | the class switcher (rule #5's list grant) |
+| `teacher_plans/{uid}` | the plan (rule #13) |
 
 Three of those overlap on purpose, because each holds something the others do not, and a
 module's progress takes the **highest** step any of them can prove. `game_scores` alone would

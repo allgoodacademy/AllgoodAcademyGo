@@ -11,6 +11,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, getDoc, setDoc, deleteDoc, collection, collectionGroup, getDocs, query, where, orderBy, limit,
+  writeBatch, Timestamp,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -19,6 +20,17 @@ const U = (db, uid) => doc(db, 'artifacts', APP, 'users', uid);
 const CLASS = (db, code) => doc(db, 'artifacts', APP, 'classrooms', code);
 const PROGRESS = (db, uid, slug) => doc(db, 'artifacts', APP, 'users', uid, 'module_progress', slug);
 const MEMBER = (db, code, uid) => doc(db, 'artifacts', APP, 'classroom_members', `${code}_${uid}`);
+const PLAN = (db, uid) => doc(db, 'artifacts', APP, 'teacher_plans', uid);
+const MARKER = (db, uid) => doc(db, 'artifacts', APP, 'teacher_free_class', uid);
+// Mission Control's create-a-class write (since the Pro plan, 2026-11-25): the classroom and
+// the teacher's free-class marker in ONE batch, so the class-create rule can see the marker
+// with getAfter. A Pro teacher's later classes carry no marker (withMarker: false).
+function createClass(db, uid, code, data, { withMarker = true } = {}) {
+  const b = writeBatch(db);
+  b.set(CLASS(db, code), { teacherUid: uid, createdAt: 2, ...data });
+  if (withMarker) b.set(MARKER(db, uid), { firstClassCode: code, createdAt: 2 });
+  return b.commit();
+}
 
 let passed = 0, failed = 0;
 async function it(name, fn) {
@@ -136,11 +148,11 @@ const googleTeacher = env.authenticatedContext('gteach_1', { email: 'g@school.or
 const linkedTeacher = env.authenticatedContext('gteach_2', { email: 'l@school.org', firebase: { sign_in_provider: 'google.com', identities: { 'google.com': ['1002'] } } }).firestore();
 const passwordUser = env.authenticatedContext('pw_1', { email: 'pw@school.org', firebase: { sign_in_provider: 'password', identities: { email: ['pw@school.org'] } } }).firestore();
 await it('a Google-signed-in user CAN become teacher of a classroom they just created (Mission Control order)', async () => {
-  await assertSucceeds(setDoc(CLASS(googleTeacher, 'NEWCODE'), { teacherUid: 'gteach_1', teacherName: 'Ms Google', createdAt: 2 }));
+  await assertSucceeds(createClass(googleTeacher, 'gteach_1', 'NEWCODE', { teacherName: 'Ms Google' }));
   await assertSucceeds(setDoc(U(googleTeacher, 'gteach_1'), { role: 'teacher', classroomCode: 'NEWCODE' }, { merge: true }));
 });
 await it('...and so CAN an anonymous session that linked Google first', async () => {
-  await assertSucceeds(setDoc(CLASS(linkedTeacher, 'LINK01'), { teacherUid: 'gteach_2', teacherName: 'Mr Linked', createdAt: 2 }));
+  await assertSucceeds(createClass(linkedTeacher, 'gteach_2', 'LINK01', { teacherName: 'Mr Linked' }));
   await assertSucceeds(setDoc(U(linkedTeacher, 'gteach_2'), { role: 'teacher', classroomCode: 'LINK01' }, { merge: true }));
 });
 await it('...and that new teacher STILL cannot read the other classroom\'s roster', async () => {
@@ -152,7 +164,7 @@ await it('an anonymous session CANNOT create a classroom', async () => {
   await assertFails(setDoc(CLASS(guest, 'ANON01'), { teacherUid: 'guest_1', teacherName: 'Sunny', createdAt: 2 }));
 });
 await it('an email/password teacher account CAN create a classroom and become its teacher', async () => {
-  await assertSucceeds(setDoc(CLASS(passwordUser, 'PASS01'), { teacherUid: 'pw_1', teacherName: 'Pw', createdAt: 2 }));
+  await assertSucceeds(createClass(passwordUser, 'pw_1', 'PASS01', { teacherName: 'Pw' }));
   await assertSucceeds(setDoc(U(passwordUser, 'pw_1'), { role: 'teacher', classroomCode: 'PASS01' }, { merge: true }));
 });
 await it('a token with some OTHER provider and no Google/email identity CANNOT create a classroom', async () => {
@@ -678,7 +690,7 @@ await it('a save-code session CANNOT become teacher even of a classroom it owns'
 });
 await it('a look-alike domain is NOT excluded (only save.allgoodacademy.com is)', async () => {
   const other = env.authenticatedContext('pw_2', { email: 'x@notsave.allgoodacademy.com.evil.org', firebase: { sign_in_provider: 'password', identities: { email: ['x@notsave.allgoodacademy.com.evil.org'] } } }).firestore();
-  await assertSucceeds(setDoc(CLASS(other, 'PASS02'), { teacherUid: 'pw_2', teacherName: 'Pw', createdAt: 2 }));
+  await assertSucceeds(createClass(other, 'pw_2', 'PASS02', { teacherName: 'Pw' }));
 });
 
 // DISPLAY NAME LENGTH (Ticket 2) — displayName on the profile doc is otherwise
@@ -696,6 +708,214 @@ await it('a displayName over 60 characters is DENIED', async () => {
 });
 await it('a displayName at exactly 60 characters succeeds', async () => {
   await assertSucceeds(setDoc(U(guest, 'guest_1'), { displayName: 'x'.repeat(60) }, { merge: true }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// MISSION CONTROL PRO (2026-11-25): the drill-down's events grant, more than one class, the
+// Pro plan and the free plan's one-class limit.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const EVENTS = (db) => collection(db, 'artifacts', APP, 'events');
+const CLASSES = (db) => collection(db, 'artifacts', APP, 'classrooms');
+const FUTURE = () => Timestamp.fromMillis(Date.now() + 365 * 24 * 3600 * 1000);
+const PAST = () => Timestamp.fromMillis(Date.now() - 24 * 3600 * 1000);
+const gIdent = (uid, email) => ({ email, firebase: { sign_in_provider: 'google.com', identities: { 'google.com': [uid], email: [email] } } });
+
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  // A student in teacher_2's class only.
+  await setDoc(U(db, 'other_student'), { role: 'student', classroomCode: 'ZZ9XYZ', displayName: 'Quiet Lynx' });
+  await setDoc(MEMBER(db, 'ZZ9XYZ', 'other_student'), { classroomCode: 'ZZ9XYZ', uid: 'other_student', joinedAt: 1 });
+  for (const [id, uid] of [['ev_member', 'member_1'], ['ev_multi', 'multi_1'], ['ev_legacy', 'student_1'], ['ev_other', 'other_student']]) {
+    await setDoc(doc(db, 'artifacts', APP, 'events', id), { uid, module: 'privacy-security', event: 'choice', meta: { scenarioIndex: 1, choiceIndex: 0, score: 3 }, ts: 1 });
+  }
+  // teacher_1 also owns a second class (as if created while on Pro).
+  await setDoc(CLASS(db, 'KM7SEC'), { teacherUid: 'teacher_1', teacherName: 'Ms Real', createdAt: 3 });
+});
+
+console.log('\nEVENTS (11b) — a teacher reads their own students\' events, one student at a time');
+await it('teacher CAN read a modern member\'s events (where uid == member)', async () => {
+  await assertSucceeds(getDocs(query(EVENTS(teacher), where('uid', '==', 'member_1'))));
+});
+await it('teacher CAN read a multi-class member\'s events (join-table only)', async () => {
+  await assertSucceeds(getDocs(query(EVENTS(teacher), where('uid', '==', 'multi_1'))));
+});
+await it('teacher CAN read a legacy single-field student\'s events', async () => {
+  await assertSucceeds(getDocs(query(EVENTS(teacher), where('uid', '==', 'student_1'))));
+});
+await it('teacher CANNOT read events of a student in ANOTHER teacher\'s class', async () => {
+  await assertFails(getDocs(query(EVENTS(teacher), where('uid', '==', 'other_student'))));
+  await assertFails(getDoc(doc(teacher, 'artifacts', APP, 'events', 'ev_other')));
+});
+await it('the other teacher CANNOT read teacher_1\'s students\' events', async () => {
+  const t2 = env.authenticatedContext('teacher_2', { email: 'o@school.org' }).firestore();
+  await assertFails(getDocs(query(EVENTS(t2), where('uid', '==', 'member_1'))));
+  await assertSucceeds(getDocs(query(EVENTS(t2), where('uid', '==', 'other_student'))));
+});
+await it('teacher CANNOT run an unfiltered (class-wide or whole-site) events query', async () => {
+  await assertFails(getDocs(query(EVENTS(teacher), limit(5))));
+});
+await it('teacher CANNOT write, edit or delete a student\'s event', async () => {
+  await assertFails(setDoc(doc(teacher, 'artifacts', APP, 'events', 'ev_member'), { uid: 'member_1', event: 'x' }));
+  await assertFails(deleteDoc(doc(teacher, 'artifacts', APP, 'events', 'ev_member')));
+});
+await it('a student reads NOTHING new: not their own events, not a classmate\'s', async () => {
+  const m = env.authenticatedContext('member_1').firestore();
+  await assertFails(getDocs(query(EVENTS(m), where('uid', '==', 'member_1'))));
+  await assertFails(getDocs(query(EVENTS(m), where('uid', '==', 'multi_1'))));
+  await assertFails(getDoc(doc(m, 'artifacts', APP, 'events', 'ev_member')));
+  await assertFails(getDoc(PLAN(m, 'teacher_1')));
+  await assertFails(getDocs(query(CLASSES(m), where('teacherUid', '==', 'teacher_1'))));
+});
+await it('a STUDENT whose profile names their class is NOT their classmates\' teacher (pre-existing hole, closed)', async () => {
+  // member_1's own profile says classroomCode KM7QPD. Before myTaughtClassroomCode() the
+  // rules took that as "the class I teach" and opened every classmate to them.
+  const m = env.authenticatedContext('member_1').firestore();
+  await assertFails(getDoc(U(m, 'multi_1')));
+  await assertFails(getDoc(PROGRESS(m, 'student_1', 'social-intelligence')));
+  await assertFails(getDocs(query(collection(m, 'artifacts', APP, 'sessions'), where('uid', '==', 'multi_1'))));
+});
+await it('an anonymous guest CANNOT read any event', async () => {
+  await assertFails(getDocs(query(EVENTS(guest), where('uid', '==', 'member_1'))));
+});
+
+console.log('\nCLASS LIST — a teacher lists only their own classes');
+await it('teacher CAN list classrooms where teacherUid == their own uid', async () => {
+  const snap = await assertSucceeds(getDocs(query(CLASSES(teacher), where('teacherUid', '==', 'teacher_1'))));
+  if (snap.size < 2) throw new Error(`expected both of teacher_1's classes, got ${snap.size}`);
+});
+await it('teacher CANNOT list another teacher\'s classes', async () => {
+  await assertFails(getDocs(query(CLASSES(teacher), where('teacherUid', '==', 'teacher_2'))));
+});
+await it('teacher CANNOT list every classroom', async () => {
+  await assertFails(getDocs(query(CLASSES(teacher), limit(10))));
+});
+
+console.log('\nACTIVE CLASS — users/{uid}.classroomCode can only name a class this teacher owns');
+await it('teacher CAN switch their active class to another class they own', async () => {
+  await assertSucceeds(setDoc(U(teacher, 'teacher_1'), { classroomCode: 'KM7SEC' }, { merge: true }));
+});
+await it('...and every join-table grant follows it: the old class\'s join-table-only member is out of reach', async () => {
+  // multi_1 is in KM7QPD by join table only (their profile names ZZ9XYZ), so nothing but the
+  // active class reaches them. (A legacy student whose own profile names one of this
+  // teacher's classes stays readable through the legacy fallback whichever class is active:
+  // they are still this teacher's student.)
+  await assertFails(getDocs(query(EVENTS(teacher), where('uid', '==', 'multi_1'))));
+  await assertFails(getDoc(U(teacher, 'multi_1')));
+});
+await it('teacher CAN switch back', async () => {
+  await assertSucceeds(setDoc(U(teacher, 'teacher_1'), { classroomCode: 'KM7QPD' }, { merge: true }));
+  await assertSucceeds(getDoc(U(teacher, 'multi_1')));
+});
+await it('teacher CANNOT point their active class at ANOTHER teacher\'s class', async () => {
+  await assertFails(setDoc(U(teacher, 'teacher_1'), { classroomCode: 'ZZ9XYZ' }, { merge: true }));
+});
+await it('...nor by dropping to role student in the same write', async () => {
+  await assertFails(setDoc(U(teacher, 'teacher_1'), { role: 'student', classroomCode: 'ZZ9XYZ' }, { merge: true }));
+});
+await it('a STUDENT can still join any class that exists (unchanged)', async () => {
+  await assertSucceeds(setDoc(U(student, 'student_1'), { classroomCode: 'ZZ9XYZ' }, { merge: true }));
+  await assertSucceeds(setDoc(U(student, 'student_1'), { classroomCode: 'KM7QPD' }, { merge: true }));
+});
+
+console.log('\nTEACHER PLANS (13) — only the admin grants Pro; a teacher reads their own');
+const freeT = env.authenticatedContext('free_1', gIdent('2001', 'free@school.org')).firestore();
+const proT = env.authenticatedContext('pro_1', gIdent('2002', 'pro@school.org')).firestore();
+await it('a teacher CANNOT grant themselves Pro', async () => {
+  await assertFails(setDoc(PLAN(freeT, 'free_1'), { plan: 'pro', proUntil: FUTURE(), grantedBy: 'me', note: '' }));
+});
+await it('the admin CAN grant Pro with an end date', async () => {
+  await assertSucceeds(setDoc(PLAN(admin, 'pro_1'), { plan: 'pro', proUntil: FUTURE(), grantedBy: 'balgood93@gmail.com', note: 'UAT', updatedAt: 1 }));
+});
+await it('the admin CANNOT write a plan value other than free/pro, or an unknown field', async () => {
+  await assertFails(setDoc(PLAN(admin, 'pro_2'), { plan: 'platinum', proUntil: FUTURE(), grantedBy: 'x', note: '' }));
+  await assertFails(setDoc(PLAN(admin, 'pro_2'), { plan: 'pro', proUntil: FUTURE(), grantedBy: 'x', note: '', isAdmin: true }));
+});
+await it('a teacher CAN read their own plan, and CANNOT read anyone else\'s', async () => {
+  await assertSucceeds(getDoc(PLAN(proT, 'pro_1')));
+  await assertFails(getDoc(PLAN(freeT, 'pro_1')));
+});
+await it('a teacher CANNOT edit or delete their plan once granted', async () => {
+  await assertFails(setDoc(PLAN(proT, 'pro_1'), { proUntil: Timestamp.fromMillis(Date.now() + 9e12) }, { merge: true }));
+  await assertFails(deleteDoc(PLAN(proT, 'pro_1')));
+});
+await it('only the admin can list plans (Insider\'s Pro teachers list)', async () => {
+  await assertSucceeds(getDocs(collection(admin, 'artifacts', APP, 'teacher_plans')));
+  await assertFails(getDocs(collection(proT, 'artifacts', APP, 'teacher_plans')));
+});
+
+console.log('\nFREE PLAN — one class, enforced in the rules');
+await it('a free teacher CAN create their first class (with its marker, one batch)', async () => {
+  await assertSucceeds(createClass(freeT, 'free_1', 'FREE01', { teacherName: 'Ms Free' }));
+  await assertSucceeds(setDoc(U(freeT, 'free_1'), { role: 'teacher', classroomCode: 'FREE01' }, { merge: true }));
+});
+await it('a free teacher\'s SECOND create is DENIED (with or without a marker)', async () => {
+  await assertFails(createClass(freeT, 'free_1', 'FREE02', { teacherName: 'Ms Free' }));
+  await assertFails(createClass(freeT, 'free_1', 'FREE03', { teacherName: 'Ms Free' }, { withMarker: false }));
+});
+await it('...still DENIED after editing their own profile (clearing the class, re-asserting teacher)', async () => {
+  await assertSucceeds(setDoc(U(freeT, 'free_1'), { classroomCode: '__none__' }, { merge: true }));
+  await assertSucceeds(setDoc(U(freeT, 'free_1'), { proUntil: 9e15, plan: 'pro', classroomCount: 0 }, { merge: true }));
+  await assertFails(createClass(freeT, 'free_1', 'FREE04', { teacherName: 'Ms Free' }));
+  await assertFails(createClass(freeT, 'free_1', 'FREE05', { teacherName: 'Ms Free' }, { withMarker: false }));
+  await assertSucceeds(setDoc(U(freeT, 'free_1'), { classroomCode: 'FREE01' }, { merge: true }));
+});
+await it('a teacher CANNOT delete, edit or replace their free-class marker', async () => {
+  await assertFails(deleteDoc(MARKER(freeT, 'free_1')));
+  await assertFails(setDoc(MARKER(freeT, 'free_1'), { firstClassCode: 'FREE01', createdAt: 9 }));
+});
+await it('a first class with NO marker is DENIED (the marker is what records it)', async () => {
+  const fresh = env.authenticatedContext('free_2', gIdent('2003', 'f2@school.org')).firestore();
+  await assertFails(createClass(fresh, 'free_2', 'FRE201', { teacherName: 'X' }, { withMarker: false }));
+});
+await it('a marker naming somebody else\'s class is DENIED', async () => {
+  const fresh = env.authenticatedContext('free_3', gIdent('2004', 'f3@school.org')).firestore();
+  await assertFails(setDoc(MARKER(fresh, 'free_3'), { firstClassCode: 'KM7QPD', createdAt: 1 }));
+});
+await it('a teacher whose class predates the plan CAN backfill their own marker, and only for their class', async () => {
+  await assertFails(setDoc(MARKER(teacher, 'teacher_1'), { firstClassCode: 'ZZ9XYZ', createdAt: 1 }));
+  await assertSucceeds(setDoc(MARKER(teacher, 'teacher_1'), { firstClassCode: 'KM7QPD', createdAt: 1 }));
+});
+await it('assigning still works on a free teacher\'s own class, including simulations', async () => {
+  await assertSucceeds(setDoc(CLASS(freeT, 'FREE01'), { assignedModules: ['ddc'], assignedGames: [], assignedSims: ['water-cycle'] }, { merge: true }));
+});
+
+console.log('\nPRO — any number of classes; when it lapses, extras go read-only and nothing is deleted');
+await it('a Pro teacher CAN create a first, second and third class', async () => {
+  await assertSucceeds(createClass(proT, 'pro_1', 'PRO001', { teacherName: 'Mr Pro' }));
+  await assertSucceeds(setDoc(U(proT, 'pro_1'), { role: 'teacher', classroomCode: 'PRO001' }, { merge: true }));
+  await assertSucceeds(createClass(proT, 'pro_1', 'PRO002', { teacherName: 'Mr Pro' }, { withMarker: false }));
+  await assertSucceeds(createClass(proT, 'pro_1', 'PRO003', { teacherName: 'Mr Pro' }, { withMarker: false }));
+});
+await it('...and switch between them', async () => {
+  await assertSucceeds(setDoc(U(proT, 'pro_1'), { classroomCode: 'PRO003' }, { merge: true }));
+  await assertSucceeds(setDoc(U(proT, 'pro_1'), { classroomCode: 'PRO002' }, { merge: true }));
+});
+await it('...and assign to an extra class, class-wide and per student', async () => {
+  await assertSucceeds(setDoc(CLASS(proT, 'PRO002'), { assignedSims: ['snowball'] }, { merge: true }));
+  await assertSucceeds(setDoc(ASSIGN(proT, 'PRO002', 'kid_9'), { classroomCode: 'PRO002', uid: 'kid_9', modules: [], games: [], sims: ['snowball'], updatedAt: 1 }));
+});
+await it('per-student extras reject a malformed sims field', async () => {
+  await assertFails(setDoc(ASSIGN(proT, 'PRO002', 'kid_8'), { classroomCode: 'PRO002', uid: 'kid_8', modules: [], games: [], sims: 'snowball', updatedAt: 1 }));
+});
+await it('when Pro EXPIRES: the extra classes are still readable and listable', async () => {
+  await assertSucceeds(setDoc(PLAN(admin, 'pro_1'), { plan: 'pro', proUntil: PAST(), grantedBy: 'balgood93@gmail.com', note: 'lapsed', updatedAt: 2 }));
+  await assertSucceeds(getDoc(CLASS(proT, 'PRO002')));
+  const snap = await assertSucceeds(getDocs(query(CLASSES(proT), where('teacherUid', '==', 'pro_1'))));
+  if (snap.size !== 3) throw new Error(`expected all 3 classes still there, got ${snap.size}`);
+  await assertSucceeds(setDoc(U(proT, 'pro_1'), { classroomCode: 'PRO003' }, { merge: true }));
+});
+await it('...but read-only: assigning to an extra class is DENIED', async () => {
+  await assertFails(setDoc(CLASS(proT, 'PRO002'), { assignedSims: [] }, { merge: true }));
+  await assertFails(setDoc(ASSIGN(proT, 'PRO002', 'kid_9'), { classroomCode: 'PRO002', uid: 'kid_9', modules: ['ddc'], games: [], updatedAt: 2 }));
+  await assertFails(deleteDoc(CLASS(proT, 'PRO002')));
+});
+await it('...the free class keeps working', async () => {
+  await assertSucceeds(setDoc(CLASS(proT, 'PRO001'), { assignedModules: ['ddc'] }, { merge: true }));
+});
+await it('...and a new class is DENIED until Pro is renewed', async () => {
+  await assertFails(createClass(proT, 'pro_1', 'PRO004', { teacherName: 'Mr Pro' }, { withMarker: false }));
+  await assertSucceeds(setDoc(PLAN(admin, 'pro_1'), { plan: 'pro', proUntil: FUTURE(), grantedBy: 'balgood93@gmail.com', note: 'renewed', updatedAt: 3 }));
+  await assertSucceeds(setDoc(CLASS(proT, 'PRO002'), { assignedSims: [] }, { merge: true }));
 });
 
 await env.cleanup();

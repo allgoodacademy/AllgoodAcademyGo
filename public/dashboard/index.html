@@ -569,7 +569,9 @@ const [registryData, simsData] = await Promise.all([
 ]);
 // Everything live and listed: retired modules have no page, and a hidden module (Pattern
 // Lab) is deliberately on no surface of the site, this one included.
-const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden);
+// Simulations are in the registry too (type 'sim', so Mission Control can assign them), but
+// this page renders them from simulations.json, so they are left out of MODULES here.
+const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden && m.type !== 'sim');
 const SIMS = (simsData.simulations || []).filter((s) => s.url).map((s) => ({ ...s, type: 'simulation' }));
 // Comms (/js/message-hq.js) builds its topic chips from this.
 window.MODULE_REGISTRY = MODULES.filter((m) => m.type !== 'game').map((m) => ({ ...m, category: m.type }));
@@ -875,7 +877,10 @@ async function renderClass(uid, profile) {
         if (assigned.items.length) {
             $('assigned-title').textContent = teacher ? `Assigned by ${teacher}` : 'Assigned by your teacher';
             $('assigned-body').innerHTML = assigned.items.map((it) => {
-                const m = MODULES.find((x) => x.id === it.id) || { ...it, type: it.type };
+                // An assigned simulation is drawn with its simulations.json card (same URL).
+                const m = MODULES.find((x) => x.id === it.id)
+                    || (it.type === 'sim' ? SIMS.find((x) => x.url === it.url) : null)
+                    || { ...it, type: it.type };
                 return card({ ...m, url: it.url, name: it.name }, { where: it.extra ? 'just for you' : '' });
             }).join('');
             $('assigned').hidden = false;

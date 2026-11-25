@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// Firebase Storage security rules (allgood-academy.firebasestorage.app).
+//
+// Until 2026-11-25 nothing on the site used Storage. The one thing it holds now is the PAID
+// facilitator guides (PDFs) that Mission Control Pro includes. They are deliberately NOT under
+// public/: everything there is served to anyone with the URL. Here they are readable only by a
+// signed-in teacher whose plan document (Firestore artifacts/allgood-academy/teacher_plans/{uid},
+// writable only by the admin allowlist — see firestore.rules #13) says Pro, with an end date
+// still in the future. The same test Mission Control and firestore.rules use.
+//
+// The founder uploads the PDFs from the Firebase console (which bypasses these rules), into
+// facilitator-guides/ with the file names listed in public/mission-control/plan-config.js.
+//
+// Mission Control reads a guide with getDownloadURL(), which goes through these rules. The URL
+// it returns carries a download token, so a Pro teacher could pass it on — the same as
+// forwarding the PDF itself. Anyone without that URL, signed out or on the free plan, is
+// denied.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isProTeacher() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/artifacts/allgood-academy/teacher_plans/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/artifacts/allgood-academy/teacher_plans/$(request.auth.uid)).data.plan == 'pro'
+        && firestore.get(/databases/(default)/documents/artifacts/allgood-academy/teacher_plans/$(request.auth.uid)).data.proUntil > request.time;
+    }
+
+    match /facilitator-guides/{file=**} {
+      allow read: if isProTeacher();
+      // Uploads come from the console (admin), never from the site.
+      allow write: if false;
+    }
+
+    // Everything else: nothing reads or writes it from the client.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

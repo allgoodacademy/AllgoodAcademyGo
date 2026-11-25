@@ -4,8 +4,9 @@
 // THE SITE NAV — single source of truth for every public page's top bar.
 //
 // Every student-facing page carries this nav (the list is PAGES, below): the site
-// pages, every hub, and every lesson, game and simulation. Teacher and admin tools
-// (Mission Control, Insider, Join) and the printable teacher sheets do not.
+// pages, every hub, and every lesson, game and simulation — and, since 2026-11-25,
+// Mission Control, where its "Teacher sign in" link is marked as the page you are on.
+// Insider, Join and the printable teacher sheets do not.
 // Originally six pages carried it. Until this file existed each one hand-wrote its own
 // copy, and they drifted: "Games" was added to the homepage in 9fe4d19 and to
 // nowhere else, so a visitor on /about/ or /for-teachers/ had no route to the
@@ -205,7 +206,7 @@ ${actions}
         },
         link: (href, label, active) =>
             `          <a class="nav-link${active ? ' here' : ''}" href="${href}">${label}</a>`,
-        signin: href => `          <a class="nav-link nav-signin" href="${href}">${SIGNIN.label}</a>`,
+        signin: (href, active) => `          <a class="nav-link nav-signin${active ? ' here' : ''}" href="${href}">${SIGNIN.label}</a>`,
         cta: href => `        <a class="nav-cta" href="${href}">${CTA.label}</a>\n${MENU_BUTTON}`,
     },
 };
@@ -255,6 +256,9 @@ const PAGES = [
     { file: 'public/educational-games/index.html', slug: 'games',        skin: 'light' },
     { file: 'public/simulations/index.html',       slug: 'simulations',  skin: 'light' },
     { file: 'public/dashboard/index.html',         slug: 'dashboard',    skin: 'light' },
+    // The teacher's page. Its "Teacher sign in" link is the one marked as here (and reads
+    // "Mission Control" for a signed-in teacher — see the session script).
+    { file: 'public/mission-control/index.html',   slug: 'mission-control', skin: 'light' },
     { file: 'public/jsh/digital-decisions-lab/index.html', slug: 'lab-hub', skin: 'light', activity: true },
     { file: 'public/jsh/real-world-ready-lab/index.html',  slug: 'lab-hub', skin: 'light', activity: true },
     { file: 'public/jsh/room-to-think-lab/index.html',     slug: 'lab-hub', skin: 'light', activity: true },
@@ -279,7 +283,7 @@ function renderNav(page) {
     const links = LINKS.map(l => skin.link(l.href(page.slug), l.label, l.current === page.slug));
     // Teacher sign in rides with the page links (it is a link, not the button), so on a
     // phone it lands on the same scrollable row and never competes with the button.
-    const body = skin.render([...links, skin.signin(SIGNIN.href)].join('\n'), skin.cta(CTA.href), page);
+    const body = skin.render([...links, skin.signin(SIGNIN.href, page.slug === 'mission-control')].join('\n'), skin.cta(CTA.href), page);
     return `${PREAMBLE}${body}\n${NAV_STYLE}\n${PHONE_STYLE}\n${SESSION_SCRIPT}\n${END}`;
 }
 
