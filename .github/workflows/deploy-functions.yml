@@ -23,6 +23,11 @@ on:
     paths:
       - 'functions/**'
   workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Verbose firebase-tools output (for diagnosing a failed deploy)'
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-functions
@@ -47,6 +52,6 @@ jobs:
       - name: Deploy functions
         # --force accepts the default Artifact Registry cleanup policy, which the CLI would
         # otherwise stop to ask about in a non-interactive run.
-        run: node_modules/.bin/firebase deploy --only functions --project allgood-academy --non-interactive --force
+        run: node_modules/.bin/firebase deploy --only functions --project allgood-academy --non-interactive --force ${{ inputs.debug && '--debug' || '' }}
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
