@@ -313,7 +313,7 @@ footer{background:var(--surface);padding:0 0 44px}
     <nav class="nav site-nav">
       <a class="wordmark" href="/">Allgood<em>Academy</em></a>
       <div class="nav-right">
-        <div class="nav-links">
+        <div class="nav-links" id="site-nav-links">
           <a class="nav-link" href="/educational-games/">Games</a>
           <a class="nav-link" href="/simulations/">Simulations</a>
           <a class="nav-link" href="/for-teachers/">For teachers</a>
@@ -322,6 +322,7 @@ footer{background:var(--surface);padding:0 0 44px}
           <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
         </div>
         <a class="nav-cta" href="/dashboard/">Start learning</a>
+        <button class="nav-menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-nav-links"><svg class="bars" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="x" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
     </nav>
   </div>
@@ -348,6 +349,7 @@ body.present .nav-shell.activity{display:none}
 </style>
 <style>
 .site-nav .nav-links{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-menu{display:none}
 @media(max-width:960px){
   .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
   .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
@@ -356,6 +358,18 @@ body.present .nav-shell.activity{display:none}
   .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
   .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
   .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+  .nav-shell{padding-top:10px}
+  .nav-shell .wrap{padding-left:12px;padding-right:12px}
+  .site-nav.has-menu.nav{flex-wrap:wrap;gap:6px;row-gap:0;border-radius:26px;padding:6px 6px 6px 18px}
+  .site-nav.has-menu .wordmark{font-size:20px;margin-right:auto;min-width:0;overflow:hidden;text-overflow:clip}
+  .site-nav.has-menu .nav-cta{order:1;margin-left:0;padding:8px 16px}
+  .site-nav.has-menu .nav-menu{order:2;display:inline-flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;padding:0;margin:0;border:0;border-radius:999px;background:var(--color-teal-wash);color:var(--color-teal-deep);cursor:pointer}
+  .site-nav.has-menu .nav-menu svg{display:block;width:20px;height:20px}
+  .site-nav.has-menu .nav-menu .x,.site-nav.has-menu.open .nav-menu .bars{display:none}
+  .site-nav.has-menu.open .nav-menu .x{display:block}
+  .site-nav.has-menu .nav-links{order:3;display:none;margin:8px 0 4px;padding:6px 12px 0 0;border-top:1px solid var(--color-teal-wash)}
+  .site-nav.has-menu.open .nav-links{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+  .site-nav.has-menu.open .nav-links .nav-link{display:block;font-size:15px;line-height:1.4;padding:12px 14px;border-radius:14px;white-space:normal;max-width:none;text-align:left}
 }
 @media(max-width:380px){
   .nav-shell .wrap{padding-left:10px;padding-right:10px}
@@ -363,6 +377,10 @@ body.present .nav-shell.activity{display:none}
   .site-nav .wordmark{font-size:18px}
   .site-nav .nav-cta{padding-left:12px;padding-right:12px}
   .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+  .site-nav.has-menu.nav{padding-left:14px;padding-right:6px;gap:4px}
+  .site-nav.has-menu .wordmark{font-size:17px}
+  .site-nav.has-menu .nav-cta{padding:8px 11px;font-size:12px}
+  .site-nav.has-menu .nav-menu{width:38px;height:38px}
 }
 </style>
 <script>
@@ -372,6 +390,14 @@ body.present .nav-shell.activity{display:none}
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
   if(s&&cta)cta.textContent='My dashboard';
   if(a&&signin)signin.textContent='Mission Control';
+  var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
+  if(!btn)return;
+  nav.classList.add('has-menu');
+  function set(o){nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false');btn.setAttribute('aria-label',o?'Close menu':'Menu');}
+  btn.addEventListener('click',function(){set(!nav.classList.contains('open'));});
+  nav.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('.nav-links a'))set(false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&nav.classList.contains('open')){set(false);btn.focus();}});
+  document.addEventListener('click',function(e){if(!nav.contains(e.target))set(false);});
 })();
 </script>
 <!-- END GENERATED NAV -->
