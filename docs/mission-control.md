@@ -22,7 +22,7 @@ the student panel; no "at risk", no class average.
 | **Overview** | four stat tiles (students, active this week, finished at least one, time on task this week), **Assigned work** (each row opens its drill-down), **Could use a check-in** with a plain reason. A class with no students shows the three setup steps instead. |
 | **Students** | one table: search, Everyone / Could use a check-in / All done, a checkbox per row. Ticking shows **Assign to these N**, which opens Assign scoped to them. CSV and the choice-level CSV (Pro). |
 | **Assign** | the full catalog from the registry: each Lab Pack, then Games, then Simulations. Tap to toggle; a sticky **Save assignments (N changes)** bar. Scoped to students, class-wide items show greyed as "Whole class". |
-| **Teacher guides** | every guide in `plan-config.js`: free guides on TPT for everyone; paid guides are a plain "Download facilitator guide" link on Pro (`downloadUrl`; empty = "coming soon"), or "Included with Pro / or $X on TPT" on Free. |
+| **Teacher guides** | every guide in `plan-config.js`: free guides on TPT for everyone; paid guides are "Download guide" (a direct download of `public/guides/<name>.pdf`) on Pro, or "Get it on TPT · $X" on Free. |
 
 The header carries the class switcher, the class code with **Copy**, **Print poster** (the QR
 poster below) and **Show on screen** (a full-screen view of only the code and the join
@@ -69,10 +69,10 @@ records hold (rule #6); only simulation predictions need events.
   `prefilled_email` (the teacher's sign-in email, if any) and `client_reference_id` (their
   uid), so the founder can match the payment in Insider and turn Pro on by hand. Set it to ''
   and Get Pro becomes "Email us to get Pro" (a mailto).
-- Paid guides are plain links (`downloadUrl` in `plan-config.js`, e.g. Google Drive shares),
-  shown only to Pro teachers. Anyone who has a link can open the PDF. Nothing paid is under
-  `public/`. `storage.rules` and its deploy job are still in the repo but unused since
-  2026-11-25 (the project has no Storage bucket).
+- Paid guide PDFs are in `public/guides/` (the `pdf` field in `plan-config.js`), linked only
+  from Mission Control and only for Pro teachers, served with `X-Robots-Tag: noindex`. They are
+  public URLs: anyone who has one can download the file. `storage.rules` and its deploy job are
+  still in the repo but unused (the project has no Storage bucket).
 
 ### Simulations are assignable
 

@@ -1134,3 +1134,18 @@ test('choiceLevelRows: one row per student per scored step, with the real choice
     assert.equal(rows[0].tag, 'RISKY');
     assert.equal(choicesFor(s, MODULE_DATA['privacy-security']).length, 0, 'another module\'s events are not mixed in');
 });
+
+// Teacher guides: every paid guide's "Download guide" points at a PDF that is really in
+// public/, so a Pro teacher never downloads a 404.
+test('every guide pdf in plan-config.js exists under public/', async () => {
+    const { GUIDES } = await import('../public/mission-control/plan-config.js');
+    const { existsSync, statSync } = await import('node:fs');
+    const paid = GUIDES.filter((g) => g.tpt && g.tpt !== 'FREE');
+    for (const g of paid) {
+        assert.ok(g.pdf, `${g.id}: a paid guide needs a pdf`);
+        assert.match(g.pdf, /^\/guides\/[a-z0-9-]+\.pdf$/, `${g.id}: pdf must be /guides/<name>.pdf`);
+        const file = new URL(`../public${g.pdf}`, import.meta.url);
+        assert.ok(existsSync(file), `${g.id}: ${g.pdf} is missing from public/`);
+        assert.ok(statSync(file).size > 1024, `${g.id}: ${g.pdf} is suspiciously small`);
+    }
+});
