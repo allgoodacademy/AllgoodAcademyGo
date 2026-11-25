@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wolves &amp; Deer · Allgood Academy</title>
+<meta name="description" content="A winter survey simulation for grades 6–8. Fly over a snowy valley, count the deer and wolves, and figure out why their numbers rise and fall together.">
+<meta name="standards" content="NGSS MS-LS2-2; MS-LS2-1; MS-LS2-4">
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+<style>
+/* VOICE: a field biologist's winter. Quiet, cold air, a warm notebook.
+   IDEA: the aerial winter survey (Isle Royale has flown one every winter since 1958) + the biologist's field notebook.
+   PICTURE: a top-down topo map of a snowy valley; deer and wolf packs leave tracks; saplings go from green to browsed brown.
+   COLOUR: snow and slate for the land, pine green for the forest, rust deer, slate-grey wolves, brand orange only for actions.
+   LAYOUT: the map fills the window; a field notebook floats right; a survey log is clipped to the map's lower left. */
+:root{
+  --ink:var(--color-ink); --ink2:var(--color-ink-soft); --line:var(--color-hairline);
+  --accent:var(--color-teal); --accent-text:var(--color-teal-deep); --cta:var(--color-orange); --cta-d:var(--color-orange-deep); --focus:var(--color-teal-deep);
+  --snow1:#F3F7F8; --snow2:#E2EBEE; --topo:#C9D7DD; --lake:#BCD5DF; --lake-edge:#94B6C4;
+  --pine:#2E5A4C; --pine2:#41725F; --sapling:#5E8F4E; --browsed:#A6876A;
+  --deer:#8A4B2A; --wolf:#3E4A55; --track:#9DB0B9;
+  --paper:var(--color-cream); --paper-b:var(--color-cream-border); --rule:#DCE7EB; --margin:color-mix(in srgb, var(--color-orange) 38%, var(--color-cream));
+  --hud:color-mix(in srgb, var(--color-surface) 90%, transparent); --card:var(--color-surface); --sel:var(--color-teal-wash);
+  --nbw:clamp(300px, 31vw, 400px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme=light]){
+  --ink:var(--color-warm-white); --ink2:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted)); --line:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+  --accent-text:var(--color-teal-wash); --focus:var(--color-teal-wash);
+  --snow1:#1C2B36; --snow2:#15222B; --topo:#2B3F4C; --lake:#203849; --lake-edge:#355468;
+  --pine:#3D7362; --pine2:#4E8774; --sapling:#86B872; --browsed:#8E7762; --deer:#D9925F; --wolf:#C9D3DA; --track:#4C6271;
+  --paper:var(--color-dark-card); --paper-b:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card)); --rule:color-mix(in srgb, var(--color-muted) 22%, var(--color-dark-card));
+  --margin:color-mix(in srgb, var(--color-orange) 45%, var(--color-dark-card));
+  --hud:color-mix(in srgb, var(--color-dark-card) 90%, transparent); --card:var(--color-dark); --sel:color-mix(in srgb, var(--color-teal) 30%, var(--color-dark-card));
+  color-scheme:dark; } }
+:root[data-theme=dark]{
+  --ink:var(--color-warm-white); --ink2:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted)); --line:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+  --accent-text:var(--color-teal-wash); --focus:var(--color-teal-wash);
+  --snow1:#1C2B36; --snow2:#15222B; --topo:#2B3F4C; --lake:#203849; --lake-edge:#355468;
+  --pine:#3D7362; --pine2:#4E8774; --sapling:#86B872; --browsed:#8E7762; --deer:#D9925F; --wolf:#C9D3DA; --track:#4C6271;
+  --paper:var(--color-dark-card); --paper-b:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card)); --rule:color-mix(in srgb, var(--color-muted) 22%, var(--color-dark-card));
+  --margin:color-mix(in srgb, var(--color-orange) 45%, var(--color-dark-card));
+  --hud:color-mix(in srgb, var(--color-dark-card) 90%, transparent); --card:var(--color-dark); --sel:color-mix(in srgb, var(--color-teal) 30%, var(--color-dark-card));
+  color-scheme:dark; }
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none !important}
+html,body{margin:0}
+body{background:var(--snow2);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;line-height:1.15;margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:-1px;padding:0;border:0}
+
+/* Header: the shared Allgood Academy header */
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:50;background:var(--paper);color:var(--ink);border:1px solid var(--paper-b);border-radius:12px;padding:10px 14px;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+
+/* The field */
+.app{position:relative;height:calc(100vh - 60px);height:calc(100dvh - 60px);min-height:360px;overflow:hidden}
+.world{position:absolute;inset:0}
+#map{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;left:14px;top:12px;display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;max-width:calc(100% - var(--nbw) - 44px);z-index:4}
+.chip{background:var(--hud);border:1px solid var(--line);border-radius:12px;padding:6px 10px;box-shadow:0 2px 8px rgba(0,0,0,.08);backdrop-filter:blur(4px)}
+.chip.yr{display:flex;flex-direction:column;justify-content:center;min-width:86px}
+.chip.yr span{font-size:11px;color:var(--ink2);letter-spacing:.3px}
+.chip.yr b{font-family:var(--font-display);font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.counts{display:flex;gap:14px;align-items:center}
+.cnt{display:flex;flex-direction:column;font-size:11px;color:var(--ink2)}
+.cnt b{font-size:17px;color:var(--ink);font-variant-numeric:tabular-nums}
+.cnt .k{display:flex;align-items:center;gap:5px}
+.dot{display:inline-block;width:12px;height:7px;border-radius:50%}
+.dot.deer{background:var(--deer)} .dot.wolf{background:var(--wolf);width:14px;height:5px} .dot.sap{background:var(--sapling);width:8px;height:8px}
+.meter{width:64px;height:6px;border-radius:4px;background:var(--snow2);border:1px solid var(--line);margin-top:3px;position:relative;overflow:hidden}
+.meter i{position:absolute;left:0;top:0;bottom:0;background:var(--sapling);width:50%}
+.meter .dz{position:absolute;top:-2px;bottom:-2px;left:20%;width:2px;background:var(--ink)}
+.ctlchip{display:flex;gap:6px;align-items:center}
+.hbtn{border:1px solid var(--line);background:var(--card);border-radius:10px;min-height:36px;padding:4px 12px;font-weight:700;font-size:13px;cursor:pointer}
+.hbtn[aria-pressed="true"]{background:var(--accent);color:var(--color-surface);border-color:var(--accent)}
+.hbtn:disabled{opacity:.45;cursor:not-allowed}
+.keyline{font-size:11px;color:var(--ink2);margin-top:2px}
+
+.log{position:absolute;left:14px;bottom:14px;width:min(600px, calc(100% - var(--nbw) - 44px));height:clamp(140px, 30%, 240px);z-index:3;
+  background:var(--paper);border:1px solid var(--paper-b);border-radius:6px 14px 14px 6px;box-shadow:0 6px 20px rgba(0,0,0,.16)}
+.log::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;border-radius:6px 0 0 6px;background:var(--pine);opacity:.85}
+#logcv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+
+.notebook{position:absolute;right:14px;top:12px;bottom:14px;width:var(--nbw);overflow:auto;z-index:5;
+  background-color:var(--paper);background-image:linear-gradient(90deg, transparent 30px, var(--margin) 30px, var(--margin) 31.5px, transparent 31.5px);
+  border:1px solid var(--paper-b);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:18px 18px 22px 44px;overscroll-behavior:contain}
+.tabs{display:flex;gap:5px;list-style:none;padding:0;margin:0 0 12px}
+.tabs li{flex:1;height:5px;border-radius:3px;background:var(--paper-b)}
+.tabs li.done{background:var(--accent)} .tabs li.now{background:var(--cta)}
+.kicker{font-size:11.5px;font-weight:700;color:var(--accent-text);margin:0 0 3px;letter-spacing:.4px}
+.notebook h2{font-size:24px;margin:0 0 10px;outline:none}
+.notebook p{margin:0 0 10px}
+.q{font-weight:700;margin:12px 0 8px}
+.radio{display:flex;gap:10px;align-items:flex-start;margin:8px 0 12px;padding:9px 11px;border:1px solid var(--paper-b);border-radius:4px 14px 14px 14px;background:var(--card)}
+.radio img{width:38px;height:38px;border-radius:50%;flex:none;background:var(--paper);border:1px solid var(--paper-b)}
+.radio .who{display:block;font-size:10.5px;font-weight:700;color:var(--accent-text);letter-spacing:.5px;margin-bottom:2px}
+.radio p{margin:0 0 6px}.radio p:last-child{margin:0}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
+.choices.text{grid-template-columns:1fr}
+.choice{position:relative;text-align:left;border:1px solid var(--paper-b);background:var(--card);border-radius:12px;padding:8px 9px 9px;cursor:pointer;display:flex;flex-direction:column;gap:5px;min-height:44px;line-height:1.3;font-size:13.5px}
+.choices.text .choice{flex-direction:row;align-items:flex-start;gap:9px;padding:10px 12px}
+.choice:hover:not(:disabled){border-color:var(--accent)}
+.choice[aria-pressed="true"]{border:2px solid var(--accent);padding:7px 8px 8px;background:var(--sel)}
+.choices.text .choice[aria-pressed="true"]{padding:9px 11px}
+.choice:disabled{cursor:default}
+.choice:disabled:not([aria-pressed="true"]){opacity:.55}
+.choice .ltr{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;border:1.5px solid var(--accent);color:var(--accent-text);font-weight:700;font-size:12px;flex:none}
+.choice[aria-pressed="true"] .ltr{background:var(--accent);color:var(--color-surface)}
+.choice .ctop{display:flex;align-items:center;gap:6px}
+.choice svg{width:100%;height:40px;display:block}
+.choice .tag{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:4px;background:var(--accent);color:var(--color-surface)}
+.btn{border:1px solid var(--paper-b);background:var(--card);border-radius:12px;padding:8px 14px;cursor:pointer;font-weight:700;min-height:44px}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn.small{min-height:36px;padding:5px 11px;font-size:13px}
+.btn.cta{background:var(--cta);color:var(--color-surface);border:0;box-shadow:0 4px 0 var(--cta-d);font-size:17px;padding:10px 18px}
+.btn.cta:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 var(--cta-d)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.note{font-size:12.5px;color:var(--ink2)}
+.goal{border:1.5px dashed var(--ink2);border-radius:12px;padding:9px 12px;margin:8px 0 10px;font-size:13.5px;background:var(--card)}
+.goal b{display:block;font-family:var(--font-display);font-size:15px;margin-bottom:2px}
+.progress{border-left:4px solid var(--cta);background:var(--card);padding:9px 12px;border-radius:0 12px 12px 0;margin:10px 0;font-size:14px}
+.found{margin:10px 0 0}
+.found h3{font-family:var(--font-ui);font-size:12px;letter-spacing:.5px;color:var(--accent-text);margin:0 0 6px;outline:none}
+.stat{font-family:var(--font-display);font-size:18px;line-height:1.35;margin:0 0 8px}
+.stat .d{color:var(--deer)} .stat .w{color:var(--wolf)}
+details.why{border-top:1px solid var(--paper-b);padding-top:8px;margin:8px 0}
+details.why summary{cursor:pointer;font-weight:700;color:var(--accent-text);font-size:13.5px}
+details.why p{margin:8px 0 0;font-size:14px}
+.pick{background:var(--card);border:1px solid var(--paper-b);border-radius:12px;padding:10px 12px;margin:6px 0 10px}
+.pick label{display:flex;justify-content:space-between;font-weight:700;margin-bottom:2px}
+.pick output{font-family:var(--font-display);font-size:20px;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.pick input[type=range]{width:100%;accent-color:var(--cta);height:30px;margin:0}
+.hints{margin:6px 0 8px;padding-left:20px;font-size:14px}
+.attempts{list-style:none;padding:0;margin:8px 0;font-size:13px}
+.attempts li{border-bottom:1px dashed var(--paper-b);padding:5px 0}
+.dtable{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:14px;background:var(--card);border:1px solid var(--paper-b)}
+.dtable th,.dtable td{padding:6px 9px;text-align:left;border-bottom:1px solid var(--paper-b);font-variant-numeric:tabular-nums}
+.dtable td:not(:first-child),.dtable th:not(:first-child){text-align:right}
+.report dl{margin:4px 0 12px}
+.report dt{font-family:var(--font-display);font-weight:700;margin-top:8px}
+.report dd{margin:1px 0 0;font-size:14px}
+.yours{list-style:none;padding:0;margin:6px 0 12px;font-size:13.5px}
+.yours li{border-bottom:1px dashed var(--paper-b);padding:6px 0}
+.honest{border:1px dashed var(--ink2);border-radius:12px;padding:9px 12px;margin:10px 0;background:var(--card);font-size:13.5px}
+.honest b{font-family:var(--font-display);font-size:15px;display:block;margin-bottom:2px}
+.honest p{margin:0 0 6px}
+.toolbox{border:1px solid var(--paper-b);border-radius:12px;padding:10px 12px;background:var(--card);margin:10px 0}
+.toolbox h3{font-family:var(--font-ui);font-size:12px;letter-spacing:.5px;color:var(--accent-text);margin:0 0 6px}
+.tb{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:13px}
+.tb .grp{display:flex;gap:5px;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--paper-b);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-left:1px solid var(--paper-b);background:var(--card);padding:6px 10px;min-height:36px;cursor:pointer;font-size:13px}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--color-surface);font-weight:700}
+.vote{border:1px dashed var(--paper-b);border-radius:12px;padding:8px 10px;margin:0 0 10px;background:var(--card)}
+.vote summary{cursor:pointer;font-weight:700;font-size:13px}
+.vote .vrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:6px}
+.vote label{display:flex;align-items:center;gap:4px;font-weight:700}
+.vote input{width:100%;min-height:38px;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:3px 6px;font-size:16px}
+.teach{border-top:1px solid var(--paper-b);margin-top:16px;padding-top:10px;font-size:12px;color:var(--ink2)}
+.teach summary{cursor:pointer;font-weight:700}
+.teach ul{padding-left:16px;margin:6px 0}
+.term{appearance:none;background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--accent-text);text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
+.tip{position:absolute;z-index:60;max-width:min(270px,calc(100vw - 24px));background:var(--paper);color:var(--ink);border:1px solid var(--paper-b);border-radius:12px;padding:9px 11px;font-size:13.5px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.tip b{display:block;font-family:var(--font-display);font-size:14.5px}
+
+/* Present mode */
+body.present{--nbw:clamp(380px, 38vw, 520px)}
+body.present .notebook{font-size:18px}
+body.present .notebook h2{font-size:32px}
+body.present .choice{font-size:17px}
+body.present .choice svg{height:54px}
+body.present .choice .ltr{width:28px;height:28px;font-size:15px}
+body.present .btn.cta{font-size:21px}
+body.present .chip.yr b{font-size:32px}
+body.present .cnt b{font-size:22px}
+
+/* Phones held upright and narrow windows: map pinned on top, notebook scrolls under it */
+@media (max-width:759px), (orientation:portrait) and (max-width:1000px){
+  .app{height:auto;overflow:visible;min-height:0}
+  .world{position:sticky;top:60px;height:58vh;height:58svh;z-index:6;border-bottom:1px solid var(--line)}
+  .hud{max-width:calc(100% - 16px);left:8px;top:8px;gap:5px;flex-wrap:nowrap}
+  .chip{padding:3px 7px;border-radius:10px}
+  .chip.yr{min-width:0} .chip.yr span{font-size:10px} .chip.yr b{font-size:16px}
+  .cnt{font-size:10px} .cnt b{font-size:13px} .counts{gap:8px}
+  .meter{width:44px}
+  .hbtn{min-height:32px;padding:3px 8px;font-size:12px}
+  .ctlchip{gap:4px}
+  .keyline{display:none}
+  .log{left:8px;right:8px;bottom:8px;width:auto;height:40%}
+  .notebook{position:relative;inset:auto;width:auto;margin:10px;box-shadow:none}
+}
+@media (max-width:420px){ .choices{gap:6px} .choice{font-size:12.5px} }
+@media (max-height:480px) and (orientation:landscape){ .chip.yr b{font-size:18px} .keyline{display:none} .log{height:34%} }
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;scroll-behavior:auto !important} }
+</style>
+<style>
+/* Activity row (under the generated site nav): copied verbatim from /simulations/watercycle/ so
+   every simulation page has the same row. Change it there and here together. The two lines after the copy pin what the
+   header takes from Water Cycle's page rules (header teal, .wrap width, Present widths), so this
+   page's own palette and layout cannot move it. */
+.top{background:var(--header);color:var(--on-header);position:sticky;top:0;z-index:30;box-shadow:0 2px 6px color-mix(in srgb, var(--color-ink) 18%, transparent)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.wordmark{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--on-header);text-decoration:none;white-space:nowrap}
+.pill{background:var(--color-orange);color:var(--color-surface);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.top-right{display:flex;align-items:center;gap:6px;flex:none}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:999px;color:var(--color-teal-wash);text-decoration:none}
+.iconbtn:hover{background:color-mix(in srgb, var(--color-surface) 12%, transparent);color:var(--color-surface)}
+.iconbtn:focus-visible{outline-color:var(--color-surface);outline-offset:-3px}
+.iconbtn svg{width:22px;height:22px}
+button.iconbtn{appearance:none;border:0;background:transparent;cursor:pointer;padding:0}
+.wm-sub{font-family:var(--font-ui);font-size:12px;font-weight:400;opacity:.7;letter-spacing:.5px}
+.navbtn{appearance:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:999px;border:1px solid color-mix(in srgb, var(--color-surface) 45%, transparent);background:transparent;color:var(--color-surface);font-weight:700;font-size:13px;cursor:pointer;margin-right:4px}
+.navbtn svg{width:18px;height:18px}
+.navbtn:hover,.navbtn[aria-pressed="true"]{background:var(--color-surface);color:var(--color-teal-deep)}
+.navbtn:focus-visible{outline-color:var(--color-surface)}
+body.present .wm-sub,body.present .pill{display:none}
+@media (max-width:700px){ .navbtn span{display:none}.navbtn{padding:0 9px} .wm-sub{display:none} .wordmark{font-size:16px} }
+@media (max-width:420px){ .wordmark{display:none} .pill{max-width:70vw} }
+.top{--header:var(--color-teal);--on-header:var(--color-surface);font-family:var(--font-ui);font-size:16px;line-height:1.55}
+.top .wrap{max-width:1180px;margin:0 auto;padding:0 24px} body.present .top .wrap{max-width:none;padding:0 22px}
+</style>
+<style>
+/* Comms (/js/message-hq.js) host styles. message-hq.js builds its inbox from Tailwind
+   class names and expects the host page to define .hidden-modal / .visible-modal. These
+   pages ship no Tailwind bundle (its preflight reset would restyle them), so the classes
+   the inbox actually uses are defined here, scoped to #message-modal. Without this block
+   the inbox renders open, unstyled, over the page on every load. */
+.modal-transition{transition:opacity .2s ease-in-out,transform .2s ease-in-out}
+#message-modal.hidden-modal{opacity:0;pointer-events:none;transform:translateY(-10px)}
+#message-modal.visible-modal{opacity:1;pointer-events:auto;transform:none}
+#message-modal{padding:24px;font:14px/1.5 Verdana,Geneva,Tahoma,sans-serif;color:var(--color-ink);text-align:left;color-scheme:light}
+#message-modal *{box-sizing:border-box} #message-modal .relative{position:relative}
+#message-modal h3,#message-modal p{margin:0}
+#message-modal button{font:inherit;cursor:pointer;background:none;border:0;color:inherit;padding:0}
+#message-modal svg.w-5{width:20px;height:20px} #message-modal svg.w-3{width:12px;height:12px}
+#message-modal .bg-white{background:var(--color-surface)}
+#message-modal .rounded-lg{border-radius:10px} #message-modal .rounded{border-radius:6px} #message-modal .rounded-full{border-radius:999px} #message-modal .rounded-r{border-radius:0 6px 6px 0}
+#message-modal .shadow-2xl{box-shadow:0 24px 48px rgba(0,0,0,.3)}
+#message-modal .border-t-4{border-top:4px solid var(--color-orange)}
+#message-modal .px-6{padding-left:24px;padding-right:24px} #message-modal .pt-6{padding-top:24px} #message-modal .pb-3{padding-bottom:12px} #message-modal .py-4{padding-top:16px;padding-bottom:16px} #message-modal .py-6{padding-top:24px;padding-bottom:24px} #message-modal .py-2{padding-top:8px;padding-bottom:8px} #message-modal .py-3{padding-top:12px;padding-bottom:12px} #message-modal .p-3{padding:12px} #message-modal .px-3{padding-left:12px;padding-right:12px} #message-modal .py-1\.5{padding-top:6px;padding-bottom:6px}
+#message-modal .mt-1{margin-top:4px} #message-modal .mt-2{margin-top:8px} #message-modal .mt-3{margin-top:12px} #message-modal .mt-4{margin-top:16px} #message-modal .mb-1{margin-bottom:4px} #message-modal .mb-2{margin-bottom:8px} #message-modal .mb-3{margin-bottom:12px} #message-modal .mt-1\.5{margin-top:6px}
+#message-modal .border-t{border-top:1px solid var(--color-hairline)}
+#message-modal .border-l-4{border-left:4px solid var(--color-hairline)}
+#message-modal .border-l-4.border-allgood-primary{border-left-color:var(--color-orange)} #message-modal .border-l-4.border-allgood-secondary{border-left-color:var(--color-teal)}
+#message-modal .border{border:1px solid var(--color-hairline)}
+#message-modal .bg-gray-50{background:var(--color-light)} #message-modal .hover\:bg-gray-100:hover{background:var(--color-hairline)}
+#message-modal .w-full{width:100%} #message-modal .text-left{text-align:left} #message-modal .text-center{text-align:center}
+#message-modal .flex{display:flex} #message-modal .flex-wrap{flex-wrap:wrap} #message-modal .items-start{align-items:flex-start} #message-modal .items-center{align-items:center} #message-modal .justify-center{justify-content:center} #message-modal .gap-2{gap:8px} #message-modal .shrink-0{flex-shrink:0} #message-modal .min-w-0{min-width:0}
+#message-modal .h-2{height:8px} #message-modal .w-2{width:8px} #message-modal .bg-allgood-primary{background:var(--color-orange)} #message-modal .bg-transparent{background:transparent}
+#message-modal .text-xl{font-size:20px;line-height:1.3} #message-modal .text-sm{font-size:14px} #message-modal .text-xs{font-size:12px} #message-modal .text-\[10px\]{font-size:10px}
+#message-modal .font-heading{font-family:Georgia,"Times New Roman",serif} #message-modal .font-bold{font-weight:700}
+#message-modal .uppercase{text-transform:uppercase} #message-modal .tracking-wide{letter-spacing:.025em} #message-modal .tracking-widest{letter-spacing:.1em} #message-modal .italic{font-style:italic} #message-modal .leading-snug{line-height:1.375} #message-modal .leading-relaxed{line-height:1.625} #message-modal .break-words{overflow-wrap:break-word}
+#message-modal .text-allgood-dark{color:var(--color-ink)} #message-modal .text-gray-600,#message-modal .text-gray-500{color:var(--color-ink-soft)} #message-modal .text-gray-400{color:var(--color-ink-soft)}
+#message-modal .text-white{color:var(--color-surface)} #message-modal .underline{text-decoration:underline}
+#message-modal .bg-allgood-primary.text-white:hover,#message-modal .hover\:bg-allgood-hover:hover{background:var(--color-orange-deep)}
+#message-modal .bg-emerald-600{background:var(--color-teal)}
+#message-modal .hover\:text-red-500:hover{color:var(--color-orange-deep)}
+#message-modal .hover\:border-allgood-primary:hover{border-color:var(--color-orange);color:var(--color-orange-deep)}
+#message-modal textarea{display:block;width:100%;border:1px solid var(--color-hairline);border-radius:6px;padding:12px;margin-bottom:12px;background:var(--color-light);color:var(--color-ink);font-family:inherit;resize:none}
+#message-modal textarea:focus{outline:2px solid var(--color-teal-deep);outline-offset:1px}
+#message-modal button:focus-visible{outline:2px solid var(--color-teal-deep);outline-offset:2px}
+</style>
+</head>
+<body>
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
+<div class="nav-shell activity">
+  <div class="wrap">
+    <nav class="nav site-nav">
+      <a class="wordmark" href="/">Allgood<em>Academy</em></a>
+      <div class="nav-right">
+        <div class="nav-links">
+          <a class="nav-link" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
+      </div>
+    </nav>
+  </div>
+</div>
+<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>
+<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+}
+</style>
+<script>
+(function(){
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.textContent='Mission Control';
+})();
+</script>
+<!-- END GENERATED NAV -->
+<!-- The activity row: this simulation's name, Present and Comms. Same markup on every simulation page. -->
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="pill">Wolves &amp; Deer</span>
+    </div>
+    <div class="top-right">
+      <button class="navbtn" type="button" id="presentBtn" aria-pressed="false" title="Present to your class">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg>
+        <span id="presentLabel">Present</span>
+      </button>
+      <button class="iconbtn" type="button" id="commsBtn" title="Comms" aria-label="Comms">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<main class="app">
+  <h1 class="sr-only">Wolves and Deer: a winter survey simulation</h1>
+  <section class="world" aria-label="The valley from above">
+    <canvas id="map" role="img" aria-label="Top-down winter map of a valley: forest stands, a frozen lake, young trees the deer eat, deer, and wolf packs with their tracks." aria-describedby="desc"></canvas>
+    <div class="hud">
+      <div class="chip yr"><span id="yrLabel">Winter</span><b id="hYear">0</b></div>
+      <div class="chip">
+        <div class="counts">
+          <div class="cnt"><span class="k"><i class="dot deer" aria-hidden="true"></i><span id="preyName">Deer</span></span><b id="hD">0</b></div>
+          <div class="cnt"><span class="k"><i class="dot wolf" aria-hidden="true"></i>Wolves</span><b id="hW">0</b></div>
+          <div class="cnt" id="sapCnt"><span class="k"><i class="dot sap" aria-hidden="true"></i>Young trees</span><b id="hP">0%</b><span class="meter" aria-hidden="true"><i id="hPbar"></i><span class="dz" id="hPdz" hidden></span></span></div>
+        </div>
+        <div class="keyline" id="keyline">1 shape = 10 deer · 1 shape = 1 wolf</div>
+      </div>
+      <div class="chip ctlchip">
+        <button class="hbtn" type="button" id="play" aria-pressed="false">Fly</button>
+        <button class="hbtn" type="button" id="speed" aria-pressed="false" title="Fly faster">×3</button>
+      </div>
+    </div>
+    <div class="log" aria-label="Survey log"><canvas id="logcv" role="img" aria-label="Survey log: one dot per winter count, deer on top, wolves below." aria-describedby="desc"></canvas></div>
+  </section>
+  <aside class="notebook" id="guide" aria-label="Field notebook"></aside>
+</main>
+<p class="sr-only" id="desc" aria-live="off"></p>
+<p class="sr-only" id="announce" aria-live="polite"></p>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s);};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+var REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+var VERSION = "1.3";
+var IS_PROD = true; // served only by allgoodacademy.com and its staging channels
+
+/* Jodi, from the repo at assets/jodi/. Never redraw her. */
+var JODI = { neutral:"/assets/jodi/jodi-neutral.svg", happy:"/assets/jodi/jodi-happy.svg", thinking:"/assets/jodi/jodi-thinking.svg", concerned:"/assets/jodi/jodi-concerned.svg" };
+
+/* ================= Telemetry (first-party only, anonymous, stream 'wolves-and-deer') ================= */
+var TEL = {ready:false, queue:[]};
+function telInit(tries){
+  if(window.Telemetry && window.AuthCore){
+    if(TEL.ready) return; TEL.ready = true;
+    try{ window.Telemetry.init({ module:'wolves-and-deer', gameName:'Wolves & Deer', stepsTotal:6, stream:'wolves-and-deer' });
+      var c = window.AuthCore; if(c.anonymousSessionOnly) c.anonymousSessionOnly().catch(function(){}); }catch(e){}
+    var q = TEL.queue; TEL.queue = []; q.forEach(dispatch); return;
+  }
+  if((tries||0) > 200) return; setTimeout(function(){ telInit((tries||0)+1); }, 50);
+}
+if(IS_PROD){ ["/js/auth-core.js","/js/telemetry.js"].forEach(function(src){ var s=document.createElement("script"); s.type="module"; s.src=src; s.async=false; document.head.appendChild(s); }); telInit(0); }
+function dispatch(e){ var T = TEL.ready ? window.Telemetry : null; if(!T) return;
+  try{ if(e.kind==="track" && T.track) T.track(e.name, e.meta); else if(e.kind==="step" && T.step) T.step(e.meta.step);
+    else if(e.kind==="complete" && T.complete) T.complete(e.meta); else if(e.kind==="restart" && T.restart) T.restart(); }catch(err){} }
+function send(kind, name, meta){ meta=meta||{}; meta.v=VERSION; var e={kind:kind,name:name,meta:meta}; if(!IS_PROD) return; if(TEL.ready) dispatch(e); else TEL.queue.push(e); }
+function track(name, meta){ send("track", name, meta); }
+
+/* ================= Model =================
+   A simplified plants–deer–wolves model, stepped every 1/50 of a year.
+   Plants are "% of a healthy forest's browse". Deer and wolves are head counts.
+   It is an illustration of the pattern, tuned by hand, not a forecast for any real place. */
+var FOOD={low:0.5, normal:0.8, rich:1.15}, FOOD_WORD={low:"low",normal:"normal",rich:"rich"};
+var K={c:0.06, hp:25, bD:0.9, mD:0.30, fh:30, R:25, a:18, hk:250, e:0.045, mW:0.33, dW:0.011, seed:3, hg:0.8};
+var DT=1/50, LOG_EVERY=0.25;
+var DANGER={P:20, D:100, W:3};
+function Model(){ this.set({}); }
+Model.prototype.set=function(o){
+  o=o||{}; this.t=0; this.P=o.P!=null?o.P:70; this.D=o.D!=null?o.D:400; this.W=o.W!=null?o.W:14;
+  this.food=o.food||"normal"; this.schedule=(o.winters||[]).slice(); this.pendingWinter=false;
+  this.winterLog=[]; this.snow=0; this.acc=0; this.hist=[]; this.log();
+};
+Model.prototype.food01=function(){ return this.P/(this.P+K.fh); };
+Model.prototype.step=function(dt){
+  var P=this.P, D=this.D, W=this.W, rP=FOOD[this.food];
+  var dP = rP*P*(1-P/100) + K.seed*(1-P/100) - K.c*D*P/(P+K.hp);   // regrowth minus browsing
+  var f = P/(P+K.fh);                                                 // how well fed the deer are
+  var Deff=Math.max(0,D-K.R), kill=K.a*Deff/(Deff+K.hk);              // deer caught per wolf per year (some deer always hide)
+  var dD = D*(K.bD*f - K.mD) - kill*W;                                // fawns minus deaths minus wolves
+  var births = W>=2 ? K.e*kill*W : 0;                                 // pups need a pair and full bellies
+  var hunger = K.hg*Math.pow(Math.max(0,1-kill/K.a*1.6),2);
+  var dW = births - (K.mW + K.dW*W + hunger)*W;
+  this.P=Math.min(100,Math.max(0.5,P+dP*dt)); this.D=Math.max(0,D+dD*dt); this.W=Math.max(0,W+dW*dt);
+  if(this.W<0.6) this.W=0; if(this.D<5) this.D=0;
+  var before=this.t; this.t+=dt; this.snow=Math.max(0,this.snow-dt);
+  if(this.schedule.length && this.t>=this.schedule[0]){ this.schedule.shift(); this.winter(); }
+  if(this.pendingWinter && Math.floor(this.t)!==Math.floor(before)){ this.pendingWinter=false; this.winter(); }
+  this.acc+=dt; if(this.acc>=LOG_EVERY-1e-9){ this.acc=0; this.log(); }
+};
+// A harsh winter: deep snow costs deer energy, and well-fed deer ride it out better. Wolves catch more in deep snow.
+Model.prototype.winter=function(){
+  var f=this.food01(), loss=Math.min(0.6, 0.10+0.40*(1-f/0.77));
+  this.D*=(1-loss); this.D=Math.max(0, this.D-Math.min(this.D*0.15, this.W*4));
+  this.winterLog.push(this.t); this.snow=1.2; this.log();
+};
+Model.prototype.log=function(){ this.hist.push({t:this.t, P:this.P, D:this.D, W:this.W}); if(this.hist.length>2400) this.hist.shift(); };
+Model.prototype.ff=function(years, onStep){ var n=Math.round(years/DT); for(var i=0;i<n;i++){ this.step(DT); if(onStep) onStep(this); } };
+function challengeRun(release){
+  var m=new Model(); m.set({P:60, D:700, W:2+release, winters:[8,19]});
+  var fail=null;
+  m.ff(30, function(mm){ if(fail) return; if(mm.P<DANGER.P) fail={k:"P",t:mm.t}; else if(mm.D<DANGER.D) fail={k:"D",t:mm.t}; else if(mm.W<DANGER.W) fail={k:"W",t:mm.t}; });
+  return {fail:fail, m:m};
+}
+
+
+var RANGE = (function(){ var ok=[]; for(var r=0;r<=40;r++){ if(!challengeRun(r).fail) ok.push(r); } return ok.length ? {lo:ok[0], hi:ok[ok.length-1]} : null; })();
+
+/* Isle Royale: only counts we could source (NPS, MTU winter study reports, the Isle Royale Wolf-Moose Project). */
+var ISRO = { moose:[{y:1995,v:2400},{y:1997,v:500},{y:2007,v:385},{y:2019,v:2000},{y:2024,v:840},{y:2026,v:524,late:true}],
+             wolves:[{y:2016,v:2},{y:2022,v:28,late:true},{y:2023,v:31,late:true},{y:2024,v:30,late:true},{y:2026,v:37,late:true}] };
+
+/* ================= Colors ================= */
+var C={};
+var probe=document.createElement("span"); probe.style.display="none"; document.body.appendChild(probe);
+function resolve(v){ probe.style.color="var("+v+")"; return getComputedStyle(probe).color; }
+function loadColors(){ ["snow1","snow2","topo","lake","lake-edge","pine","pine2","sapling","browsed","deer","wolf","track","paper","paper-b","rule","margin","ink","ink2","accent","card","cta"].forEach(function(k){ C[k]=resolve("--"+k); }); C.white=resolve("--color-surface"); }
+function rgbOf(s){ var m=String(s).match(/[\d.]+/g)||[0,0,0]; return [+m[0],+m[1],+m[2]]; }
+function alpha(s,a){ var x=rgbOf(s); return "rgba("+x[0]+","+x[1]+","+x[2]+","+a+")"; }
+loadColors();
+var FONT = getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim() || "Verdana, Geneva, sans-serif";
+var SERIF = "Georgia, 'Times New Roman', serif";
+function fmt(n){ return Math.round(n).toLocaleString("en-US"); }
+function approx(n){ var v = n>=1000 ? Math.round(n/50)*50 : n>=100 ? Math.round(n/10)*10 : Math.round(n); return v.toLocaleString("en-US"); }
+function hash(i,s){ var x=Math.sin(i*127.1+s*311.7)*43758.5453; return x-Math.floor(x); }
+
+/* ================= Map (top-down winter survey) ================= */
+var LAKE={x:0.74,y:0.3,rx:0.11,ry:0.085};
+function inLake(x,y){ var dx=(x-LAKE.x)/(LAKE.rx+0.03), dy=(y-LAKE.y)/(LAKE.ry+0.03); return dx*dx+dy*dy<1; }
+var SAPS=[]; (function(){ var i=0,n=0; while(SAPS.length<150 && n<2000){ n++; var x=0.03+0.94*hash(n,31), y=0.04+0.92*hash(n,32); if(inLake(x,y)) continue; SAPS.push({x:x,y:y,o:hash(n,33),s:0.8+0.4*hash(n,34)}); } SAPS.sort(function(a,b){return a.y-b.y;}); })();
+var STANDS=[]; (function(){ for(var k=0;k<10;k++){ var cx=0.05+0.9*hash(k,41), cy=0.06+0.88*hash(k,42); if(inLake(cx,cy)) continue; var n=6+Math.floor(hash(k,43)*7); for(var j=0;j<n;j++){ STANDS.push({x:cx+(hash(k*20+j,44)-0.5)*0.12, y:cy+(hash(k*20+j,45)-0.5)*0.1, r:0.7+0.6*hash(k*20+j,46)}); } } })();
+var PACKS=[{ph:0,a:0.36,b:0.30,cx:0.47,cy:0.52,sp:0.022,f:2},{ph:0.37,a:0.28,b:0.36,cx:0.42,cy:0.5,sp:0.018,f:3},{ph:0.71,a:0.40,b:0.22,cx:0.5,cy:0.55,sp:0.02,f:2},{ph:0.2,a:0.22,b:0.25,cx:0.3,cy:0.4,sp:0.026,f:2},{ph:0.55,a:0.25,b:0.2,cx:0.62,cy:0.66,sp:0.024,f:3}];
+function packPos(p,s){ var a=2*Math.PI*(s+p.ph); return {x:p.cx+p.a*Math.sin(a), y:p.cy+p.b*Math.sin(p.f*a+0.6)}; }
+
+function MapView(cv){ this.cv=cv; this.c=cv.getContext("2d"); this.k=1; this.dispD=0; this.dispW=0; this.packS=[0,0,0,0,0]; this.mode="valley"; this.iso={moose:2000, wolves:15}; this.isoT={moose:2000,wolves:15}; this.resize(); }
+MapView.prototype.resize=function(){ var r=this.cv.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); if(r.width<10) return; this.w=r.width; this.h=r.height; this.cv.width=Math.round(r.width*d); this.cv.height=Math.round(r.height*d); this.c.setTransform(d,0,0,d,0,0); };
+MapView.prototype.field=function(){
+  // the part of the map not covered by the notebook, HUD or survey log
+  var w=this.w, h=this.h, world=$(".world").getBoundingClientRect(), nb=$("#guide").getBoundingClientRect(), lg=$(".log").getBoundingClientRect(), hd=$(".hud").getBoundingClientRect();
+  var right = (nb.left>world.left+100 && nb.top<world.bottom-50) ? nb.left-world.left-14 : w-10;
+  var top = Math.min(h*0.4, hd.bottom-world.top+10), bot = lg.top-world.top-10;
+  if(bot-top<80){ top=Math.max(6,bot-120); }
+  return {x:12, y:top, w:Math.max(80,right-12), h:Math.max(60,bot-top)};
+};
+MapView.prototype.ground=function(){
+  var c=this.c, w=this.w, h=this.h, i, j;
+  var g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,C.snow1); g.addColorStop(1,C.snow2); c.fillStyle=g; c.fillRect(0,0,w,h);
+  // topo contours
+  c.strokeStyle=C.topo; c.lineWidth=1;
+  [[0.22,0.3,5],[0.55,0.78,4],[0.9,0.85,4],[0.4,0.05,3]].forEach(function(hill,hi){
+    for(j=1;j<=hill[2];j++){ c.beginPath(); for(i=0;i<=60;i++){ var a=i/60*6.283, rr=j*Math.min(w,h)*0.075*(1+0.18*Math.sin(a*3+hi)+0.1*Math.sin(a*5+j)); var x=hill[0]*w+Math.cos(a)*rr*1.4, y=hill[1]*h+Math.sin(a)*rr; if(i===0) c.moveTo(x,y); else c.lineTo(x,y); } c.closePath(); c.stroke(); }
+  });
+};
+MapView.prototype.draw=function(m, clock, dt){
+  if(!this.w) return;
+  this.ground();
+  if(this.mode==="island"){ this.drawIsland(clock, dt); return; }
+  var c=this.c, F=this.field(), k=this.k, t=REDUCED?0:clock, i, self=this;
+  var X=function(v){ return F.x+v*F.w; }, Y=function(v){ return F.y+v*F.h; };
+  var unit=Math.max(3.4, Math.min(F.w,F.h)/88)*k;
+  // frozen lake
+  c.fillStyle=C.lake; c.strokeStyle=C["lake-edge"]; c.lineWidth=1.5;
+  c.beginPath(); c.ellipse(X(LAKE.x),Y(LAKE.y),LAKE.rx*F.w,LAKE.ry*F.h,0.3,0,6.283); c.fill(); c.stroke();
+  // forest stands (cover, not food)
+  STANDS.forEach(function(s){ var x=X(s.x), y=Y(s.y), r=unit*1.5*s.r; c.fillStyle=C.pine; c.beginPath(); for(var q=0;q<10;q++){ var a=q/10*6.283, rr=q%2?r*0.55:r; c.lineTo(x+Math.cos(a)*rr, y+Math.sin(a)*rr); } c.closePath(); c.fill(); c.fillStyle=C.pine2; c.beginPath(); c.arc(x,y,r*0.32,0,6.283); c.fill(); });
+  // young trees: the food. Green while there's browse, brown stubs when eaten down.
+  var green=Math.max(0,Math.min(1,m.P/100));
+  SAPS.forEach(function(s){ var x=X(s.x), y=Y(s.y), r=unit*0.62*s.s;
+    if(s.o<green){ c.fillStyle=C.sapling; c.beginPath(); c.arc(x,y,r,0,6.283); c.fill(); }
+    else { c.strokeStyle=C.browsed; c.lineWidth=Math.max(1,unit*0.28); c.lineCap="round"; c.beginPath(); c.moveTo(x-r*0.7,y); c.lineTo(x+r*0.7,y); c.moveTo(x,y-r*0.7); c.lineTo(x,y+r*0.7); c.stroke(); } });
+  // counts on screen ease toward the model so animals fade in and out (no animal is ever shown being caught)
+  var lerp=REDUCED?1:Math.min(1,dt*4);
+  this.dispD += (m.D/10-this.dispD)*lerp; this.dispW += (m.W-this.dispW)*lerp;
+  var nD=Math.min(190,this.dispD), nW=Math.min(60,this.dispW);
+  // deer: drift slowly around a home spot
+  for(i=0;i<Math.ceil(nD);i++){
+    var hx=0.03+0.94*hash(i,7), hy=0.04+0.92*hash(i,8); if(inLake(hx,hy)) hx=Math.max(0.03,hx-0.2);
+    var sp=0.25+0.2*hash(i,9), a=t*sp+hash(i,10)*6.283;
+    var x=X(hx+0.014*Math.cos(a)), y=Y(hy+0.014*Math.sin(a*1.3)), dir=Math.atan2(1.3*Math.cos(a*1.3)*F.h, -Math.sin(a)*F.w);
+    c.globalAlpha=Math.max(0,Math.min(1,nD-i));
+    c.save(); c.translate(x,y); c.rotate(dir); c.fillStyle=C.deer;
+    c.beginPath(); c.ellipse(0,0,unit*1.05,unit*0.55,0,0,6.283); c.fill(); c.beginPath(); c.arc(unit*1.15,0,unit*0.36,0,6.283); c.fill(); c.restore();
+  }
+  c.globalAlpha=1;
+  // wolves travel in packs along loops and leave tracks in the snow
+  var nPacks = nW>0.5 ? Math.max(1,Math.min(5,Math.ceil(nW/8))) : 0, per = nPacks ? nW/nPacks : 0, made=0;
+  for(var pk=0; pk<nPacks; pk++){
+    var P=PACKS[pk]; this.packS[pk]=(this.packS[pk]+(REDUCED?0:dt*P.sp))%1; var s0=this.packS[pk];
+    c.fillStyle=alpha(C.track,0.9);
+    for(var tr=1; tr<60; tr++){ var tp=packPos(P,s0-tr*0.004); c.globalAlpha=Math.max(0,0.75-tr/70); c.beginPath(); c.arc(X(tp.x)+((tr%2)?2:-2),Y(tp.y),Math.max(0.9,unit*0.18),0,6.283); c.fill(); }
+    c.globalAlpha=1;
+    var count=Math.round(per*(pk+1))-made; made+=count;
+    for(var wv=0; wv<count; wv++){
+      var pa=packPos(P,s0-wv*0.006), pb=packPos(P,s0-wv*0.006+0.001), d2=Math.atan2((pb.y-pa.y)*F.h,(pb.x-pa.x)*F.w);
+      var idx=pk*20+wv; c.globalAlpha=Math.max(0,Math.min(1,nW-idx*0));
+      c.save(); c.translate(X(pa.x),Y(pa.y)); c.rotate(d2); c.fillStyle=C.wolf;
+      c.beginPath(); c.ellipse(0,0,unit*1.35,unit*0.48,0,0,6.283); c.fill();
+      c.beginPath(); c.moveTo(unit*1.2,-unit*0.42); c.lineTo(unit*2.0,0); c.lineTo(unit*1.2,unit*0.42); c.closePath(); c.fill();
+      c.strokeStyle=C.wolf; c.lineWidth=Math.max(1,unit*0.3); c.lineCap="round"; c.beginPath(); c.moveTo(-unit*1.2,0); c.lineTo(-unit*2.1,unit*0.25*Math.sin(t*3+wv)); c.stroke();
+      c.restore();
+    }
+  }
+  c.globalAlpha=1;
+  this.overlays(m, clock, dt, F);
+};
+MapView.prototype.overlays=function(m, clock, dt, F){
+  var c=this.c, w=this.w, h=this.h, k=this.k, i;
+  // harsh winter: blowing snow
+  if(m.snow>0){ var a=Math.min(1,m.snow/0.4); c.fillStyle=alpha(C.white,0.35*a); c.fillRect(0,0,w,h);
+    if(!REDUCED){ c.strokeStyle=alpha(C.white,0.85*a); c.lineWidth=1.4; c.beginPath(); for(i=0;i<90;i++){ var sx=(hash(i,51)*w+clock*220*(0.6+hash(i,52)))%(w+40)-20, sy=hash(i,53)*h; c.moveTo(sx,sy); c.lineTo(sx-14,sy+5); } c.stroke(); }
+    var fs=Math.round(15*k); c.font="700 "+fs+"px "+SERIF; var txt="Harsh winter: deep snow", tw=c.measureText(txt).width;
+    c.fillStyle=alpha(C.paper,0.92); c.fillRect(F.x+F.w/2-tw/2-12, F.y+8, tw+24, fs+14); c.fillStyle=C.ink; c.textAlign="center"; c.fillText(txt, F.x+F.w/2, F.y+8+fs+3); }
+  // compass
+  var cx=F.x+F.w-22*k, cy=F.y+24*k; c.strokeStyle=C.ink2; c.fillStyle=C.ink2; c.lineWidth=1.2;
+  c.beginPath(); c.moveTo(cx,cy-12*k); c.lineTo(cx+5*k,cy+6*k); c.lineTo(cx,cy+2*k); c.lineTo(cx-5*k,cy+6*k); c.closePath(); c.fill();
+  c.font="700 "+Math.round(11*k)+"px "+FONT; c.textAlign="center"; c.fillText("N", cx, cy-15*k);
+};
+MapView.prototype.drawIsland=function(clock, dt){
+  var c=this.c, w=this.w, h=this.h, F=this.field(), k=this.k, t=REDUCED?0:clock, i;
+  c.fillStyle=C.lake; c.fillRect(0,0,w,h);
+  c.strokeStyle=alpha(C["lake-edge"],0.5); c.lineWidth=1; for(i=0;i<14;i++){ c.beginPath(); var yy=h*i/14+((clock*4)%(h/14)); c.moveTo(0,yy); c.bezierCurveTo(w*0.3,yy-6,w*0.6,yy+6,w,yy); c.stroke(); }
+  // a long island lying southwest to northeast (simplified outline)
+  var cx=F.x+F.w*0.5, cy=F.y+F.h*0.55, L=F.w*0.46, B=Math.min(F.h*0.24, L*0.22), ang=-0.32;
+  var pt=function(u,v){ return {x:cx+Math.cos(ang)*u*L-Math.sin(ang)*v*B, y:cy+Math.sin(ang)*u*L+Math.cos(ang)*v*B}; };
+  c.fillStyle=C.snow1; c.strokeStyle=C["lake-edge"]; c.lineWidth=2; c.beginPath();
+  for(i=0;i<=80;i++){ var u=-1+2*i/80, half=Math.sqrt(Math.max(0,1-u*u))*(1+0.18*Math.sin(u*9)+0.1*Math.sin(u*23)); var q=pt(u,-half); if(i===0) c.moveTo(q.x,q.y); else c.lineTo(q.x,q.y); }
+  for(i=80;i>=0;i--){ var u2=-1+2*i/80, half2=Math.sqrt(Math.max(0,1-u2*u2))*(1+0.15*Math.cos(u2*11)+0.08*Math.sin(u2*31)); var q2=pt(u2,half2); c.lineTo(q2.x,q2.y); }
+  c.closePath(); c.fill(); c.stroke();
+  c.save(); c.clip();
+  for(i=0;i<70;i++){ var su=-0.95+1.9*hash(i,61), sv=(hash(i,62)-0.5)*1.4, s=pt(su,sv), r=Math.max(3,Math.min(F.w,F.h)/90)*k*(0.8+0.5*hash(i,63)); c.fillStyle=C.pine; c.beginPath(); c.arc(s.x,s.y,r,0,6.283); c.fill(); }
+  var lerp=REDUCED?1:Math.min(1,dt*1.5); this.iso.moose+=(this.isoT.moose-this.iso.moose)*lerp; this.iso.wolves+=(this.isoT.wolves-this.iso.wolves)*lerp;
+  var unit=Math.max(3.4, Math.min(F.w,F.h)/105)*k, nM=this.iso.moose/20, nWv=this.iso.wolves;
+  for(i=0;i<Math.ceil(nM);i++){ var mu=-0.9+1.8*hash(i,71), mv=(hash(i,72)-0.5)*1.3, a=t*0.3+i; var mp=pt(mu+0.01*Math.cos(a), mv+0.03*Math.sin(a)); c.globalAlpha=Math.max(0,Math.min(1,nM-i)); c.fillStyle=C.deer; c.beginPath(); c.ellipse(mp.x,mp.y,unit*1.3,unit*0.65,ang,0,6.283); c.fill(); }
+  for(i=0;i<Math.ceil(nWv);i++){ var wu=-0.85+1.7*((hash(i%3,81)+t*0.01*(1+i%3)+i*0.012)%1), wv=(hash(i%3,82)-0.5)*0.9, wp=pt(wu,wv); c.globalAlpha=Math.max(0,Math.min(1,nWv-i)); c.fillStyle=C.wolf; c.beginPath(); c.ellipse(wp.x,wp.y,unit*1.3,unit*0.45,ang,0,6.283); c.fill(); }
+  c.globalAlpha=1; c.restore();
+  var fs=Math.round(13*k); c.font="700 "+fs+"px "+SERIF; c.fillStyle=C.ink; c.textAlign="center";
+  var lab=pt(0,1.6); c.fillText("Isle Royale (outline simplified)", lab.x, Math.min(F.y+F.h-6, lab.y+fs));
+  c.font="400 "+Math.round(11*k)+"px "+FONT; c.fillStyle=C.ink2; var lab2=pt(0,-1.8); c.fillText("Lake Superior · 1 shape = 20 moose · 1 shape = 1 wolf", lab2.x, Math.max(F.y+fs, lab2.y));
+};
+
+/* ================= Survey log ================= */
+function LogView(cv){ this.cv=cv; this.c=cv.getContext("2d"); this.k=1; this.hoverX=null; this.danger=false; this.ghost=null; this.marks=null; this.mode="valley"; this.isoLate=false; this.resize(); }
+LogView.prototype.resize=MapView.prototype.resize;
+LogView.prototype.draw=function(m){
+  if(!this.w) return;
+  var c=this.c, w=this.w, h=this.h, k=this.k, self=this, small=w<420;
+  c.clearRect(0,0,w,h);
+  c.strokeStyle=C.rule; c.lineWidth=1; for(var ry=26; ry<h; ry+=14*k){ c.beginPath(); c.moveTo(8,ry+.5); c.lineTo(w,ry+.5); c.stroke(); }
+  var fs=Math.round((small?10.5:11.5)*k);
+  c.font="700 "+Math.round(13*k)+"px "+SERIF; c.fillStyle=C.ink; c.textAlign="left"; c.fillText(this.mode==="island"?"Isle Royale counts":"Survey log", 16, 17*k);
+  c.font="400 "+fs+"px "+FONT; c.fillStyle=C.ink2; c.textAlign="right";
+  c.fillText(this.mode==="island" ? "dots = real winter counts we could source" : (this.ghost ? "dashed = your guess · dots = counts" : "one dot per winter"), w-10, 16*k);
+  var L=(small?52:66)*k, R=12, T=24*k, B=16*k, gap=8*k, ph=(h-T-B-gap)/2;
+  if(this.mode==="island"){ this.drawIsland(L,R,T,B,gap,ph,fs); return; }
+  var span=40, tEnd=Math.max(span, m.t), tStart=tEnd-span, X=function(t){ return L+(t-tStart)/span*(w-L-R); };
+  var pts=[]; m.hist.forEach(function(p){ if(p.t>=tStart-0.01 && Math.abs(p.t-Math.round(p.t))<0.13) pts.push(p); });
+  var vD=0,vW=0; pts.forEach(function(p){ vD=Math.max(vD,p.D); vW=Math.max(vW,p.W); });
+  var S=[{k:"D",name:"Deer",max:Math.max(800,Math.ceil(vD*1.15/200)*200),col:C.deer,dz:DANGER.D},{k:"W",name:"Wolves",max:Math.max(20,Math.ceil(vW*1.2/5)*5),col:C.wolf,dz:DANGER.W}];
+  S.forEach(function(s,ix){
+    var top=T+ix*(ph+gap), bot=top+ph, Y=function(v){ return bot-Math.min(1,v/s.max)*ph; }; s.Y=Y; s.top=top; s.bot=bot;
+    c.strokeStyle=C.ink2; c.globalAlpha=.5; c.beginPath(); c.moveTo(L,bot+.5); c.lineTo(w-R,bot+.5); c.stroke(); c.globalAlpha=1;
+    c.fillStyle=C.ink; c.font="700 "+fs+"px "+FONT; c.textAlign="left"; c.fillText(s.name, 16, top+fs);
+    c.fillStyle=C.ink2; c.font="400 "+fs+"px "+FONT; c.fillText(fmt(s.max), 16, top+fs*2+3);
+    if(self.danger){ var dy=Y(s.dz); c.strokeStyle=C.cta; c.setLineDash([5,4]); c.lineWidth=1.3; c.beginPath(); c.moveTo(L,dy); c.lineTo(w-R,dy); c.stroke(); c.setLineDash([]); c.fillStyle=C.cta; c.textAlign="right"; c.fillText("danger "+s.dz, w-R-2, dy-3); }
+    if(self.ghost && ix===0){ var G=self.ghost; c.strokeStyle=C.ink; c.globalAlpha=.55; c.setLineDash([6,5]); c.lineWidth=2; c.beginPath();
+      for(var gi=0; gi<=40; gi++){ var gt=G.t0+G.len*gi/40, gv=G.v0+(G.top-G.v0)*G.f(gi/40); var gx=X(gt); if(gi===0) c.moveTo(gx,Y(gv)); else c.lineTo(gx,Y(gv)); } c.stroke(); c.setLineDash([]); c.globalAlpha=1; }
+    c.save(); c.beginPath(); c.rect(L-6,top-4,w-L-R+12,ph+8); c.clip();
+    c.strokeStyle=s.col; c.lineWidth=1.8*k; c.lineJoin="round"; c.beginPath(); var st=false;
+    m.hist.forEach(function(p){ if(p.t<tStart-0.3) return; var px=X(p.t), py=Y(p[s.k]); if(!st){ c.moveTo(px,py); st=true; } else c.lineTo(px,py); }); c.stroke();
+    c.fillStyle=s.col; pts.forEach(function(p){ c.beginPath(); c.arc(X(p.t),Y(p[s.k]),2.6*k,0,6.283); c.fill(); });
+    c.restore();
+    c.fillStyle=C.paper; c.beginPath(); c.arc(X(m.t),Y(m[s.k]),5.5*k,0,6.283); c.fill(); c.fillStyle=s.col; c.beginPath(); c.arc(X(m.t),Y(m[s.k]),3.6*k,0,6.283); c.fill();
+  });
+  m.winterLog.forEach(function(wt){ if(wt<tStart) return; var x=X(wt); c.strokeStyle=C.ink2; c.globalAlpha=.6; c.setLineDash([2,3]); c.lineWidth=1; c.beginPath(); c.moveTo(x,T); c.lineTo(x,h-B); c.stroke(); c.setLineDash([]); c.globalAlpha=1; flake(c,x,T+2,4*k,C.ink2); });
+  if(this.marks){ this.marks.forEach(function(mk){ var s=S[mk.panel]; if(mk.t<tStart) return; var x=X(mk.t), y=s.Y(mk.v);
+    c.strokeStyle=C.ink; c.lineWidth=1.4; c.beginPath(); c.arc(x,y,9*k,0,6.283); c.stroke();
+    c.font="700 "+fs+"px "+SERIF; var lw=c.measureText(mk.label).width, lx=Math.min(x+12*k, w-R-lw-2); c.fillStyle=C.paper; c.fillRect(lx-2,s.top,lw+4,fs+4); c.fillStyle=C.ink; c.textAlign="left"; c.fillText(mk.label, lx, s.top+fs); }); }
+  c.fillStyle=C.ink2; c.font="400 "+fs+"px "+FONT; c.textAlign="center";
+  for(var yv=Math.ceil(tStart/10-1e-6)*10; yv<=tEnd+0.01; yv+=10){ c.fillText("winter "+yv, Math.max(L+24,Math.min(w-R-28,X(yv))), h-3); }
+  if(this.hoverX!=null && this.hoverX>=L){ var ht=tStart+(this.hoverX-L)/(w-L-R)*span, best=null, bd=1e9; pts.forEach(function(p){ var d=Math.abs(p.t-ht); if(d<bd){bd=d;best=p;} });
+    if(best){ var hx=X(best.t); c.strokeStyle=C.ink; c.globalAlpha=.45; c.beginPath(); c.moveTo(hx,T); c.lineTo(hx,h-B); c.stroke(); c.globalAlpha=1;
+      var lines=["Winter "+Math.round(best.t), "Deer "+fmt(best.D), "Wolves "+fmt(best.W), "Young trees "+Math.round(best.P)+"%"];
+      c.font="400 "+fs+"px "+FONT; var bw=0; lines.forEach(function(l){ bw=Math.max(bw,c.measureText(l).width); }); bw+=14; var bh=lines.length*(fs+4)+8, bx=hx+10; if(bx+bw>w-4) bx=hx-10-bw;
+      c.fillStyle=C.card; c.strokeStyle=C["paper-b"]; c.fillRect(bx,T,bw,bh); c.strokeRect(bx,T,bw,bh); c.fillStyle=C.ink; c.textAlign="left"; lines.forEach(function(l,ix){ c.font=(ix===0?"700 ":"400 ")+fs+"px "+FONT; c.fillText(l,bx+7,T+5+fs+ix*(fs+4)); }); } }
+};
+LogView.prototype.drawIsland=function(L,R,T,B,gap,ph,fs){
+  var c=this.c, w=this.w, h=this.h, k=this.k, self=this, y0=1993, y1=2028, X=function(y){ return L+(y-y0)/(y1-y0)*(w-L-R); };
+  [{k:"moose",name:"Moose",max:3000,col:C.deer},{k:"wolves",name:"Wolves",max:45,col:C.wolf}].forEach(function(s,ix){
+    var top=T+ix*(ph+gap), bot=top+ph, Y=function(v){ return bot-v/s.max*ph; };
+    c.strokeStyle=C.ink2; c.globalAlpha=.5; c.beginPath(); c.moveTo(L,bot+.5); c.lineTo(w-R,bot+.5); c.stroke(); c.globalAlpha=1;
+    c.fillStyle=C.ink; c.font="700 "+fs+"px "+FONT; c.textAlign="left"; c.fillText(s.name,16,top+fs); c.fillStyle=C.ink2; c.font="400 "+fs+"px "+FONT; c.fillText(fmt(s.max),16,top+fs*2+3);
+    ISRO[s.k].forEach(function(p){ if(p.late && !self.isoLate) return; var x=X(p.y), y=Y(p.v);
+      c.fillStyle=s.col; c.beginPath(); c.arc(x,y,4*k,0,6.283); c.fill(); if(p.late){ c.strokeStyle=C.ink; c.lineWidth=1.2; c.beginPath(); c.arc(x,y,7*k,0,6.283); c.stroke(); }
+      c.fillStyle=C.ink; c.font="700 "+Math.round(fs*0.92)+"px "+FONT; c.textAlign="center"; c.fillText(fmt(p.v), x, Math.max(top+fs, y-8*k)); });
+    if(!self.isoLate && ix===0){ var qx=X(2026), qy=top+ph*0.45; c.font="700 "+Math.round(fs*1.6)+"px "+SERIF; c.fillStyle=C.cta; c.textAlign="center"; c.fillText("?", qx, qy); c.fillText("?", qx, qy+ph+gap); }
+  });
+  c.fillStyle=C.ink2; c.font="400 "+fs+"px "+FONT; c.textAlign="center"; [1995,2005,2015,2025].forEach(function(y){ c.fillText(String(y), X(y), h-3); });
+};
+function flake(c,x,y,r,col){ c.strokeStyle=col; c.lineWidth=1.1; c.beginPath(); for(var i=0;i<3;i++){ var a=i*Math.PI/3; c.moveTo(x-Math.cos(a)*r,y+r-Math.sin(a)*r); c.lineTo(x+Math.cos(a)*r,y+r+Math.sin(a)*r); } c.stroke(); }
+
+/* ================= Wiring ================= */
+var model=new Model(), map=new MapView($("#map")), logv=new LogView($("#logcv"));
+var playing=false, fast=false, pageVisible=!document.hidden, onScreen=true, rafId=null, lastTs=null, simAcc=0, clock=0, stepHook=null, baseYPS=2;
+function yps(){ return S.step===3 && S.testing ? (REDUCED?40:4) : baseYPS*(fast?3:1); }
+function frame(ts){
+  rafId=null; if(lastTs==null) lastTs=ts;
+  var dt=Math.min(0.1,(ts-lastTs)/1000); lastTs=ts; clock+=dt;
+  if(playing){ simAcc+=dt*yps(); var n=0;
+    while(simAcc>=DT && n<600){ model.step(DT); if(stepHook) stepHook(model); simAcc-=DT; n++; } if(n>=600) simAcc=0;
+  }
+  map.draw(model, clock, dt); logv.draw(model); tick();
+  schedule();
+}
+function schedule(){ if(rafId==null && pageVisible && onScreen) rafId=requestAnimationFrame(frame); if(!(pageVisible&&onScreen)) lastTs=null; }
+document.addEventListener("visibilitychange", function(){ pageVisible=!document.hidden; activeClock(); schedule(); });
+if("IntersectionObserver" in window){ new IntersectionObserver(function(es){ onScreen=es[0].isIntersecting; schedule(); },{threshold:0.02}).observe($(".world")); }
+function redrawAll(){ map.resize(); logv.resize(); map.draw(model,clock,0); logv.draw(model); }
+var roT=null;
+if("ResizeObserver" in window){ new ResizeObserver(function(){ clearTimeout(roT); roT=setTimeout(redrawAll,60); }).observe($(".world")); } else window.addEventListener("resize", function(){ clearTimeout(roT); roT=setTimeout(redrawAll,60); });
+new MutationObserver(function(){ loadColors(); redrawAll(); }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(window.matchMedia){ var mq=matchMedia("(prefers-color-scheme: dark)"); var onScheme=function(){ loadColors(); redrawAll(); }; if(mq.addEventListener) mq.addEventListener("change",onScheme); else if(mq.addListener) mq.addListener(onScheme); }
+function setPlaying(on){ playing=!!on; var b=$("#play"); b.setAttribute("aria-pressed",String(playing)); b.textContent=playing?"Pause":"Fly"; lastTs=null; simAcc=0; }
+$("#play").addEventListener("click", function(){ if(this.disabled) return; setPlaying(!playing); track("wd_play",{step:S.step, playing:playing}); });
+$("#speed").addEventListener("click", function(){ fast=!fast; this.setAttribute("aria-pressed",String(fast)); });
+function logPoint(e){ var r=$("#logcv").getBoundingClientRect(); logv.hoverX=e.clientX-r.left; logv.draw(model); }
+$("#logcv").addEventListener("pointermove", logPoint); $("#logcv").addEventListener("pointerdown", logPoint);
+$("#logcv").addEventListener("pointerleave", function(){ logv.hoverX=null; logv.draw(model); });
+
+function renderHud(){
+  if(S.step===5){ $("#hYear").textContent = S.picked ? "2026" : "2019"; $("#yrLabel").textContent="Winter";
+    $("#preyName").textContent="Moose"; $("#hD").textContent = S.picked ? "524" : "2,000"; $("#hW").textContent = S.picked ? "37" : "19 brought in";
+    $("#sapCnt").hidden=true; $("#keyline").textContent="1 shape = 20 moose · 1 shape = 1 wolf"; return; }
+  $("#yrLabel").textContent="Winter"; $("#preyName").textContent="Deer"; $("#sapCnt").hidden=false; $("#keyline").textContent="1 shape = 10 deer · 1 shape = 1 wolf";
+  $("#hYear").textContent=Math.floor(model.t+1e-6); $("#hD").textContent=fmt(model.D); $("#hW").textContent=fmt(model.W);
+  $("#hP").textContent=Math.round(model.P)+"%"; $("#hPbar").style.width=Math.round(model.P)+"%"; $("#hPdz").hidden=!(S.step===3);
+  $("#desc").textContent="Winter "+Math.floor(model.t+1e-6)+". "+fmt(model.D)+" deer, "+fmt(model.W)+" wolves, young trees at "+Math.round(model.P)+"% of a healthy forest.";
+}
+function changeWolves(delta, zero){ var before=model.W; model.W = zero ? 0 : Math.max(0, Math.min(60, Math.round(model.W)+delta)); model.log();
+  track("wd_control",{step:S.step, control:"wolves", from:Math.round(before), to:Math.round(model.W)}); renderHud(); announce(fmt(model.W)+" wolves in the valley."); }
+
+var stepClock={ms:0, since:null};
+function activeClock(){ var now=performance.now(); if(stepClock.since!=null) stepClock.ms+=now-stepClock.since; stepClock.since = document.hidden ? null : now; }
+function resetClock(){ stepClock.ms=0; stepClock.since=document.hidden?null:performance.now(); }
+
+/* ================= Lesson ================= */
+var S, guide=$("#guide"), PRESENT=false, LTR=["A","B","C","D"];
+function freshState(){ return {step:0, pred:null, locked:false, running:false, revealed:false, hints:0, waitStart:null, stats:null, attempts:[], testing:null, solved:false, firstExplain:null, picked:null, firstTransfer:null, history:{}, release:0}; }
+S=freshState();
+function esc(s){ return String(s).replace(/[&<>"]/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch];}); }
+function radio(mood, html){ return '<div class="radio"><img src="'+JODI[mood]+'" alt="" width="38" height="38"><div><span class="who">RADIO · JODI AT BASE CAMP</span>'+html+'</div></div>'; }
+function announce(t){ var a=$("#announce"); a.textContent=""; setTimeout(function(){ a.textContent=t; },30); }
+function tabs(n){ var h='<ol class="tabs" aria-hidden="true">'; for(var i=1;i<=5;i++) h+='<li class="'+(i<n?"done":i===n?"now":"")+'"></li>'; return h+'</ol>'; }
+function isNarrow(){ return $(".world").getBoundingClientRect().width > window.innerWidth-40 && $("#guide").getBoundingClientRect().top > 100; }
+function focusEl(sel){ var el=$(sel,guide); if(el){ el.setAttribute("tabindex","-1"); el.focus({preventScroll:true}); if(!isNarrow()) guide.scrollTop=Math.max(0, el.offsetTop-20); else el.scrollIntoView({block:"nearest", behavior:REDUCED?"auto":"smooth"}); } }
+
+var GLOSSARY = {
+  predator:["Predator","An animal that hunts other animals. Here, the wolves."],
+  prey:["Prey","An animal that gets hunted. Here, the deer."],
+  capacity:["Carrying capacity","About how many animals a place's food can keep going, year after year."],
+  browse:["Browse","Twigs, buds and leaves of young trees and shrubs. Deer and moose eat it all winter."],
+  cycle:["Predator–prey cycle","Predator and prey numbers rise and fall in linked waves, with the predator a step behind."]
+};
+function term(key,label){ return '<button type="button" class="term" data-term="'+key+'" aria-expanded="false">'+label+'</button>'; }
+
+/* Answer shapes: what line will the log draw? */
+function spark(kind){
+  var D='var(--deer)', W='var(--wolf)', path=function(pts,col,dash){ return '<polyline fill="none" stroke="'+col+'" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"'+(dash?' stroke-dasharray="1 0"':'')+' points="'+pts+'"/>'; };
+  var base='<line x1="2" y1="38" x2="118" y2="38" stroke="var(--paper-b)" stroke-width="1.5"/>', body='';
+  var wave=function(amp,mid,ph,col){ var p=[]; for(var i=0;i<=40;i++){ var x=4+i*2.8; p.push(x.toFixed(1)+","+(mid-amp*Math.sin(i/40*6.283*1.6+ph)).toFixed(1)); } return path(p.join(" "),col); };
+  if(kind==="up") body=path("4,32 40,26 80,15 116,4",D);
+  else if(kind==="level") body=path("4,32 28,22 48,13 70,10 116,10",D);
+  else if(kind==="boom") body=path("4,30 22,20 34,8 44,6 56,14 70,26 84,27 100,24 116,26",D);
+  else if(kind==="flat") body=path("4,22 40,21 80,23 116,22",D);
+  else if(kind==="wipe") body=path("4,10 30,22 52,34 70,37 116,37",D)+path("4,34 26,26 46,22 66,30 86,37 116,37",W);
+  else if(kind==="flat2") body=path("4,10 30,18 60,16 116,16",D)+path("4,34 30,28 60,29 116,29",W);
+  else if(kind==="waves") body=wave(9,17,0,D)+wave(5,30,-1.1,W);
+  else if(kind==="noeffect") body=path("4,10 40,9 80,11 116,10",D)+path("4,33 40,33 80,34 116,33",W);
+  else if(kind==="ir_a") body=path("4,8 60,20 116,30",D)+path("4,34 60,24 116,12",W);
+  else if(kind==="ir_b") body=path("4,8 50,26 80,37 116,37",D)+path("4,34 50,18 80,26 116,37",W);
+  else if(kind==="ir_c") body=path("4,10 116,10",D)+path("4,32 116,32",W);
+  else if(kind==="ir_d") body=path("4,12 60,8 116,4",D)+path("4,32 60,32 116,33",W);
+  return '<svg viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">'+base+body+'</svg>';
+}
+var STEPS = {
+  1:{ kicker:"Field season 1 of 5", title:"Take the wolves away",
+      q:"The rangers move every wolf out. What line will the deer draw over the next 20 winters?",
+      choices:[{id:"grow_forever",t:"Climbs and keeps climbing",s:"up"},{id:"new_high",t:"Climbs, then levels off",s:"level"},{id:"boom_crash",t:"Booms, then crashes",s:"boom",best:true},{id:"no_change",t:"Stays about the same",s:"flat"}],
+      go:"Remove the wolves · fly 20 winters", need:20,
+      hints:["Watch the young trees on the map, not just the deer.","All those deer have to eat something every winter."] },
+  2:{ kicker:"Field season 2 of 5", title:"Bring the wolves back",
+      q:"The rangers release 10 wolves. What will your log look like after 25 winters?",
+      choices:[{id:"wipe_out",t:"Wolves eat every deer, then vanish",s:"wipe"},{id:"steady",t:"Both settle and stay flat",s:"flat2"},{id:"waves",t:"Waves, wolves a step behind",s:"waves",best:true},{id:"no_effect",t:"Ten wolves barely matter",s:"noeffect"}],
+      go:"Release 10 wolves · fly 25 winters", need:25,
+      hints:["Find the highest deer dot. Then find the highest wolf dot after it."] },
+  3:{ kicker:"Field season 3 of 5", title:"Your call",
+      hints:["Think back to season 1. With hardly any wolves, what happened to the young trees?","Season 2: lots of wolves eat the deer down, then go hungry. Look for the middle.","Try bringing in between 10 and 15 wolves."] },
+  4:{ kicker:"Field season 4 of 5", title:"Read the log",
+      q:"Why does the wolf peak come a few winters after the deer peak?",
+      choices:[{id:"lag_food",t:"Well-fed wolves raise more pups, so wolves climb later. Hungry wolves die off later too.",best:true},{id:"leave",t:"Wolves leave when there are too many deer."},{id:"seasons",t:"Deer and wolves have babies in different seasons."},{id:"hunt_peak",t:"Wolves only hunt when deer are at their peak."}] },
+  5:{ kicker:"Field season 5 of 5", title:"Isle Royale, for real",
+      q:"2019: about 2,000 moose, and the park just brought in 19 wolves. What will the 2026 count show?",
+      choices:[{id:"wolves_up",t:"More wolves, far fewer moose",s:"ir_a",best:true},{id:"wipe_out",t:"Wolves wiped out the moose",s:"ir_b"},{id:"same",t:"Both about the same",s:"ir_c"},{id:"moose_up",t:"Moose kept growing",s:"ir_d"}] }
+};
+var GHOST={ grow_forever:function(x){return x;}, new_high:function(x){return Math.min(1,1-Math.pow(1-x,3))*0.75;}, boom_crash:function(x){ return x<0.3? Math.sin(x/0.3*Math.PI/2): Math.max(0.25, 1-(x-0.3)/0.4*0.75); }, no_change:function(){return 0;} };
+
+var R1 = {
+  boom_crash:{mood:"happy", lead:"<p>You called it. Boom, then crash.</p>"},
+  grow_forever:{mood:"thinking", lead:"<p>Lots of grown-ups guess that too. And for 5 winters, you were right! Then the food ran out.</p>"},
+  new_high:{mood:"thinking", lead:"<p>So close. There is a ceiling. But the deer didn't stop at it. They shot past, ate the food down, and crashed.</p>"},
+  no_change:{mood:"thinking", lead:"<p>Fourteen wolves sounds tiny next to 350 deer. But each wolf catches a lot of deer in a year. Look how fast that line took off.</p>"}
+};
+var R2 = {
+  waves:{mood:"happy", lead:"<p>Waves, with the wolves running late. Nailed it.</p>"},
+  wipe_out:{mood:"thinking", lead:"<p>Common worry! But look: the deer dropped a lot and never hit zero. The wolves went hungry first.</p>"},
+  steady:{mood:"thinking", lead:"<p>People call it the \"balance of nature,\" like a flat line. It's more like a seesaw that keeps rocking.</p>"},
+  no_effect:{mood:"thinking", lead:"<p>Ten sounds small. But wolves have pups, and a growing pack catches a lot of deer.</p>"}
+};
+var R4 = {
+  lag_food:{mood:"happy", lead:"<p>That's the heart of it.</p>"},
+  leave:{mood:"thinking", lead:"<p>Nobody leaves this valley. The wolf line keeps climbing <i>after</i> the deer peak. That's pups growing up.</p>"},
+  seasons:{mood:"thinking", lead:"<p>Good eye for timing! But the gap is years, not months. Something slower is going on.</p>"},
+  hunt_peak:{mood:"thinking", lead:"<p>Wolves hunt every winter. What changes is how well they eat, and well-fed wolves raise more pups.</p>"}
+};
+var R5 = {
+  wolves_up:{mood:"happy", lead:"<p>That's exactly what the scientists counted.</p>"},
+  wipe_out:{mood:"thinking", lead:"<p>The moose took a big hit, but they're still there. Same as your valley: the wolves feel the hunger before the last moose is gone.</p>"},
+  same:{mood:"thinking", lead:"<p>Seven winters is plenty of time for the seesaw to tip. Lots of moose meant lots of well-fed wolf pups.</p>"},
+  moose_up:{mood:"thinking", lead:"<p>Nineteen sounds small next to 2,000. But just like season 2, well-fed wolves raised pups, and the packs grew.</p>"}
+};
+var FAIL = {
+  too_few_wolves:"So few wolves that the pack faded out. Then nothing kept the deer in check.",
+  overbrowsed:"The young trees dropped below 20%. Too few wolves, so the deer boomed and ate their food down. Season 1 again!",
+  too_many_wolves:"So many wolves! They ate the deer down fast, ran out of food, and the packs crashed.",
+  too_many_boom:"All those wolves ate the deer down, then went hungry and shrank. With hardly any wolves left, the deer boomed and ate the young trees.",
+  deer_crash:"The deer fell below 100. That many wolves catch deer faster than fawns are born."
+};
+
+/* ---------- render ---------- */
+function choiceGrid(st, opts){
+  var txt=!st.choices[0].s, h='<div class="choices'+(txt?' text':'')+'" role="group" aria-label="Choices">', sel=opts.sel, first=opts.first;
+  st.choices.forEach(function(ch,ix){
+    var label=esc(ch.t)+(first===ch.id?'<span class="tag">'+(PRESENT?'first pick':'your first pick')+'</span>':'');
+    h+='<button class="choice" data-act="pick" data-id="'+ch.id+'" aria-pressed="'+(sel===ch.id)+'"'+(opts.locked?' disabled':'')+'>'+
+      (txt ? '<span class="ltr" aria-hidden="true">'+LTR[ix]+'</span><span>'+label+'</span>'
+           : '<span class="ctop"><span class="ltr" aria-hidden="true">'+LTR[ix]+'</span><span>'+label+'</span></span>'+spark(ch.s))+'</button>';
+  });
+  return h+'</div>';
+}
+function voteBlock(){ if(!PRESENT) return ""; var v=S.votes||{};
+  return '<details class="vote"><summary>Record the class vote (optional)</summary><div class="vrow">'+LTR.map(function(l){ return '<label>'+l+' <input type="number" min="0" max="99" inputmode="numeric" data-vote="'+l+'" value="'+(v[l]!=null?v[l]:'')+'" aria-label="Votes for '+l+'"></label>'; }).join('')+'</div></details>'; }
+function sendVote(n){ if(!PRESENT || !S.votes) return; var c={}, any=false; LTR.forEach(function(l){ var x=+S.votes[l]; if(x>0){ c[l]=Math.min(99,Math.round(x)); any=true; } }); if(any && !S.voteSent){ S.voteSent=true; track("wd_class_vote",{step:n, counts:c}); } }
+function hintsBlock(st){ if(!st.hints) return ""; var h=""; if(S.hints>0){ h+='<ol class="hints">'; for(var i=0;i<S.hints;i++) h+='<li>'+esc(st.hints[i])+'</li>'; h+='</ol>'; }
+  var more=S.hints<st.hints.length; return h+'<button class="btn small" data-act="hint"'+(more?'':' disabled')+'>'+(S.hints===0?"Need a hint?":more?"Another hint":"That's all my hints")+'</button>'; }
+function render(){
+  var n=S.step, h="";
+  if(n===0){
+    h+='<p class="kicker">Simulation · Grades 6–8 · 10–15 min</p><h2 id="stitle">Wolves &amp; Deer</h2>';
+    h+='<p>You\'re the new wildlife biologist for <b>Cedar Hollow</b>. Every winter you fly over the valley and count the deer and the wolves.</p>';
+    h+='<p class="note">Real scientists do exactly this on Isle Royale, every winter since 1958. You\'ll see their counts at the end.</p>';
+    h+=radio("neutral", PRESENT?'<p>Jodi here, everybody. Big question: would the deer be better off without the wolves? Each season, write your guess, vote A–D, then we fly. No grades.</p>'
+                               :'<p>Jodi here at base camp. Big question: would the deer be better off without the wolves? Guess first, then fly. No grades.</p>');
+    h+='<div class="row"><button class="btn cta" data-act="start">Start the survey</button>'+(PRESENT?'<button class="btn" data-act="present-off">Exit Present mode</button>':'<button class="btn" data-act="present-on">Present to a class</button>')+'</div>';
+    h+='<p class="note" style="margin-top:12px">Cedar Hollow is a simplified model, built to show a pattern. Real valleys are messier, and we\'ll say where.</p>';
+    h+=teachNotes();
+  }
+  else if(n===1||n===2) h+=renderPredict(n);
+  else if(n===3) h+=renderChallenge();
+  else if(n===4||n===5) h+=renderChoice(n);
+  else h+=renderReport();
+  hideTip(); guide.innerHTML=h;
+}
+function renderPredict(n){
+  var st=STEPS[n], h=tabs(n)+'<p class="kicker">'+st.kicker+'</p><h2 id="stitle">'+st.title+'</h2>';
+  h+= n===1 ? '<p>Cedar Hollow has about <b>'+approx(S.introD)+' deer</b> and <b>'+fmt(S.introW)+' wolves</b>. Your log shows the last 24 winters: up a little, down a little.</p>'
+            : '<p>A fresh valley: <b>600 deer</b>, plenty of young trees, and no wolves.</p>';
+  h+='<p class="q">'+esc(st.q)+'</p>'+choiceGrid(st,{sel:S.pred, locked:S.locked});
+  if(!S.locked){ h+=voteBlock()+'<div class="row"><button class="btn cta" data-act="lock"'+(S.pred?'':' disabled')+'>'+(PRESENT?'Lock in the class guess':'Lock in my guess')+'</button></div>'; }
+  else if(!S.revealed){
+    if(!S.running) h+='<div class="row"><button class="btn cta" data-act="go" id="act">'+st.go+'</button></div>';
+    else h+='<div class="progress" id="act">Flying… winter <b id="wleft">0</b> of '+st.need+'. '+(n===1?'Keep an eye on the young trees.':'Watch both lines in your log.')+'</div><div class="row">'+hintsBlock(st)+'</div>';
+  } else {
+    var s=S.stats, f, stat, why;
+    if(n===1){ f=R1[S.pred];
+      stat='<p class="stat"><span class="d">Deer</span> '+approx(s.d0)+' → '+approx(s.peak)+' in '+s.peakYrs+' winters → '+approx(s.minAfter)+'. Young trees fell to '+s.minP+'%.</p>';
+      why='<p>No '+term("predator","predator")+', so more fawns were born than deer died. The deer ate '+term("browse","browse")+' faster than it grew back (look at all the brown on the map). Hungry deer have fewer fawns, and more of them die. Boom, then crash.</p>'+
+        '<details class="why"><summary>Why do they stay low afterward?</summary><p>The young trees stay beaten down, so the deer bounce around at a level that worn-out food can barely hold. That limit is the '+term("capacity","carrying capacity")+'. The wolves were keeping the deer below it.</p></details>';
+    } else { f=R2[S.pred];
+      stat='<p class="stat"><span class="d">Deer</span> peaked in winter '+s.dPeakT+'. <span class="w">Wolves</span> peaked in winter '+s.wPeakT+'.</p>';
+      why='<p>Lots of deer means well-fed wolves raise more pups. More wolves catch more deer, so the deer drop. Then the wolves go hungry and their numbers fall, and the deer bounce back. Scientists call it a '+term("cycle","predator–prey cycle")+'.</p>'+
+        '<details class="why"><summary>Can predators ever wipe out their prey?</summary><p>Sometimes, yes. The science standards even say predators can wipe out whole populations. But in a valley where wolves and deer have lived together a long time, the wolves usually run short of food first. Real wolves mostly catch the easiest deer: young, old, sick, or stuck in deep snow.</p></details>';
+    }
+    h+='<div class="found"><h3 id="fbh">WHAT THE SURVEY SHOWED</h3>'+stat+radio(f.mood,f.lead)+why+'</div>';
+    h+='<div class="row"><button class="btn cta" data-act="next">Next season</button></div>';
+  }
+  return h;
+}
+function renderChallenge(){
+  var st=STEPS[3], h=tabs(3)+'<p class="kicker">'+st.kicker+'</p><h2 id="stitle">'+st.title+'</h2>';
+  if(!S.solved){
+    h+='<p>Cedar Hollow is down to its <b>last 2 wolves</b>, and the deer are piling up. You decide how many wolves to bring in.</p>';
+    h+='<div class="goal"><b>Goal: 30 winters, nobody crosses a danger line</b>Young trees above 20% · deer above 100 · wolves 3 or more. Harsh winters hit in winters 8 and 19.</div>';
+    h+='<div class="pick"><label for="release">Wolves to bring in <output id="relOut" for="release">'+S.release+'</output></label><input type="range" id="release" min="0" max="40" step="1" value="'+S.release+'"'+(S.testing?' disabled':'')+'></div>';
+    if(S.testing) h+='<div class="progress" id="act">Flying… winter <b id="tyear">0</b> of 30.</div>';
+    else h+='<div class="row"><button class="btn cta" data-act="test">Fly 30 winters</button>'+hintsBlock(st)+'</div>';
+    if(S.attempts.length && !S.testing){ var last=S.attempts[S.attempts.length-1];
+      h+='<div class="found"><h3 id="fbh">FLIGHT '+S.attempts.length+' · '+last.release+' WOLVES</h3><p class="stat">'+esc(last.headline)+'</p>'+radio("thinking",'<p>'+FAIL[last.reason]+'</p>'+(last.winterNote||''))+'</div>';
+      if(S.attempts.length>1){ h+='<ul class="attempts" aria-label="Earlier flights">'; for(var i=S.attempts.length-2;i>=0;i--){ var a=S.attempts[i]; h+='<li><b>Flight '+(i+1)+':</b> '+a.release+' wolves · '+esc(a.headline)+'</li>'; } h+='</ul>'; } }
+  } else { var w=S.attempts[S.attempts.length-1];
+    h+='<div class="found"><h3 id="fbh">FLIGHT '+S.attempts.length+' · '+w.release+' WOLVES</h3><p class="stat">Thirty winters, two harsh ones, and the valley made it.</p>'+
+      radio("happy",'<p>The wolves kept the deer from eating all their food, and there were always enough deer for the wolves.</p>')+
+      (RANGE?'<p>Here\'s a secret: no single magic number. In this model, anything from about <b>'+RANGE.lo+' to '+RANGE.hi+'</b> wolves works. Ecologists think in ranges like that.</p>':'')+
+      '<p class="note">A real park faced this exact choice. That\'s season 5.</p></div><div class="row"><button class="btn cta" data-act="next">Next season</button></div>'; }
+  return h;
+}
+function renderChoice(n){
+  var st=STEPS[n], h=tabs(n)+'<p class="kicker">'+st.kicker+'</p><h2 id="stitle">'+st.title+'</h2>', first=n===4?S.firstExplain:S.firstTransfer;
+  if(n===4) h+='<p>Here are 40 winters after the wolves came back. I circled the first big deer peak and the wolf peak after it, about <b>'+S.stats.gap+' winters</b> later.</p>';
+  else h+='<p>Real place, real counts. Isle Royale is an island national park in Lake Superior. It has <b>moose</b>, not deer, and scientists have flown this survey every winter since 1958.</p>'+
+          '<p class="note">1995: about 2,400 moose. Then the worst winter in a century, ticks, and too little food: about 500 left. By about 2016, just 2 wolves remained, so the park brought in 19 more in 2018–19.</p>';
+  h+='<p class="q">'+esc(st.q)+'</p>';
+  if(!S.picked) h+=voteBlock();
+  h+=choiceGrid(st,{sel:S.picked, first:first});
+  if(S.picked){
+    if(n===4){ var f=R4[S.picked];
+      h+='<div class="found"><h3 id="fbh">JODI\'S TAKE</h3>'+radio(f.mood,f.lead)+'<p>It\'s timing. Pups take time to grow into hunters, so wolves keep climbing after the deer start to fall. And hungry wolves take time to die off, so the deer keep dropping for a while too. Linked, but never in step.</p></div>'; }
+    else { var g=R5[S.picked];
+      h+='<div class="found"><h3 id="fbh">THE 2026 COUNT</h3>'+radio(g.mood,g.lead)+
+        '<table class="dtable"><thead><tr><th scope="col"></th><th scope="col">2019</th><th scope="col">2026</th></tr></thead><tbody><tr><td>Wolves</td><td>19 brought in</td><td>about 37</td></tr><tr><td>Moose</td><td>about 2,000</td><td>about 524</td></tr></tbody></table>'+
+        '<p>The most wolves since the late 1970s. For the first time in 68 years of counting, the team saw no moose calves.</p>'+
+        '<details class="why" open><summary>Was it only the wolves?</summary><p>No. The moose had also eaten their favorite winter food, balsam fir, so hard that it still hasn\'t recovered. Predators and food, together. Scientists are now watching whether the packs can stay in balance with so few moose. You already know what your log would guess next.</p></details></div>'; }
+    h+='<p class="note">Tap another answer to compare.</p><div class="row"><button class="btn cta" data-act="next">'+(n===4?"Next season":"Write the field report")+'</button></div>';
+  }
+  return h;
+}
+function renderReport(){
+  var h='<ol class="tabs" aria-hidden="true"><li class="done"></li><li class="done"></li><li class="done"></li><li class="done"></li><li class="done"></li></ol><p class="kicker">Survey complete</p><h2 id="stitle">Field report</h2>';
+  h+='<div class="report"><dl>'+
+    '<dt>Predators keep prey in check.</dt><dd>Wolves stop deer from eating all their food.</dd>'+
+    '<dt>No predators: boom, then bust.</dt><dd>Deer shoot past what their food can hold, eat it down, and crash.</dd>'+
+    '<dt>Predators usually run out first.</dt><dd>When prey get scarce, wolves go hungry and their numbers fall.</dd>'+
+    '<dt>Linked waves.</dt><dd>The two lines rise and fall together, wolves a step behind.</dd>'+
+    '<dt>Food and weather count too.</dt><dd>Harsh winters and worn-out food push numbers around as much as wolves do.</dd></dl></div>';
+  var H=S.history, items=[];
+  if(H[1]) items.push('<b>Season 1.</b> You drew "'+esc(H[1].guess)+'." The survey: boom, then crash.');
+  if(H[2]) items.push('<b>Season 2.</b> You drew "'+esc(H[2].guess)+'." The survey: waves, wolves a step behind.');
+  if(H[3]) items.push('<b>Season 3.</b> You saved the valley in '+H[3].tests+(H[3].tests===1?' flight':' flights')+'.');
+  if(H[5]) items.push('<b>Season 5.</b> You picked "'+esc(H[5].guess)+'." The count: about 37 wolves, about 524 moose.');
+  if(items.length) h+='<h3 style="font-size:16px;margin:4px 0">Your guesses vs. the survey</h3><ul class="yours"><li>'+items.join('</li><li>')+'</li></ul>';
+  h+='<div class="honest"><b>One honest thing</b><p>Cedar Hollow is a model, kept simple on purpose. Real places add disease, ticks, cougars, bears and people.</p><p>Even on Isle Royale, scientists say neither "the wolves did it" nor "the food did it" explains the swings alone. And in Yellowstone, scientists are still debating how far the wolves\' effects reach. That\'s real science, still being worked out.</p></div>';
+  h+=radio("happy",'<p>Nice flying, biologist. The valley is yours now. Try a harsh winter, a rich food year, or no wolves at all, and watch your log.</p>');
+  h+='<div class="toolbox" aria-label="Field tools"><h3>FIELD TOOLS</h3><div class="tb">'+
+    '<span>Wolves</span><span class="grp"><button class="btn small" data-act="w-5">− 5</button><button class="btn small" data-act="w+5">+ 5</button><button class="btn small" data-act="w0">Remove all</button></span>'+
+    '<span>Food</span><span class="seg" role="group" aria-label="Food supply">'+["low","normal","rich"].map(function(f){ return '<button data-act="food" data-food="'+f+'" aria-pressed="'+(model.food===f)+'">'+f.charAt(0).toUpperCase()+f.slice(1)+'</button>'; }).join('')+'</span>'+
+    '<span>Weather</span><span class="grp"><button class="btn small" data-act="winter">Send a harsh winter</button></span></div></div>';
+  h+='<div class="row"><button class="btn" data-act="restart">Start over</button></div>'+teachNotes();
+  return h;
+}
+function teachNotes(){
+  return '<details class="teach"><summary>For teachers: standards, sources, privacy</summary>'+
+    '<p><b>Standards.</b> NGSS MS-LS2-2 (patterns of interactions, including predatory, across ecosystems). Supports MS-LS2-1 (resources and populations) and MS-LS2-4 (ecosystem changes affect populations).</p>'+
+    '<p><b>The model</b> is hand-tuned to show the pattern. It isn\'t a forecast for any real place.</p>'+
+    '<p><b>Privacy.</b> No sign-in, nothing typed is stored, class votes are counts only.</p>'+
+    '<ul><li>NGSS MS-LS2-2 and LS2.A text (nextgenscience.org; CA Dept. of Education)</li><li>NPS Isle Royale: Wolf &amp; Moose Populations; Predator-Prey Relationships; Why Relocate Wolves</li><li>Michigan Tech Isle Royale Winter Study (2024, 2026 reports); Isle Royale Wolf-Moose Project</li><li>USGS, Nelson &amp; Mech 1986: snow depth and wolf predation on deer</li><li>Minnesota DNR: how winter affects deer survival</li><li>NPS Yellowstone: The Big Scientific Debate: Trophic Cascades</li></ul></details>';
+}
+
+/* ---------- flow ---------- */
+function peaks(hist, from){ var d=null, wp=null, i;
+  for(i=1;i<hist.length-1;i++){ var p=hist[i]; if(p.t<from) continue; if(p.D>=hist[i-1].D && p.D>hist[i+1].D && p.D>300){ d=p; break; } }
+  if(d){ for(i=1;i<hist.length-1;i++){ var q=hist[i]; if(q.t<=d.t) continue; if(q.W>=hist[i-1].W && q.W>hist[i+1].W){ wp=q; break; } } }
+  return {d:d, w:wp}; }
+function enterStep(n){
+  if(S.step>=1 && S.step!==n){ activeClock(); track("wd_step_end",{step:S.step, activeMs:Math.round(stepClock.ms)}); }
+  S.step=n; S.votes={}; S.voteSent=false; S.pred=null; S.locked=false; S.running=false; S.revealed=false; S.hints=0; S.waitStart=null; S.testing=null; S.picked=null;
+  resetClock(); stepHook=null; logv.danger=false; logv.ghost=null; logv.marks=null; logv.mode="valley"; logv.isoLate=false; map.mode="valley"; $("#play").disabled=false; fast=false; $("#speed").setAttribute("aria-pressed","false");
+  if(n===0){ model.set({P:70,D:400,W:14}); model.ff(10); setPlaying(true); }
+  else if(n===1){ model.set({P:70,D:400,W:14}); model.ff(24); S.introD=model.D; S.introW=model.W; setPlaying(false); $("#play").disabled=true; }
+  else if(n===2){ model.set({P:50,D:600,W:0}); setPlaying(false); $("#play").disabled=true; }
+  else if(n===3){ model.set({P:60,D:700,W:2+S.release,winters:[8,19]}); setPlaying(false); logv.danger=true; $("#play").disabled=true; }
+  else if(n===4){ model.set({P:50,D:600,W:10}); model.ff(40); setPlaying(false); $("#play").disabled=true;
+    var pk=peaks(model.hist,3); S.stats={gap: pk.d&&pk.w ? Math.round(pk.w.t-pk.d.t) : 3};
+    logv.marks=(pk.d&&pk.w)?[{panel:0,t:pk.d.t,v:pk.d.D,label:"deer peak"},{panel:1,t:pk.w.t,v:pk.w.W,label:"wolf peak"}]:null; }
+  else if(n===5){ setPlaying(false); $("#play").disabled=true; map.mode="island"; logv.mode="island"; map.iso={moose:2000,wolves:15}; map.isoT={moose:2000,wolves:15}; }
+  else if(n===6){ model.set({P:70,D:400,W:14}); model.ff(15); setPlaying(true); }
+  if(n>=1){ track("wd_step_start",{step:n, mode:PRESENT?"class":"solo"}); send("step",null,{step:n}); }
+  if(n===6){ var H=S.history; send("complete",null,{summary:{predictionsMatched:(H[1]&&H[1].matched?1:0)+(H[2]&&H[2].matched?1:0), hintsUsed:H.hints||0, attemptsStep3:S.attempts.length, explanationBest:H[4]?H[4].best:false, transferBest:H[5]?H[5].best:false}}); }
+  render(); renderHud(); guide.scrollTop=0; map.draw(model,clock,0); logv.draw(model);
+  if(n>0) focusEl("#stitle");
+}
+function startRun(n){
+  S.running=true;
+  if(n===1){ model.W=0; model.log(); S.waitStart=model.t; logv.ghost={t0:model.t, len:20, v0:model.D, top:Math.max(800, model.D*3.6), f:GHOST[S.pred]}; }
+  else { model.W=10; model.log(); S.waitStart=model.t; }
+  track("wd_control",{step:n, control:n===1?"remove_wolves":"release_wolves"});
+  setPlaying(true); $("#play").disabled=false; render(); focusEl("#act");
+}
+function reveal(){
+  var n=S.step; S.revealed=true; setPlaying(false); $("#play").disabled=true;
+  var st=STEPS[n], best=null, pc=null; st.choices.forEach(function(c){ if(c.best) best=c.id; if(c.id===S.pred) pc=c; });
+  var matched=S.pred===best; track("wd_reveal",{step:n, prediction:S.pred, matched:matched});
+  S.history[n]={guess:pc?pc.t:"", matched:matched};
+  render(); announce("The survey results are in."); focusEl("#fbh");
+}
+function step1Stats(){ var t0=S.waitStart, after=model.hist.filter(function(h){return h.t>=t0;}), pk=after[0], minP=100;
+  after.forEach(function(h){ if(h.D>pk.D) pk=h; if(h.P<minP) minP=h.P; }); var post=after.filter(function(h){return h.t>pk.t;}), minA=post.length?post[0].D:pk.D; post.forEach(function(h){ if(h.D<minA) minA=h.D; });
+  return {d0:after[0].D, peak:pk.D, peakYrs:Math.max(1,Math.round(pk.t-t0)), minAfter:minA, minP:Math.round(minP)}; }
+function step2Stats(){ var pk=peaks(model.hist.filter(function(h){return h.t>=S.waitStart;}), S.waitStart+1); var r=function(v){ return Math.round(v-S.waitStart); }; return {dPeakT:pk.d?r(pk.d.t):"?", wPeakT:pk.w?r(pk.w.t):"?"}; }
+function tick(){
+  var n=S.step;
+  if(Math.floor(clock*4)!==tick.last){ tick.last=Math.floor(clock*4); renderHud(); }
+  if((n===1||n===2) && S.running && !S.revealed){ var need=STEPS[n].need, el=$("#wleft"); if(el) el.textContent=Math.min(need,Math.floor(model.t-S.waitStart));
+    if(model.t>=S.waitStart+need){ S.stats = n===1?step1Stats():step2Stats(); reveal(); } }
+  if(n===3 && S.testing){ var ty=$("#tyear"); if(ty) ty.textContent=Math.min(30,Math.floor(model.t)); if(model.t>=30) finishTest(); }
+}
+function startTest(){
+  var r=S.release; model.set({P:60,D:700,W:2+r,winters:[8,19]}); S.testing={release:r, fail:null};
+  stepHook=function(mm){ var T=S.testing; if(!T||T.fail) return; if(mm.P<DANGER.P) T.fail={k:"P",t:mm.t}; else if(mm.D<DANGER.D) T.fail={k:"D",t:mm.t}; else if(mm.W<DANGER.W) T.fail={k:"W",t:mm.t}; };
+  if(model.W<DANGER.W) S.testing.fail={k:"W",t:0};
+  setPlaying(true); render(); announce("Flying 30 winters.");
+}
+function finishTest(){
+  var T=S.testing; S.testing=null; stepHook=null; setPlaying(false);
+  var r=T.release, f=T.fail, reason=null, headline, wn="";
+  if(!f) headline="The valley made it 30 winters.";
+  else { var many=r>=12; reason = f.k==="P" ? (many?"too_many_boom":"overbrowsed") : f.k==="W" ? (many?"too_many_wolves":"too_few_wolves") : "deer_crash";
+    headline={P:"Young trees",D:"Deer",W:"Wolves"}[f.k]+" crossed the danger line in winter "+Math.max(0,Math.floor(f.t))+".";
+    [8,19].forEach(function(wy){ if(f.t>=wy && f.t<wy+3) wn='<p>That harsh winter in winter '+wy+' made it harder: deep snow wears deer out, and wolves catch more deer in deep snow.</p>'; }); }
+  var a={release:r, success:!f, reason:reason, headline:headline, winterNote:wn}; S.attempts.push(a);
+  track("wd_attempt",{step:3, attempt:S.attempts.length, success:!f, failReason:reason, release:r, failLine:f?f.k:null, failYear:f?Math.floor(f.t):null});
+  if(!f){ S.solved=true; S.history[3]={tests:S.attempts.length}; }
+  render(); announce(headline); focusEl("#fbh");
+}
+guide.addEventListener("click", function(e){
+  var b=e.target.closest("[data-act]"); if(!b||b.disabled) return;
+  var act=b.getAttribute("data-act"), n=S.step, st=STEPS[n];
+  if(act==="start") enterStep(1);
+  else if(act==="present-on") setPresent(true);
+  else if(act==="present-off") setPresent(false);
+  else if(act==="pick"){ var id=b.getAttribute("data-id");
+    if(n===1||n===2){ if(S.locked) return; S.pred=id; render(); var nb=$('[data-id="'+id+'"]',guide); if(nb) nb.focus({preventScroll:true}); }
+    else { var ch=null; st.choices.forEach(function(c){ if(c.id===id) ch=c; });
+      if(n===4 && S.firstExplain==null){ S.firstExplain=id; S.history[4]={best:!!ch.best}; track("wd_explanation",{step:4, choiceId:id, isBest:!!ch.best, firstTry:true}); }
+      if(n===5 && S.firstTransfer==null){ S.firstTransfer=id; S.history[5]={guess:ch.t, best:!!ch.best}; track("wd_transfer",{step:5, choiceId:id, isBest:!!ch.best, firstTry:true}); logv.isoLate=true; map.isoT={moose:524, wolves:37}; }
+      if(!S.picked) sendVote(n); var was=!!S.picked; S.picked=id; render(); renderHud(); logv.draw(model);
+      if(!was){ announce("Jodi responds."); focusEl("#fbh"); } else { var pb=$('[data-id="'+id+'"]',guide); if(pb) pb.focus({preventScroll:true}); } } }
+  else if(act==="lock"){ if(!S.pred) return; S.locked=true; track("wd_prediction",{step:n, choiceId:S.pred, mode:PRESENT?"class":"solo"}); sendVote(n); render(); focusEl("#act"); }
+  else if(act==="go") startRun(n);
+  else if(act==="hint"){ if(!st.hints||S.hints>=st.hints.length) return; S.hints++; S.history.hints=(S.history.hints||0)+1; track("wd_hint",{step:n, hint:S.hints}); render(); }
+  else if(act==="test"){ if(!S.testing) startTest(); }
+  else if(act==="next") enterStep(n+1);
+  else if(act==="restart"){ send("restart",null,{}); S=freshState(); enterStep(0); }
+  else if(act==="w-5") changeWolves(-5); else if(act==="w+5") changeWolves(5); else if(act==="w0") changeWolves(0,true);
+  else if(act==="food"){ model.food=b.getAttribute("data-food"); $$('[data-act="food"]',guide).forEach(function(x){ x.setAttribute("aria-pressed",String(x===b)); }); track("wd_control",{step:n, control:"food", value:model.food}); }
+  else if(act==="winter"){ if(!model.pendingWinter){ model.pendingWinter=true; if(!playing) setPlaying(true); toast("A harsh winter is on the way."); track("wd_control",{step:n, control:"winter"}); } }
+});
+guide.addEventListener("input", function(e){
+  if(e.target.id==="release"){ S.release=+e.target.value; var o=$("#relOut"); if(o) o.textContent=S.release; if(!S.testing){ model.set({P:60,D:700,W:2+S.release,winters:[8,19]}); renderHud(); } return; }
+  var l=e.target.getAttribute&&e.target.getAttribute("data-vote"); if(l){ S.votes=S.votes||{}; S.votes[l]=e.target.value; }
+});
+
+/* glossary tips */
+var tipEl=$("#tip"), tipFor=null, tipPinned=false;
+function showTip(btn){ var g=GLOSSARY[btn.getAttribute("data-term")]; if(!g) return; if(tipFor&&tipFor!==btn) tipFor.setAttribute("aria-expanded","false"); tipFor=btn; btn.setAttribute("aria-expanded","true");
+  tipEl.innerHTML="<b>"+esc(g[0])+"</b>"+esc(g[1]); tipEl.hidden=false; var r=btn.getBoundingClientRect(), tw=tipEl.offsetWidth, th=tipEl.offsetHeight;
+  tipEl.style.left=Math.max(12,Math.min(r.left+window.scrollX, window.scrollX+document.documentElement.clientWidth-tw-12))+"px";
+  var top=r.bottom+window.scrollY+8; if(r.bottom+th+16>window.innerHeight && r.top>th+16) top=r.top+window.scrollY-th-8; tipEl.style.top=top+"px"; }
+function hideTip(){ if(tipFor) tipFor.setAttribute("aria-expanded","false"); tipFor=null; tipPinned=false; tipEl.hidden=true; }
+document.addEventListener("click", function(e){ var b=e.target.closest(".term"); if(b){ if(tipFor===b&&tipPinned){ hideTip(); return; } showTip(b); tipPinned=true; return; } if(!e.target.closest("#tip")) hideTip(); });
+document.addEventListener("mouseover", function(e){ var b=e.target.closest&&e.target.closest(".term"); if(b&&!tipPinned) showTip(b); });
+document.addEventListener("mouseout", function(e){ var b=e.target.closest&&e.target.closest(".term"); if(b&&!tipPinned&&!(e.relatedTarget&&b.contains(e.relatedTarget))) hideTip(); });
+document.addEventListener("keydown", function(e){ if(e.key==="Escape"&&!tipEl.hidden){ var f=tipFor; hideTip(); if(f) f.focus(); } });
+guide.addEventListener("scroll", function(){ if(!tipEl.hidden) hideTip(); }, {passive:true});
+
+/* Present mode */
+function setPresent(on){ if(PRESENT===on) return; PRESENT=on; document.body.classList.toggle("present",on);
+  $("#presentBtn").setAttribute("aria-pressed",String(on)); $("#presentLabel").textContent=on?"Exit present":"Present"; map.k=logv.k=on?1.3:1;
+  track("wd_mode",{mode:on?"class":"solo", step:S.step});
+  try{ if(on&&document.documentElement.requestFullscreen&&!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){}); if(!on&&document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen().catch(function(){}); }catch(e){}
+  render(); setTimeout(redrawAll,120); announce(on?"Present mode on.":"Present mode off."); }
+$("#presentBtn").addEventListener("click", function(){ setPresent(!PRESENT); });
+
+var toastT=null;
+function toast(msg){ var t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(function(){ t.hidden=true; },3000); }
+if(IS_PROD){ var mh=document.createElement("script"); mh.src="/js/message-hq.js"; mh.setAttribute("data-message-source","Simulations: Wolves & Deer"); document.body.appendChild(mh); }
+$("#commsBtn").addEventListener("click", function(){ if(window.openComms) window.openComms(); else if(window.openMessageModal) window.openMessageModal(); else toast("Comms opens your Allgood Academy inbox on allgoodacademy.com."); });
+document.addEventListener("keydown", function(e){ if(e.ctrlKey||e.metaKey||e.altKey) return; var tag=(e.target.tagName||"").toLowerCase(); if(tag==="input"||tag==="textarea") return;
+  var i=LTR.indexOf(String(e.key).toUpperCase()); if(i<0) return; var btns=$$(".choice:not(:disabled)",guide); if(btns[i]) btns[i].click(); });
+
+enterStep(0);
+if(location.hash==="#present") setPresent(true);
+schedule();
+})();
+</script>
+</body>
+</html>

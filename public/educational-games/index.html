@@ -30,41 +30,8 @@ body{
   *{animation:none!important;transition:none!important}
 }
 
-/* ── NAV ── */
-nav{
-  position:sticky;top:0;z-index:100;
-  background:var(--dark);
-  padding:0 24px;
-  height:56px;
-  display:flex;align-items:center;justify-content:space-between;
-}
-.nav-logo{
-  font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;
-  color:white;letter-spacing:0.02em;text-decoration:none;
-}
-.nav-logo span{color:var(--teal)}
-.nav-links{display:flex;gap:4px;align-items:center}
-.nav-link{
-  font-size:12px;color:rgba(255,255,255,0.55);
-  text-decoration:none;padding:6px 12px;border-radius:6px;
-  transition:color 0.15s,background 0.15s;
-}
-.nav-link:hover{color:white;background:rgba(255,255,255,0.08)}
-.nav-link.active{color:white;background:rgba(255,255,255,0.1)}
-/* The one button in the nav. It points at a real lesson, because the product needs no
-   account to start — the homepage hero's "I'm a student" CTA goes to the same GoodBlock. */
-.nav-cta{
-  font-size:12px;font-weight:700;color:var(--dark);
-  background:var(--cream);border:none;padding:7px 16px;
-  border-radius:20px;cursor:pointer;text-decoration:none;
-  transition:opacity 0.15s;
-}
-.nav-cta:hover{opacity:0.85}
-/* Sign in is a plain text link now — available, not advertised. The class is the hook the
-   session-aware relabel and the click handler below query; it carries no button styling. */
-.nav-signin{font-weight:700;color:rgba(255,255,255,0.8)}
-@media(max-width:480px){.nav-signin{white-space:normal;line-height:1.15;max-width:5.6em;text-align:center}} /* "Teacher sign in" wraps so the button still fits */
-.nav-right{display:flex;align-items:center;gap:4px}
+/* The site nav is generated (nav/nav.js) and carries its own styles. */
+:root{--nav-fade:var(--dark);--nav-fade-end:var(--dark)}
 
 /* ── HERO ── */
 .hero{
@@ -373,8 +340,6 @@ footer{
   .radar{display:none}
   .edu-strip{padding:28px 24px}
   .page{padding:0 16px 60px}
-  nav{padding:0 16px}
-  .nav-links .nav-link{display:none}
 }
 @media(max-width:480px){
   .challenge-grid{grid-template-columns:1fr}
@@ -387,20 +352,44 @@ footer{
 <!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
      build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
      change a link in nav/nav.js and every page picks it up. -->
-<nav class="site-nav">
-  <a href="/" class="nav-logo">Allgood<span>Academy</span></a>
-  <div class="nav-links">
-    <a href="/educational-games/" class="nav-link active">Games</a>
-    <a href="/simulations/" class="nav-link">Simulations</a>
-    <a href="/for-teachers/" class="nav-link">For teachers</a>
-    <a href="/about/" class="nav-link">About</a>
-    <a href="/about/#contact" class="nav-link">Contact</a>
-    <a href="/mission-control/" class="nav-link nav-signin">Teacher sign in</a>
+<div class="nav-shell">
+  <div class="wrap">
+    <nav class="nav site-nav">
+      <a class="wordmark" href="/">Allgood<em>Academy</em></a>
+      <div class="nav-right">
+        <div class="nav-links">
+          <a class="nav-link here" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
+      </div>
+    </nav>
   </div>
-  <div class="nav-right">
-    <a href="/dashboard/" class="nav-cta">Start learning</a>
-  </div>
-</nav>
+</div>
+<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>
 <style>
 .site-nav .nav-links{display:flex;align-items:center;gap:4px}
 @media(max-width:960px){

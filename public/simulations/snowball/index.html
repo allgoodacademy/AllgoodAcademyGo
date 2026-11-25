@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Snowball · Allgood Academy</title>
+<meta name="description" content="A savings simulation for grades 7–9. Roll a snowball down the hill of your life and find out why starting early beats saving more later.">
+<meta name="standards" content="NSPFE Saving 8-4, 8-5; Investing 8-6, 8-7; CCSS 7.RP.A.3, 8.F.A.3, HSF-LE.A.1, HSF-LE.A.3; CASEL Responsible Decision-Making">
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+
+<style>
+/* VOICE  quiet winter evening, a story you step into, not a worksheet
+   IDEA   your life is a ski hill; money you pack is a snowball that rolls from your start age to 60
+   PICTURE one big dusk scene: hill, age flags, a growing snowball with a teal core (what you packed)
+   COLOUR dusk teal sky, cream snow, Allgood orange for flags and the one thing to look at
+   LAYOUT  full-width scene first, one short story card under it, one action at a time */
+:root{
+  --bg:var(--color-canvas); --card:var(--color-surface); --panel:var(--color-cream); --panel-b:var(--color-cream-border);
+  --ink:var(--color-ink); --ink2:var(--color-ink-soft); --line:var(--color-hairline);
+  --accent:var(--color-teal); --accent-text:var(--color-teal-deep); --sel:var(--color-teal-wash);
+  --cta:var(--color-orange); --cta-d:var(--color-orange-deep); --focus:var(--color-teal-deep);
+  --header:var(--color-teal); --on-header:var(--color-surface);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme=light]){
+  --bg:var(--color-dark); --card:var(--color-dark-card); --panel:var(--color-dark-card);
+  --panel-b:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+  --ink:var(--color-warm-white); --ink2:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted));
+  --line:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+  --accent-text:var(--color-teal-wash); --sel:color-mix(in srgb, var(--color-teal) 30%, var(--color-dark-card)); --focus:var(--color-teal-wash);
+  color-scheme:dark; } }
+:root[data-theme=dark]{
+  --bg:var(--color-dark); --card:var(--color-dark-card); --panel:var(--color-dark-card);
+  --panel-b:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+  --ink:var(--color-warm-white); --ink2:color-mix(in srgb, var(--color-warm-white) 72%, var(--color-muted));
+  --line:color-mix(in srgb, var(--color-muted) 40%, var(--color-dark-card));
+  --accent-text:var(--color-teal-wash); --sel:color-mix(in srgb, var(--color-teal) 30%, var(--color-dark-card)); --focus:var(--color-teal-wash);
+  color-scheme:dark; }
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none !important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:16px;line-height:1.55;overflow-x:clip}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;line-height:1.1;margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:-1px;padding:0;border:0}
+a{color:var(--accent-text)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+</style>
+<style>
+/* Header: same pattern as the Digital Decisions Lab Pack header */
+.time{font-size:12px;color:var(--color-teal-wash);white-space:nowrap}
+.choice{display:flex;gap:10px;align-items:flex-start}
+.choice .ltr{flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;border:1.5px solid var(--accent);color:var(--accent-text);font-weight:700;font-size:13px;line-height:1}
+.choice[aria-pressed="true"] .ltr{background:var(--accent);color:var(--color-surface)}
+.choice .ct{flex:1}
+.introbtns{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.teachnote{font-size:13px;color:var(--ink2);margin:10px 0 0}
+.vote{border:1px dashed var(--panel-b);border-radius:12px;padding:10px 12px;margin:0 0 12px;background:var(--card)}
+.vote summary{cursor:pointer;font-weight:700;font-size:14px}
+.vote .vrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+.vote label{display:flex;align-items:center;gap:6px;font-weight:700}
+.vote input{width:100%;min-width:0;min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:4px 8px;font-size:16px}
+/* Present mode: projector-friendly */
+body.present{font-size:19px}
+body.present .wrap{max-width:none;padding:0 22px}
+body.present .layout{grid-template-columns:minmax(0,1.45fr) minmax(380px,1fr)}
+body.present .guide h2{font-size:34px}
+body.present .kicker{font-size:15px}
+body.present .choice{font-size:20px;padding:14px 16px;min-height:56px}
+body.present .choice[aria-pressed="true"]{padding:13px 15px}
+body.present .choice .ltr{width:34px;height:34px;font-size:17px}
+body.present .jodi img{width:76px;height:76px}
+body.present .btn.cta{font-size:22px;padding:12px 26px}
+body.present .gauge b{font-size:15px}
+body.present .ctl label,body.present .ctl legend{font-size:16px}
+body.present .stage-bar p,body.present .desc{font-size:15px}
+body.present .q{font-size:21px}
+
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:50;background:var(--card);color:var(--ink);border:1px solid var(--panel-b);border-radius:12px;padding:10px 14px;font-size:14px;box-shadow:0 6px 18px color-mix(in srgb, var(--color-ink) 22%, transparent);max-width:calc(100vw - 24px)}
+.linkbtn{font-weight:700;color:var(--accent-text);white-space:nowrap}
+
+</style>
+<style>
+/* ===== Scene ===== */
+.scene-wrap{background:linear-gradient(var(--color-dark), var(--color-teal-deep));padding:18px 0 0}
+.scene{position:relative;border-radius:18px 18px 0 0;overflow:hidden;box-shadow:0 10px 30px color-mix(in srgb, var(--color-dark) 45%, transparent)}
+.scene canvas{display:block;width:100%;aspect-ratio:16/8.2;touch-action:pan-y}
+.chip{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:10px;background:color-mix(in srgb, var(--color-dark) 55%, transparent);color:var(--color-warm-white);border-radius:999px;padding:6px 14px 6px 12px;font-size:13px;font-weight:700;backdrop-filter:blur(4px)}
+.flakes{display:flex;gap:4px}
+.flakes i{width:9px;height:9px;border-radius:50%;background:color-mix(in srgb, var(--color-warm-white) 28%, transparent)}
+.flakes i.done{background:var(--color-warm-white)} .flakes i.now{background:var(--color-orange)}
+.readout{position:absolute;right:14px;top:12px;background:color-mix(in srgb, var(--color-dark) 58%, transparent);color:var(--color-warm-white);border-radius:14px;padding:9px 14px;text-align:right;backdrop-filter:blur(4px);min-width:170px}
+.readout .ro-k{display:block;font-size:12px;opacity:.8}
+.readout .ro-v{display:block;font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
+.readout .ro-s{display:block;font-size:12.5px;margin-top:3px;white-space:nowrap}
+.readout .ro-s b{color:var(--color-teal-wash)}
+.readout .ro-row{display:flex;gap:16px;justify-content:flex-end}
+.pretend{position:absolute;left:14px;bottom:10px;background:color-mix(in srgb, var(--color-dark) 55%, transparent);color:var(--color-warm-white);border-radius:999px;padding:4px 12px;font-size:12px}
+.keyline{position:absolute;right:14px;bottom:10px;display:flex;gap:12px;background:color-mix(in srgb, var(--color-dark) 55%, transparent);color:var(--color-warm-white);border-radius:999px;padding:4px 12px;font-size:12px}
+.keyline i{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:5px}
+.k-core{background:var(--color-teal)} .k-snow{background:var(--color-warm-white)}
+
+/* ===== Story card ===== */
+.story-wrap{background:linear-gradient(var(--color-teal-deep) 0 1px, var(--bg) 1px)}
+.story{background:var(--panel);border:1px solid var(--panel-b);border-top:0;border-radius:0 0 18px 18px;padding:22px 24px 24px;margin-bottom:30px}
+.story-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:22px 30px;align-items:start}
+.story-grid.one{grid-template-columns:minmax(0,1fr)}
+.kicker{font-size:12.5px;font-weight:700;color:var(--accent-text);margin:0 0 4px;letter-spacing:.3px}
+.story h2{font-size:clamp(26px,3vw,34px);margin:0 0 10px;outline:none;text-wrap:balance}
+.story p{margin:0 0 10px}
+.narr{font-size:17px}
+.guide-line{display:flex;gap:10px;align-items:flex-start;margin-top:6px}
+.guide-line img{width:44px;height:44px;border-radius:50%;flex:none;background:var(--card);border:1px solid var(--panel-b)}
+.guide-line .say{background:var(--card);border:1px solid var(--panel-b);border-radius:4px 14px 14px 14px;padding:10px 13px;flex:1}
+.guide-line .say p:last-child{margin-bottom:0}
+.who{display:block;font-size:11px;font-weight:700;color:var(--accent-text);letter-spacing:.5px;margin-bottom:2px}
+.q{font-family:var(--font-display);font-weight:700;font-size:21px;line-height:1.25;margin:0 0 12px;text-wrap:balance}
+.choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 14px}
+.choice{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:12px 14px;cursor:pointer;min-height:56px;line-height:1.35}
+.choice:hover:not(:disabled){border-color:var(--accent)}
+.choice[aria-pressed="true"]{border:2px solid var(--accent);padding:11.5px 13.5px;background:var(--sel)}
+.choice:disabled{cursor:default}
+.choice:disabled:not([aria-pressed="true"]){opacity:.55}
+.choice .ltr{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent-text);font-weight:700;font-size:13px}
+.choice[aria-pressed="true"] .ltr{background:var(--accent);color:var(--color-surface)}
+.choice .big{display:block;font-family:var(--font-display);font-weight:700;font-size:18px}
+.choice .sm{display:block;font-size:14px;color:var(--ink2)}
+.choice .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:4px;background:var(--accent);color:var(--color-surface)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:9px 16px;cursor:pointer;font-weight:700;min-height:44px}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn.small{min-height:38px;padding:6px 12px;font-size:14px}
+.btn.cta{background:var(--cta);color:var(--color-surface);border:0;box-shadow:0 4px 0 var(--cta-d);font-size:19px;padding:11px 24px}
+.btn.cta:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 var(--cta-d)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.note{font-size:13.5px;color:var(--ink2)}
+.reveal{border-left:4px solid var(--cta);background:var(--card);border-radius:0 14px 14px 0;padding:12px 16px;margin:0 0 14px}
+.reveal h3{font-family:var(--font-ui);font-size:15px;margin:0 0 6px;outline:none}
+.reveal p:last-child{margin-bottom:0}
+.big-num{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1.05;margin:2px 0 8px}
+.ctls{display:grid;gap:14px;margin:0 0 14px}
+.ctl label{display:flex;justify-content:space-between;font-weight:700;font-size:14.5px;margin-bottom:4px}
+.ctl output{font-family:var(--font-display);font-size:20px;color:var(--ink)}
+.ctl input[type=range]{width:100%;accent-color:var(--cta);height:30px;margin:0}
+.stepper{display:flex;align-items:center;gap:10px}
+.stepper button{width:48px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);font-size:22px;font-weight:700;cursor:pointer}
+.stepper output{min-width:90px;text-align:center}
+.budget{font-size:12.5px;color:var(--ink2);font-weight:400}
+.tests{list-style:none;padding:0;margin:8px 0 0;font-size:14px;display:flex;flex-wrap:wrap;gap:6px}
+.tests li{background:var(--card);border:1px solid var(--panel-b);border-radius:999px;padding:4px 12px}
+.hints{margin:6px 0 10px;padding-left:22px}
+.takeaways{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 14px}
+.takeaways div{background:var(--card);border:1px solid var(--panel-b);border-radius:14px;padding:12px 14px}
+.takeaways b{display:block;font-family:var(--font-display);font-size:17px;margin-bottom:2px}
+.yours{list-style:none;padding:0;margin:6px 0 14px;font-size:14px}
+.yours li{background:var(--card);border:1px solid var(--panel-b);border-radius:10px;padding:8px 12px;margin-bottom:6px}
+.vote{border:1px dashed var(--panel-b);border-radius:12px;padding:10px 12px;margin:0 0 12px;background:var(--card)}
+.vote summary{cursor:pointer;font-weight:700;font-size:14px}
+.vote .vrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+.vote label{display:flex;align-items:center;gap:6px;font-weight:700}
+.vote input{width:100%;min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:4px 8px;font-size:16px}
+.teachnote{font-size:13px;color:var(--ink2);margin:10px 0 0}
+
+footer{border-top:1px solid var(--line);color:var(--ink2);font-size:13px;background:var(--card)}
+footer .wrap{padding-top:20px;padding-bottom:28px;max-width:720px}
+footer h2{font-size:17px;color:var(--ink);margin-bottom:8px}
+footer p{margin:0 0 8px} footer ul{margin:6px 0 10px;padding-left:20px}
+footer summary{cursor:pointer;font-weight:700;color:var(--ink)}
+.ver{font-size:12px;color:var(--ink2)}
+
+/* Present mode */
+body.present .wrap{max-width:none;padding:0 20px}
+body.present .scene canvas{aspect-ratio:16/7.4}
+body.present .story h2{font-size:40px}
+body.present .narr,body.present .story p{font-size:21px}
+body.present .q{font-size:28px}
+body.present .choice{font-size:20px;min-height:64px}
+body.present .choice .big{font-size:24px}
+body.present .choice .ltr{width:36px;height:36px;font-size:17px}
+body.present .readout .ro-v{font-size:40px}
+body.present .readout .ro-k,body.present .readout .ro-s,body.present .chip{font-size:16px}
+body.present .btn.cta{font-size:23px;padding:13px 28px}
+
+@media (max-width:860px){
+  .story-grid{grid-template-columns:minmax(0,1fr)}
+  .scene canvas{aspect-ratio:4/3.4}
+  .readout{min-width:0;padding:7px 11px}.readout .ro-v{font-size:22px}.readout .ro-row{gap:10px}
+  .keyline{display:none}
+}
+@media (max-width:600px){
+  .choices,.takeaways{grid-template-columns:minmax(0,1fr)}
+  .story{padding:18px 16px 20px}
+  .scene-wrap{padding-top:10px}
+  .chip .ctext{display:none}
+  .readout .ro-v{font-size:19px}.readout .ro-k,.readout .ro-s{font-size:11px}
+  .pretend{font-size:11px}
+  
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;scroll-behavior:auto !important} }
+</style>
+<style>
+/* Activity row (under the generated site nav): copied verbatim from /simulations/watercycle/ so
+   every simulation page has the same row. Change it there and here together. The two lines after the copy pin what the
+   header takes from Water Cycle's page rules (header teal, .wrap width, Present widths), so this
+   page's own palette and layout cannot move it. */
+.top{background:var(--header);color:var(--on-header);position:sticky;top:0;z-index:30;box-shadow:0 2px 6px color-mix(in srgb, var(--color-ink) 18%, transparent)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.wordmark{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--on-header);text-decoration:none;white-space:nowrap}
+.pill{background:var(--color-orange);color:var(--color-surface);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.top-right{display:flex;align-items:center;gap:6px;flex:none}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:999px;color:var(--color-teal-wash);text-decoration:none}
+.iconbtn:hover{background:color-mix(in srgb, var(--color-surface) 12%, transparent);color:var(--color-surface)}
+.iconbtn:focus-visible{outline-color:var(--color-surface);outline-offset:-3px}
+.iconbtn svg{width:22px;height:22px}
+button.iconbtn{appearance:none;border:0;background:transparent;cursor:pointer;padding:0}
+.wm-sub{font-family:var(--font-ui);font-size:12px;font-weight:400;opacity:.7;letter-spacing:.5px}
+.navbtn{appearance:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:999px;border:1px solid color-mix(in srgb, var(--color-surface) 45%, transparent);background:transparent;color:var(--color-surface);font-weight:700;font-size:13px;cursor:pointer;margin-right:4px}
+.navbtn svg{width:18px;height:18px}
+.navbtn:hover,.navbtn[aria-pressed="true"]{background:var(--color-surface);color:var(--color-teal-deep)}
+.navbtn:focus-visible{outline-color:var(--color-surface)}
+body.present .wm-sub,body.present .pill{display:none}
+@media (max-width:700px){ .navbtn span{display:none}.navbtn{padding:0 9px} .wm-sub{display:none} .wordmark{font-size:16px} }
+@media (max-width:420px){ .wordmark{display:none} .pill{max-width:70vw} }
+.top{--header:var(--color-teal);--on-header:var(--color-surface);font-family:var(--font-ui);font-size:16px;line-height:1.55}
+.top .wrap{max-width:1180px;margin:0 auto;padding:0 24px} body.present .top .wrap{max-width:none;padding:0 22px}
+</style>
+<style>
+/* Comms (/js/message-hq.js) host styles. message-hq.js builds its inbox from Tailwind
+   class names and expects the host page to define .hidden-modal / .visible-modal. These
+   pages ship no Tailwind bundle (its preflight reset would restyle them), so the classes
+   the inbox actually uses are defined here, scoped to #message-modal. Without this block
+   the inbox renders open, unstyled, over the page on every load. */
+.modal-transition{transition:opacity .2s ease-in-out,transform .2s ease-in-out}
+#message-modal.hidden-modal{opacity:0;pointer-events:none;transform:translateY(-10px)}
+#message-modal.visible-modal{opacity:1;pointer-events:auto;transform:none}
+#message-modal{padding:24px;font:14px/1.5 Verdana,Geneva,Tahoma,sans-serif;color:var(--color-ink);text-align:left;color-scheme:light}
+#message-modal *{box-sizing:border-box} #message-modal .relative{position:relative}
+#message-modal h3,#message-modal p{margin:0}
+#message-modal button{font:inherit;cursor:pointer;background:none;border:0;color:inherit;padding:0}
+#message-modal svg.w-5{width:20px;height:20px} #message-modal svg.w-3{width:12px;height:12px}
+#message-modal .bg-white{background:var(--color-surface)}
+#message-modal .rounded-lg{border-radius:10px} #message-modal .rounded{border-radius:6px} #message-modal .rounded-full{border-radius:999px} #message-modal .rounded-r{border-radius:0 6px 6px 0}
+#message-modal .shadow-2xl{box-shadow:0 24px 48px rgba(0,0,0,.3)}
+#message-modal .border-t-4{border-top:4px solid var(--color-orange)}
+#message-modal .px-6{padding-left:24px;padding-right:24px} #message-modal .pt-6{padding-top:24px} #message-modal .pb-3{padding-bottom:12px} #message-modal .py-4{padding-top:16px;padding-bottom:16px} #message-modal .py-6{padding-top:24px;padding-bottom:24px} #message-modal .py-2{padding-top:8px;padding-bottom:8px} #message-modal .py-3{padding-top:12px;padding-bottom:12px} #message-modal .p-3{padding:12px} #message-modal .px-3{padding-left:12px;padding-right:12px} #message-modal .py-1\.5{padding-top:6px;padding-bottom:6px}
+#message-modal .mt-1{margin-top:4px} #message-modal .mt-2{margin-top:8px} #message-modal .mt-3{margin-top:12px} #message-modal .mt-4{margin-top:16px} #message-modal .mb-1{margin-bottom:4px} #message-modal .mb-2{margin-bottom:8px} #message-modal .mb-3{margin-bottom:12px} #message-modal .mt-1\.5{margin-top:6px}
+#message-modal .border-t{border-top:1px solid var(--color-hairline)}
+#message-modal .border-l-4{border-left:4px solid var(--color-hairline)}
+#message-modal .border-l-4.border-allgood-primary{border-left-color:var(--color-orange)} #message-modal .border-l-4.border-allgood-secondary{border-left-color:var(--color-teal)}
+#message-modal .border{border:1px solid var(--color-hairline)}
+#message-modal .bg-gray-50{background:var(--color-light)} #message-modal .hover\:bg-gray-100:hover{background:var(--color-hairline)}
+#message-modal .w-full{width:100%} #message-modal .text-left{text-align:left} #message-modal .text-center{text-align:center}
+#message-modal .flex{display:flex} #message-modal .flex-wrap{flex-wrap:wrap} #message-modal .items-start{align-items:flex-start} #message-modal .items-center{align-items:center} #message-modal .justify-center{justify-content:center} #message-modal .gap-2{gap:8px} #message-modal .shrink-0{flex-shrink:0} #message-modal .min-w-0{min-width:0}
+#message-modal .h-2{height:8px} #message-modal .w-2{width:8px} #message-modal .bg-allgood-primary{background:var(--color-orange)} #message-modal .bg-transparent{background:transparent}
+#message-modal .text-xl{font-size:20px;line-height:1.3} #message-modal .text-sm{font-size:14px} #message-modal .text-xs{font-size:12px} #message-modal .text-\[10px\]{font-size:10px}
+#message-modal .font-heading{font-family:Georgia,"Times New Roman",serif} #message-modal .font-bold{font-weight:700}
+#message-modal .uppercase{text-transform:uppercase} #message-modal .tracking-wide{letter-spacing:.025em} #message-modal .tracking-widest{letter-spacing:.1em} #message-modal .italic{font-style:italic} #message-modal .leading-snug{line-height:1.375} #message-modal .leading-relaxed{line-height:1.625} #message-modal .break-words{overflow-wrap:break-word}
+#message-modal .text-allgood-dark{color:var(--color-ink)} #message-modal .text-gray-600,#message-modal .text-gray-500{color:var(--color-ink-soft)} #message-modal .text-gray-400{color:var(--color-ink-soft)}
+#message-modal .text-white{color:var(--color-surface)} #message-modal .underline{text-decoration:underline}
+#message-modal .bg-allgood-primary.text-white:hover,#message-modal .hover\:bg-allgood-hover:hover{background:var(--color-orange-deep)}
+#message-modal .bg-emerald-600{background:var(--color-teal)}
+#message-modal .hover\:text-red-500:hover{color:var(--color-orange-deep)}
+#message-modal .hover\:border-allgood-primary:hover{border-color:var(--color-orange);color:var(--color-orange-deep)}
+#message-modal textarea{display:block;width:100%;border:1px solid var(--color-hairline);border-radius:6px;padding:12px;margin-bottom:12px;background:var(--color-light);color:var(--color-ink);font-family:inherit;resize:none}
+#message-modal textarea:focus{outline:2px solid var(--color-teal-deep);outline-offset:1px}
+#message-modal button:focus-visible{outline:2px solid var(--color-teal-deep);outline-offset:2px}
+</style>
+</head>
+<body>
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
+<div class="nav-shell activity">
+  <div class="wrap">
+    <nav class="nav site-nav">
+      <a class="wordmark" href="/">Allgood<em>Academy</em></a>
+      <div class="nav-right">
+        <div class="nav-links">
+          <a class="nav-link" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
+      </div>
+    </nav>
+  </div>
+</div>
+<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>
+<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+}
+</style>
+<script>
+(function(){
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.textContent='Mission Control';
+})();
+</script>
+<!-- END GENERATED NAV -->
+<!-- The activity row: this simulation's name, Present and Comms. Same markup on every simulation page. -->
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="pill">The Snowball</span>
+    </div>
+    <div class="top-right">
+      <button class="navbtn" type="button" id="presentBtn" aria-pressed="false" title="Present to your class">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg>
+        <span id="presentLabel">Present</span>
+      </button>
+      <button class="iconbtn" type="button" id="commsBtn" title="Comms" aria-label="Comms">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<main>
+  <h1 class="sr-only">The Snowball: a savings simulation</h1>
+  <div class="scene-wrap">
+    <div class="wrap">
+      <div class="scene" id="scene">
+        <canvas id="cv" role="img" aria-describedby="desc"></canvas>
+        <div class="chip" aria-hidden="true"><span class="flakes" id="flakes"></span><span class="ctext" id="chipText">The Snowball</span></div>
+        <div class="readout" id="readout" aria-hidden="true"></div>
+        <div class="pretend">Pretend growth rate · not financial advice</div>
+        <div class="keyline" id="keyline" aria-hidden="true"><span><i class="k-core"></i>Core: money you packed</span><span><i class="k-snow"></i>Snow: growth</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="story-wrap">
+    <div class="wrap">
+      <section class="story" id="story" aria-label="Story"></section>
+    </div>
+  </div>
+  <p class="sr-only" id="desc" aria-live="off"></p>
+</main>
+
+<footer>
+  <div class="wrap">
+    <h2>For teachers</h2>
+    <p>Grades 7–9 · About 10–15 minutes · Projector (Present mode) or Chromebooks. No sign-in, and nothing students type is saved.</p>
+    <details>
+      <summary>Standards and sources</summary>
+      <ul>
+        <li><b>National Standards for Personal Financial Education</b> (CEE &amp; Jump$tart, 2021): Saving 8-4 (principal vs. interest, Rule of 72), Saving 8-5 (compound vs. simple interest), Investing 8-6 (risk differs by investment), Investing 8-7 (compounding rewards investing regularly over longer periods).</li>
+        <li><b>CCSS Math:</b> 7.RP.A.3 (percent and simple interest), 8.F.A.3 (linear vs. nonlinear functions). Grade 9 stretch: HSF-LE.A.1 and HSF-LE.A.3 (linear vs. exponential growth).</li>
+        <li><b>CASEL:</b> Responsible Decision-Making (anticipating and evaluating the consequences of choices).</li>
+        <li>Background reading: <a href="https://www.investor.gov/additional-resources/specialized-resources/youth/teachers-classroom-resources/what-compound-interest" rel="noopener">Investor.gov: What is compound interest?</a> (U.S. SEC) and <a href="https://www.consumerfinance.gov/consumer-tools/educator-tools/youth-financial-education/" rel="noopener">CFPB youth financial education</a>.</li>
+      </ul>
+    </details>
+    <p>How to read the snowball: its size shows the money in it. The teal core is money put in; the white snow is growth. Every number uses a pretend, steady growth rate so the pattern is easy to see. People, cards, and amounts are made up. This is a math lesson, not investment advice.</p>
+  </div>
+</footer>
+
+<script>
+{
+"use strict";
+const $=(s,r)=>(r||document).querySelector(s);
+const $$=(s,r)=>Array.prototype.slice.call((r||document).querySelectorAll(s));
+const REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const VERSION = "1.1";
+
+/* Jodi, from the repo at assets/jodi/. PRODUCTION: use the paths, not embedded copies. */
+const JODI = { neutral:"/assets/jodi/jodi-neutral.svg", happy:"/assets/jodi/jodi-happy.svg", thinking:"/assets/jodi/jodi-thinking.svg", concerned:"/assets/jodi/jodi-concerned.svg" };
+
+
+/* ================= Telemetry (first-party only, anonymous, off-funnel) ================= */
+const IS_PROD = true; // served only by allgoodacademy.com and its staging channels
+const TEL = {ready:false, queue:[]};
+function telInit(tries){
+  if(window.Telemetry && window.AuthCore){
+    if(TEL.ready) return; TEL.ready = true;
+    try{
+      window.Telemetry.init({ module:'snowball', gameName:'The Snowball', stepsTotal:6, stream:'snowball', version:VERSION });
+      const c = window.AuthCore; if(c.anonymousSessionOnly) c.anonymousSessionOnly().catch(function(){});
+    }catch(e){}
+    const q = TEL.queue; TEL.queue = []; q.forEach(dispatch); return;
+  }
+  if((tries||0) > 200) return; setTimeout(function(){ telInit((tries||0)+1); }, 50);
+}
+if(IS_PROD){
+  ["/js/auth-core.js","/js/telemetry.js"].forEach(function(src){ const s=document.createElement("script"); s.type="module"; s.src=src; s.async=false; document.head.appendChild(s); });
+  telInit(0);
+}
+function dispatch(e){
+  const T = TEL.ready ? window.Telemetry : null; if(!T) return;
+  try{
+    if(e.kind==="track" && T.track) T.track(e.name, e.meta);
+    else if(e.kind==="step" && T.step) T.step(e.meta.step);
+    else if(e.kind==="complete" && T.complete) T.complete(e.meta);
+    else if(e.kind==="restart" && T.restart) T.restart();
+  }catch(err){}
+}
+function send(kind, name, meta){ const e={kind:kind, name:name, meta:meta||{}}; if(!IS_PROD) return; if(TEL.ready) dispatch(e); else TEL.queue.push(e); }
+function track(name, meta){ send("track", name, Object.assign({v:VERSION}, meta||{})); }
+
+/* ================= Model =================
+   Money goes in at the end of each month. "6% a year" is applied as its equivalent monthly rate.
+   Bumpy mode applies a fixed pattern of yearly ups and downs around the chosen rate. */
+const END_AGE=60, RATE=6, GOAL=50000, BUDGET=25;
+const BUMP=[12,-8,5,16,-22,9,3,-11,14,2,-15,-5]; // sums to 0
+function simulate(startAge, monthly, ratePct, bumpy){
+  let bal=0, dep=0; const pts=[{t:startAge, bal:0, dep:0}];
+  for(let age=startAge; age<END_AGE; age++){
+    const ann=(ratePct + (bumpy ? BUMP[(age-startAge)%BUMP.length] : 0))/100, rm=Math.pow(1+ann,1/12)-1;
+    for(let m=0;m<12;m++){ bal=bal*(1+rm)+monthly; dep+=monthly; }
+    pts.push({t:age+1, bal:bal, dep:dep, down: bumpy && ann<0});
+  }
+  return pts;
+}
+function at(pts,t){
+  if(!pts||!pts.length||t<pts[0].t) return null;
+  const last=pts[pts.length-1]; if(t>=last.t) return last;
+  const i=Math.floor(t-pts[0].t), a=pts[i], b=pts[i+1], f=t-a.t;
+  return {t:t, bal:a.bal+(b.bal-a.bal)*f, dep:a.dep+(b.dep-a.dep)*f};
+}
+const finalOf=p=>p[p.length-1];
+const balAt=(p,t)=>p.find(x=>x.t===t)||finalOf(p);
+const money=n=>"$"+Math.round(n).toLocaleString("en-US");
+function simpleTotal(startAge, monthly, ratePct){
+  const months=(END_AGE-startAge)*12; let total=0;
+  for(let k=1;k<=months;k++) total += monthly*(1 + ratePct/100*(months-k)/12);
+  return total;
+}
+function neededMonthly(a, target, ratePct){ const one=finalOf(simulate(a,1,ratePct)).bal; return Math.ceil(target/one/5)*5; }
+const debtPts=[], linePts=[];
+for(let y=0;y<=6;y++){ debtPts.push({t:y, bal:1000*Math.pow(1.02,12*y), dep:1000}); linePts.push({t:y, bal:1000+240*y, dep:1000}); }
+
+const MAYA={name:"Maya", start:15, monthly:20}, THEO={name:"Theo", start:30, monthly:40};
+const N={};
+N.one=simulate(20,25,RATE); N.s40=balAt(N.one,40); N.s60=finalOf(N.one);
+N.maya=simulate(MAYA.start,MAYA.monthly,RATE); N.theo=simulate(THEO.start,THEO.monthly,RATE);
+N.mayaF=finalOf(N.maya); N.theoF=finalOf(N.theo);
+N.theoNeeds=neededMonthly(THEO.start, N.mayaF.bal, RATE);
+N.firstRing=N.maya[1].bal-N.maya[0].bal; N.lastRing=N.mayaF.bal-N.maya[N.maya.length-2].bal;
+N.mayaSimple=simpleTotal(MAYA.start,MAYA.monthly,RATE);
+N.debt6=finalOf(debtPts).bal; N.debt3=debtPts[3].bal;
+
+/* ================= Scene ================= */
+const cv=$("#cv"), ctx=cv.getContext("2d");
+let W=0,H=0;
+const COL={ skyTop:"#0F1923", skyMid:"#2D6473", skyLow:"#357889", glow:"#E9B48F", sun:"#F3C9A6",
+  mtnFar:"#3F7484", mtnNear:"#2D5866", snow:"#FBF6EE", snowShade:"#DCE6E8", snowDeep:"#C9D6D9",
+  core:"#357889", coreEdge:"#2D6473", orange:"#D34716", orangeD:"#B23A0F", ink:"#17272C", ink2:"#5C6E75",
+  tree:"#1C3A44", treeSnow:"#EAF1F2", cabin:"#7A4A2E", window:"#F6C46B", rock:"#5C6E75" };
+const SC={ mode:"single", lanes:[], t:20, cut:null, rolling:null, flakes:[], present:false, drag:false, cutReveal:false };
+function resize(){
+  const r=cv.getBoundingClientRect(), d=Math.min(2, window.devicePixelRatio||1);
+  if(r.width<10) return; W=r.width; H=r.height;
+  cv.width=Math.round(W*d); cv.height=Math.round(H*d); ctx.setTransform(d,0,0,d,0,0);
+  if(!SC.flakes.length) for(let i=0;i<90;i++) SC.flakes.push({x:Math.random(), y:Math.random(), s:0.6+Math.random()*1.8, v:0.02+Math.random()*0.05, ph:Math.random()*6.28});
+}
+function k(){ return SC.present ? 1.3 : (W<560 ? 0.82 : 1); }
+function font(px,w,serif){ return (w||400)+" "+Math.round(px*k())+"px "+(serif?"Georgia, 'Times New Roman', serif":"Verdana, Geneva, sans-serif"); }
+
+/* A lane is one hill with one snowball on it. */
+function laneGeo(L){
+  const x0=W*0.07, x1=W*(L.x1f||0.74), y0=H*L.y0f, y1=H*L.y1f;
+  function u(t){ return (t-L.tMin)/(L.tMax-L.tMin); }
+  function P(t){ const q=Math.max(0,Math.min(1,u(t))); return {x:x0+(x1-x0)*q, y:y0+(y1-y0)*(0.62*q+0.38*q*q)}; }
+  function ang(t){ const q=Math.max(0,Math.min(1,u(t))); return Math.atan2((y1-y0)*(0.62+0.76*q), x1-x0); }
+  return {x0:x0,x1:x1,y0:y0,y1:y1,P:P,ang:ang};
+}
+function radius(L, bal){ if(!(bal>0)) return 0; return Math.max(3, L.rMaxF*H*Math.sqrt(bal/L.balMax)); }
+
+function drawSky(){
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,COL.skyTop); g.addColorStop(0.45,COL.skyMid); g.addColorStop(0.8,COL.skyLow); g.addColorStop(1,COL.glow);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // low sun glow
+  const sx=W*0.83, sy=H*0.36, rg=ctx.createRadialGradient(sx,sy,2,sx,sy,H*0.42);
+  rg.addColorStop(0,"rgba(243,201,166,.55)"); rg.addColorStop(1,"rgba(243,201,166,0)"); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=COL.sun; ctx.beginPath(); ctx.arc(sx,sy,H*0.045,0,Math.PI*2); ctx.fill();
+  // mountains
+  mtn(COL.mtnFar, 0.40, [0,.18,.30,.12,.46,.24,.62,.08,.78,.22,.92,.14,1.04,.26], .52);
+  mtn(COL.mtnNear, 0.50, [0,.16,.16,.30,.34,.12,.52,.26,.70,.18,.86,.30,1.04,.16], .62);
+}
+function mtn(color, base, pts, bottom){
+  ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(0,H);
+  for(let i=0;i<pts.length;i+=2) ctx.lineTo(W*pts[i], H*(base - pts[i+1]*0.55));
+  ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+}
+function tree(x,y,s){
+  ctx.fillStyle=COL.tree;
+  for(let i=0;i<3;i++){ const w=s*(0.55-i*0.13), yy=y-s*(0.25+i*0.28); ctx.beginPath(); ctx.moveTo(x,yy-s*0.42); ctx.lineTo(x-w,yy); ctx.lineTo(x+w,yy); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle=COL.treeSnow; ctx.beginPath(); ctx.moveTo(x,y-s*1.22); ctx.lineTo(x-s*0.12,y-s*1.02); ctx.lineTo(x+s*0.12,y-s*1.02); ctx.closePath(); ctx.fill();
+}
+function drawGround(L,G,idx){
+  const P0=G.P(L.tMin), P1=G.P(L.tMax);
+  ctx.beginPath(); ctx.moveTo(-5,P0.y); ctx.lineTo(P0.x,P0.y);
+  for(let i=1;i<=60;i++){ const p=G.P(L.tMin+(L.tMax-L.tMin)*i/60); ctx.lineTo(p.x,p.y); }
+  ctx.lineTo(W+5,P1.y); ctx.lineTo(W+5,H+5); ctx.lineTo(-5,H+5); ctx.closePath();
+  const g=ctx.createLinearGradient(0,P0.y,0,H); g.addColorStop(0,COL.snow); g.addColorStop(1,COL.snowShade);
+  ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=2; ctx.stroke();
+  // trees on the plateau and valley
+  if(idx===0 || SC.mode!=="compare"){ tree(W*0.035,P0.y+2,H*0.07); }
+  tree(W*0.95,P1.y+2,H*0.075); tree(W*0.985,P1.y+3,H*0.055);
+}
+function drawFlags(L,G){
+  (L.labels||[]).forEach(function(lb){
+    const p=G.P(lb.t), h=H*0.055*k();
+    ctx.strokeStyle=COL.ink2; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(p.x,p.y+2); ctx.lineTo(p.x,p.y-h); ctx.stroke();
+    ctx.fillStyle=lb.hot?COL.orange:COL.snowDeep; ctx.beginPath(); ctx.moveTo(p.x,p.y-h); ctx.lineTo(p.x+11*k(),p.y-h+5*k()); ctx.lineTo(p.x,p.y-h+10*k()); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=COL.ink; ctx.font=font(11,700); ctx.textAlign="center"; ctx.textBaseline="top";
+    ctx.fillText(lb.text, p.x, p.y+7);
+  });
+}
+function drawFinish(L,G){
+  const p=G.P(L.tMax), s=H*0.13*k();
+  if(L.cabin){
+    const cx=Math.min(W-s*0.75, p.x+W*0.17), cy=p.y+2;
+    ctx.fillStyle=COL.cabin; ctx.fillRect(cx-s*0.45,cy-s*0.5,s*0.9,s*0.5);
+    ctx.fillStyle=COL.snow; ctx.beginPath(); ctx.moveTo(cx-s*0.58,cy-s*0.48); ctx.lineTo(cx,cy-s*0.92); ctx.lineTo(cx+s*0.58,cy-s*0.48); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=COL.window; ctx.fillRect(cx-s*0.12,cy-s*0.36,s*0.24,s*0.18);
+    ctx.fillStyle=COL.ink; ctx.font=font(12,700); ctx.textAlign="center"; ctx.textBaseline="top"; ctx.fillText(L.cabin, cx, cy+6);
+  }
+}
+function drawGoal(L,G){
+  if(!L.goal) return;
+  const p=G.P(L.tMax), a=G.ang(L.tMax), r=radius(L,L.goal), n={x:Math.sin(a), y:-Math.cos(a)};
+  const cx=p.x+n.x*r, cy=p.y+n.y*r;
+  ctx.setLineDash([6,5]); ctx.strokeStyle=COL.orange; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  pill("Goal: "+money(L.goal)+" by 60", cx-r-8, cy, "right", COL.orangeD);
+}
+function drawRocks(L,G){
+  if(!L.rocks) return;
+  L.pts.forEach(function(q){ if(q.down){ const p=G.P(q.t-0.5), s=H*0.011; ctx.fillStyle=COL.rock; ctx.beginPath(); ctx.ellipse(p.x,p.y-s*0.3,s*1.2,s,0,0,Math.PI*2); ctx.fill(); } });
+}
+function drawTrail(L,G,t){
+  const t0=L.start, t1=Math.min(t,L.tMax); if(t1<=t0) return;
+  const top=[], bot=[], steps=Math.max(4,Math.ceil((t1-t0)*3));
+  for(let i=0;i<=steps;i++){
+    const tt=t0+(t1-t0)*i/steps, p=G.P(tt), a=G.ang(tt), q=at(L.pts,tt), w=Math.max(1.2, radius(L,q?q.bal:0)*0.32);
+    top.push(p); bot.push({x:p.x-Math.sin(a)*w, y:p.y+Math.cos(a)*w});
+  }
+  ctx.beginPath(); ctx.moveTo(top[0].x,top[0].y); top.forEach(p=>ctx.lineTo(p.x,p.y)); for(let i=bot.length-1;i>=0;i--) ctx.lineTo(bot[i].x,bot[i].y); ctx.closePath();
+  ctx.fillStyle="rgba(53,120,137,.22)"; ctx.fill();
+}
+function ball(L,G,t,opts){
+  opts=opts||{};
+  const pts=opts.pts||L.pts, q=at(pts, Math.min(t,L.tMax)); if(!q || q.bal<=0) return null;
+  const r=radius(L,q.bal), p=G.P(q.t), a=G.ang(q.t), n={x:Math.sin(a), y:-Math.cos(a)};
+  const cx=p.x+n.x*r, cy=p.y+n.y*r;
+  if(opts.ghost){
+    ctx.setLineDash([6,5]); ctx.strokeStyle=COL.ink; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    if(opts.label){ const big=at(L.pts,Math.min(t,L.tMax)), br=big?radius(L,big.bal):r; ctx.strokeStyle=COL.ink; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(cx-r*0.7,cy); ctx.lineTo(cx-br-10,cy); ctx.stroke(); pill(opts.label, cx-br-10, cy, "right"); }
+    return {cx:cx,cy:cy,r:r,q:q};
+  }
+  // shadow
+  ctx.fillStyle="rgba(23,39,44,.16)"; ctx.beginPath(); ctx.ellipse(p.x+r*0.25,p.y+1,r*0.95,r*0.2,a,0,Math.PI*2); ctx.fill();
+  // body
+  const slush=L.slush, g=ctx.createRadialGradient(cx-r*0.35,cy-r*0.4,r*0.1,cx,cy,r);
+  if(slush){ g.addColorStop(0,"#FBE3D6"); g.addColorStop(0.7,"#EBA987"); g.addColorStop(1,"#C8643A"); }
+  else { g.addColorStop(0,"#FFFFFF"); g.addColorStop(0.75,"#F1F5F5"); g.addColorStop(1,"#C9D6D9"); }
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  // core: what was put in (area-true)
+  const cr=r*Math.sqrt(Math.min(1,q.dep/q.bal));
+  if(cr>1){ ctx.fillStyle=slush?"rgba(45,100,115,.92)":"rgba(53,120,137,.9)"; ctx.beginPath(); ctx.arc(cx,cy,cr,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.6)"; ctx.lineWidth=1; ctx.stroke(); }
+  // texture that rolls
+  const dist=(p.x-G.x0)/Math.cos(a), rot=dist/Math.max(r,4);
+  ctx.fillStyle=slush?"rgba(178,58,15,.25)":"rgba(201,214,217,.75)";
+  for(let i=0;i<6;i++){ const ang=rot+i*1.047, rr=r*(0.55+0.3*((i*37)%10)/10); if(rr<cr+2) continue; const dx=Math.cos(ang)*rr, dy=Math.sin(ang)*rr; ctx.beginPath(); ctx.arc(cx+dx,cy+dy,Math.max(1,r*0.05),0,Math.PI*2); ctx.fill(); }
+  // tag
+  if(opts.label!==false){
+    const txt=(opts.name?opts.name+" · ":"")+money(q.bal);
+    ctx.font=font(13,700); const tw=ctx.measureText(txt).width+16, th=22*k();
+    let tx=cx-tw/2, ty=cy-r-th-8; tx=Math.max(6,Math.min(W-tw-6,tx)); if(ty<6) ty=6;
+    ctx.fillStyle="rgba(255,255,255,.95)"; roundRect(tx,ty,tw,th,th/2); ctx.fill();
+    ctx.fillStyle=opts.color||COL.ink; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(txt, tx+8, ty+th/2+0.5);
+  }
+  return {cx:cx,cy:cy,r:r,q:q};
+}
+function pill(txt,x,y,align,color,bg){
+  ctx.font=font(12,700); const tw=ctx.measureText(txt).width+16, th=21*k();
+  let tx = align==="right" ? x-tw : align==="center" ? x-tw/2 : x; tx=Math.max(4,Math.min(W-tw-4,tx));
+  ctx.fillStyle=bg||"rgba(255,255,255,.95)"; roundRect(tx,y-th/2,tw,th,th/2); ctx.fill();
+  ctx.fillStyle=color||COL.ink; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(txt,tx+8,y+0.5);
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function startFlag(L,G){
+  const p=G.P(L.start), h=H*0.11*k();
+  ctx.strokeStyle=COL.ink; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(p.x,p.y+3); ctx.lineTo(p.x,p.y-h); ctx.stroke();
+  ctx.fillStyle=COL.orange; ctx.beginPath(); ctx.moveTo(p.x,p.y-h); ctx.lineTo(p.x+24*k(),p.y-h+9*k()); ctx.lineTo(p.x,p.y-h+18*k()); ctx.closePath(); ctx.fill();
+  pill(L.startLabel||((L.startText||"Start at")+" "+L.start), p.x-6, p.y-h+9*k(), "right");
+  if(L.draggable){ ctx.fillStyle="rgba(211,71,22,.18)"; ctx.beginPath(); ctx.arc(p.x,p.y-h*0.5,20*k(),0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=COL.orangeD; ctx.font=font(11,700); ctx.textAlign="center"; ctx.textBaseline="top"; ctx.fillText("drag me", p.x, p.y+20*k()); }
+  L._flag={x:p.x, y:p.y-h*0.5};
+}
+function drawFlakes(dt){
+  ctx.fillStyle="rgba(255,255,255,.8)";
+  SC.flakes.forEach(function(f){
+    if(dt){ f.y+=f.v*dt; f.ph+=dt; if(f.y>1.02){ f.y=-0.02; f.x=Math.random(); } }
+    const x=(f.x+Math.sin(f.ph)*0.006)*W, y=f.y*H; ctx.beginPath(); ctx.arc(x,y,f.s,0,Math.PI*2); ctx.fill();
+  });
+}
+function drawCut(){
+  const C=SC.cut, R=Math.min(H*0.37, W*0.28), cx=W*0.5, cy=H*0.88-R;
+  // ground
+  const gy=cy+R; const gg=ctx.createLinearGradient(0,gy,0,H); gg.addColorStop(0,COL.snow); gg.addColorStop(1,COL.snowShade);
+  ctx.fillStyle=gg; ctx.fillRect(0,gy,W,H-gy); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke();
+  ctx.fillStyle="rgba(23,39,44,.16)"; ctx.beginPath(); ctx.ellipse(cx,gy+2,R*0.9,R*0.08,0,0,Math.PI*2); ctx.fill();
+  tree(W*0.08,gy+2,H*0.09); tree(W*0.12,gy+2,H*0.06); tree(W*0.93,gy+2,H*0.08);
+  const pts=C.pts, F=finalOf(pts).bal;
+  for(let i=pts.length-1;i>=1;i--){
+    const rr=R*Math.sqrt(pts[i].bal/F);
+    ctx.fillStyle = i%2 ? "#FFFFFF" : "#EEF3F4"; ctx.beginPath(); ctx.arc(cx,cy,rr,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle="rgba(92,110,117,.18)"; ctx.lineWidth=0.8; ctx.stroke();
+  }
+  // highlight first and last year
+  const rLast=R, rPrev=R*Math.sqrt(pts[pts.length-2].bal/F), rFirst=R*Math.sqrt(pts[1].bal/F);
+  ctx.fillStyle="rgba(211,71,22,.30)"; ctx.beginPath(); ctx.arc(cx,cy,rLast,0,Math.PI*2); ctx.arc(cx,cy,rPrev,0,Math.PI*2,true); ctx.fill("evenodd");
+  ctx.fillStyle=COL.orange; ctx.beginPath(); ctx.arc(cx,cy,Math.max(2,rFirst),0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=COL.ink2; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+  // labels
+  const small=W<620;
+  ctx.strokeStyle="#FFFFFF"; ctx.lineWidth=1.5;
+  const ly=cy-R*0.62, lx=cx+R+12;
+  ctx.beginPath(); ctx.moveTo(cx+R*Math.cos(-0.9)*0.99,cy+R*Math.sin(-0.9)*0.99); ctx.lineTo(lx,ly); ctx.stroke();
+  pill(small?"Last year: +"+money(N.lastRing):"Last ring, age 59→60: +"+money(N.lastRing), lx, ly, "left", COL.orangeD);
+  const fy=cy-R*0.05, fx=cx-R-12;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx-R*0.35,fy); ctx.lineTo(fx,fy); ctx.stroke();
+  pill(small?"First year: +"+money(N.firstRing):"First ring, age 15→16: +"+money(N.firstRing), fx, fy, "right", COL.orangeD);
+  pill("Maya's snowball, cut in half: one ring per year", cx, Math.max(16*k(), cy-R-18*k()), "center");
+  if(SC.cutReveal){
+    const cr=R*Math.sqrt(finalOf(pts).dep/F);
+    ctx.setLineDash([6,5]); ctx.strokeStyle=COL.core; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(cx,cy,cr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle="rgba(53,120,137,.16)"; ctx.beginPath(); ctx.arc(cx,cy,cr,0,Math.PI*2); ctx.fill();
+    pill("All she packed by hand: "+money(finalOf(pts).dep), cx, cy+cr+16*k(), "center", COL.coreEdge);
+  }
+}
+function wrapText(lines,x,y,lh){ lines.forEach(function(l,i){ ctx.fillText(l,x,y+i*lh); }); }
+
+let lastFrame=null;
+function draw(dt){
+  if(!W) return;
+  ctx.clearRect(0,0,W,H);
+  drawSky();
+  if(SC.mode==="cut"){ drawCut(); }
+  else {
+    SC.lanes.forEach(function(L,i){ const G=laneGeo(L); L._G=G; drawGround(L,G,i); drawFinish(L,G); drawFlags(L,G); drawRocks(L,G); });
+    SC.lanes.forEach(function(L){ const G=L._G; drawTrail(L,G,SC.t); });
+    SC.lanes.forEach(function(L){ const G=L._G;
+      if(L.showStart!==false) startFlag(L,G);
+      if(SC.t>=L.start || L.showAtStart) ball(L,G,Math.max(SC.t,L.start),{name:L.name, color:L.tagColor});
+      else if(L.waiting){ const p=G.P(L.start); pill(L.waiting, p.x+30*k(), p.y-H*0.06, "left"); }
+      if(L.ghostPts && SC.t>L.start) ball(L,G,SC.t,{pts:L.ghostPts, ghost:true, label:L.ghostLabel?L.ghostLabel(at(L.ghostPts,Math.min(SC.t,L.tMax))):null});
+      drawGoal(L,G);
+    });
+  }
+  if(!REDUCED) drawFlakes(dt);
+}
+function loop(ts){
+  const dt = lastFrame==null ? 0 : Math.min(0.1,(ts-lastFrame)/1000); lastFrame=ts;
+  if(SC.rolling){
+    const R=SC.rolling; SC.t=Math.min(R.to, SC.t+R.speed*dt);
+    if(SC.t>=R.to){ SC.rolling=null; readout(true); if(R.done) R.done(); }
+    readout();
+  }
+  draw(dt);
+  if(!document.hidden) requestAnimationFrame(loop); else lastFrame=null;
+}
+document.addEventListener("visibilitychange", function(){ if(!document.hidden){ lastFrame=null; requestAnimationFrame(loop); } activeClock(); });
+function rollTo(to, speed, done){
+  if(REDUCED){ SC.t=to; readout(); draw(0); if(done) done(); return; }
+  SC.rolling={to:to, speed:speed, done:done};
+}
+function speed(){ return SC.present ? 6.5 : 8.5; }
+
+/* readout overlay (top right) */
+let lastRO=0;
+function readout(force){
+  const now=performance.now(); if(!force && now-lastRO<80) return; lastRO=now;
+  const el=$("#readout"); let h="", d="";
+  if(SC.mode==="cut"){
+    h='<span class="ro-k">Maya at 60</span><span class="ro-v">'+money(N.mayaF.bal)+'</span><span class="ro-s"><b>She packed '+money(N.mayaF.dep)+'</b></span>';
+    d="A cut-open snowball with "+(N.maya.length-1)+" rings, one per year. The first ring added "+money(N.firstRing)+". The last ring added "+money(N.lastRing)+".";
+  } else if(SC.mode==="compare"){
+    h='<div class="ro-row">'; SC.lanes.forEach(function(L){ const q=at(L.pts,Math.min(SC.t,L.tMax)); h+='<div><span class="ro-k">'+L.name+'</span><span class="ro-v">'+money(q?q.bal:0)+'</span><span class="ro-s"><b>packed '+money(q?q.dep:0)+'</b></span></div>'; d+=L.name+": "+money(q?q.bal:0)+" in the snowball, "+money(q?q.dep:0)+" packed. "; }); h+='</div>';
+    d="Age "+Math.floor(SC.t)+". "+d;
+  } else if(SC.lanes[0]){
+    const L=SC.lanes[0], q=at(L.pts,Math.min(Math.max(SC.t,L.start),L.tMax))||{bal:0,dep:0};
+    if(SC.mode==="debt"){
+      const yr=Math.floor(SC.t);
+      h='<span class="ro-k">'+(yr===0?"Today":"After "+yr+(yr===1?" year":" years"))+' · Jordan owes</span><span class="ro-v">'+money(q.bal)+'</span><span class="ro-s"><b>borrowed '+money(q.dep)+'</b></span>';
+      d=(yr===0?"Today":"After "+yr+" years")+", Jordan owes "+money(q.bal)+".";
+    } else {
+      h='<span class="ro-k">Age '+Math.floor(Math.max(SC.t,L.start))+' · in the snowball</span><span class="ro-v">'+money(q.bal)+'</span><span class="ro-s"><b>packed '+money(q.dep)+'</b> · snow '+money(q.bal-q.dep)+'</span>';
+      d="Age "+Math.floor(Math.max(SC.t,L.start))+". The snowball holds "+money(q.bal)+": "+money(q.dep)+" packed by hand and "+money(q.bal-q.dep)+" of growth.";
+    }
+  }
+  el.innerHTML=h; $("#desc").textContent=d; cv.setAttribute("aria-label", d || "A snowy hill at dusk.");
+}
+
+/* lane presets */
+function ageLabels(from){ const out=[]; for(let a=20;a<=60;a+=10) if(a>from) out.push({t:a, text:String(a)}); return out; }
+function singleLane(pts, start, extra){
+  return Object.assign({pts:pts, start:start, tMin:10, tMax:END_AGE, y0f:0.36, y1f:0.86, rMaxF:0.17, balMax:finalOf(pts).bal, labels:ageLabels(start), cabin:"Age 60"}, extra||{});
+}
+
+/* ================= Story / lesson ================= */
+const story=$("#story"), LTR=["A","B","C","D"];
+let S, PRESENT=false;
+function freshState(){ return {step:0, phase:"", pred:null, hints:0, attempts:[], solved:false, picked:null, firstPick:null, history:{}, bumpy:false, votes:{}, voteSent:false, A:30, M:25, R:RATE}; }
+S=freshState();
+const esc=s=>String(s).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+function say(mood, html){ return '<div class="guide-line"><img src="'+JODI[mood]+'" alt="" width="44" height="44"><div class="say"><span class="who">JODI</span>'+html+'</div></div>'; }
+function announce(t){ const a=$("#desc"); a.setAttribute("aria-live","polite"); a.textContent=t; setTimeout(function(){ a.setAttribute("aria-live","off"); }, 1200); }
+function focusEl(sel){ const el=$(sel,story); if(el){ el.setAttribute("tabindex","-1"); el.focus({preventScroll:true}); } }
+const CHAPTERS=["","Pack it","Two hills","Your run","Cut it open","Avalanche","The lodge"];
+function setChip(n){
+  let h=""; for(let i=1;i<=5;i++) h+='<i class="'+(i<n||n===6?"done":i===n?"now":"")+'"></i>';
+  $("#flakes").innerHTML=h; $("#chipText").textContent = n===0 ? "The Snowball" : n===6 ? "The lodge · all done" : "Chapter "+n+" · "+CHAPTERS[n];
+}
+
+const STEPS={
+  1:{ q:"Same $25 a month, 20 more years of hill. How big is the snowball at 60?",
+      choices:[
+        {id:"same", big:"About the same", sm:"It's mostly done growing."},
+        {id:"double", big:"About $23,000", sm:"Twice the years, twice the money."},
+        {id:"triple", big:"Over $34,000", sm:"More than triple.", best:true},
+        {id:"slows", big:"Under $22,000", sm:"It slows down as it gets heavy."}
+      ] },
+  2:{ q:"Who has the bigger snowball at 60?",
+      choices:[
+        {id:"theo_lot", big:"Theo, by a lot", sm:"He packs twice as much."},
+        {id:"theo_little", big:"Theo, by a little", sm:"Double beats a head start."},
+        {id:"tie", big:"About the same", sm:"It evens out."},
+        {id:"maya", big:"Maya", sm:"The head start wins.", best:true}
+      ] },
+  3:{ hints:["You have two controls. One is about money. One is about time.",
+             "Keep it at $25 a month. Drag the orange start flag up the hill to a younger age.",
+             "Try starting at 16 with $25 a month."] },
+  4:{ q:"Maya only packed "+money(N.mayaF.dep)+" by hand. Where did the rest of the snow come from?",
+      choices:[
+        {id:"growth_on_growth", big:"Snow on snow", sm:"Each year it grew on everything in it, including old growth.", best:true},
+        {id:"rate_rises", big:"A steeper hill", sm:"The growth rate went up as she got older."},
+        {id:"deposits_only", big:"Her $20s, added up", sm:"Growth only on what she packed, for 45 years."},
+        {id:"more_later", big:"Bigger handfuls", sm:"She must have packed more later on."}
+      ] },
+  5:{ q:"Jordan makes no payments. About how much does Jordan owe after 6 years?",
+      choices:[
+        {id:"stays", big:"$1,000", sm:"It only grows if Jordan buys more."},
+        {id:"straight", big:"About $2,440", sm:"$240 a year, six times."},
+        {id:"snowball", big:"About $4,000+", sm:"It snowballs.", best:true},
+        {id:"one_year", big:"About $1,240", sm:"One year of interest."}
+      ] }
+};
+const FB={
+  1:{ triple:["happy","You saw it coming. It ended up more than four times bigger."],
+      double:["thinking","That's the most common guess, and it makes sense. Lots of things go in a straight line: work twice the hours, get twice the pay. Snowballs don't."],
+      same:["thinking","It might look finished at 40. But as long as it keeps rolling, it keeps picking up snow, and faster than before."],
+      slows:["thinking","Fair hunch. Heavy things usually slow down. This one speeds up: a bigger snowball touches more snow on every turn."] },
+  2:{ maya:["happy","Right. Maya wins, and she packed less by hand."],
+      theo_lot:["thinking","That's the \"I'll catch up later\" plan, and lots of grown-ups count on it. Doubling feels like it should win."],
+      theo_little:["thinking","Doubling feels like it should at least squeak past. Watch what the head start did instead."],
+      tie:["thinking","It looks like it should even out. But early years aren't equal to late years. Snow packed early rolls the longest."] },
+  4:{ growth_on_growth:["happy","That's it. Snow on snow."],
+      rate_rises:["thinking","It sure looks that way, since the rings get thicker. But it was 6% every single year. What changed is how big the snowball was for that 6% to work on."],
+      deposits_only:["thinking","That's called simple interest: growth only on what you put in. If that were the rule, Maya would have about "+money(N.mayaSimple)+". She has "+money(N.mayaF.bal)+", because her growth grew too."],
+      more_later:["thinking","She packed the same $20 every single month. The extra came from the rolling, not from Maya."] },
+  5:{ snowball:["happy","You flipped it around and still got it."],
+      straight:["thinking","That's the straight line again, and it's a really natural guess. It's what would happen if interest were only charged on the first $1,000. The dashed circle shows that path. The real one is bigger."],
+      stays:["thinking","That would be nice! But a debt keeps growing even if Jordan never buys another thing. The interest gets added on every month."],
+      one_year:["thinking","That's about right after one year. But the interest keeps getting added, and then it earns interest too."] }
+};
+
+function choiceGrid(st, sel, first, disabled){
+  let h='<div class="choices" role="group" aria-label="Choices">';
+  st.choices.forEach(function(ch,ix){
+    h+='<button class="choice" data-act="pick" data-id="'+ch.id+'" aria-pressed="'+(sel===ch.id)+'"'+(disabled?' disabled':'')+'><span class="ltr" aria-hidden="true">'+LTR[ix]+'</span><span><span class="big">'+esc(ch.big)+'</span><span class="sm">'+esc(ch.sm)+'</span>'+(first===ch.id?'<span class="tag">'+(PRESENT?'first pick':'your first pick')+'</span>':'')+'</span></button>';
+  });
+  return h+'</div>';
+}
+function voteBlock(){
+  if(!PRESENT) return "";
+  const v=S.votes||{};
+  return '<details class="vote"><summary>Record the class vote (optional)</summary><div class="vrow">'+LTR.map(l=>'<label>'+l+' <input type="number" min="0" max="99" inputmode="numeric" data-vote="'+l+'" value="'+(v[l]!=null?esc(v[l]):'')+'" aria-label="Votes for '+l+'"></label>').join('')+'</div></details>';
+}
+function sendVote(n){
+  if(!PRESENT || !S.votes || S.voteSent) return;
+  const c={}; let any=false; LTR.forEach(function(l){ const x=+S.votes[l]; if(x>0){ c[l]=Math.min(99,Math.round(x)); any=true; } });
+  if(any){ S.voteSent=true; track("sb_class_vote",{step:n, counts:c}); }
+}
+function guessNote(){ return '<p class="note" style="margin-top:8px">'+(PRESENT?'Everyone writes a guess first. Then vote, and lock in the class answer.':'Guess first. Then watch it roll.')+'</p>'; }
+
+function render(){
+  const n=S.step; let h="";
+  setChip(n);
+  if(n===0){
+    h+='<div class="story-grid"><div><p class="kicker">Simulation · Grades 7–9 · About 12 minutes</p><h2 id="stitle">The Snowball</h2>'+
+      '<p class="narr">The hill above is your life, from age 10 at the top to 60 at the bottom. Every dollar you save gets packed into a snowball and rolled down. The question: is it better to start early with a little, or late with a lot?</p></div><div>'+
+      say("neutral", PRESENT?'<p>Hey, everybody. Five quick chapters. At each one, write down a guess, vote A–D with your fingers, then we roll it and see. No grades, I promise.</p>':'<p>Hey there. Five quick chapters. You guess, then we roll it and see. No grades, I promise.</p>')+
+      '<div class="row" style="margin-top:14px"><button class="btn cta" data-act="start">Start rolling</button>'+(PRESENT?'<button class="btn" data-act="present-off">Exit Present mode</button>':'<button class="btn" data-act="present-on">Present to your class</button>')+'</div>'+
+      (PRESENT?'':'<p class="teachnote">Present mode is built for a projector: full screen, bigger text, A–D class votes.</p>')+'</div></div>';
+  }
+  else if(n===1) h+=renderPack();
+  else if(n===2) h+=renderTwo();
+  else if(n===3) h+=renderRun();
+  else if(n===4) h+=renderCut();
+  else if(n===5) h+=renderAval();
+  else if(n===6) h+=renderLodge();
+  story.innerHTML=h;
+}
+function predictBlock(n){
+  const st=STEPS[n]; let h='<p class="q" id="q">'+esc(st.q)+'</p>';
+  if(S.phase==="ask"){
+    h+=choiceGrid(st,S.pred,null,false)+voteBlock()+'<div class="row"><button class="btn cta" data-act="roll"'+(S.pred?'':' disabled')+'>'+(n===1?'Roll to 60':'Race to 60')+'</button></div>'+guessNote();
+  } else if(S.phase==="rolling"){
+    h+=choiceGrid(st,S.pred,null,true)+'<p class="note">Rolling… watch the hill.</p>';
+  } else if(S.phase==="reveal"){
+    h+=choiceGrid(st,S.pred,null,true);
+  }
+  return h;
+}
+function revealBlock(n, core){
+  const f=FB[n][S.pred];
+  return '<div class="reveal"><h3 id="fbh">What happened</h3>'+say(f[0],'<p>'+f[1]+'</p>'+core)+'</div><div class="row"><button class="btn small" data-act="replay">Watch again</button><button class="btn cta" data-act="next">Next chapter</button></div>';
+}
+function renderPack(){
+  let left='<p class="kicker">Chapter 1 of 5</p><h2 id="stitle">Pack it</h2>';
+  left+='<p class="narr">Someone starts at <b>20</b> and packs <b>$25 a month</b> into the snowball. It grows a pretend <b>6% a year</b>. That growth is the snow it picks up rolling.</p>';
+  if(S.phase==="watch") left+='<p class="note">Watching it roll from 20 to 40…</p>';
+  else left+='<p class="narr">At 40, it\'s worth <b>'+money(N.s40.bal)+'</b>. Only '+money(N.s40.dep)+' of that was packed by hand: that\'s the teal core.</p>';
+  let right='';
+  if(S.phase!=="watch") right+=predictBlock(1);
+  if(S.phase==="reveal") right+=revealBlock(1,'<p>From 20 to 40, the snowball picked up '+money(N.s40.bal)+'. From 40 to 60, it picked up <b>'+money(N.s60.bal-N.s40.bal)+'</b>, with the exact same $25 a month.</p><p>Why? It grows on <b>everything</b> in it, including last year\'s snow. Bigger snowball, more snow sticks on every turn. Grown-ups call that <b>compound growth</b>. Look at the trail, too: the track gets wider faster.</p>');
+  return '<div class="story-grid"><div>'+left+'</div><div>'+right+'</div></div>';
+}
+function renderTwo(){
+  let left='<p class="kicker">Chapter 2 of 5</p><h2 id="stitle">Two hills</h2>'+
+    '<p class="narr"><b>Maya</b> starts at <b>15</b> and packs <b>$20 a month</b>. <b>Theo</b> waits until <b>30</b>, then packs double: <b>$40 a month</b>. Same pretend 6%. Both roll to 60.</p>';
+  let right=predictBlock(2);
+  if(S.phase==="reveal") right+=revealBlock(2,'<p>Maya: <b>'+money(N.mayaF.bal)+'</b> from '+money(N.mayaF.dep)+' packed. Theo: <b>'+money(N.theoF.bal)+'</b> from '+money(N.theoF.dep)+' packed. Theo packed <b>more</b> and still finished smaller.</p><p>Maya\'s 15-year head start gave her snow more years to pick up snow. To catch her, Theo would need about <b>$'+N.theoNeeds+' a month</b>, nearly three times what Maya packs.</p>');
+  return '<div class="story-grid"><div>'+left+'</div><div>'+right+'</div></div>';
+}
+const FAIL={
+  over_budget:a=> a.bal>=GOAL ? 'You made it, '+money(a.bal)+'! But that took $'+a.monthly+' a month, over the $'+BUDGET+' budget. Something other than money could do that work. What else can you move?'
+                              : '$'+a.monthly+' a month is over the $'+BUDGET+' budget, and the snowball still only reached '+money(a.bal)+'. More money isn\'t the only control here.',
+  close:a=>'So close: '+money(a.bal)+'. A year or two more of rolling would push you over. Which control gives the snowball more hill?',
+  started_late:a=>'Starting at '+a.start+' gives the snowball only '+(END_AGE-a.start)+' years of hill. It reached '+money(a.bal)+'. It can\'t catch up in that time. What if you start higher up the hill?',
+  tiny_amount:a=>'Nice early start. But $'+a.monthly+' a month is a tiny snowball to begin with, and it reached '+money(a.bal)+'. Try a little more, while staying at $'+BUDGET+' or less.'
+};
+function renderRun(){
+  let left='<p class="kicker">Chapter 3 of 5</p><h2 id="stitle">Your run</h2>'+
+    '<p class="narr">Your turn. Roll a snowball worth <b>'+money(GOAL)+'</b> by 60, the dashed circle at the bottom. The catch: you can only pack <b>$'+BUDGET+' a month</b> or less. Growth stays at a pretend 6%.</p>';
+  if(S.attempts.length) left+='<ul class="tests" aria-label="Your runs">'+S.attempts.map((a,i)=>'<li>Run '+(i+1)+': start '+a.start+', $'+a.monthly+' → '+money(a.bal)+'</li>').join('')+'</ul>';
+  let right='';
+  if(!S.solved){
+    const dis=S.phase==="rolling"?' disabled':'';
+    right+='<div class="ctls">'+
+      '<div class="ctl"><label for="inA">Start age <span class="budget">or drag the orange flag</span><output id="outA">'+S.A+'</output></label><input type="range" id="inA" min="10" max="40" step="1" value="'+S.A+'"'+dis+'></div>'+
+      '<div class="ctl"><label>Pack each month <span class="budget">budget: $'+BUDGET+' or less</span></label><div class="stepper"><button type="button" data-act="minus" aria-label="Five dollars less"'+dis+'>−</button><output id="outM" class="big-num" style="margin:0">$'+S.M+'</output><button type="button" data-act="plus" aria-label="Five dollars more"'+dis+'>+</button></div></div></div>';
+    right+='<div class="row"><button class="btn cta" data-act="test"'+dis+'>Roll it</button>'+hintBtn()+'</div>';
+    if(S.hints) right+='<ol class="hints">'+STEPS[3].hints.slice(0,S.hints).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>';
+    if(S.phase==="rolling") right+='<p class="note">Rolling…</p>';
+    else if(S.attempts.length){ const a=S.attempts[S.attempts.length-1]; right+='<div class="reveal"><h3 id="fbh">Run '+S.attempts.length+': '+money(a.bal)+'</h3>'+say("thinking",'<p>'+FAIL[a.failReason](a)+'</p>')+'</div>'; }
+  } else {
+    const w=S.attempts[S.attempts.length-1];
+    right+='<div class="reveal"><h3 id="fbh">Run '+S.attempts.length+': '+money(w.bal)+'. Goal reached!</h3>'+say("happy",'<p>'+money(w.bal)+' from just $'+w.monthly+' a month. You packed '+money(w.dep)+'; the hill did the rest.</p><p>Notice what did the heavy lifting: <b>time</b>. Every year higher up the hill is another year of snow. A shortcut grown-ups use, the <b>Rule of 72</b>: divide 72 by the growth rate to see how long money takes to double. At 6%, about every 12 years.</p>')+'</div><div class="row"><button class="btn cta" data-act="next">Next chapter</button></div>';
+  }
+  return '<div class="story-grid"><div>'+left+'</div><div>'+right+'</div></div>';
+}
+function hintBtn(){ const more=S.hints<STEPS[3].hints.length; return '<button class="btn small" data-act="hint"'+(more?'':' disabled')+'>'+(S.hints===0?"Need a hint?":more?"Another hint":"That's all my hints")+'</button>'; }
+function pickBlock(n){
+  const st=STEPS[n]; let h='<p class="q" id="q">'+esc(st.q)+'</p>';
+  if(!S.picked) h+=voteBlock();
+  h+=choiceGrid(st,S.picked,S.firstPick,false);
+  if(S.picked){
+    const f=FB[n][S.picked];
+    const core = n===4
+      ? '<p>Look at the rings. Her first year added about <b>'+money(N.firstRing)+'</b>. Her last year added about <b>'+money(N.lastRing)+'</b>, more than '+Math.floor(N.lastRing/(MAYA.monthly*12))+' years of her $20s in a single year. Same 6% the whole time. 6% of a big snowball is a lot of snow.</p><p>The dashed teal circle is everything she packed by hand. Everything outside it is snow on snow.</p>'
+      : '<p>Same math, rolling the other way. Interest gets added to what Jordan owes, then interest grows on <i>that</i>. At 24% a year, the Rule of 72 says it doubles about every 3 years: $1,000, then about '+money(N.debt3)+', then about <b>'+money(N.debt6)+'</b>.</p><p>Compound growth works <b>for</b> you in a savings snowball and <b>against</b> you in a debt one. Real cards ask for a payment every month. What happens if someone pays only the smallest payment allowed? That\'s a story for another day.</p>';
+    h+='<div class="reveal"><h3 id="fbh">Jodi\'s take</h3>'+say(f[0],'<p>'+f[1]+'</p>'+core)+'</div><p class="note">Tap another answer to compare.</p><div class="row">'+(n===5?'<button class="btn small" data-act="replay">Watch again</button>':'')+'<button class="btn cta" data-act="next">'+(n===4?"Next chapter":"Head to the lodge")+'</button></div>';
+  }
+  return h;
+}
+function renderCut(){
+  return '<div class="story-grid"><div><p class="kicker">Chapter 4 of 5</p><h2 id="stitle">Cut it open</h2><p class="narr">We sliced Maya\'s snowball in half at 60. Like a tree, it has rings: <b>one for every year</b> it rolled.</p></div><div>'+pickBlock(4)+'</div></div>';
+}
+function renderAval(){
+  return '<div class="story-grid"><div><p class="kicker">Chapter 5 of 5</p><h2 id="stitle">Avalanche</h2><p class="narr">Now the snowball rolls the wrong way. Jordan puts <b>$1,000</b> on a FlexCard, a made-up credit card that charges <b>24% a year</b>, and makes no payments for 6 years. This snowball is what Jordan <b>owes</b>.</p>'+(S.picked?'':'<p class="note">It stays at the top until you guess.</p>')+'</div><div>'+pickBlock(5)+'</div></div>';
+}
+function renderLodge(){
+  const H_=S.history, items=[];
+  if(H_[1]) items.push('<b>Pack it.</b> You guessed '+esc(H_[1].guess)+'. It became '+money(N.s60.bal)+'.');
+  if(H_[2]) items.push('<b>Two hills.</b> You guessed '+esc(H_[2].guess)+'. Maya won with '+money(N.mayaF.bal)+'.');
+  if(H_[3]) items.push('<b>Your run.</b> You hit the goal on $'+H_[3].monthly+' a month, starting at '+H_[3].start+', in '+H_[3].tests+(H_[3].tests===1?' run':' runs')+'.');
+  if(H_[5]) items.push('<b>Avalanche.</b> Your first pick: '+esc(H_[5].guess)+'. Jordan would owe about '+money(N.debt6)+'.');
+  let left='<p class="kicker">All done</p><h2 id="stitle">Back at the lodge</h2>'+say("happy",'<p>Lots of grown-ups wish someone had shown them this at your age. Now someone has.</p>')+
+    '<div class="takeaways" style="margin-top:14px"><div><b>Snow on snow</b>It grows on everything in it, including old growth. That\'s why it curves.</div><div><b>Time is the big lever</b>Starting early with a little beat starting late with double.</div><div><b>Small handfuls count</b>$25 a month, started young, can become tens of thousands.</div><div><b>It rolls both ways</b>Unpaid debt snowballs too.</div></div>';
+  if(items.length) left+='<h3 style="font-size:17px;margin:4px 0 6px">Your guesses vs. what happened</h3><ul class="yours"><li>'+items.join('</li><li>')+'</li></ul>';
+  let right='<h3 style="font-size:19px;margin:0 0 8px">One honest thing</h3>'+say("thinking",'<p>Our hill was perfectly smooth: the same 6% every year. Real hills have rocks. Real growth goes up some years and <b>down</b> in others, and nobody can promise what any year brings.</p><p>Try the bumpy hill. A rock knocks snow off. Bumpy rides can end higher or lower than smooth ones. What stays true: more hill gives growth more time to work.</p>');
+  right+='<div class="row" style="margin:12px 0 16px"><button class="btn" data-act="bumpy" aria-pressed="'+S.bumpy+'">'+(S.bumpy?"Back to the smooth hill":"Try the bumpy hill")+'</button></div>';
+  right+='<h3 style="font-size:19px;margin:0 0 8px">Free roll</h3><p class="note" style="margin-bottom:10px">Everything is yours now, the growth rate too.</p><div class="ctls">'+
+    '<div class="ctl"><label for="fA">Start age <output id="oA">'+S.A+'</output></label><input type="range" id="fA" min="10" max="40" step="1" value="'+S.A+'"></div>'+
+    '<div class="ctl"><label for="fM">Pack each month <output id="oM">$'+S.M+'</output></label><input type="range" id="fM" min="5" max="200" step="5" value="'+S.M+'"></div>'+
+    '<div class="ctl"><label for="fR">Pretend growth per year <output id="oR">'+S.R+'%</output></label><input type="range" id="fR" min="0" max="10" step="0.5" value="'+S.R+'"></div></div>'+
+    '<div class="row"><button class="btn small" data-act="replay">Roll it again</button><button class="btn small" data-act="restart">Start over</button></div>';
+  return '<div class="story-grid"><div>'+left+'</div><div>'+right+'</div></div>';
+}
+
+/* ---------- scenes per chapter ---------- */
+function sceneFor(n){
+  SC.cut=null; SC.cutReveal=false; SC.rolling=null; $("#keyline").hidden=false;
+  $("#keyline").innerHTML = n===5 ? '<span><i class="k-core"></i>Core: what Jordan borrowed</span><span><i class="k-snow" style="background:#EBA987"></i>Outside: interest</span>' : '<span><i class="k-core"></i>Core: money you packed</span><span><i class="k-snow"></i>Snow: growth</span>';
+  if(n===0){ SC.mode="single"; SC.lanes=[singleLane(N.one,20,{showAtStart:true})]; SC.t=END_AGE; }
+  else if(n===1){ SC.mode="single"; SC.lanes=[singleLane(N.one,20)]; SC.t=20; }
+  else if(n===2){
+    SC.mode="compare";
+    const base={tMin:10, tMax:END_AGE, rMaxF:0.105, balMax:N.mayaF.bal, x1f:0.82};
+    SC.lanes=[ Object.assign({name:"Maya", pts:N.maya, start:15, y0f:0.20, y1f:0.47, labels:ageLabels(15), startText:"Maya starts at", tagColor:COL.coreEdge}, base),
+               Object.assign({name:"Theo", pts:N.theo, start:30, y0f:0.58, y1f:0.88, labels:ageLabels(30).concat([{t:20,text:"20"}]), startText:"Theo starts at", waiting:"Theo waits until 30", tagColor:COL.orangeD}, base) ];
+    SC.t=15;
+  }
+  else if(n===3){ runLane(); SC.t=S.A; }
+  else if(n===4){ SC.mode="cut"; SC.lanes=[]; SC.cut={pts:N.maya}; $("#keyline").hidden=true; }
+  else if(n===5){
+    SC.mode="debt";
+    SC.lanes=[{pts:debtPts, start:0, tMin:-0.8, tMax:6, y0f:0.36, y1f:0.86, rMaxF:0.17, balMax:N.debt6*1.02, slush:true, startLabel:"Today: $1,000 borrowed", showAtStart:true,
+      labels:[1,2,3,4,5,6].map(y=>({t:y, text:"Yr "+y})), cabin:"Jordan", ghostPts:linePts, ghostLabel:q=>q&&SC.t>=6?"Straight line: "+money(q.bal):null}];
+    SC.t=0;
+  }
+  else if(n===6){ freeLane(); SC.t=END_AGE; }
+  readout(true);
+}
+function runLane(){
+  const pts=simulate(S.A,S.M,RATE), F=finalOf(pts).bal;
+  SC.mode="single"; SC.lanes=[singleLane(pts,S.A,{balMax:Math.max(GOAL*1.25,F), goal:GOAL, draggable:S.phase!=="rolling" && !S.solved})];
+}
+function freeLane(){
+  const smooth=simulate(S.A,S.M,S.R), bumpy=S.bumpy?simulate(S.A,S.M,S.R,true):null;
+  const top=Math.max(finalOf(smooth).bal, bumpy?Math.max.apply(null,bumpy.map(p=>p.bal)):0, 1000);
+  SC.mode="single";
+  SC.lanes=[singleLane(bumpy||smooth,S.A,{balMax:top, rocks:!!bumpy, ghostPts:bumpy?smooth:null, ghostLabel:q=>q&&SC.t>=END_AGE?"Smooth hill: "+money(q.bal):null})];
+}
+
+/* ---------- flow ---------- */
+const stepClock={ms:0, since:null};
+function activeClock(){ const now=performance.now(); if(stepClock.since!=null) stepClock.ms+=now-stepClock.since; stepClock.since=document.hidden?null:now; }
+function resetClock(){ stepClock.ms=0; stepClock.since=document.hidden?null:performance.now(); }
+
+function enterStep(n){
+  if(S.step>=1 && S.step!==n){ activeClock(); track("sb_step_end",{step:S.step, activeMs:Math.round(stepClock.ms)}); }
+  S.step=n; S.pred=null; S.picked=null; S.firstPick=null; S.hints=0; S.votes={}; S.voteSent=false;
+  S.phase = n===1 ? "watch" : (n===2 ? "ask" : "");
+  if(n===3){ S.A=30; S.M=25; S.attempts=[]; S.solved=false; }
+  if(n===6){ S.R=RATE; if(S.history[3]){ S.A=S.history[3].start; S.M=S.history[3].monthly; } else { S.A=MAYA.start; S.M=MAYA.monthly; } }
+  resetClock(); sceneFor(n); render();
+  if(n>=1){ track("sb_step_start",{step:n, mode:PRESENT?"class":"solo"}); send("step",null,{step:n}); focusEl("#stitle"); }
+  if(n===1){
+    setTimeout(function(){ if(S.step!==1) return; rollTo(40, speed()*0.8, function(){ if(S.step!==1) return; S.phase="ask"; render(); announce("At 40 the snowball is worth "+money(N.s40.bal)+". Make your guess."); }); }, REDUCED?0:600);
+  }
+  if(n===6){
+    send("complete",null,{summary:{
+      predictionsMatched:(S.history[1]&&S.history[1].matched?1:0)+(S.history[2]&&S.history[2].matched?1:0),
+      hintsUsed:S.history.hints||0, attemptsStep3:(S.history[3]&&S.history[3].tests)||0,
+      explanationBest:S.history[4]?S.history[4].best:false, transferBest:S.history[5]?S.history[5].best:false }});
+  }
+}
+function doRoll(){
+  const n=S.step, st=STEPS[n], pc=st.choices.find(c=>c.id===S.pred);
+  sendVote(n); track("sb_prediction",{step:n, choiceId:S.pred, mode:PRESENT?"class":"solo"});
+  S.phase="rolling"; render(); scrollToScene();
+  if(n===2) SC.t=15;
+  rollTo(END_AGE, speed(), function(){
+    S.phase="reveal"; S.history[n]={guess:pc.big.toLowerCase().replace(/^about /,"about "), matched:!!pc.best};
+    track("sb_reveal",{step:n, prediction:S.pred, matched:!!pc.best});
+    render(); focusEl("#fbh"); announce("Jodi explains what happened.");
+  });
+}
+function scrollToScene(){ const r=$("#scene").getBoundingClientRect(); if(r.top<0 || r.bottom>window.innerHeight) $("#scene").scrollIntoView({behavior:REDUCED?"auto":"smooth", block:"start"}); }
+function runTest(){
+  const a=S.A, m=S.M; S.phase="rolling"; runLane(); SC.lanes[0].draggable=false; SC.t=a; render(); scrollToScene();
+  rollTo(END_AGE, SC.present?13:17, function(){
+    const f=finalOf(SC.lanes[0].pts), success=f.bal>=GOAL && m<=BUDGET;
+    let reason=null; if(!success){ reason = m>BUDGET ? "over_budget" : f.bal>=GOAL*0.85 ? "close" : a>=24 ? "started_late" : "tiny_amount"; }
+    const prev=S.attempts[S.attempts.length-1];
+    const lever=!prev?"first":(prev.start!==a&&prev.monthly!==m?"both":prev.start!==a?"age":prev.monthly!==m?"amount":"none");
+    S.attempts.push({start:a, monthly:m, bal:f.bal, dep:f.dep, success:success, failReason:reason});
+    track("sb_attempt",{step:3, attempt:S.attempts.length, success:success, failReason:reason, startAge:a, monthly:m, balance:Math.round(f.bal), leverChanged:lever});
+    S.phase="";
+    if(success){ S.solved=true; S.history[3]={tests:S.attempts.length, start:a, monthly:m}; }
+    else SC.lanes[0].draggable=true;
+    render(); focusEl("#fbh"); announce(success?"Goal reached.":"The snowball reached "+money(f.bal)+".");
+  });
+}
+function setRun(a,m){ S.A=a; S.M=m; runLane(); SC.t=a; readout(true); const oa=$("#outA"), om=$("#outM"), ia=$("#inA"); if(oa) oa.textContent=a; if(om) om.textContent="$"+m; if(ia && +ia.value!==a) ia.value=a; }
+
+story.addEventListener("click", function(e){
+  const b=e.target.closest("[data-act]"); if(!b || b.disabled) return;
+  const act=b.getAttribute("data-act"), n=S.step;
+  if(act==="start") enterStep(1);
+  else if(act==="present-on") setPresent(true);
+  else if(act==="present-off") setPresent(false);
+  else if(act==="pick"){
+    const id=b.getAttribute("data-id");
+    if(n===1||n===2){ if(S.phase!=="ask") return; S.pred=id; render(); const nb=$('[data-id="'+id+'"]',story); if(nb) nb.focus(); }
+    else if(n===4||n===5){
+      const ch=STEPS[n].choices.find(c=>c.id===id), first=S.firstPick==null;
+      if(first){ S.firstPick=id; S.history[n]={guess:ch.big, best:!!ch.best}; sendVote(n); }
+      track(n===4?"sb_explanation":"sb_transfer",{step:n, choiceId:id, isBest:!!ch.best, firstTry:first});
+      S.picked=id;
+      if(n===4){ SC.cutReveal=true; }
+      if(n===5 && first){ SC.t=0; rollTo(6, 1.6); scrollToScene(); }
+      render(); focusEl("#fbh");
+    }
+  }
+  else if(act==="roll"){ if(S.pred) doRoll(); }
+  else if(act==="replay"){
+    if(n===1){ SC.t=20; rollTo(END_AGE, speed()); }
+    else if(n===2){ SC.t=15; rollTo(END_AGE, speed()); }
+    else if(n===5){ SC.t=0; rollTo(6,1.6); }
+    else if(n===6){ SC.t=S.A; rollTo(END_AGE, speed()*1.4); }
+    scrollToScene(); track("sb_play",{step:n});
+  }
+  else if(act==="minus"||act==="plus"){ const m=Math.max(5,Math.min(200,S.M+(act==="plus"?5:-5))); setRun(S.A,m); }
+  else if(act==="test"){ if(S.phase!=="rolling") runTest(); }
+  else if(act==="hint"){ if(S.hints<3){ S.hints++; S.history.hints=(S.history.hints||0)+1; track("sb_hint",{step:3, hint:S.hints}); render(); const hb=$('[data-act="hint"]',story); if(hb) hb.focus(); } }
+  else if(act==="bumpy"){ S.bumpy=!S.bumpy; track("sb_bumpy",{on:S.bumpy}); freeLane(); SC.t=S.A; rollTo(END_AGE, speed()*1.4); render(); const bb=$('[data-act="bumpy"]',story); if(bb) bb.focus(); scrollToScene(); }
+  else if(act==="next") enterStep(n+1);
+  else if(act==="restart"){ send("restart",null,{}); S=freshState(); enterStep(0); window.scrollTo({top:0, behavior:REDUCED?"auto":"smooth"}); }
+});
+story.addEventListener("input", function(e){
+  const t=e.target, l=t.getAttribute&&t.getAttribute("data-vote");
+  if(l){ S.votes[l]=t.value; return; }
+  if(t.id==="inA"){ setRun(+t.value, S.M); }
+  if(t.id==="fA"||t.id==="fM"||t.id==="fR"){
+    S.A=+$("#fA").value; S.M=+$("#fM").value; S.R=+$("#fR").value;
+    $("#oA").textContent=S.A; $("#oM").textContent="$"+S.M; $("#oR").textContent=S.R+"%";
+    freeLane(); SC.t=END_AGE; readout(true);
+  }
+});
+
+/* drag the start flag up and down the hill (chapter 3) */
+function flagHit(x,y){ const L=SC.lanes[0]; return L && L.draggable && L._flag && Math.hypot(x-L._flag.x, y-L._flag.y) < 34*k(); }
+function xyOf(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+cv.addEventListener("pointerdown", function(e){ const p=xyOf(e); if(S.step===3 && flagHit(p.x,p.y)){ SC.drag=true; cv.setPointerCapture(e.pointerId); e.preventDefault(); } });
+cv.addEventListener("pointermove", function(e){
+  const p=xyOf(e), L=SC.lanes[0];
+  if(!SC.drag){ cv.style.cursor = (S.step===3 && flagHit(p.x,p.y)) ? "grab" : "default"; return; }
+  const G=laneGeo(L), u=(p.x-G.x0)/(G.x1-G.x0), age=Math.round(Math.max(10,Math.min(40, L.tMin+u*(L.tMax-L.tMin))));
+  if(age!==S.A) setRun(age, S.M);
+});
+cv.addEventListener("pointerup", function(){ if(SC.drag){ SC.drag=false; track("sb_flag_drag",{startAge:S.A}); } });
+
+/* ---------- Present mode ---------- */
+function setPresent(on){
+  if(PRESENT===on) return; PRESENT=on; SC.present=on;
+  document.body.classList.toggle("present", on);
+  $("#presentBtn").setAttribute("aria-pressed", String(on)); $("#presentLabel").textContent = on ? "Exit present" : "Present";
+  track("sb_mode",{mode:on?"class":"solo", step:S.step});
+  try{
+    if(on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){});
+    if(!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
+  }catch(e){}
+  render(); setTimeout(function(){ resize(); readout(true); }, 120);
+}
+$("#presentBtn").addEventListener("click", function(){ setPresent(!PRESENT); });
+
+/* ---------- Comms ---------- */
+let toastT=null;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(function(){ t.hidden=true; }, 3200); }
+if(IS_PROD){ const mh=document.createElement("script"); mh.src="/js/message-hq.js"; mh.setAttribute("data-message-source","Simulations: The Snowball"); document.body.appendChild(mh); }
+$("#commsBtn").addEventListener("click", function(){ if(window.openComms) window.openComms(); else if(window.openMessageModal) window.openMessageModal(); else toast("Comms opens your Allgood Academy inbox on allgoodacademy.com."); });
+
+/* ---------- keyboard: A–D picks ---------- */
+document.addEventListener("keydown", function(e){
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  const tag=(e.target.tagName||"").toLowerCase(); if(tag==="input"||tag==="textarea") return;
+  const i=LTR.indexOf(String(e.key).toUpperCase()); if(i<0) return;
+  const btns=$$(".choice:not(:disabled)", story); if(btns[i]) btns[i].click();
+});
+
+/* ---------- go ---------- */
+const ro=new ResizeObserver(function(){ resize(); draw(0); }); ro.observe(cv);
+resize(); enterStep(0); readout(true);
+requestAnimationFrame(loop);
+if(location.hash==="#present") setPresent(true);
+}
+</script>
+</body>
+</html>

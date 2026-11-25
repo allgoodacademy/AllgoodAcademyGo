@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reasons for the Seasons · Allgood Academy</title>
+<meta name="description" content="A seasons simulation for grades 6–8. Steer Earth around the Sun on a copper orrery and find out what really makes summer and winter.">
+<meta name="standards" content="NGSS MS-ESS1-1">
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+<style>
+/* VOICE: a planetarium after hours. Quiet, dark, one warm light: the Sun.
+   IDEA: a copper orrery (the desk machine that models Earth and Sun), plus a window down to one city at noon.
+   PICTURE: full-width night scene; the orrery above, the city window below. You steer Earth by hand.
+   COLOUR and TYPE: night (dark tokens) everywhere, copper from orange + cream tokens, the Sun in brand orange. Georgia titles, Verdana UI.
+   LAYOUT: scene first, one story card under it, one action at a time. Controls appear only when they're yours. */
+:root{
+  --night:var(--color-dark); --night2:var(--color-dark-card); --star:var(--color-warm-white);
+  --ink:var(--color-warm-white); --ink2:color-mix(in srgb, var(--color-warm-white) 70%, var(--color-muted));
+  --line:color-mix(in srgb, var(--color-muted) 45%, var(--color-dark-card));
+  --copper:color-mix(in srgb, var(--color-orange) 55%, var(--color-cream));
+  --copper-d:color-mix(in srgb, var(--color-orange) 70%, var(--color-dark));
+  --sun:var(--color-orange); --cta:var(--color-orange); --cta-d:var(--color-orange-deep);
+  --teal:var(--color-teal); --teal-w:var(--color-teal-wash);
+  --earth-day:var(--color-teal); --earth-night:color-mix(in srgb, var(--color-teal-deep) 40%, var(--color-dark));
+  --sky-hi:var(--color-teal-wash); --sky-lo:var(--color-cream); --ground:var(--color-cream-border); --snow:var(--color-warm-white);
+  --city:color-mix(in srgb, var(--color-teal-deep) 55%, var(--color-dark-card)); --pole:var(--color-ink);
+  --focus:var(--color-teal-wash);
+  color-scheme: dark;
+}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none !important}
+html,body{margin:0}
+body{background:radial-gradient(1200px 600px at 50% -10%, var(--night2), var(--night) 70%) fixed, var(--night);color:var(--ink);font-family:var(--font-ui);font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%;overflow-x:clip}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;line-height:1.15;margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:-1px;padding:0;border:0}
+a{color:var(--teal-w)}
+
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:50;background:var(--night2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px;max-width:calc(100vw - 24px)}
+
+/* Stage: scene + story card, one column */
+main{padding:16px 12px 40px}
+.stage{width:min(1100px, 100%, calc((100vh - 150px) * 1.6));margin:0 auto}
+.scene{scroll-margin-top:66px;position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line);box-shadow:0 18px 60px color-mix(in srgb, var(--color-dark) 70%, transparent)}
+.scene canvas{display:block;width:100%;aspect-ratio:16/10;touch-action:pan-y;cursor:grab}
+.scene canvas.dragging{cursor:grabbing}
+.scene canvas:focus-visible{outline:3px solid var(--focus);outline-offset:-3px}
+.sbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;background:var(--night2);border-top:1.5px solid var(--copper);padding:10px 14px;font-size:15px;color:var(--ink)}
+.sbar p{margin:0;flex:1 1 180px}
+body.present .sbar{font-size:18px}
+
+/* Controls that appear only when they're yours */
+.deck{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;padding:12px 4px 0}
+.dctl{flex:1 1 200px;max-width:320px}
+.dctl label,.dctl legend{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px;padding:0;width:100%}
+.dctl output{font-weight:400;color:var(--ink2);font-variant-numeric:tabular-nums}
+.dctl input[type=range]{width:100%;accent-color:var(--copper);height:28px;margin:0}
+fieldset.dctl{border:0;margin:0;padding:0}
+.live{flex:2 1 340px;background:var(--night2);border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+.live h3{font-family:var(--font-ui);font-size:13px;margin:0 0 6px}
+.lrow{display:grid;grid-template-columns:7.5em 1fr 4.2em;gap:8px;align-items:center;font-size:13px;margin:6px 0}
+.lrow output{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.ltrack{position:relative;height:16px;border-radius:8px;background:var(--night);border:1px solid var(--line);overflow:hidden}
+.ltrack .zone{position:absolute;top:0;bottom:0;background:color-mix(in srgb, var(--color-teal) 45%, transparent)}
+.ltrack i{position:absolute;left:0;top:3px;bottom:3px;border-radius:6px;background:var(--copper);transition:width .15s}
+.ltrack .real{position:absolute;top:0;bottom:0;width:2px;background:var(--ink)}
+.lrow .st{grid-column:2/4;font-size:12px;color:var(--ink2);margin-top:-4px}
+.lrow.ok i{background:var(--color-teal-wash)}
+.lkey{font-size:12px;color:var(--ink2);margin:4px 0 0}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg label{flex:1;margin:0;justify-content:center;padding:7px 4px;font-weight:400;cursor:pointer;border-left:1px solid var(--line);min-height:38px;align-items:center;font-size:13px;color:var(--ink)}
+.seg label:first-child{border-left:0}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--copper);color:var(--color-dark);font-weight:700}
+.seg label:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:-3px}
+
+/* Story card */
+.story{margin:14px auto 0;background:var(--night2);border:1px solid var(--line);border-radius:20px;padding:20px 24px 22px}
+.story .kicker{font-size:12.5px;font-weight:700;color:var(--copper);margin:0 0 4px;letter-spacing:.3px}
+.story h2{font-size:clamp(22px,2.6vw,30px);margin:0 0 8px;outline:none;text-wrap:balance}
+.story p{margin:0 0 10px;max-width:70ch}
+.chap{display:flex;gap:6px;list-style:none;padding:0;margin:0 0 12px}
+.chap li{width:26px;height:6px;border-radius:3px;background:var(--line)}
+.chap li.done{background:var(--copper)}
+.chap li.now{background:var(--cta)}
+.q{font-weight:700;font-size:17px;margin:12px 0 10px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px}
+.choice{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--night);color:var(--ink);border-radius:14px;padding:12px 14px;cursor:pointer;min-height:52px;line-height:1.35}
+.choice:hover:not(:disabled){border-color:var(--copper)}
+.choice .ltr{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;border:1.5px solid var(--copper);color:var(--copper);font-weight:700;font-size:13px}
+.choice[aria-pressed="true"]{border:2px solid var(--copper);padding:11px 13px;background:color-mix(in srgb, var(--copper) 16%, var(--night))}
+.choice[aria-pressed="true"] .ltr{background:var(--copper);color:var(--color-dark)}
+.choice:disabled{cursor:default}
+.choice:disabled:not([aria-pressed="true"]){opacity:.55}
+.choice .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-left:6px;background:var(--copper);color:var(--color-dark)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.btn{border:1px solid var(--line);background:var(--night);color:var(--ink);border-radius:12px;padding:9px 16px;cursor:pointer;font-weight:700;min-height:44px}
+.btn:hover:not(:disabled){border-color:var(--copper)}
+.btn.small{min-height:38px;padding:6px 12px;font-size:13.5px}
+.btn.cta{background:var(--cta);color:var(--color-surface);border:0;box-shadow:0 4px 0 var(--cta-d);font-size:18px;padding:10px 22px}
+.btn.cta:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 var(--cta-d)}
+.btn.go{background:var(--copper);color:var(--color-dark);border:0;font-size:16px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.task{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;border:1px dashed var(--copper);border-radius:14px;padding:12px 14px;margin:6px 0 4px}
+.task p{margin:0;flex:1 1 260px}
+.note{font-size:13px;color:var(--ink2)}
+.take{display:flex;gap:12px;align-items:flex-start;margin:12px 0 4px;border-top:1px solid var(--line);padding-top:14px}
+.take img{width:44px;height:44px;flex:none;border-radius:50%;background:var(--color-cream);border:2px solid var(--copper)}
+.take .who{display:block;font-size:11.5px;font-weight:700;color:var(--copper);letter-spacing:.4px;margin-bottom:2px}
+.take p{margin:0 0 8px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}
+.fact{background:var(--night);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.fact b{display:block;font-family:var(--font-display);font-size:22px;color:var(--copper);line-height:1.1}
+.fact span{font-size:13px;color:var(--ink2)}
+.hints{margin:6px 0 4px;padding-left:22px;font-size:14.5px}
+.vote{border:1px dashed var(--line);border-radius:12px;padding:8px 12px;margin:0 0 10px}
+.vote summary{cursor:pointer;font-weight:700;font-size:14px}
+.vote .vrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+.vote label{display:flex;align-items:center;gap:6px;font-weight:700}
+.vote input{width:100%;min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--night);padding:4px 8px;font-size:16px}
+.cmp{display:grid;gap:10px;margin:10px 0}
+.cmp .lab{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:14px}
+.cmp .lab span{font-weight:400;color:var(--ink2);font-variant-numeric:tabular-nums}
+.cmp .track{position:relative;height:14px;border-radius:7px;background:var(--night);border:1px solid var(--line);margin-top:4px}
+.cmp .track i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;background:var(--copper)}
+.cmp .track .real{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink)}
+.cmp .track .goalmk{position:absolute;top:-5px;bottom:-5px;border-left:2px dashed var(--cta)}
+.cmp .ok{color:var(--teal-w);font-weight:700}.cmp .no{color:var(--copper);font-weight:700}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:10px 0 14px;padding:0;list-style:none}
+.sum li{background:var(--night);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.sum li b{display:block;font-family:var(--font-display);font-size:17px;margin-bottom:2px}
+.yours{list-style:none;padding:0;margin:8px 0 14px;font-size:14px}
+.yours li{border-left:3px solid var(--copper);padding:4px 0 4px 12px;margin-bottom:8px}
+.honest{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0;background:var(--night)}
+.term{appearance:none;background:none;border:0;padding:0;margin:0;font:inherit;font-weight:700;color:var(--teal-w);text-decoration:underline dotted;text-underline-offset:3px;text-decoration-thickness:2px;cursor:help;display:inline}
+.tip{position:absolute;z-index:40;max-width:min(280px,calc(100vw - 24px));background:var(--color-surface);color:var(--color-ink);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.45;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.tip b{display:block;font-family:var(--font-display);font-size:15px;margin-bottom:2px}
+footer{color:var(--ink2);font-size:13px;border-top:1px solid var(--line)}
+footer .wrap{max-width:760px;margin:0 auto;padding:18px 16px 28px}
+footer h2{font-size:16px;color:var(--ink);margin-bottom:6px}
+footer p{margin:0 0 8px}
+
+/* Present mode: projector */
+body.present{font-size:20px}
+body.present .stage{width:min(1500px, 100%, calc((100vh - 110px) * 1.62))}
+body.present .story h2{font-size:36px}
+body.present .q{font-size:23px}
+body.present .choice{font-size:21px;min-height:64px}
+body.present .choice .ltr{width:36px;height:36px;font-size:18px}
+body.present .btn.cta{font-size:23px}
+
+@media (max-width:700px){
+  .scene canvas{aspect-ratio:4/5}
+  .sbar{font-size:14px}
+  .choices{grid-template-columns:1fr}
+  .story{padding:16px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;scroll-behavior:auto !important} }
+</style>
+<style>
+/* Activity row (under the generated site nav): copied verbatim from /simulations/watercycle/ so
+   every simulation page has the same row. Change it there and here together. The two lines after the copy pin what the
+   header takes from Water Cycle's page rules (header teal, .wrap width, Present widths), so this
+   page's own palette and layout cannot move it. */
+.top{background:var(--header);color:var(--on-header);position:sticky;top:0;z-index:30;box-shadow:0 2px 6px color-mix(in srgb, var(--color-ink) 18%, transparent)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.wordmark{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--on-header);text-decoration:none;white-space:nowrap}
+.pill{background:var(--color-orange);color:var(--color-surface);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.top-right{display:flex;align-items:center;gap:6px;flex:none}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:999px;color:var(--color-teal-wash);text-decoration:none}
+.iconbtn:hover{background:color-mix(in srgb, var(--color-surface) 12%, transparent);color:var(--color-surface)}
+.iconbtn:focus-visible{outline-color:var(--color-surface);outline-offset:-3px}
+.iconbtn svg{width:22px;height:22px}
+button.iconbtn{appearance:none;border:0;background:transparent;cursor:pointer;padding:0}
+.wm-sub{font-family:var(--font-ui);font-size:12px;font-weight:400;opacity:.7;letter-spacing:.5px}
+.navbtn{appearance:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:999px;border:1px solid color-mix(in srgb, var(--color-surface) 45%, transparent);background:transparent;color:var(--color-surface);font-weight:700;font-size:13px;cursor:pointer;margin-right:4px}
+.navbtn svg{width:18px;height:18px}
+.navbtn:hover,.navbtn[aria-pressed="true"]{background:var(--color-surface);color:var(--color-teal-deep)}
+.navbtn:focus-visible{outline-color:var(--color-surface)}
+body.present .wm-sub,body.present .pill{display:none}
+@media (max-width:700px){ .navbtn span{display:none}.navbtn{padding:0 9px} .wm-sub{display:none} .wordmark{font-size:16px} }
+@media (max-width:420px){ .wordmark{display:none} .pill{max-width:70vw} }
+.top{--header:var(--color-teal);--on-header:var(--color-surface);font-family:var(--font-ui);font-size:16px;line-height:1.55}
+.top .wrap{max-width:1180px;margin:0 auto;padding:0 24px} body.present .top .wrap{max-width:none;padding:0 22px}
+</style>
+<style>
+/* Comms (/js/message-hq.js) host styles. message-hq.js builds its inbox from Tailwind
+   class names and expects the host page to define .hidden-modal / .visible-modal. These
+   pages ship no Tailwind bundle (its preflight reset would restyle them), so the classes
+   the inbox actually uses are defined here, scoped to #message-modal. Without this block
+   the inbox renders open, unstyled, over the page on every load. */
+.modal-transition{transition:opacity .2s ease-in-out,transform .2s ease-in-out}
+#message-modal.hidden-modal{opacity:0;pointer-events:none;transform:translateY(-10px)}
+#message-modal.visible-modal{opacity:1;pointer-events:auto;transform:none}
+#message-modal{padding:24px;font:14px/1.5 Verdana,Geneva,Tahoma,sans-serif;color:var(--color-ink);text-align:left;color-scheme:light}
+#message-modal *{box-sizing:border-box} #message-modal .relative{position:relative}
+#message-modal h3,#message-modal p{margin:0}
+#message-modal button{font:inherit;cursor:pointer;background:none;border:0;color:inherit;padding:0}
+#message-modal svg.w-5{width:20px;height:20px} #message-modal svg.w-3{width:12px;height:12px}
+#message-modal .bg-white{background:var(--color-surface)}
+#message-modal .rounded-lg{border-radius:10px} #message-modal .rounded{border-radius:6px} #message-modal .rounded-full{border-radius:999px} #message-modal .rounded-r{border-radius:0 6px 6px 0}
+#message-modal .shadow-2xl{box-shadow:0 24px 48px rgba(0,0,0,.3)}
+#message-modal .border-t-4{border-top:4px solid var(--color-orange)}
+#message-modal .px-6{padding-left:24px;padding-right:24px} #message-modal .pt-6{padding-top:24px} #message-modal .pb-3{padding-bottom:12px} #message-modal .py-4{padding-top:16px;padding-bottom:16px} #message-modal .py-6{padding-top:24px;padding-bottom:24px} #message-modal .py-2{padding-top:8px;padding-bottom:8px} #message-modal .py-3{padding-top:12px;padding-bottom:12px} #message-modal .p-3{padding:12px} #message-modal .px-3{padding-left:12px;padding-right:12px} #message-modal .py-1\.5{padding-top:6px;padding-bottom:6px}
+#message-modal .mt-1{margin-top:4px} #message-modal .mt-2{margin-top:8px} #message-modal .mt-3{margin-top:12px} #message-modal .mt-4{margin-top:16px} #message-modal .mb-1{margin-bottom:4px} #message-modal .mb-2{margin-bottom:8px} #message-modal .mb-3{margin-bottom:12px} #message-modal .mt-1\.5{margin-top:6px}
+#message-modal .border-t{border-top:1px solid var(--color-hairline)}
+#message-modal .border-l-4{border-left:4px solid var(--color-hairline)}
+#message-modal .border-l-4.border-allgood-primary{border-left-color:var(--color-orange)} #message-modal .border-l-4.border-allgood-secondary{border-left-color:var(--color-teal)}
+#message-modal .border{border:1px solid var(--color-hairline)}
+#message-modal .bg-gray-50{background:var(--color-light)} #message-modal .hover\:bg-gray-100:hover{background:var(--color-hairline)}
+#message-modal .w-full{width:100%} #message-modal .text-left{text-align:left} #message-modal .text-center{text-align:center}
+#message-modal .flex{display:flex} #message-modal .flex-wrap{flex-wrap:wrap} #message-modal .items-start{align-items:flex-start} #message-modal .items-center{align-items:center} #message-modal .justify-center{justify-content:center} #message-modal .gap-2{gap:8px} #message-modal .shrink-0{flex-shrink:0} #message-modal .min-w-0{min-width:0}
+#message-modal .h-2{height:8px} #message-modal .w-2{width:8px} #message-modal .bg-allgood-primary{background:var(--color-orange)} #message-modal .bg-transparent{background:transparent}
+#message-modal .text-xl{font-size:20px;line-height:1.3} #message-modal .text-sm{font-size:14px} #message-modal .text-xs{font-size:12px} #message-modal .text-\[10px\]{font-size:10px}
+#message-modal .font-heading{font-family:Georgia,"Times New Roman",serif} #message-modal .font-bold{font-weight:700}
+#message-modal .uppercase{text-transform:uppercase} #message-modal .tracking-wide{letter-spacing:.025em} #message-modal .tracking-widest{letter-spacing:.1em} #message-modal .italic{font-style:italic} #message-modal .leading-snug{line-height:1.375} #message-modal .leading-relaxed{line-height:1.625} #message-modal .break-words{overflow-wrap:break-word}
+#message-modal .text-allgood-dark{color:var(--color-ink)} #message-modal .text-gray-600,#message-modal .text-gray-500{color:var(--color-ink-soft)} #message-modal .text-gray-400{color:var(--color-ink-soft)}
+#message-modal .text-white{color:var(--color-surface)} #message-modal .underline{text-decoration:underline}
+#message-modal .bg-allgood-primary.text-white:hover,#message-modal .hover\:bg-allgood-hover:hover{background:var(--color-orange-deep)}
+#message-modal .bg-emerald-600{background:var(--color-teal)}
+#message-modal .hover\:text-red-500:hover{color:var(--color-orange-deep)}
+#message-modal .hover\:border-allgood-primary:hover{border-color:var(--color-orange);color:var(--color-orange-deep)}
+#message-modal textarea{display:block;width:100%;border:1px solid var(--color-hairline);border-radius:6px;padding:12px;margin-bottom:12px;background:var(--color-light);color:var(--color-ink);font-family:inherit;resize:none}
+#message-modal textarea:focus{outline:2px solid var(--color-teal-deep);outline-offset:1px}
+#message-modal button:focus-visible{outline:2px solid var(--color-teal-deep);outline-offset:2px}
+</style>
+</head>
+<body>
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
+<div class="nav-shell activity">
+  <div class="wrap">
+    <nav class="nav site-nav">
+      <a class="wordmark" href="/">Allgood<em>Academy</em></a>
+      <div class="nav-right">
+        <div class="nav-links">
+          <a class="nav-link" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
+      </div>
+    </nav>
+  </div>
+</div>
+<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>
+<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+}
+</style>
+<script>
+(function(){
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.textContent='Mission Control';
+})();
+</script>
+<!-- END GENERATED NAV -->
+<!-- The activity row: this simulation's name, Present and Comms. Same markup on every simulation page. -->
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="pill">Reasons for the Seasons</span>
+    </div>
+    <div class="top-right">
+      <button class="navbtn" type="button" id="presentBtn" aria-pressed="false" title="Present to your class">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg>
+        <span id="presentLabel">Present</span>
+      </button>
+      <button class="iconbtn" type="button" id="commsBtn" title="Comms" aria-label="Comms">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<main>
+  <h1 class="sr-only">Reasons for the Seasons: a copper orrery simulation of Earth's tilt and orbit</h1>
+  <div class="stage">
+    <div class="scene">
+      <canvas id="cv" tabindex="0" role="slider" aria-label="Earth's place in its orbit. Drag Earth around the Sun, or use the arrow keys." aria-valuemin="1" aria-valuemax="365" aria-valuenow="80" aria-valuetext="March 21" aria-describedby="desc"></canvas>
+      <div class="sbar" id="sbar" hidden></div>
+    </div>
+    <div class="deck" id="deck">
+      <div class="dctl" id="ctl-T" hidden><label for="inT">Tilt <output id="outT" for="inT">23.4°</output></label><input type="range" id="inT" min="0" max="45" step="0.1" value="23.4"></div>
+      <div class="dctl" id="ctl-S" hidden><label for="inS">Orbit size (what if) <output id="outS" for="inS">Real</output></label><input type="range" id="inS" min="80" max="120" step="1" value="100"></div>
+      <fieldset class="dctl" id="ctl-C" hidden><legend>City</legend><div class="seg">
+        <label><input type="radio" name="city" value="chicago" checked><span>Chicago</span></label>
+        <label><input type="radio" name="city" value="sydney"><span>Sydney</span></label>
+        <label><input type="radio" name="city" value="singapore"><span>Singapore</span></label></div></fieldset>
+      <div class="live" id="live" hidden aria-live="polite">
+        <h3>Chicago's sunlight compared with the real Earth</h3>
+        <div class="lrow" id="lw"><span>Winter day<br><small>Dec 21</small></span><div class="ltrack"><span class="zone" style="left:0;width:40%"></span><span class="real" style="left:50%"></span><i></i></div><output>100%</output></div>
+        <div class="lrow" id="ls"><span>Summer day<br><small>Jun 21</small></span><div class="ltrack"><span class="zone" style="left:50%;width:50%"></span><span class="real" style="left:50%"></span><i></i></div><output>100%</output></div>
+        <p class="lkey">Teal = goal zone. White line = the real Earth today. Get <b>both</b> bars into their teal zones.</p>
+      </div>
+    </div>
+    <section class="story" id="guide" aria-label="Story"></section>
+    <p class="sr-only" id="desc" aria-live="off"></p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <h2>For teachers</h2>
+    <p id="stdLine"></p>
+    <p>The science comes from NASA, NOAA, the National Weather Service and the U.S. Naval Observatory. Sun height, daylight and sunlight energy are calculated from real solar geometry for each city's latitude. The model leaves out air, clouds, oceans and weather. Nothing students type is stored.</p>
+  </div>
+</footer>
+
+<p class="sr-only" id="announce" aria-live="polite"></p>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s);};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+var REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+var VERSION = "1.2";
+var IS_PROD = true; // served only by allgoodacademy.com and its staging channels
+
+/* Jodi, from the repo at assets/jodi/. Never redraw her. In v1.1 she only speaks at reveals. */
+var JODI = { neutral:"/assets/jodi/jodi-neutral.svg", happy:"/assets/jodi/jodi-happy.svg", thinking:"/assets/jodi/jodi-thinking.svg", concerned:"/assets/jodi/jodi-concerned.svg" };
+
+$("#stdLine").textContent = "Supports NGSS MS-ESS1-1 (the seasons part): students use a model of the Earth–Sun system to explain that seasons come from Earth's tilt, which changes how directly sunlight hits and how long the day lasts. Moon phases and eclipses, the rest of that standard, aren't covered here.";
+
+/* ================= Telemetry (first-party only, stream 'seasons', anonymous, off-funnel) ================= */
+var TEL = {ready:false, queue:[], log:[]};
+function telInit(tries){
+  if(window.Telemetry && window.AuthCore){
+    if(TEL.ready) return; TEL.ready = true;
+    try{ window.Telemetry.init({ module:'reasons-for-the-seasons', gameName:'Reasons for the Seasons', stepsTotal:7, stream:'seasons' });
+      var c=window.AuthCore; if(c.anonymousSessionOnly) c.anonymousSessionOnly().catch(function(){}); }catch(e){}
+    var q=TEL.queue; TEL.queue=[]; q.forEach(dispatch); return;
+  }
+  if((tries||0) > 200) return; setTimeout(function(){ telInit((tries||0)+1); }, 50);
+}
+if(IS_PROD){ ["/js/auth-core.js","/js/telemetry.js"].forEach(function(src){ var s=document.createElement("script"); s.type="module"; s.src=src; s.async=false; document.head.appendChild(s); }); telInit(0); }
+function dispatch(e){ var T=TEL.ready?window.Telemetry:null; if(!T) return;
+  try{ if(e.kind==="track"&&T.track) T.track(e.name,e.meta); else if(e.kind==="step"&&T.step) T.step(e.meta.step); else if(e.kind==="complete"&&T.complete) T.complete(e.meta); else if(e.kind==="restart"&&T.restart) T.restart(); }catch(err){} }
+function send(kind,name,meta){ meta=meta||{}; if(kind==="track") meta.v=VERSION; var e={kind:kind,name:name,meta:meta,t:Date.now()}; TEL.log.push(e); if(!IS_PROD) return; if(TEL.ready) dispatch(e); else TEL.queue.push(e); }
+function track(n,m){ send("track",n,m); }
+window.__rsTel = TEL;
+
+/* ================= Model: real solar geometry =================
+   Tilt 23.4° (USNO). Perihelion early January ~91.4M mi, aphelion early July ~94.5M mi (NASA Space Place, NOAA NESDIS).
+   Daylight uses the −0.833° sunrise/sunset correction (NOAA method). Sunlight energy = daily energy on flat ground, top of the atmosphere. */
+var D2R=Math.PI/180, ECC=0.0167, A_MI=92.96, REAL_TILT=23.4, S0=1361, LP=282.94*D2R;
+var CITIES={ chicago:{k:"chicago",name:"Chicago",lat:41.88,latTxt:"42° N"}, sydney:{k:"sydney",name:"Sydney",lat:-33.87,latTxt:"34° S"}, singapore:{k:"singapore",name:"Singapore",lat:1.35,latTxt:"1° N"} };
+function orbitAt(day,scale){ var M=2*Math.PI*(day-3)/365.25, nu=M+2*ECC*Math.sin(M)+1.25*ECC*ECC*Math.sin(2*M); return {r:A_MI*(1-ECC*ECC)/(1+ECC*Math.cos(nu))*scale, lam:nu+LP}; }
+function dayFromLam(lam){ var nu=lam-LP; nu=Math.atan2(Math.sin(nu),Math.cos(nu)); var M=nu-2*ECC*Math.sin(nu); var d=3+M*365.25/(2*Math.PI); return ((d-1)%365+365)%365+1; }
+function solve(lat,day,tilt,scale){
+  var o=orbitAt(day,scale), dec=Math.asin(Math.sin(tilt*D2R)*Math.sin(o.lam)), p=lat*D2R, decD=dec/D2R;
+  var elev=90-Math.abs(lat-decD);
+  var c=(Math.sin(-0.833*D2R)-Math.sin(p)*Math.sin(dec))/(Math.cos(p)*Math.cos(dec));
+  var hours=c>=1?0:c<=-1?24:2*Math.acos(c)/D2R/15;
+  var c2=-Math.tan(p)*Math.tan(dec), h0=c2>=1?0:c2<=-1?Math.PI:Math.acos(c2);
+  var Q=S0/Math.PI*Math.pow(A_MI/o.r,2)*(h0*Math.sin(p)*Math.sin(dec)+Math.cos(p)*Math.cos(dec)*Math.sin(h0));
+  return {r:o.r, lam:o.lam, dec:decD, elev:Math.max(0,elev), hours:hours, kwh:Math.max(0,Q*24/1000)};
+}
+var MLEN=[31,28,31,30,31,30,31,31,30,31,30,31], MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], MF=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function monthOf(day){ day=Math.round(day); if(day<1) day=365; if(day>365) day=1; var d=day,m=0; while(m<11&&d>MLEN[m]){ d-=MLEN[m]; m++; } return {m:m,d:d}; }
+function fmtDay(day){ var x=monthOf(day); return MN[x.m]+" "+x.d; }
+function fmtDayLong(day){ var x=monthOf(day); return MF[x.m]+" "+x.d; }
+function fmtHours(h){ var t=Math.round(h*60); return Math.floor(t/60)+" h "+(t%60)+" min"; }
+function r1(x){ return Math.round(x*10)/10; }
+function spreadOf(e){ return e>0.5?1/Math.sin(e*D2R):Infinity; }
+var REAL={ dec:solve(41.88,355,REAL_TILT,1).kwh, jun:solve(41.88,172,REAL_TILT,1).kwh }, GOAL_DEC=REAL.dec*0.8;
+var model={tilt:REAL_TILT, day:80, scale:1, city:CITIES.chicago};
+function state(){ return solve(model.city.lat, model.day, model.tilt, model.scale); }
+
+/* ================= Colors ================= */
+var C={}, probe=document.createElement("span"); probe.style.display="none"; document.body.appendChild(probe);
+function resolve(v){ probe.style.color="var("+v+")"; return getComputedStyle(probe).color; }
+function loadColors(){ ["night","night2","star","ink","ink2","line","copper","copper-d","sun","teal","teal-w","earth-day","earth-night","sky-hi","sky-lo","ground","snow","city","pole","cta"].forEach(function(k){ C[k]=resolve("--"+k); }); C.white=resolve("--color-surface"); C.dark=resolve("--color-dark"); }
+function rgba(s,a){ var m=String(s).match(/[\d.]+/g)||[0,0,0]; return "rgba("+m[0]+","+m[1]+","+m[2]+","+a+")"; }
+function mixc(a,b,t){ var x=String(a).match(/[\d.]+/g), y=String(b).match(/[\d.]+/g); return "rgb("+[0,1,2].map(function(i){ return Math.round(+x[i]+(+y[i]-x[i])*t); }).join(",")+")"; }
+loadColors();
+
+/* ================= Scene ================= */
+var FONT=getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim()||"Verdana, Geneva, sans-serif";
+var DFONT=getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim()||"Georgia, serif";
+var cv=$("#cv"), ctx=cv.getContext("2d"), W=0, H=0, K=1;
+var STARS=[], BLDG=[]; (function(){ var s=11; function rnd(){ s=(s*16807)%2147483647; return s/2147483647; }
+  for(var i=0;i<110;i++) STARS.push([rnd(),rnd(),rnd()]);
+  var x=0; while(x<1){ var w=0.025+rnd()*0.05; BLDG.push([x,w,0.25+rnd()*0.75]); x+=w+0.004; } })();
+var V={ ghosts:[], apsides:false, focus:null, beam:false, hud:"dist", minDist:null, pulse:0, dragHint:false };
+function resize(){ var r=cv.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); if(r.width<10) return; W=r.width; H=r.height; cv.width=Math.round(W*d); cv.height=Math.round(H*d); ctx.setTransform(d,0,0,d,0,0); }
+function circle(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function font(w,px,fam){ ctx.font=w+" "+Math.round(px*K)+"px "+(fam||FONT); }
+function layout(){
+  var portrait=H>W*0.9, oh=Math.round(H*(portrait?0.52:0.58));
+  var orb={x:0,y:0,w:W,h:oh};
+  var pad=Math.round(Math.min(W,H)*0.03), win={x:pad,y:oh+4,w:W-pad*2,h:H-oh-pad-4};
+  var cx=W/2, cy=oh*(portrait?0.6:0.54), Kp=portrait?0.5:0.34;
+  var base=Math.min(W*0.38, (oh*0.40)/Kp)/1.2;
+  return {orb:orb, win:win, cx:cx, cy:cy, Kp:Kp, base:base, portrait:portrait,
+    pos:function(day,scale){ var o=orbitAt(day,scale), a=o.lam+Math.PI/2, r=base*(o.r/A_MI); return {x:cx+r*Math.cos(a), y:cy-r*Kp*Math.sin(a), far:Math.sin(a)>0, depth:Math.sin(a)}; }};
+}
+function drawEarth(x,y,er,alpha,sunX,sunY,city){
+  var b=Math.atan2(sunY-y,sunX-x), t=model.tilt*D2R, ux=Math.sin(t), uy=-Math.cos(t), px=Math.cos(t), py=Math.sin(t);
+  ctx.globalAlpha=alpha;
+  ctx.fillStyle=C["earth-night"]; circle(x,y,er);
+  ctx.fillStyle=C["earth-day"]; ctx.beginPath(); ctx.arc(x,y,er,b-Math.PI/2,b+Math.PI/2); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=rgba(C.star,0.45); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x-px*er,y-py*er); ctx.lineTo(x+px*er,y+py*er); ctx.stroke();
+  ctx.strokeStyle=C.copper; ctx.lineWidth=Math.max(2,er*0.13); ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(x-ux*er*1.6,y-uy*er*1.6); ctx.lineTo(x+ux*er*1.6,y+uy*er*1.6); ctx.stroke();
+  ctx.fillStyle=C.copper; circle(x+ux*er*1.6,y+uy*er*1.6,er*0.13);
+  if(city){ var s=Math.sin(model.city.lat*D2R); ctx.fillStyle=C.sun; ctx.strokeStyle=C.star; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x+ux*er*s,y+uy*er*s,Math.max(3.5,er*0.17),0,6.283); ctx.fill(); ctx.stroke(); }
+  ctx.globalAlpha=1;
+}
+function drawOrrery(L){
+  var O=L.orb, i;
+  var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,C.night); g.addColorStop(1,C.night2); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  for(i=0;i<STARS.length;i++){ var st=STARS[i]; ctx.globalAlpha=0.2+0.55*st[2]; ctx.fillStyle=C.star; circle(st[0]*W, st[1]*O.h, 0.5+st[2]); }
+  ctx.globalAlpha=1;
+  // North Star
+  var nx=W-22*K, ny=22*K; ctx.fillStyle=C.star; font("700",15); ctx.textAlign="right"; ctx.fillText("✦", nx, ny+5);
+  font("400",11); ctx.fillStyle=C.ink2; ctx.fillText("North Star", nx-16*K, ny+4);
+  // ring (real shape) with a copper rim
+  var pts=[]; for(i=0;i<=180;i++) pts.push(L.pos(1+364*i/180, model.scale));
+  ctx.strokeStyle=rgba(C.copper,0.35); ctx.lineWidth=7*K; ctx.beginPath(); pts.forEach(function(p,j){ if(j) ctx.lineTo(p.x,p.y); else ctx.moveTo(p.x,p.y); }); ctx.closePath(); ctx.stroke();
+  ctx.strokeStyle=C.copper; ctx.lineWidth=1.6; ctx.stroke();
+  // month ticks
+  var cm=monthOf(model.day).m;
+  for(i=0;i<12;i++){ var d=1+(MLEN.slice(0,i).reduce(function(a,b){return a+b;},0))+14; var dm=Math.abs(d-model.day); if(Math.min(dm,365-dm)<16 && i!==cm) continue; var p=L.pos(d,model.scale), dx=p.x-L.cx, dy=(p.y-L.cy)/L.Kp, len=Math.sqrt(dx*dx+dy*dy)||1;
+    var ox=dx/len, oy=dy/len*L.Kp;
+    ctx.strokeStyle=C.copper; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(p.x+ox*5*K,p.y+oy*5*K); ctx.lineTo(p.x+ox*11*K,p.y+oy*11*K); ctx.stroke();
+    font(i===cm?"700":"400", i===cm?12.5:11); ctx.fillStyle=i===cm?C.star:C.ink2; ctx.textAlign="center";
+    ctx.fillText(MN[i], p.x+ox*26*K, p.y+oy*24*K+4*K); }
+  if(V.apsides){ [[3,"closest"],[186,"farthest"]].forEach(function(a){ var p=L.pos(a[0],model.scale); ctx.fillStyle=C.sun; circle(p.x,p.y,3.5*K);
+    font("700",10.5); ctx.fillStyle=C.copper; ctx.textAlign="center"; ctx.fillText(a[1], p.x, p.y+(p.y>L.cy?-10:16)*K); }); }
+  var er=Math.max(11, Math.min(34, W*0.03))*K, sr=er*1.5, cur=L.pos(model.day,model.scale);
+  function sun(){ var gg=ctx.createRadialGradient(L.cx,L.cy,sr*0.4,L.cx,L.cy,sr*2.2); gg.addColorStop(0,rgba(C.sun,0.55)); gg.addColorStop(1,rgba(C.sun,0)); ctx.fillStyle=gg; circle(L.cx,L.cy,sr*2.2); ctx.fillStyle=C.sun; circle(L.cx,L.cy,sr); }
+  function arm(p){ ctx.strokeStyle=rgba(C.copper,0.75); ctx.lineWidth=2.2*K; ctx.beginPath(); ctx.moveTo(L.cx,L.cy); ctx.lineTo(p.x,p.y); ctx.stroke(); }
+  var behind=[], front=[];
+  V.ghosts.forEach(function(gd){ var dd=Math.abs(gd-model.day); if(Math.min(dd,365-dd)<14) return; var p=L.pos(gd,model.scale); (p.far?behind:front).push(p); });
+  behind.forEach(function(p){ drawEarth(p.x,p.y,er*0.8,0.35,L.cx,L.cy,false); });
+  if(cur.far){ arm(cur); drawEarth(cur.x,cur.y,er*0.92,1,L.cx,L.cy,true); sun(); }
+  else { sun(); arm(cur); }
+  ctx.fillStyle=C.copper; circle(L.cx,L.cy,3*K);
+  front.forEach(function(p){ drawEarth(p.x,p.y,er*0.85,0.35,L.cx,L.cy,false); });
+  if(!cur.far) drawEarth(cur.x,cur.y,er*(1+0.06*(-cur.depth)),1,L.cx,L.cy,true);
+  if(V.focus==="axis" || V.dragHint){ var pr=er*2.3+Math.sin(V.pulse*3)*3*K; ctx.strokeStyle=rgba(C.cta,0.9); ctx.lineWidth=2; ctx.setLineDash([5,5]); ctx.beginPath(); ctx.arc(cur.x,cur.y,pr,0,6.283); ctx.stroke(); ctx.setLineDash([]);
+    if(V.dragHint){ font("700",11.5); ctx.fillStyle=C.star; ctx.textAlign="center"; ctx.fillText("drag me", cur.x, cur.y+(cur.far?-pr-6*K:pr+14*K)); } }
+  font("400",11); ctx.fillStyle=C.ink2; ctx.textAlign="left"; ctx.fillText("Not to scale. The orbit's shape is real: almost a circle.", 14*K, O.h-6*K);
+  // HUD
+  var hx=18*K, hy=34*K; ctx.textAlign="left";
+  font("700",26,DFONT); ctx.fillStyle=C.star; ctx.fillText(fmtDayLong(model.day), hx, hy);
+  var s=state(), line=fmtMiles(s.r)+" from the Sun";
+  font("400",13); ctx.fillStyle=V.hud==="dist"?C.copper:C.ink2; ctx.fillText(line, hx, hy+22*K);
+  font("400",13); ctx.fillStyle=V.hud==="tilt"?C.copper:C.ink2; ctx.fillText("Tilt "+model.tilt.toFixed(1)+"°"+(model.scale!==1?" · orbit "+Math.round(model.scale*100)+"%":""), hx, hy+40*K);
+  if(V.hud==="dist" && V.minDist){ font("700",12); ctx.fillStyle=C.star; ctx.fillText("Closest so far: "+fmtDay(V.minDist.day)+" · "+V.minDist.r.toFixed(1)+"M mi", hx, hy+60*K); }
+  if(V.focus==="hud"){ ctx.strokeStyle=rgba(C.cta,0.9); ctx.lineWidth=2; ctx.setLineDash([5,5]); rr(hx-8*K, hy-26*K, 300*K, 98*K, 10*K); ctx.stroke(); ctx.setLineDash([]); }
+}
+function fmtMiles(r){ return r.toFixed(1)+" million miles"; }
+function winterHere(){ var m=monthOf(model.day).m, lat=model.city.lat; if(Math.abs(lat)<15) return false; return lat>0 ? (m===11||m<=1) : (m>=5&&m<=7); }
+function drawWindow(L){
+  var R=L.win, s=state(), e=s.elev, rad=14*K;
+  ctx.save(); rr(R.x,R.y,R.w,R.h,rad); ctx.clip();
+  // sky: dusky when the Sun is low
+  var dusk=Math.max(0,Math.min(1,(45-e)/45)), top=mixc(C["sky-hi"],C["copper-d"],dusk*0.35), bot=mixc(C["sky-lo"],C.copper,dusk*0.35);
+  var g=ctx.createLinearGradient(0,R.y,0,R.y+R.h); g.addColorStop(0,top); g.addColorStop(1,bot); ctx.fillStyle=g; ctx.fillRect(R.x,R.y,R.w,R.h);
+  var gy=R.y+R.h*0.74;
+  // skyline (generic)
+  ctx.fillStyle=rgba(C.city,0.55);
+  BLDG.forEach(function(b){ var bx=R.x+b[0]*R.w, bh=R.h*0.28*b[2]; ctx.fillRect(bx, gy-bh, b[1]*R.w, bh); });
+  // ground: snow in winter, otherwise ground
+  ctx.fillStyle=winterHere()?C.snow:C.ground; ctx.fillRect(R.x,gy,R.w,R.y+R.h-gy);
+  ctx.strokeStyle=rgba(C.dark,0.35); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(R.x,gy); ctx.lineTo(R.x+R.w,gy); ctx.stroke();
+  // the day clock (right): 24 h, noon at top
+  var dr=Math.min(R.h*0.30, R.w*0.11), dcx=R.x+R.w-dr-18*K, dcy=R.y+dr+16*K;
+  ctx.fillStyle=rgba(C.dark,0.82); circle(dcx,dcy,dr+6*K);
+  ctx.strokeStyle=C["earth-night"]; ctx.lineWidth=dr*0.28; ctx.beginPath(); ctx.arc(dcx,dcy,dr*0.8,0,6.283); ctx.stroke();
+  var frac=s.hours/24; if(frac>0){ ctx.strokeStyle=C.sun; ctx.beginPath(); ctx.arc(dcx,dcy,dr*0.8,-Math.PI/2-frac*Math.PI,-Math.PI/2+frac*Math.PI); ctx.stroke(); }
+  ctx.strokeStyle=C.copper; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(dcx,dcy,dr+6*K,0,6.283); ctx.stroke();
+  ctx.fillStyle=C.star; ctx.textAlign="center"; font("700",Math.max(11,dr*0.32/K)); var hh=Math.round(s.hours*60);
+  ctx.fillText(Math.floor(hh/60)+"h "+(hh%60)+"m", dcx, dcy+4*K); font("400",10); ctx.fillStyle=C.ink2; ctx.fillText("daylight", dcx, dcy+17*K);
+  // you are here: a flagpole, its shadow, the sun at its true noon angle
+  var P={x:R.x+R.w*0.5, y:gy}, ph=R.h*0.34;
+  if(e<0.5){ font("700",14); ctx.fillStyle=C.dark; ctx.textAlign="center"; ctx.fillText("The Sun doesn't rise today", R.x+R.w*0.4, R.y+R.h*0.45); }
+  else {
+    var er=e*D2R, dx=Math.cos(er), dy=Math.sin(er);
+    var D=Math.min((P.x-R.x-30*K)/Math.max(dx,0.01), (P.y-R.y-62*K)/Math.max(dy,0.01));
+    var sx=P.x-dx*D, sy=P.y-dy*D;
+    // beam (same width every day) and the patch it lights
+    var BW=Math.max(22*K, R.w*0.07), Lp=BW/Math.sin(er), a1=P.x-Lp*0.5+R.w*0.12, a2=a1+Lp;
+    if(V.beam){
+      ctx.fillStyle=rgba(C.sun,0.22); ctx.beginPath(); ctx.moveTo(a1,gy); ctx.lineTo(a2,gy); ctx.lineTo(a2-dx*R.w*2,gy-dy*R.w*2); ctx.lineTo(a1-dx*R.w*2,gy-dy*R.w*2); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle=rgba(C.sun,0.85); ctx.lineWidth=1.4*K; for(var i=0;i<4;i++){ var gx=a1+Lp*(i+0.5)/4; ctx.beginPath(); ctx.moveTo(gx-dx*R.w*0.6,gy-dy*R.w*0.6); ctx.lineTo(gx,gy); ctx.stroke(); }
+      ctx.fillStyle=C.cta; ctx.fillRect(a1,gy-1,Lp,6*K);
+      var sp=spreadOf(e); font("700",12.5); ctx.fillStyle=C.dark; ctx.textAlign="center";
+      ctx.fillText(sp<1.06?"Sunlight lands almost straight down":"Same beam, spread over "+sp.toFixed(1)+"× the ground", Math.min(Math.max((a1+a2)/2,R.x+130*K),R.x+R.w-130*K), gy+20*K);
+    }
+    // sun rays glow
+    var sg=ctx.createRadialGradient(sx,sy,2,sx,sy,30*K); sg.addColorStop(0,rgba(C.sun,0.6)); sg.addColorStop(1,rgba(C.sun,0)); ctx.fillStyle=sg; circle(sx,sy,30*K);
+    ctx.fillStyle=C.sun; circle(sx,sy,11*K);
+    // shadow of the pole (true length)
+    var sh=Math.min(ph/Math.tan(er), R.w*0.45);
+    ctx.fillStyle=rgba(C.dark,0.28); ctx.beginPath(); ctx.moveTo(P.x,gy); ctx.lineTo(P.x+sh,gy+3*K); ctx.lineTo(P.x+sh,gy+7*K); ctx.lineTo(P.x,gy+5*K); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=C.pole; ctx.lineWidth=3*K; ctx.beginPath(); ctx.moveTo(P.x,gy); ctx.lineTo(P.x,gy-ph); ctx.stroke();
+    ctx.fillStyle=C.cta; ctx.beginPath(); ctx.moveTo(P.x,gy-ph); ctx.lineTo(P.x+18*K,gy-ph+6*K); ctx.lineTo(P.x,gy-ph+12*K); ctx.closePath(); ctx.fill();
+    // angle at the pole's foot
+    ctx.strokeStyle=C.dark; ctx.lineWidth=1.3; ctx.beginPath(); ctx.arc(P.x,gy,30*K,Math.PI,Math.PI+er); ctx.stroke();
+    ctx.setLineDash([3,4]); ctx.beginPath(); ctx.moveTo(P.x,gy); ctx.lineTo(P.x-dx*60*K,gy-dy*60*K); ctx.stroke(); ctx.setLineDash([]);
+    font("700",13); var nt="Noon Sun "+Math.round(e)+"° up", nw=ctx.measureText(nt).width, nyy=gy-8*K-Math.min(26,e/3)*K; ctx.fillStyle=rgba(C.white,0.85); rr(P.x-40*K-nw,nyy-15*K,nw+10*K,21*K,5*K); ctx.fill(); ctx.fillStyle=C.dark; ctx.textAlign="right"; ctx.fillText(nt, P.x-36*K, nyy);
+  }
+  // label
+  font("700",15,DFONT); ctx.fillStyle=C.dark; ctx.textAlign="left"; ctx.fillText(model.city.name+" at noon", R.x+14*K, R.y+24*K);
+  font("400",11.5); ctx.fillStyle=rgba(C.dark,0.75); ctx.fillText(model.city.latTxt+(winterHere()?" · winter":""), R.x+14*K, R.y+40*K);
+  ctx.restore();
+  ctx.strokeStyle=V.focus==="window"?C.cta:C.copper; ctx.lineWidth=V.focus==="window"?3:2; rr(R.x,R.y,R.w,R.h,rad); ctx.stroke();
+}
+function draw(){ if(!W) return; var L=layout(); drawOrrery(L); drawWindow(L); }
+
+/* ================= Time: drag Earth, keys, spin ================= */
+var spinning=false, rafId=null, lastTs=null, timeOn=false, dragging=false;
+function setDay(d){
+  d=((d-1)%365+365)%365+1; model.day=d;
+  var s=state(); if(V.hud==="dist" && S.step===1 && S.locked && !S.revealed){ if(!V.minDist || s.r<V.minDist.r) V.minDist={day:d, r:s.r}; }
+  cv.setAttribute("aria-valuenow", Math.round(d)); cv.setAttribute("aria-valuetext", fmtDayLong(d)+", "+fmtMiles(s.r)+" from the Sun");
+  noteDay(d); draw(); descSoon();
+}
+function frame(ts){
+  rafId=null; if(lastTs==null) lastTs=ts; var dt=Math.min(0.1,(ts-lastTs)/1000); lastTs=ts; V.pulse+=dt;
+  if(S.testing) testTick(dt);
+  else if(spinning){ if(REDUCED){ spinAcc+=dt; if(spinAcc>0.6){ spinAcc=0; setDay(model.day+30.4); } } else setDay(model.day+dt*32); }
+  else if(S.step===0 && !REDUCED) setDay(model.day+dt*10);
+  draw(); schedule();
+}
+var spinAcc=0;
+function needsAnim(){ return spinning || S.testing || (S.step===0 && !REDUCED) || V.dragHint || V.focus==="axis"; }
+function schedule(){ if(rafId==null && needsAnim() && !document.hidden) rafId=requestAnimationFrame(frame); if(!needsAnim()) lastTs=null; }
+document.addEventListener("visibilitychange", function(){ activeClock(); schedule(); });
+function setSpin(on){ spinning=on&&timeOn; $$('[data-act="spin"]').forEach(function(b){ b.textContent=spinning?"\u275a\u275a Pause":"\u25b6 Spin the year"; b.setAttribute("aria-pressed",String(spinning)); }); schedule(); }
+function pointerDay(ev){ var r=cv.getBoundingClientRect(), x=ev.clientX-r.left, y=ev.clientY-r.top, L=layout(); var a=Math.atan2(-(y-L.cy)/L.Kp, x-L.cx); return dayFromLam(a-Math.PI/2); }
+function nearOrbit(ev){ var r=cv.getBoundingClientRect(), x=ev.clientX-r.left, y=ev.clientY-r.top, L=layout(); if(y>L.orb.h) return false;
+  var p=L.pos(model.day,model.scale); if(Math.hypot(x-p.x,y-p.y)<60*K) return true;
+  var dx=(x-L.cx), dy=(y-L.cy)/L.Kp, rr2=Math.sqrt(dx*dx+dy*dy)/(L.base*model.scale); return rr2>0.75 && rr2<1.3; }
+cv.addEventListener("pointerdown", function(ev){ if(!timeOn || !nearOrbit(ev)) return; dragging=true; cv.classList.add("dragging"); cv.setPointerCapture(ev.pointerId); setSpin(false); V.dragHint=false; setDay(pointerDay(ev)); ev.preventDefault(); });
+cv.addEventListener("pointermove", function(ev){ if(dragging) setDay(pointerDay(ev)); });
+["pointerup","pointercancel"].forEach(function(t){ cv.addEventListener(t, function(){ if(dragging){ dragging=false; cv.classList.remove("dragging"); } }); });
+cv.addEventListener("keydown", function(e){ if(!timeOn) return; var k=e.key, d=0;
+  if(k==="ArrowRight"||k==="ArrowUp") d=5; else if(k==="ArrowLeft"||k==="ArrowDown") d=-5; else if(k==="PageUp") d=30; else if(k==="PageDown") d=-30; else return;
+  e.preventDefault(); setSpin(false); V.dragHint=false; setDay(model.day+d); });
+
+/* ================= Controls (shown only when yours) ================= */
+var inT=$("#inT"), inS=$("#inS"), cities=$$('input[name="city"]');
+function syncOut(){ $("#outT").textContent=(+inT.value).toFixed(1)+"°"+(Math.abs(+inT.value-REAL_TILT)<0.05?" (real)":""); var sv=+inS.value; $("#outS").textContent=sv===100?"Real":sv+"%"; }
+function applyCtl(){ model.tilt=+inT.value; model.scale=+inS.value/100; var c="chicago"; cities.forEach(function(r){ if(r.checked) c=r.value; }); model.city=CITIES[c]; syncOut(); renderLive(); draw(); descSoon(); }
+function pctReal(t,sc){ return {w:solve(41.88,355,t,sc).kwh/REAL.dec*100, s:solve(41.88,172,t,sc).kwh/REAL.jun*100}; }
+function renderLive(){ var L=$("#live"); if(!L||L.hidden) return; var p=pctReal(model.tilt,model.scale);
+  [["#lw",p.w,p.w<=80.5,"needs 80% or less"],["#ls",p.s,p.s>=99.5,"needs 100% or more"]].forEach(function(x){ var row=$(x[0]); row.querySelector("i").style.width=Math.min(100,x[1]/2)+"%"; row.querySelector("output").textContent=Math.round(x[1])+"%"; row.classList.toggle("ok",x[2]); row.querySelector("output").style.color=x[2]?"var(--teal-w)":""; }); }
+inT.addEventListener("input",applyCtl); inS.addEventListener("input",applyCtl);
+cities.forEach(function(r){ r.addEventListener("change", function(){ applyCtl(); if(S.step===7) track("rs_free_city",{city:model.city.k}); }); });
+function setModel(o){ if(o.tilt!=null) inT.value=o.tilt; if(o.scale!=null) inS.value=o.scale; if(o.city) cities.forEach(function(r){ r.checked=r.value===o.city; }); applyCtl(); if(o.day!=null) setDay(o.day); }
+function show(o){ timeOn=!!o.time; if(!timeOn) setSpin(false); $("#ctl-T").hidden=!o.T; $("#ctl-S").hidden=!o.S; $("#ctl-C").hidden=!o.C; $("#live").hidden=!o.live; renderLive(); cv.style.cursor=timeOn?"":"default"; }
+var descT=null; function descSoon(){ clearTimeout(descT); descT=setTimeout(function(){ var s=state(); $("#desc").textContent=fmtDayLong(model.day)+". Earth is "+fmtMiles(s.r)+" from the Sun, tilt "+model.tilt.toFixed(1)+"°. In "+model.city.name+" the noon Sun is "+Math.round(s.elev)+"° up and daylight lasts "+fmtHours(s.hours)+"."; },400); }
+
+/* ================= Step clock ================= */
+var stepClock={ms:0,since:null};
+function activeClock(){ var n=performance.now(); if(stepClock.since!=null) stepClock.ms+=n-stepClock.since; stepClock.since=document.hidden?null:n; }
+function resetClock(){ stepClock.ms=0; stepClock.since=document.hidden?null:performance.now(); }
+
+/* ================= Story ================= */
+var S, guide=$("#guide"), PRESENT=false, LTR=["A","B","C","D"], NCH=6;
+function fresh(){ return {step:0,pred:null,locked:false,revealed:false,hints:0,visited:{},ghostSet:{},attempts:[],testing:null,solved:false,picked:null,first:{},sub:"a",history:{}}; }
+S=fresh();
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+function take(mood,html){ return '<div class="take"><img src="'+JODI[mood]+'" alt="" width="44" height="44"><div><span class="who">JODI’S TAKE</span>'+html+'</div></div>'; }
+function announce(t){ var a=$("#announce"); a.textContent=""; setTimeout(function(){ a.textContent=t; },30); }
+function chap(n){ var h='<ol class="chap" aria-hidden="true">'; for(var i=1;i<=NCH;i++) h+='<li class="'+(i<n?"done":i===n?"now":"")+'"></li>'; return h+'</ol>'; }
+function focusEl(sel){ var el=$(sel,guide); if(el){ el.setAttribute("tabindex","-1"); el.focus({preventScroll:true}); } }
+function toCard(){ guide.scrollIntoView({behavior:REDUCED?"auto":"smooth", block:"nearest"}); }
+function toScene(){ var r=$(".scene").getBoundingClientRect(); if(r.top<56 || r.bottom>window.innerHeight) $(".scene").scrollIntoView({behavior:REDUCED?"auto":"smooth", block:"start"}); }
+var GLOSS={ orrery:["Orrery","A machine that models the planets moving around the Sun. You turn it to watch the motion, like this one."], axis:["Axis","An imaginary line through the North and South Poles. Earth spins around it once a day."],
+  perihelion:["Perihelion","The point in Earth's orbit closest to the Sun. It comes in early January."],
+  energy:["Sunlight energy","How much energy from sunlight lands on one square meter of flat ground in a day, before air and clouds block any. Measured in kWh per square meter."],
+  hemisphere:["Hemisphere","Half of Earth. The equator splits it into the Northern and Southern Hemispheres."] };
+function term(k,l){ return '<button type="button" class="term" data-term="'+k+'" aria-expanded="false" aria-describedby="tip">'+l+'</button>'; }
+var SPIN='<button class="btn go" type="button" data-act="spin" aria-pressed="false">\u25b6 Spin the year</button>';
+
+var CH={
+ 1:{kicker:"Chapter 1 of 6", title:"The closest day", setup:{tilt:REAL_TILT,day:80,scale:100,city:"chicago"}, hud:"dist", focus:"hud",
+    intro:'<p>Up top is a model of Earth going around the Sun, built like an old copper '+term("orrery","orrery")+'. The orange dot on Earth is Chicago. Earth\u2019s distance from the Sun changes a little during the year.</p>',
+    q:"When is Earth closest to the Sun?",
+    choices:[{id:"july",t:"In July, during Chicago's summer"},{id:"january",t:"In January, during Chicago's winter",best:true},{id:"april",t:"In April, during spring"},{id:"same",t:"It's the same distance all year"}],
+    act:'Drag Earth all the way around the Sun, or spin the year. Watch the distance at the top left.',
+    hints:["Grab Earth and pull it around the copper ring. Or press Spin the year.","Watch “Closest so far.” Which month does it land on?"]},
+ 2:{kicker:"Chapter 2 of 6", title:"The leaning rod", setup:{tilt:REAL_TILT,day:172,scale:100,city:"chicago"}, hud:"tilt", focus:"axis",
+    intro:'<p>The copper rod through Earth is its '+term("axis","axis")+', the line it spins around once a day. It leans about 23.4°. It’s June, so Chicago’s half of Earth leans toward the Sun.</p>',
+    q:"When Earth reaches the far side of the Sun in December, what will the rod do?",
+    choices:[{id:"flips",t:"Flip, so the top leans away from the Sun"},{id:"same_dir",t:"Keep pointing the same way in space",best:true},{id:"straightens",t:"Straighten up, then lean again"},{id:"follows",t:"Keep leaning toward the Sun, wherever Earth goes"}],
+    act:'Take Earth to December. Watch the copper rod. I’ll leave faint copies of Earth along the way.',
+    hints:["Drag Earth to the right side of the ring, near Dec.","Compare the faint copies of Earth. Do their rods point the same way?"]},
+ 3:{kicker:"Chapter 3 of 6", title:"Same light, different ground", setup:{tilt:REAL_TILT,day:172,scale:100,city:"chicago"}, hud:"none", focus:"window", beam:true,
+    intro:'<p>Look down through the window: Chicago at noon in June. The orange beam of sunlight is always the same width.</p>',
+    q:"In December, Chicago’s noon Sun sits much lower. What happens to that same beam when it hits the ground?",
+    choices:[{id:"spreads",t:"It spreads over more ground, so each spot gets less",best:true},{id:"squeezes",t:"It squeezes into a smaller, stronger spot"},{id:"same",t:"Nothing. It lands the same way"},{id:"farther",t:"It gets weaker because Earth is farther away"}],
+    act:'Take Earth to late December. Watch the orange strip on the ground, the flagpole’s shadow, and the daylight dial.',
+    hints:["Drag Earth to the right side of the ring, past Dec 15.","Compare the orange strip in June and December. Which is longer?"]},
+ 4:{kicker:"Chapter 4 of 6", title:"Make Chicago’s seasons wilder", setup:{tilt:REAL_TILT,day:355,scale:100,city:"chicago"}, hud:"tilt",
+    hints:["Move one slider at a time and watch the bars. Which slider pushes them in opposite directions?","Orbit size moves both bars the same way. Tilt pulls them apart.","Try a tilt of 30\u00b0 with the orbit size back at Real."]},
+ 5:{kicker:"Chapter 5 of 6", title:"Closest to the Sun, and freezing", setup:{tilt:REAL_TILT,day:3,scale:100,city:"chicago"}, hud:"dist", beam:true,
+    q:"Earth is as close to the Sun as it ever gets. Why is Chicago in the middle of winter?",
+    choices:[{id:"tilt_away",t:"Chicago’s half leans away from the Sun. The noon Sun is low, its light spreads out, and the days are short.",best:true},{id:"far_side",t:"Chicago is on the side of Earth that’s farther from the Sun right now."},{id:"flipped",t:"Earth’s tilt has flipped away from the Sun for winter."},{id:"sun_dimmer",t:"The Sun gives off less light in winter."}]},
+ 6:{kicker:"Chapter 6 of 6", title:"Two cities you haven’t visited", setup:{tilt:REAL_TILT,day:3,scale:100,city:"chicago"}, hud:"none", beam:true,
+    a:{name:"Sydney, Australia", intro:'<p>Same day: January 3. Same Earth, same distance from the Sun. Chicago is deep in winter. Now let’s look south of the equator.</p>',
+       q:"It’s early January in Sydney, Australia too. What season is Sydney having?",
+       choices:[{id:"winter",t:"Winter, same as Chicago"},{id:"summer",t:"Summer",best:true},{id:"spring",t:"Spring"},{id:"none",t:"No season. It’s too close to the equator"}]},
+    b:{name:"Singapore", intro:'<p>One more. Singapore sits almost exactly on the equator, about 1° north.</p>',
+       q:"How much does Singapore’s daylight change between June and December?",
+       choices:[{id:"lots",t:"A lot: about 6 hours, like Chicago"},{id:"hardly",t:"Hardly at all. About 12 hours all year",best:true},{id:"midnight",t:"It gets 24 hours of daylight in June"},{id:"flips",t:"It flips like Sydney: long days in December, short in June"}]}}
+};
+
+/* ---------- Jodi's reframes (she never grades) ---------- */
+var FB={
+ 1:{core:function(){ return '<div class="facts"><div class="fact"><b>Early Jan</b><span>closest: about 91.4 million miles</span></div><div class="fact"><b>Early Jul</b><span>farthest: about 94.5 million miles</span></div><div class="fact"><b>About 7%</b><span>stronger sunlight in January. That’s all.</span></div></div><p>Closest in Chicago’s winter, farthest in its summer. That’s backwards from the distance idea. The closest point is called '+term("perihelion","perihelion")+'. And look at the copper ring: that’s the orbit’s real shape, almost a circle. Lots of textbook pictures stretch it into an egg, which is part of why so many people believe distance makes summer.</p>'; },
+    july:["thinking",'<p>That’s the most common guess there is. Plenty of grown-ups say the same thing. But in July Earth is at its <i>farthest</i>.</p>'],
+    january:["happy",'<p>Nice call. Strange, right? Chicago is closest to the Sun in the dead of winter.</p>'],
+    april:["thinking",'<p>Spring is halfway between, so it’s a fair guess. But the distance bottoms out in early January.</p>'],
+    same:["thinking",'<p>So close. The orbit really is almost a circle. Almost: the distance changes by about 3 million miles.</p>']},
+ 2:{core:function(){ return '<p>The rod <b>never flips</b>. All year it points the same way in space, toward the North Star, Polaris. Every faint copy of Earth has a parallel rod. What changes is <i>where Earth is</i>. In June, Chicago’s half leans <b>toward</b> the Sun. Six months later Earth is on the other side, so the same lean points Chicago’s half <b>away</b>.</p>'; },
+    flips:["thinking",'<p>That’s how a lot of diagrams make it look. But watch the rod: it never turned. Earth moved, and that alone made the north half lean away.</p>'],
+    same_dir:["happy",'<p>Exactly. The tilt never changes.</p>'],
+    straightens:["thinking",'<p>I see why. In March and September neither half leans toward the Sun. But the rod didn’t straighten. From the Sun, it’s leaning sideways then.</p>'],
+    follows:["thinking",'<p>If it did, Chicago would have summer all year. Watch the rod: it holds still while Earth goes around.</p>']},
+ 3:{core:function(){ var j=solve(41.88,172,REAL_TILT,1), d=solve(41.88,355,REAL_TILT,1);
+      return '<div class="facts"><div class="fact"><b>'+spreadOf(d.elev).toFixed(1)+'×</b><span>more ground for the same beam in December</span></div><div class="fact"><b>'+Math.round(j.hours)+' h vs. '+Math.round(d.hours)+' h</b><span>daylight in June vs. December</span></div><div class="fact"><b>3×+</b><span>more '+term("energy","sunlight energy")+' on a June day</span></div></div><p>Two effects work together. A low Sun spreads the same light thin, like tipping a flashlight so its spot stretches and dims. And winter days are short, so there are fewer hours of that weak light.</p>'; },
+    spreads:["happy",'<p>Yes. You just described the main reason for winter.</p>'],
+    squeezes:["thinking",'<p>Look again. A low Sun sends the beam in at a slant, and a slanted beam stretches out, like a long shadow at sunset.</p>'],
+    same:["thinking",'<p>The beam is the same, but the ground catches it at a different angle. See how long the orange strip got?</p>'],
+    farther:["thinking",'<p>Remember chapter 1: in December Earth is actually a little <i>closer</i>. The light isn’t weaker on the way. It’s spread thinner when it lands.</p>']},
+ 5:{core:function(){ return '<p><b>Seasons come from the tilt.</b> When your half of Earth leans away from the Sun, the Sun stays low, its light spreads thin, and days are short: winter. When it leans toward the Sun, you get a high Sun, concentrated light, and long days: summer. The distance barely matters.</p>'; },
+    tilt_away:["happy",'<p>That’s the whole idea in one sentence.</p>'],
+    far_side:["thinking",'<p>Smart geometry thinking. But Earth is only about 7,900 miles wide. Next to 91 million miles, leaning away doesn’t move Chicago meaningfully farther. It changes the <i>angle</i> of the light and how long the day lasts.</p>'],
+    flipped:["thinking",'<p>Remember chapter 2: the rod never flips. It’s pointing exactly the way it did in June. Earth moved.</p>'],
+    sun_dimmer:["thinking",'<p>The Sun didn’t change. If it had, the whole planet would have winter at once. You’re about to see it doesn’t.</p>']},
+ "6a":{core:function(){ var s=solve(-33.87,3,REAL_TILT,1); return '<p>In January the <b>south</b> half of Earth leans toward the Sun. Look through the window: Sydney’s noon Sun is about '+Math.round(s.elev)+'° up, and it gets '+Math.floor(s.hours)+'+ hours of daylight. Same Earth, same day, same distance from the Sun, and the two '+term("hemisphere","hemispheres")+' have <b>opposite seasons</b>.</p>'; },
+    winter:["thinking",'<p>A lot of people picture one season for the whole planet. But look through the window: Sydney’s Sun is high and its day is long.</p>'],
+    summer:["happy",'<p>Yes! Summer in Sydney in January.</p>'],
+    spring:["thinking",'<p>You figured it isn’t winter. It’s more than spring, though. Sydney’s Sun is about as high as Chicago’s in June.</p>'],
+    none:["thinking",'<p>Sydney is pretty far from the equator, about as far south as Atlanta is north. It has real seasons, just at the opposite time from Chicago’s.</p>']},
+ "6b":{core:function(){ var mn=99,mx=0; for(var d=1;d<=365;d++){ var h=solve(1.35,d,REAL_TILT,1).hours; if(h<mn) mn=h; if(h>mx) mx=h; }
+      return '<p>Singapore’s daylight only ranges from about <b>'+fmtHours(mn)+'</b> to <b>'+fmtHours(mx)+'</b>. Near the equator, the tilt barely changes the noon Sun or the length of the day, so there’s no real summer or winter. Seasons get bigger the farther you go from the equator.</p><p>Earth is yours again: spin the year and watch the daylight dial hardly move.</p>'; },
+    lots:["thinking",'<p>That’s Chicago, far from the equator. Singapore’s daylight barely moves.</p>'],
+    hardly:["happy",'<p>Right. Close to 12 hours, every day.</p>'],
+    midnight:["thinking",'<p>24-hour daylight happens near the poles. Singapore is the opposite: about 12 hours all year.</p>'],
+    flips:["thinking",'<p>Good instinct to compare hemispheres. But Singapore sits so close to the equator that neither half’s lean makes much difference there.</p>']}
+};
+var FAIL={
+  tilt_zero:'<p>You erased the seasons! With no tilt, Chicago gets about 12 hours of daylight every day and the noon Sun sits at the same height all year. Winter and summer come out nearly equal. December even gets a hair <i>more</i> sunlight, because Earth is a bit closer then. That sliver is all the distance does. Now, which way would you push the tilt?</p>',
+  farther_only:'<p>Moving Earth farther made winter darker, but it dimmed summer too. Distance changes the whole year at once. It can’t make one season harsher than the other.</p>',
+  closer_only:'<p>Moving Earth closer brightened <i>both</i> seasons. Distance moves the whole year together. You need something that pulls winter and summer apart.</p>',
+  tilt_smaller:'<p>Your seasons got milder: winter got sunnier and summer got weaker. Less tilt, smaller seasons. So which way should it go?</p>',
+  summer_dimmed:'<p>Winter got harsher. That part worked! But the bigger orbit dimmed summer below the real Earth. Your tilt is right. What about the orbit size?</p>',
+  not_enough:'<p>Winter got darker and summer got brighter. Right direction! Push it a little further.</p>'
+};
+var WIN='<p>A harsher winter and a stronger summer at the same time. More tilt means a lower winter Sun with shorter days, and a higher summer Sun with longer days. <b>The tilt sets how big the seasons are.</b> Distance can’t, because it dims or brightens the whole year together. Try 0° and spin the year to see Earth with no seasons at all.</p>';
+
+/* ---------- render ---------- */
+function choiceBtns(list, pressed, dis, first){
+  return '<div class="choices" role="group" aria-label="Choices">'+list.map(function(c,i){ return '<button class="choice" data-act="pick" data-id="'+c.id+'" aria-pressed="'+(pressed===c.id)+'"'+(dis?' disabled':'')+'><span class="ltr" aria-hidden="true">'+LTR[i]+'</span><span class="ct">'+esc(c.t)+(first===c.id?'<span class="tag">'+(PRESENT?'first pick':'your first pick')+'</span>':'')+'</span></button>'; }).join("")+'</div>';
+}
+function voteBlock(){ if(!PRESENT) return ""; var v=S.votes||{}; return '<details class="vote"><summary>Record the class vote (optional)</summary><div class="vrow">'+LTR.map(function(l){ return '<label>'+l+' <input type="number" min="0" max="99" inputmode="numeric" data-vote="'+l+'" value="'+(v[l]!=null?v[l]:'')+'" aria-label="Votes for '+l+'"></label>'; }).join('')+'</div></details>'; }
+function sendVote(n,part){ if(!PRESENT||!S.votes) return; var c={},any=false; LTR.forEach(function(l){ var x=+S.votes[l]; if(x>0){ c[l]=Math.min(99,Math.round(x)); any=true; } }); S.vs=S.vs||{}; var key=n+(part||""); if(any&&!S.vs[key]){ S.vs[key]=1; var m={step:n,counts:c}; if(part) m.part=part; track("rs_class_vote",m); } }
+function hintsBlock(st){ if(!st.hints) return ""; var h=""; if(S.hints>0){ h+='<ol class="hints">'; for(var i=0;i<S.hints;i++) h+='<li>'+esc(st.hints[i])+'</li>'; h+='</ol>'; } var more=S.hints<st.hints.length; return h+'<button class="btn small" data-act="hint"'+(more?'':' disabled')+'>'+(S.hints===0?"Need a hint?":more?"Another hint":"That’s all my hints")+'</button>'; }
+function render(){
+  var n=S.step, h="";
+  if(n===0){
+    h+='<p class="kicker">Simulation · Grades 6–8 · 12–15 minutes</p><h2 id="stitle">Why is winter cold?</h2>';
+    h+='<p>Most grown-ups get this one wrong, even college graduates. Steer Earth around the Sun for a year and figure it out yourself. In each of six short chapters, you guess first, then test.</p>';
+    h+= PRESENT ? '<p class="note">Class mode: everyone writes a guess, votes A–D with fingers, then we test it together.</p><div class="row"><button class="btn cta" data-act="start">Begin</button><button class="btn" data-act="present-off">Exit Present mode</button></div>'
+                : '<div class="row"><button class="btn cta" data-act="start">Begin</button><button class="btn" data-act="present-on">Teaching? Present to your class</button></div>';
+  }
+  else if(n>=1&&n<=3) h+=renderPredict(n);
+  else if(n===4) h+=renderChallenge();
+  else if(n===5) h+=renderPick(5);
+  else if(n===6) h+=renderPick(6);
+  else h+=renderSummary();
+  hideTip(); guide.innerHTML=h; renderSbar();
+}
+var sbar=$("#sbar");
+function renderSbar(){
+  var n=S.step, h="";
+  if(n>=1&&n<=3&&S.locked&&!S.revealed) h='<p><b>Test it:</b> drag Earth around the Sun, or</p>'+SPIN;
+  else if(n===4&&!S.solved) h='<p>'+(S.testing?'<b>Running a year\u2026</b>':'Get both bars below into their teal zones, then')+'</p><button class="btn go" data-act="test"'+(S.testing?' disabled':'')+'>\u25b6 Test my Earth</button>';
+  else if(n===4&&S.solved) h='<p>Try 0\u00b0 too. Earth is yours:</p>'+SPIN;
+  else if((n===6&&S.sub==="b"&&S.picked)||n===7) h='<p>Earth is yours. Drag it, or</p>'+SPIN;
+  sbar.innerHTML=h; sbar.hidden=!h; setSpin(spinning);
+}
+function renderPredict(n){
+  var st=CH[n], h=chap(n)+'<p class="kicker">'+st.kicker+'</p><h2 id="stitle">'+st.title+'</h2>'+st.intro;
+  h+='<p class="q">'+esc(st.q)+'</p>'+choiceBtns(st.choices,S.pred,S.locked);
+  if(!S.locked){ h+=voteBlock()+'<div class="row"><button class="btn cta" data-act="lock"'+(S.pred?'':' disabled')+'>'+(PRESENT?'Lock in the class guess':'Lock in my guess')+'</button><span class="note">Guess first. Then you’ll test it.</span></div>'; }
+  else if(!S.revealed){ h+='<div class="task" id="act"><p><b>Test it.</b> '+st.act+'</p></div><div class="row">'+hintsBlock(st)+'</div>'; }
+  else { var f=FB[n], m=f[S.pred]; h+='<h3 class="sr-only" id="fbh">What happened</h3>'+take(m[0], m[1]+f.core())+'<div class="row"><button class="btn cta" data-act="next">Next chapter</button></div>'; }
+  return h;
+}
+function cmpBars(a){ var pct=function(v){ return Math.max(0,Math.min(100,v/2)); }, wp=a.dec/REAL.dec*100, sp=a.jun/REAL.jun*100, dOk=a.dec<=GOAL_DEC+1e-9, jOk=a.jun>=REAL.jun-0.05;
+  return '<div class="cmp"><div><div class="lab">Winter day \u00b7 Dec 21 <span>'+Math.round(wp)+'% of today \u00b7 '+(dOk?'<span class="ok">goal met</span>':'<span class="no">needs 80% or less</span>')+'</span></div><div class="track"><i style="width:'+pct(wp)+'%"></i><span class="real" style="left:50%"></span><span class="goalmk" style="left:40%"></span></div></div>'+
+    '<div><div class="lab">Summer day \u00b7 Jun 21 <span>'+Math.round(sp)+'% of today \u00b7 '+(jOk?'<span class="ok">goal met</span>':'<span class="no">needs 100% or more</span>')+'</span></div><div class="track"><i style="width:'+pct(sp)+'%"></i><span class="real" style="left:50%"></span></div></div>'+
+    '<p class="note" style="margin:0">White line: the real Earth. Dashed line: the winter goal.</p></div>'; }
+function renderChallenge(){
+  var st=CH[4], h=chap(4)+'<p class="kicker">'+st.kicker+' · Your turn</p><h2 id="stitle">'+st.title+'</h2>';
+  if(!S.solved){
+    h+='<p>Can you give Chicago <b>darker winter days</b> and <b>brighter summer days</b> at the same time?</p>';
+    h+='<div class="task" id="act"><p><b>1.</b> Under the scene, move <b>Tilt</b> or <b>Orbit size</b>.<br><b>2.</b> Watch the two bars. They show Chicago\u2019s '+term("energy","sunlight")+' on its shortest and longest days, compared with today\u2019s Earth.<br><b>3.</b> When <b>both</b> bars are in their teal zones (winter 80% or less, summer 100% or more), press <b>Test my Earth</b>.</p></div>';
+    h+='<div class="row">'+hintsBlock(st)+'</div>';
+    if(S.attempts.length){ var a=S.attempts[S.attempts.length-1];
+      h+='<h3 id="fbh" style="font-size:16px;margin:14px 0 0;font-family:var(--font-ui)">Test '+S.attempts.length+': tilt '+a.tilt.toFixed(1)+'°, orbit '+(a.scale===100?'real':a.scale+'%')+'</h3>'+cmpBars(a)+take(a.failReason==="not_enough"?"happy":"thinking",FAIL[a.failReason]); }
+  } else { var w=S.attempts[S.attempts.length-1]; h+='<h3 id="fbh" style="font-size:16px;margin:4px 0 0;font-family:var(--font-ui)">Test '+S.attempts.length+': you did it</h3>'+cmpBars(w)+take("happy",WIN)+'<div class="row"><button class="btn cta" data-act="next">Next chapter</button></div>'; }
+  return h;
+}
+function renderPick(n){
+  var st=CH[n], P=n===5?st:st[S.sub], key=n===5?"5":"6"+S.sub, f=FB[n===5?5:key];
+  var h=chap(n)+'<p class="kicker">'+st.kicker+(n===6?(S.sub==="a"?' · 1 of 2':' · 2 of 2'):'')+'</p><h2 id="stitle">'+(n===5?st.title:P.name)+'</h2>';
+  h+= n===5 ? '<p>Back to the real Earth on <b>January 3</b>, the closest it ever gets to the Sun. Look through the window at Chicago: a low Sun, a long stretched strip of light, and a short day.</p>' : P.intro;
+  h+='<p class="q">'+esc(P.q)+'</p>'+(S.picked?'':voteBlock())+choiceBtns(P.choices,S.picked,false,S.first[key]);
+  if(S.picked){ var m=f[S.picked]; h+='<h3 class="sr-only" id="fbh">Jodi’s take</h3>'+take(m[0],m[1]+f.core())+'<p class="note">Tap another answer to compare.</p><div class="row"><button class="btn cta" data-act="'+(n===6&&S.sub==="a"?"subnext":"next")+'">'+(n===6&&S.sub==="a"?"One more city":n===6?"See what you figured out":"Next chapter")+'</button>'+'</div>'; }
+  return h;
+}
+function renderSummary(){
+  var h=chap(NCH+1)+'<p class="kicker">All done</p><h2 id="stitle">What you figured out</h2>';
+  h+='<ul class="sum"><li><b>It’s the tilt</b>Earth’s axis leans about 23.4° and keeps pointing the same way in space all year.</li><li><b>Direct or spread out</b>Leaning toward the Sun means a high Sun and concentrated light. Leaning away, the same light spreads thin.</li><li><b>Long or short days</b>Leaning toward the Sun also means more hours of daylight.</li><li><b>Opposite halves</b>Winter in Chicago is summer in Sydney. Near the equator, the seasons hardly change.</li><li><b>Distance barely matters</b>Earth is closest to the Sun in early January.</li></ul>';
+  var H=S.history, it=[];
+  if(H[1]) it.push('Chapter 1: you guessed “'+esc(H[1].guess)+'.” Earth was closest in early January.');
+  if(H[2]) it.push('Chapter 2: you guessed “'+esc(H[2].guess)+'.” The rod kept pointing the same way.');
+  if(H[3]) it.push('Chapter 3: you guessed “'+esc(H[3].guess)+'.” The low Sun spread the light thin.');
+  if(H[4]) it.push('Chapter 4: you made Chicago’s seasons wilder in '+H[4].tests+(H[4].tests===1?' test':' tests')+' with a '+H[4].tilt.toFixed(1)+'° tilt.');
+  if(H["6a"]) it.push('Chapter 6: your first pick for Sydney was “'+esc(H["6a"].guess)+'.” It’s summer there in January.');
+  if(it.length) h+='<h3 style="font-size:17px;margin:4px 0">Your guesses vs. what happened</h3><ul class="yours"><li>'+it.join('</li><li>')+'</li></ul>';
+  h+='<div class="honest"><b>One honest thing.</b> The hottest weeks usually come a few weeks <i>after</i> the longest day. Land, air and water take time to warm up, like a pool that’s still chilly in early June. Real weather also adds clouds, wind and oceans that this model leaves out.</div>';
+  h+=take("happy",'<p>The whole orrery is yours now: tilt, orbit size and all three cities. Try a 45° tilt in Sydney, or no tilt at all. And next January, when someone says it’s cold because we’re far from the Sun, you’ll know better.</p>');
+  h+='<div class="row"><button class="btn" data-act="restart">Start over</button></div>';
+  return h;
+}
+
+/* ---------- flow ---------- */
+function noteDay(d){ if(!S) return; S.visited[monthOf(d).m]=true;
+  if(S.step===2&&S.locked&&!S.revealed){ [80,172,266,355].forEach(function(q){ var dd=Math.abs(d-q); dd=Math.min(dd,365-dd); if(dd<10&&!S.ghostSet[q]){ S.ghostSet[q]=1; V.ghosts.push(q); } }); }
+  var n=S.step; if(!(n>=1&&n<=3)||!S.locked||S.revealed) return;
+  var v=S.visited, cnt=Object.keys(v).length, dd2=Math.round(d);
+  if(n===1&&v[0]&&v[6]&&cnt>=6) reveal("january");
+  if(n===2&&(dd2>=340||dd2<=10)) reveal("same_dir");
+  if(n===3&&(dd2>=345||dd2<=5)) reveal("spreads");
+}
+function enter(n){
+  if(S.step>=1&&S.step<=7&&S.step!==n){ activeClock(); track("rs_step_end",{step:S.step,activeMs:Math.round(stepClock.ms)}); }
+  setSpin(false);
+  S.step=n; S.votes={}; S.pred=null; S.locked=false; S.revealed=false; S.hints=0; S.testing=null; S.picked=null; S.ghostSet={}; S.sub="a";
+  resetClock(); var st=CH[n];
+  V.ghosts=[]; V.apsides=n>=2; V.minDist=null; V.focus=null; V.dragHint=false; V.beam=!!(st&&st.beam)||n>=7; V.hud=st?st.hud:(n===7?"tilt":"dist");
+  if(n===2){ V.ghosts=[172]; S.ghostSet[172]=1; }
+  if(st&&st.setup){ var u=st.setup; setModel({tilt:u.tilt,scale:u.scale,city:u.city,day:u.day}); }
+  S.visited={};
+  if(n===0) show({});
+  else if(n<=3) show({});
+  else if(n===4) show({time:true,T:true,S:true,live:true});
+  else if(n===5||n===6) show({});
+  else show({time:true,T:true,S:true,C:true});
+  if(n>=1){ track("rs_step_start",{step:n,mode:PRESENT?"class":"solo"}); send("step",null,{step:n}); }
+  if(n===7){ var H=S.history; send("complete",null,{summary:{predictionsMatched:(H[1]&&H[1].matched?1:0)+(H[2]&&H[2].matched?1:0)+(H[3]&&H[3].matched?1:0),hintsUsed:H.hints||0,attemptsStep4:S.attempts.length,explanationBest:H[5]?H[5].best:false,transferBestA:H["6a"]?H["6a"].best:false,transferBestB:H["6b"]?H["6b"].best:false,v:VERSION}}); }
+  render(); draw(); descSoon(); schedule();
+  if(n>0) focusEl("#stitle");
+}
+function reveal(outcome){
+  var n=S.step; S.revealed=true; setSpin(false); V.focus=null; V.dragHint=false; if(n===1) V.apsides=true;
+  var pc=null; CH[n].choices.forEach(function(c){ if(c.id===S.pred) pc=c; });
+  var matched=S.pred===outcome; track("rs_reveal",{step:n,outcome:outcome,prediction:S.pred,matched:matched});
+  S.history[n]={guess:pc?pc.t:"",matched:matched};
+  render(); draw(); announce("Jodi explains what happened."); focusEl("#fbh"); setTimeout(toCard, 250);
+}
+function startTest(){ setSpin(false); show({time:false,T:false,S:false,live:true}); S.testing={tilt:+inT.value,scale:+inS.value,from:model.day,acc:0}; render(); toScene(); announce("Running a year.");
+  if(REDUCED){ setTimeout(function(){ setDay(172); setTimeout(function(){ setDay(355); finishTest(); },600); },100); } schedule(); }
+function testTick(dt){ var t=S.testing; if(!t||REDUCED) return; t.acc+=dt; if(t.acc*130>=365){ setDay(355); finishTest(); return; } setDay(t.from+t.acc*130); }
+function finishTest(){
+  var t=S.testing; if(!t) return; S.testing=null;
+  var dec=solve(41.88,355,t.tilt,t.scale/100).kwh, jun=solve(41.88,172,t.tilt,t.scale/100).kwh, ok=dec<=GOAL_DEC+1e-9&&jun>=REAL.jun-0.05, why=null;
+  if(!ok){ if(t.tilt<2) why="tilt_zero"; else if(Math.abs(t.scale-100)>=3&&Math.abs(t.tilt-REAL_TILT)<1.5) why=t.scale>100?"farther_only":"closer_only"; else if(t.tilt<REAL_TILT-1) why="tilt_smaller"; else if(jun<REAL.jun-0.05) why="summer_dimmed"; else why="not_enough"; }
+  var a={tilt:t.tilt,scale:t.scale,dec:dec,jun:jun,failReason:why,success:ok}; S.attempts.push(a);
+  track("rs_attempt",{step:4,attempt:S.attempts.length,success:ok,failReason:why,tilt:r1(t.tilt),orbitPct:t.scale,decKwh:r1(dec),junKwh:r1(jun)});
+  if(ok){ S.solved=true; S.history[4]={tests:S.attempts.length,tilt:t.tilt}; }
+  show({time:true,T:true,S:true,live:!ok}); render(); announce(ok?"You did it.":"Test done."); focusEl("#fbh"); setTimeout(toCard,200);
+}
+function onAct(e){
+  var b=e.target.closest("[data-act]"); if(!b||b.disabled) return;
+  var act=b.getAttribute("data-act"), n=S.step, st=CH[n];
+  if(act==="start") enter(1);
+  else if(act==="present-on") setPresent(true);
+  else if(act==="present-off") setPresent(false);
+  else if(act==="spin"){ setSpin(!spinning); if(spinning){ V.dragHint=false; toScene(); } }
+  else if(act==="pick"){
+    var id=b.getAttribute("data-id");
+    if(n>=1&&n<=3){ if(S.locked) return; S.pred=id; render(); var nb=$('[data-id="'+id+'"]',guide); if(nb) nb.focus(); }
+    else if(n===5||n===6){
+      var key=n===5?"5":"6"+S.sub, P=n===5?st:st[S.sub], ch=null; P.choices.forEach(function(c){ if(c.id===id) ch=c; });
+      if(S.first[key]==null){ S.first[key]=id;
+        if(n===5){ S.history[5]={best:!!ch.best}; track("rs_explanation",{step:5,choiceId:id,isBest:!!ch.best,firstTry:true}); }
+        else { S.history[key]={guess:ch.t,best:!!ch.best}; track("rs_transfer",{step:6,part:S.sub,choiceId:id,isBest:!!ch.best,firstTry:true}); } }
+      if(!S.picked) sendVote(n,n===6?S.sub:null);
+      var was=!!S.picked; S.picked=id;
+      if(n===6&&!was){ if(S.sub==="a") setModel({city:"sydney"}); else { setModel({city:"singapore"}); show({time:true}); } }
+      render(); if(!was){ announce("Jodi responds."); focusEl("#fbh"); } else { var pb=$('[data-id="'+id+'"]',guide); if(pb) pb.focus(); }
+    }
+  }
+  else if(act==="lock"){ if(!S.pred) return; S.locked=true; track("rs_prediction",{step:n,choiceId:S.pred,mode:PRESENT?"class":"solo"}); sendVote(n);
+    show({time:true}); V.focus=st.focus; V.dragHint=n===1; S.visited={}; V.minDist=null; render(); draw(); schedule(); focusEl("#act"); toScene(); }
+  else if(act==="hint"){ if(!st.hints||S.hints>=st.hints.length) return; S.hints++; S.history.hints=(S.history.hints||0)+1; track("rs_hint",{step:n,hint:S.hints}); render(); var hb=$('[data-act="hint"]',guide); if(hb&&!hb.disabled) hb.focus(); }
+  else if(act==="test"){ if(!S.testing) startTest(); }
+  else if(act==="subnext"){ activeClock(); S.sub="b"; S.picked=null; S.votes={}; setSpin(false); show({}); setModel({day:3,city:"chicago"}); render(); focusEl("#stitle"); toScene(); }
+  else if(act==="next") enter(n+1);
+  else if(act==="restart"){ send("restart",null,{}); S=fresh(); enter(0); window.scrollTo({top:0,behavior:REDUCED?"auto":"smooth"}); }
+}
+guide.addEventListener("click", onAct); sbar.addEventListener("click", onAct);
+
+/* ---------- glossary ---------- */
+var tipEl=$("#tip"), tipFor=null, tipPinned=false;
+function showTip(btn){ var g=GLOSS[btn.getAttribute("data-term")]; if(!g) return; if(tipFor&&tipFor!==btn) tipFor.setAttribute("aria-expanded","false"); tipFor=btn; btn.setAttribute("aria-expanded","true");
+  tipEl.innerHTML="<b>"+esc(g[0])+"</b>"+esc(g[1]); tipEl.hidden=false; var r=btn.getBoundingClientRect(), tw=tipEl.offsetWidth, th=tipEl.offsetHeight;
+  var left=Math.max(12,Math.min(r.left+window.scrollX, window.scrollX+document.documentElement.clientWidth-tw-12)), top=r.bottom+window.scrollY+8; if(r.bottom+th+16>window.innerHeight&&r.top>th+16) top=r.top+window.scrollY-th-8;
+  tipEl.style.left=left+"px"; tipEl.style.top=top+"px"; }
+function hideTip(){ if(tipFor) tipFor.setAttribute("aria-expanded","false"); tipFor=null; tipPinned=false; tipEl.hidden=true; }
+document.addEventListener("click", function(e){ var b=e.target.closest(".term"); if(b){ if(tipFor===b&&tipPinned){ hideTip(); return; } showTip(b); tipPinned=true; return; } if(!e.target.closest("#tip")) hideTip(); });
+document.addEventListener("mouseover", function(e){ var b=e.target.closest&&e.target.closest(".term"); if(b&&!tipPinned) showTip(b); });
+document.addEventListener("mouseout", function(e){ var b=e.target.closest&&e.target.closest(".term"); if(b&&!tipPinned&&!(e.relatedTarget&&b.contains(e.relatedTarget))) hideTip(); });
+document.addEventListener("keydown", function(e){ if(e.key==="Escape"&&!tipEl.hidden){ var f=tipFor; hideTip(); if(f) f.focus(); } });
+guide.addEventListener("input", function(e){ var l=e.target.getAttribute&&e.target.getAttribute("data-vote"); if(l){ S.votes=S.votes||{}; S.votes[l]=e.target.value; } });
+
+/* ---------- Present mode ---------- */
+function setPresent(on){ if(PRESENT===on) return; PRESENT=on; document.body.classList.toggle("present",on); var b=$("#presentBtn"); b.setAttribute("aria-pressed",String(on)); $("#presentLabel").textContent=on?"Exit present":"Present";
+  track("rs_mode",{mode:on?"class":"solo",step:S.step});
+  try{ if(on&&document.documentElement.requestFullscreen&&!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){}); if(!on&&document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen().catch(function(){}); }catch(e){}
+  render(); setTimeout(function(){ resize(); K=PRESENT?1.25:1; draw(); },150); announce(on?"Present mode on.":"Present mode off."); }
+$("#presentBtn").addEventListener("click", function(){ setPresent(!PRESENT); });
+
+/* ---------- Comms ---------- */
+var toastT=null; function toast(m){ var t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(function(){ t.hidden=true; },3200); }
+if(IS_PROD){ var mh=document.createElement("script"); mh.src="/js/message-hq.js"; mh.setAttribute("data-message-source","Simulations: Seasons"); document.body.appendChild(mh); }
+$("#commsBtn").addEventListener("click", function(){ if(window.openComms) window.openComms(); else if(window.openMessageModal) window.openMessageModal(); else toast("Comms opens your Allgood Academy inbox on allgoodacademy.com."); });
+
+/* ---------- keys: A–D pick ---------- */
+document.addEventListener("keydown", function(e){ if(e.ctrlKey||e.metaKey||e.altKey) return; var tag=(e.target.tagName||"").toLowerCase(); if(tag==="input"||tag==="textarea"||e.target===cv) return; var i=LTR.indexOf(String(e.key).toUpperCase()); if(i<0) return; var bs=$$(".choice:not(:disabled)",guide); if(bs[i]) bs[i].click(); });
+
+/* ---------- go ---------- */
+var roT=null; function onResize(){ clearTimeout(roT); roT=setTimeout(function(){ resize(); draw(); },60); }
+if("ResizeObserver" in window) new ResizeObserver(onResize).observe(cv); else window.addEventListener("resize",onResize);
+resize(); applyCtl(); enter(0);
+if(location.hash==="#present") setPresent(true);
+})();
+</script>
+</body>
+</html>
