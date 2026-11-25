@@ -93,6 +93,7 @@ const state = {
     dirty: false,
     pending: [],          // events queued before a signed-in user exists
     entry: null,
+    source: {},
     device: null,
     flushing: false,
     summary: null,       // per-module end-of-session roll-up merged onto the session doc
@@ -114,6 +115,29 @@ function detectEntry() {
     } catch (e) {
         return 'unknown';
     }
+}
+
+// Where the visit came from: ?src=, utm_source/medium/campaign and the referrer's HOST,
+// each sanitised to [a-z0-9._-] (max 40, else 'other'). The site nav records it once per
+// visit in sessionStorage ('ag_src'); a page without the nav computes it here. Cookie-free,
+// nothing personal. firestore.rules (sourceOk) enforces the same shape.
+function detectSource() {
+    const clean = (v) => { v = String(v || '').toLowerCase(); return /^[a-z0-9._-]{1,40}$/.test(v) ? v : (v ? 'other' : ''); };
+    let o = null;
+    try { o = JSON.parse(sessionStorage.getItem('ag_src') || 'null'); } catch (e) { o = null; }
+    if (!o || typeof o !== 'object') {
+        const q = new URLSearchParams(window.location.search);
+        let refHost = '';
+        try { const h = document.referrer ? new URL(document.referrer).host : ''; refHost = h && h !== window.location.host ? clean(h) : ''; } catch (e) { refHost = ''; }
+        o = { src: clean(q.get('src')), utmSource: clean(q.get('utm_source')), utmMedium: clean(q.get('utm_medium')), utmCampaign: clean(q.get('utm_campaign')), refHost };
+        try { sessionStorage.setItem('ag_src', JSON.stringify(o)); } catch (e) { /* storage blocked */ }
+    }
+    const out = {};
+    for (const k of ['src', 'utmSource', 'utmMedium', 'utmCampaign', 'refHost']) {
+        const v = clean(o[k]);
+        if (v) out[k] = v;
+    }
+    return out;
 }
 
 function detectDevice() {
@@ -170,6 +194,7 @@ async function openSession() {
             completed: state.completed,
             device: state.device,
             entry: state.entry,
+            source: state.source,
             path: window.location.pathname,
             ...(state.summary ? { summary: state.summary } : {}),
         });
@@ -326,6 +351,7 @@ function init({ module: moduleSlug, gameName, stepsTotal, stream } = {}) {
     state.stream = (typeof stream === 'string' && stream.trim()) ? stream.trim() : 'core';
     state.stepsTotal = typeof stepsTotal === 'number' ? stepsTotal : null;
     state.entry = detectEntry();
+    state.source = detectSource();
     state.device = detectDevice();
     enqueue('module_open', { entry: state.entry, device: state.device });
     ['pointerdown', 'keydown'].forEach((type) => {

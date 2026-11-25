@@ -409,6 +409,10 @@ body.present .nav-shell.activity{display:none}
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
   if(s&&cta)cta.textContent='My dashboard';
   if(a&&signin)signin.textContent='Mission Control';
+  // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
+  // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
+  // writes it onto the session doc. See docs/insider-analytics.md.
+  try{if(!sessionStorage.getItem('ag_src')){var q=new URLSearchParams(location.search),c=function(v){v=String(v||'').toLowerCase();return /^[a-z0-9._-]{1,40}$/.test(v)?v:(v?'other':'');},r='';try{var h=document.referrer?new URL(document.referrer).host:'';r=h&&h!==location.host?c(h):'';}catch(e){}var o={src:c(q.get('src')),utmSource:c(q.get('utm_source')),utmMedium:c(q.get('utm_medium')),utmCampaign:c(q.get('utm_campaign')),refHost:r};sessionStorage.setItem('ag_src',JSON.stringify(o));}}catch(e){/* storage blocked - no source recorded */}
   var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
   if(!btn)return;
   nav.classList.add('has-menu');
@@ -893,6 +897,36 @@ function generateClassroomCode() {
  * teacher's later classes carry no marker. The profile is written after, as before: the
  * rules only let a uid point classroomCode at (or become teacher of) a class that already
  * exists and names them. */
+/* GOOGLE ANALYTICS — signed-in teachers only (2026-11-25). The marketing property
+   (G-P6DZJ685W6, the same one /, /for-teachers/ and /about/ use) so homepage → for-teachers →
+   Mission Control → Get Pro is one funnel. Loaded only once load() has confirmed a signed-in
+   teacher AND the ag_account flag is set (the gate /dashboard/ uses); fails closed. Never on
+   any student page. Events carry NO uid, email, class code, nickname or student data — only
+   the event name and, at most, a content type or guide id. */
+const GA_ID = 'G-P6DZJ685W6';
+let gaReady = false;
+const gaPending = [];   // events from before load() confirmed a teacher (e.g. the first class)
+function loadTeacherAnalytics() {
+    if (gaReady) return;
+    try { if (localStorage.getItem('ag_account') !== '1') return; } catch (e) { return; }
+    if (!state.user || state.user.isAnonymous || !state.me || state.me.role !== 'teacher') return;
+    gaReady = true;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    window.gtag('js', new Date());
+    window.gtag('config', GA_ID);
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+    document.head.appendChild(s);
+    gaPending.splice(0).forEach(([n, p]) => track(n, p));
+}
+function track(name, params) {
+    if (!gaReady) { if (gaPending.length < 5) gaPending.push([name, params]); return; }
+    if (typeof window.gtag !== 'function') return;
+    try { window.gtag('event', name, { ...(params || {}), transport_type: 'beacon' }); } catch (e) { /* never break the page */ }
+}
+
 async function createClass(user, name, { needMarker }) {
     const meRef = doc(db, 'artifacts', appId, 'users', user.uid);
     const snap = await getDoc(meRef).catch(() => null);
@@ -907,6 +941,7 @@ async function createClass(user, name, { needMarker }) {
     }
     await batch.commit();
     await setDoc(meRef, { role: 'teacher', classroomCode: code }, { merge: true });
+    track('class_created');
     return code;
 }
 
@@ -1042,6 +1077,7 @@ async function load() {
         return showSetup(user);
     }
     $('loading-note').textContent = 'Loading your class…';
+    loadTeacherAnalytics();
 
     state.code = me.classroomCode;
     const classSnap = await getDoc(doc(db, 'artifacts', appId, 'classrooms', state.code));
@@ -1429,8 +1465,10 @@ function openPro(reason) {
         $('pro-after').textContent = 'We turn Pro on for your account. Schools can ask for an invoice.';
     }
     openModal('pro-panel', $('btn-pro-close'));
+    track('pro_panel_open', { reason: String(reason || '') });
 }
 $('btn-pro-close').addEventListener('click', () => closeModal('pro-panel'));
+$('btn-get-pro').addEventListener('click', () => track('get_pro_click'));
 document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-pro]');
     if (t) { e.preventDefault(); openPro(t.dataset.pro); }
@@ -2037,6 +2075,7 @@ async function saveAssignments() {
             resetDraft();
             setTab('students');
             renderAll();
+            track('content_assigned', { scope: 'students' });
             toast(`Saved — extra work for ${count === 1 ? who : `${count} students`}. Everyone else's list is unchanged.`);
         } else {
             const next = { assignedModules: [...state.draft.modules], assignedGames: [...state.draft.games], assignedSims: [...state.draft.sims] };
@@ -2047,6 +2086,7 @@ async function saveAssignments() {
             setTab('overview');
             renderAll();
             toast('Assignments saved.');
+            track('content_assigned', { scope: 'class' });
         }
     } catch (e) {
         console.warn('[Mission Control] saving assignments failed', e);
@@ -2092,6 +2132,7 @@ document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-guide-url]');
     if (!b) return;
     e.preventDefault();
+    track('guide_download', { guide: String(b.dataset.guideName || '').replace(/^Allgood Academy - | facilitator guide\.pdf$/g, '').slice(0, 60) });
     if (!b.dataset.guideFile) { window.open(b.dataset.guideUrl, '_blank', 'noopener'); return; }
     const a = document.createElement('a');
     a.href = b.dataset.guideUrl; a.download = b.dataset.guideName;

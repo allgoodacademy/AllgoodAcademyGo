@@ -964,6 +964,22 @@ await it('nobody else CAN set productUpdates on a teacher profile (not a student
   await assertFails(setDoc(U(other, 'teacher_1'), { productUpdates: { optedIn: true, source: 'setup', updatedAt: 1 } }, { merge: true }));
   const anon = env.authenticatedContext('anon_pu', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
   await assertFails(setDoc(U(anon, 'teacher_1'), { productUpdates: { optedIn: true, source: 'settings', updatedAt: 1 } }, { merge: true }));
+// VISIT SOURCE on sessions (2026-11-25): short tokens only, fixed after create.
+const SESS = (db, id) => doc(db, 'artifacts', APP, 'sessions', id);
+await it('a session CAN carry a valid source map', async () => {
+  const me = env.authenticatedContext('src_ok', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await assertSucceeds(setDoc(SESS(me, 'src_s1'), { uid: 'src_ok', module: 'watercycle', source: { src: 'email', utmCampaign: 'outreach-2026-11', refHost: 'l.facebook.com' } }));
+});
+await it('a session CANNOT carry a long, oddly-shaped or extra-field source', async () => {
+  const me = env.authenticatedContext('src_bad', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await assertFails(setDoc(SESS(me, 'src_s2'), { uid: 'src_bad', source: { src: 'x'.repeat(500) } }));
+  await assertFails(setDoc(SESS(me, 'src_s3'), { uid: 'src_bad', source: { src: 'Has Spaces@mail' } }));
+  await assertFails(setDoc(SESS(me, 'src_s4'), { uid: 'src_bad', source: { src: 'email', email: 'kid@school.org' } }));
+});
+await it('a session source CANNOT be changed after the session is created', async () => {
+  const me = env.authenticatedContext('src_ok', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await assertFails(setDoc(SESS(me, 'src_s1'), { source: { src: 'facebook' } }, { merge: true }));
+  await assertSucceeds(setDoc(SESS(me, 'src_s1'), { activeMs: 5000 }, { merge: true }));
 });
 
 await env.cleanup();
