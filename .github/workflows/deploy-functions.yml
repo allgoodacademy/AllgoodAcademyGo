@@ -1,0 +1,52 @@
+# Deploys the Cloud Functions (functions/, today the Stripe webhook that turns on Mission
+# Control Pro) from GitHub, so the founder never needs a terminal.
+#
+#   - Runs on any push to main that touches functions/ (or this file), after the function
+#     tests pass.
+#   - Or by hand: GitHub → Actions → "Deploy functions" → Run workflow.
+#
+# Uses the same service account as the Hosting and Firestore-rules deploys
+# (FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY). That account needs, in Google Cloud IAM:
+# Cloud Functions Admin, Service Account User, Secret Manager Admin, Artifact Registry
+# Administrator, Cloud Build Editor and Cloud Run Admin; and the Cloud Functions, Cloud
+# Build, Artifact Registry, Cloud Run, Eventarc, Pub/Sub and Secret Manager APIs must be
+# enabled. Both were set up by hand in the console on 2026-11-25.
+#
+# The Stripe signing secret (STRIPE_WEBHOOK_SECRET) lives in Google Secret Manager, never in
+# this repo; it must exist there before the first deploy.
+name: Deploy functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'functions/**'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy_functions:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install repo dependencies (pinned firebase-tools)
+        run: npm ci
+      - name: Install function dependencies
+        run: npm ci
+        working-directory: functions
+      - name: Write service account credentials
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}' > "${{ runner.temp }}/firebase-service-account.json"
+      - name: Deploy functions
+        # --force accepts the default Artifact Registry cleanup policy, which the CLI would
+        # otherwise stop to ask about in a non-interactive run.
+        run: node_modules/.bin/firebase deploy --only functions --project allgood-academy --non-interactive --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
