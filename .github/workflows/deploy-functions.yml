@@ -28,6 +28,10 @@ on:
         description: 'Verbose firebase-tools output (for diagnosing a failed deploy)'
         type: boolean
         default: false
+      recreate:
+        description: 'Delete stripeWebhook first (only for a function stuck in a failed state)'
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-functions
@@ -49,6 +53,11 @@ jobs:
         working-directory: functions
       - name: Write service account credentials
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}' > "${{ runner.temp }}/firebase-service-account.json"
+      - name: Delete a stuck function first
+        if: ${{ inputs.recreate }}
+        run: node_modules/.bin/firebase functions:delete stripeWebhook --region us-central1 --project allgood-academy --force --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
       - name: Deploy functions
         # --force accepts the default Artifact Registry cleanup policy, which the CLI would
         # otherwise stop to ask about in a non-interactive run.
