@@ -675,7 +675,7 @@ import {
     ACTIVE_WINDOW_DAYS, DAY,
 } from './derive.js';
 import {
-    FREE_STUDENT_LIMIT, FREE_CLASS_LIMIT, PRO_PRICE_LABEL, PRO_CHECKOUT_URL, PRO_CONTACT_EMAIL,
+    FREE_STUDENT_LIMIT, FREE_CLASS_LIMIT, PRO_PRICE_LABEL, PRO_CHECKOUT_URL, PRO_CONTACT_EMAIL, PRO_AUTO_ON,
     GUIDES, GUIDE_BUNDLE,
 } from './plan-config.js';
 // The registry loader the games already share: one cached fetch of /data/modules-registry.json.
@@ -1388,7 +1388,9 @@ function openPro(reason) {
         get.textContent = state.plan.expired ? 'Renew Pro' : 'Get Pro';
         get.target = '_blank';
         get.rel = 'noopener';
-        $('pro-after').textContent = 'Pay by card on Stripe. Pro turns on automatically, usually within a minute.';
+        $('pro-after').textContent = PRO_AUTO_ON
+            ? 'Pay by card on Stripe. Pro turns on automatically, usually within a minute.'
+            : 'Pay by card on Stripe. We turn Pro on for your account by hand within one business day.';
     } else {
         // No Payment Link yet: never card fields on this page, just an email.
         const subject = encodeURIComponent('Mission Control Pro');
