@@ -970,7 +970,7 @@ function renderSave() {
             ${code ? `<div class="codebox"><span id="code-text">${showCode ? esc(code) : '••••-••••-••••-••••'}</span>
                 <button class="link" type="button" data-a="show" aria-pressed="${showCode}">${showCode ? 'Hide' : 'Show'}</button>
                 <button class="link" type="button" data-a="copy">Copy</button></div>
-            <p class="small">Only shown on this device. Keep it somewhere safe — anyone with it can open your progress.</p>`
+            <p class="small">Only shown on this device. 📸 Take a screenshot or write it down — it's the only way back in on another device. Keep it somewhere safe: anyone with it can open your progress.</p>`
             : '<p class="small">This device doesn\'t have your code stored. Use the copy you wrote down.</p>'}
             <p class="small"><button class="link" type="button" data-a="signout">Sign out on this device</button></p>`;
         rail.className = 'save-status ok';
@@ -989,11 +989,26 @@ function renderSave() {
 // The save sheet: one step at a time.
 let lastOpener = null;
 let pendingJoin = null;
-function sheet(html) {
+function sheet(html, after) {
     $('save-sheet').innerHTML = html;
     $('save-modal').hidden = false;
-    const first = $('save-sheet').querySelector('input, .btn');
+    const first = $('save-sheet').querySelector('input, .btn:not([disabled])');
     if (first) first.focus();
+    if (after) after();
+}
+// The save code step: "I saved it" stays off for 3 seconds, so a quick tap can't skip past
+// the code before the student has had a chance to screenshot or write it down.
+function holdSavedIt() {
+    let left = 3;
+    const tick = () => {
+        const btn = $('saved-it');
+        if (!btn) return;
+        left -= 1;
+        if (left > 0) { btn.textContent = `I saved it (${left})`; setTimeout(tick, 1000); return; }
+        btn.disabled = false;
+        btn.textContent = 'I saved it';
+    };
+    setTimeout(tick, 1000);
 }
 function closeSave() {
     if ($('save-modal').hidden) return;
@@ -1011,10 +1026,10 @@ const STEPS = {
         <p class="msg bad" id="save-msg" role="status" aria-live="polite"></p>
         <div class="row" style="margin-top:12px"><button class="btn" type="button" data-a="mkcode">Get my save code</button></div>`),
     code: (code, name) => sheet(`<p class="step">Save with a code · 2 of 2</p><h2 id="save-title">Here's your save code${name ? `, ${esc(name)}` : ''}</h2>
-        <p>Write it down, or take a picture of it. You'll need it to open your progress on a different device.</p>
         <div class="bigcode" id="big-code">${esc(code)}</div>
-        <div class="row"><button class="btn ghost" type="button" data-a="copy">Copy</button><button class="btn ghost" type="button" data-a="print">Print</button><button class="btn" type="button" data-a="done" style="margin-left:auto">I saved it</button></div>
-        <p class="small">You can see it again any time on your dashboard on this device.</p>`),
+        <p><b>📸 Take a screenshot or write this down.</b> It's the only way to get your progress back on a different device. We can't email it to you.</p>
+        <div class="row"><button class="btn ghost" type="button" data-a="copy">Copy</button><button class="btn ghost" type="button" data-a="print">Print</button><button class="btn" type="button" data-a="done" id="saved-it" disabled style="margin-left:auto">I saved it (3)</button></div>
+        <p class="small">You can see it again any time on your dashboard on this device.</p>`, holdSavedIt),
     google: () => sheet(`<p class="step">Save your progress</p><h2 id="save-title">Save with Google</h2>
         <p>Use your school or personal Google account. Your progress comes with you.</p>
         <button class="btn goog" type="button" data-a="gsave">${GOOGLE_SVG}Continue with Google</button>
