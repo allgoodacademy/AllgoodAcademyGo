@@ -3,7 +3,10 @@
 // ============================================================================
 // THE SITE NAV — single source of truth for every public page's top bar.
 //
-// Six pages carry this nav. Until this file existed each one hand-wrote its own
+// Every student-facing page carries this nav (the list is PAGES, below): the site
+// pages, every hub, and every lesson, game and simulation. Teacher and admin tools
+// (Mission Control, Insider, Join) and the printable teacher sheets do not.
+// Originally six pages carried it. Until this file existed each one hand-wrote its own
 // copy, and they drifted: "Games" was added to the homepage in 9fe4d19 and to
 // nowhere else, so a visitor on /about/ or /for-teachers/ had no route to the
 // games hub at all, and /privacy.html and /terms.html had no route to a lesson
@@ -106,21 +109,55 @@ const PHONE_STYLE = `<style>
 }
 </style>`;
 
+// --- The look, emitted with the bar. ------------------------------------------
+//
+// The bar used to take its look from each page's own stylesheet, so only pages that
+// had copied the homepage's CSS could carry it, and the games hub, the simulations
+// hub, the dashboard and every lesson, game and simulation grew a bar of their own:
+// five different top bars on one site (founder, 2026-11-25: "they all look like
+// different websites"). Now every rule the bar needs ships inside the generated
+// region, scoped to .nav-shell and written in brand tokens, so any page that lists
+// itself in PAGES gets the homepage's bar exactly, whatever its own CSS, Tailwind
+// preflight or dark palette. It comes BEFORE PHONE_STYLE, which wins ties.
+//
+// Activity pages (inside a simulation, game or lesson) pass `activity: true`: the
+// bar looks identical but scrolls away instead of sticking, so the activity keeps
+// the screen, and it hides in Present mode (body.present), where the activity's own
+// row carries "Exit present". Pages on a dark canvas set --nav-fade on :root to
+// their background (and --nav-fade-end, for a solid strip) so the band behind the sticky pill matches.
+const NAV_STYLE = `<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>`;
+
 // --- Skins. -----------------------------------------------------------------
 //
-// Two visual treatments, deliberately kept apart. The drift this file fixes was
-// in WHICH LINKS EXIST, never in styling, so the dark games-hub bar keeps its own
-// look and the light pill bar keeps its own. Each skin owns its class names and
-// its wrapper; both are fed the identical link set above.
+// One treatment: the homepage's white pill. (A dark games-hub skin lived here until
+// 2026-11-25; every page now carries the same bar.)
 const SKINS = {
-    // /, /about/, /for-teachers/, /privacy.html, /terms.html
     light: {
         activeClass: 'here',
         // One flex row: links, then Teacher sign in, then the button. The
         // responsive rules that collapse .nav-link exempt .nav-signin, so it
         // stays reachable on a phone.
-        render(links, actions) {
-            return `<div class="nav-shell">
+        render(links, actions, page) {
+            return `<div class="nav-shell${page.activity ? ' activity' : ''}">
   <div class="wrap">
     <nav class="nav site-nav">
       <a class="wordmark" href="/">Allgood<em>Academy</em></a>
@@ -139,45 +176,60 @@ ${actions}
         signin: href => `          <a class="nav-link nav-signin" href="${href}">${SIGNIN.label}</a>`,
         cta: href => `        <a class="nav-cta" href="${href}">${CTA.label}</a>`,
     },
-
-    // /educational-games/ — dark bar, its own class names, logo split in two.
-    dark: {
-        activeClass: 'active',
-        // The page links and Teacher sign in sit in .nav-links; the CTA sits in
-        // .nav-right. On a phone PHONE_STYLE below puts the links on a second row.
-        render(links, actions) {
-            return `<nav class="site-nav">
-  <a href="/" class="nav-logo">Allgood<span>Academy</span></a>
-  <div class="nav-links">
-${links}
-  </div>
-  <div class="nav-right">
-${actions}
-  </div>
-</nav>`;
-        },
-        link: (href, label, active) =>
-            `    <a href="${href}" class="nav-link${active ? ' active' : ''}">${label}</a>`,
-        signin: href => `    <a href="${href}" class="nav-link nav-signin">${SIGNIN.label}</a>`,
-        cta: href => `    <a href="${href}" class="nav-cta">${CTA.label}</a>`,
-    },
 };
 
 // --- The pages. -------------------------------------------------------------
+const ACTIVITY_PAGES = [
+    'public/simulations/watercycle/index.html',
+    'public/simulations/seasons/index.html',
+    'public/simulations/wolves-and-deer/index.html',
+    'public/simulations/snowball/index.html',
+    'public/jsh/digital-decisions-lab/digital-citizenship/index.html',
+    'public/jsh/digital-decisions-lab/privacy-security/index.html',
+    'public/jsh/digital-decisions-lab/professional-brand/index.html',
+    'public/jsh/digital-decisions-lab/social-intelligence/index.html',
+    'public/jsh/real-world-ready-lab/conflict-has-a-winner/index.html',
+    'public/jsh/real-world-ready-lab/money-as-a-skill/index.html',
+    'public/jsh/real-world-ready-lab/reading-the-room/index.html',
+    'public/jsh/room-to-think-lab/ten-voices-one-source/index.html',
+    'public/jsh/room-to-think-lab/the-cost-of-later/index.html',
+    'public/jsh/room-to-think-lab/the-question-decides-the-answer/index.html',
+    'public/jsh/room-to-think-lab/where-you-say-it/index.html',
+    'public/educational-games/digital-decisions/index.html',
+    'public/educational-games/real-world-ready/index.html',
+    'public/educational-games/room-to-think/index.html',
+    'public/educational-games/before-you-send/index.html',
+    'public/educational-games/money-moves/index.html',
+    'public/educational-games/read-the-signal/index.html',
+    'public/educational-games/the-rumor-mill/index.html',
+    'public/educational-games/pattern-lab/index.html',
+    'public/educational-games/takethebait/index.html',
+];
 const PAGES = [
+    // Site pages: the bar sticks to the top as you scroll.
     { file: 'public/index.html',                   slug: 'home',         skin: 'light' },
     { file: 'public/about/index.html',             slug: 'about',        skin: 'light' },
     { file: 'public/for-teachers/index.html',      slug: 'for-teachers', skin: 'light' },
     { file: 'public/privacy.html',                 slug: 'privacy',      skin: 'light' },
     { file: 'public/terms.html',                   slug: 'terms',        skin: 'light' },
-    { file: 'public/educational-games/index.html', slug: 'games',        skin: 'dark'  },
     // Pattern Lab's landing page. The LINKING IS ONE-WAY and that is the whole point:
     // this page carries the site nav so a visitor who arrived from a search result has a
     // route into allgoodacademy.com, while the site itself links nowhere near Pattern Lab
     // (it is \`hidden: true\` in the module registry, and check-modules.js asserts its
     // absence from every surface). Listing a page here only generates the bar INTO it —
     // it adds nothing to LINKS, so no other page gains a Pattern Lab link.
-    { file: 'public/pattern-lab/index.html',       slug: 'pattern-lab',  skin: 'dark'  },
+    { file: 'public/pattern-lab/index.html',       slug: 'pattern-lab',  skin: 'light' },
+    // Hubs.
+    { file: 'public/educational-games/index.html', slug: 'games',        skin: 'light' },
+    { file: 'public/simulations/index.html',       slug: 'simulations',  skin: 'light' },
+    { file: 'public/dashboard/index.html',         slug: 'dashboard',    skin: 'light' },
+    { file: 'public/jsh/digital-decisions-lab/index.html', slug: 'lab-hub', skin: 'light', activity: true },
+    { file: 'public/jsh/real-world-ready-lab/index.html',  slug: 'lab-hub', skin: 'light', activity: true },
+    { file: 'public/jsh/room-to-think-lab/index.html',     slug: 'lab-hub', skin: 'light', activity: true },
+    // Activities: same bar, scrolls away, hidden in Present mode. Each keeps its own
+    // row underneath for what belongs to the activity (its name, Present, Comms,
+    // progress, the jump-to menu).
+    ...ACTIVITY_PAGES.map(file => ({ file, slug: 'activity', skin: 'light', activity: true })),
 ];
 
 const BEGIN = '<!-- BEGIN GENERATED NAV -->';
@@ -195,8 +247,8 @@ function renderNav(page) {
     const links = LINKS.map(l => skin.link(l.href(page.slug), l.label, l.current === page.slug));
     // Teacher sign in rides with the page links (it is a link, not the button), so on a
     // phone it lands on the same scrollable row and never competes with the button.
-    const body = skin.render([...links, skin.signin(SIGNIN.href)].join('\n'), skin.cta(CTA.href));
-    return `${PREAMBLE}${body}\n${PHONE_STYLE}\n${SESSION_SCRIPT}\n${END}`;
+    const body = skin.render([...links, skin.signin(SIGNIN.href)].join('\n'), skin.cta(CTA.href), page);
+    return `${PREAMBLE}${body}\n${NAV_STYLE}\n${PHONE_STYLE}\n${SESSION_SCRIPT}\n${END}`;
 }
 
 module.exports = { LINKS, CTA, SIGNIN, SKINS, PAGES, BEGIN, END, renderNav };
