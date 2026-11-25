@@ -122,8 +122,11 @@ for (const file of GOODBLOCKS) {
 
 // --- 2. GA4 must never load unconditionally on a learner-reachable surface ----------
 const GTAG_LIB = 'googletagmanager.com/gtag/js';
+// Mission Control is checked separately below: since 2026-11-25 it may load GA4, but only
+// behind both the ag_account flag and a confirmed role === 'teacher'.
+const GATED_GA_SURFACES = new Set(['public/mission-control/index.html']);
 for (const file of LEARNER_SURFACES) {
-  if (!exists(file)) continue;
+  if (!exists(file) || GATED_GA_SURFACES.has(file)) continue;
   const src = read(file);
   if (src.includes(GTAG_LIB)) {
     fail('ga4',
@@ -142,6 +145,22 @@ if (exists('public/dashboard/index.html')) {
         `public/dashboard/index.html: the GA4 library is loaded without an ag_account gate ` +
         `immediately preceding it. Only a signed-in (teacher) account may trigger analytics.`);
     }
+  }
+}
+
+if (exists('public/mission-control/index.html')) {
+  const mc = read('public/mission-control/index.html');
+  let idx = mc.indexOf(GTAG_LIB);
+  while (idx !== -1) {
+    const preceding = mc.slice(Math.max(0, idx - 1500), idx);
+    if (!preceding.includes('ag_account') || !/role !== 'teacher'/.test(preceding)) {
+      fail('ga4',
+        `public/mission-control/index.html: the GA4 library is loaded without both the ` +
+        `ag_account gate and a role === 'teacher' check immediately preceding it. Students ` +
+        `can reach this page; only a confirmed signed-in teacher may trigger analytics.`);
+      break;
+    }
+    idx = mc.indexOf(GTAG_LIB, idx + 1);
   }
 }
 

@@ -170,6 +170,10 @@ body.present .nav-shell.activity{display:none}
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
   if(s&&cta)cta.textContent='My dashboard';
   if(a&&signin)signin.textContent='Mission Control';
+  // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
+  // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
+  // writes it onto the session doc. See docs/insider-analytics.md.
+  try{if(!sessionStorage.getItem('ag_src')){var q=new URLSearchParams(location.search),c=function(v){v=String(v||'').toLowerCase();return /^[a-z0-9._-]{1,40}$/.test(v)?v:(v?'other':'');},r='';try{var h=document.referrer?new URL(document.referrer).host:'';r=h&&h!==location.host?c(h):'';}catch(e){}var o={src:c(q.get('src')),utmSource:c(q.get('utm_source')),utmMedium:c(q.get('utm_medium')),utmCampaign:c(q.get('utm_campaign')),refHost:r};sessionStorage.setItem('ag_src',JSON.stringify(o));}}catch(e){/* storage blocked - no source recorded */}
   var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
   if(!btn)return;
   nav.classList.add('has-menu');
@@ -297,7 +301,7 @@ body.present .nav-shell.activity{display:none}
   <ul>
     <li><strong>Google Firebase</strong> — authentication, database and hosting. Learner and teacher records described in this policy are stored here.</li>
     <li><strong>Stripe</strong> — teacher Pro payments are processed by Stripe, and Allgood Academy never sees or stores card numbers. Students never pay.</li>
-    <li><strong>Google Analytics</strong> — used on our public marketing pages (the homepage, For Teachers, and About) to understand how people find us, and on the signed-in dashboard <em>only</em> for accounts confirmed to be 13 or over. It does not load on any surface reachable by an under-13 session, and it never loads unconditionally.</li>
+    <li><strong>Google Analytics</strong> — used on our public marketing pages (the homepage, For Teachers, and About) to understand how people find us, in Mission Control for signed-in teachers, and on the signed-in dashboard <em>only</em> for teacher accounts. It never runs on any page a student uses, it does not load on any surface reachable by an under-13 session, and it never loads unconditionally. Separately, our own lesson records note where a visit came from (a link tag such as "email", or the name of the referring website); this uses no cookies and nothing that identifies a person.</li>
   </ul>
   <p>Our GoodBlocks™ and Challenges load their code and styling from our own servers rather than from third-party content networks, so a learner working through a lesson is not making requests to other companies.</p>
 </section>

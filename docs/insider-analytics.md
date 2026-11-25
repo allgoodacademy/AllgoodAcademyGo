@@ -321,6 +321,7 @@ Three options, in order of effort:
    |---|---|---|
    | `G-EN4M7T3BLQ` (product) | `/dashboard/` only | `ag_account === '1'` (a signed-in teacher; students never are) |
    | `G-P6DZJ685W6` (public marketing) | `/`, `/for-teachers/`, `/about/` | none needed — signed-out pages |
+   | `G-P6DZJ685W6` (public marketing) | `/mission-control/` (since 2026-11-25) | `ag_account === '1'` AND load() confirmed `role: 'teacher'`; fails closed |
 
    The product property fires `launch_module` from the dashboard. `telemetry.js` forwards
    every event to `gtag` when it is present on the page, so adding the GA snippet to a
@@ -330,8 +331,11 @@ Three options, in order of effort:
    The marketing property is scoped to the three signed-out pages so that top-of-funnel
    traffic can be measured without any authenticated-student surface being instrumented.
    Those pages load no auth, no identity gate and no `telemetry.js`, so a hit there can
-   carry no learner identity. Do not add `G-P6DZJ685W6` to `/dashboard/`, `/jsh/`,
-   `/educational-games/` or `/mission-control/`.
+   carry no learner identity. Do not add `G-P6DZJ685W6` to `/dashboard/`, `/jsh/` or
+   `/educational-games/`. Mission Control (teachers only) loads it behind the gate above and
+   sends only `class_created`, `pro_panel_open`, `get_pro_click`, `guide_download`,
+   `content_assigned` and `product_updates_toggle` — never a uid, email, class code or any
+   student data. Mark `class_created` and `get_pro_click` as key events in GA once they appear.
 
    **COPPA note before enabling GA on modules:** every student is anonymous and may be under
    13. GA4 sets cookies and collects device identifiers, which is a different privacy posture
@@ -379,3 +383,25 @@ Three options, in order of effort:
   the hand-maintained module lists; `node scripts/check-modules.js` verifies they agree
   with each other and with the dashboard, the Lab Pack hub and each module's
   `Telemetry.init` call. See "Publishing a module" in `docs/goodblock-integration-checklist.md`.
+
+
+## Where a visit came from (2026-11-25)
+
+The site nav's inline script records, once per browser session (`sessionStorage.ag_src`),
+`?src=`, `utm_source`, `utm_medium`, `utm_campaign` and the referring site's **host** (never
+its path or query). Each value is lowercase `[a-z0-9._-]`, max 40 characters, else `other`.
+`telemetry.js` (`detectSource`) writes it to the session doc as
+`source: { src, utmSource, utmMedium, utmCampaign, refHost }`; `firestore.rules` (`sourceOk`)
+enforces the shape and keeps it fixed after create. No cookies, nothing personal.
+
+Insider → **Sources** groups sessions (core and off-funnel) by `src`, else `utmSource`, else
+`site: <refHost>`, else `direct`; sessions from before this date show as `not recorded`.
+
+**How to tag a link**
+
+| Where the link goes out | Add to the URL |
+|---|---|
+| Outreach email | `?src=email&utm_campaign=outreach-2026-11` |
+| Facebook post | `?src=facebook` |
+| TPT facilitator guide | `?src=tpt` (already on the simulation links) |
+| LinkedIn | `?src=linkedin` |

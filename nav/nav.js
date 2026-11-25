@@ -76,6 +76,10 @@ const SESSION_SCRIPT = `<script>
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
   if(s&&cta)cta.textContent='My dashboard';
   if(a&&signin)signin.textContent='Mission Control';
+  // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
+  // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
+  // writes it onto the session doc. See docs/insider-analytics.md.
+  try{if(!sessionStorage.getItem('ag_src')){var q=new URLSearchParams(location.search),c=function(v){v=String(v||'').toLowerCase();return /^[a-z0-9._-]{1,40}$/.test(v)?v:(v?'other':'');},r='';try{var h=document.referrer?new URL(document.referrer).host:'';r=h&&h!==location.host?c(h):'';}catch(e){}var o={src:c(q.get('src')),utmSource:c(q.get('utm_source')),utmMedium:c(q.get('utm_medium')),utmCampaign:c(q.get('utm_campaign')),refHost:r};sessionStorage.setItem('ag_src',JSON.stringify(o));}}catch(e){/* storage blocked - no source recorded */}
   var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
   if(!btn)return;
   nav.classList.add('has-menu');

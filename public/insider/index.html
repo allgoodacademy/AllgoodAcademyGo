@@ -72,6 +72,7 @@
                 <a href="#/courses" data-route="courses" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="book-open" class="w-4 h-4"></i>Courses</a>
                 <a href="#/takethebait" data-route="takethebait" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="fish" class="w-4 h-4"></i>Take the Bait</a>
                 <a href="#/simulations" data-route="simulations" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="flask-conical" class="w-4 h-4"></i>Simulations</a>
+                <a href="#/sources" data-route="sources" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="signpost" class="w-4 h-4"></i>Sources</a>
                 <a href="#/classrooms" data-route="classrooms" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="school" class="w-4 h-4"></i>Classrooms</a>
                 <a href="#/inbox" data-route="inbox" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="inbox" class="w-4 h-4"></i>Inbox</a>
                 <a href="#/feedback" data-route="feedback" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="star" class="w-4 h-4"></i>Feedback</a>
@@ -805,7 +806,7 @@
         // ------------------------------------------------------------------
         // ROUTER
         // ------------------------------------------------------------------
-        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', takethebait: 'Take the Bait', simulations: 'Simulations', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
+        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', takethebait: 'Take the Bait', simulations: 'Simulations', sources: 'Where visits come from', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
         function route() {
             if (mainView.classList.contains('hidden')) return;
             const hash = location.hash.replace(/^#\/?/, '');
@@ -813,7 +814,7 @@
             const page = TITLES[section] ? section : 'overview';
             document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === page));
             $('page-title').textContent = TITLES[page];
-            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, takethebait: renderTakeTheBait, simulations: () => renderSimulations(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
+            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, takethebait: renderTakeTheBait, simulations: () => renderSimulations(arg), sources: () => renderSources(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
             const out = typeof render === 'function' ? render() : '';
             $('page').innerHTML = typeof out === 'function' ? out() : out;
             if (window.lucide) lucide.createIcons();
@@ -1080,6 +1081,37 @@
             list.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * (usersView.dir === 'asc' ? 1 : -1); });
             return list;
         }
+        // ------------------------------------------------------------------
+        // PAGE: WHERE VISITS COME FROM (2026-11-25)
+        // Every session (core and off-funnel, so simulations and games count) by the source
+        // /js/telemetry.js recorded: ?src=, else utm_source, else the referring site, else
+        // "direct". Sessions from before 2026-11-25 have no source and show as "not recorded".
+        // ------------------------------------------------------------------
+        function sourceKey(s) {
+            const o = s.source;
+            if (!o || typeof o !== 'object') return 'not recorded';
+            return o.src || o.utmSource || (o.refHost ? `site: ${o.refHost}` : 'direct');
+        }
+        function renderSources(arg) {
+            const all = [...D.sessions, ...D.offFunnel.sessions].filter(s => inRange(s.startMs));
+            const groups = new Map();
+            all.forEach(s => { const k = sourceKey(s); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(s); });
+            const label = (s) => s.gameName || s.module || '—';
+            const top3 = (list) => { const c = new Map(); list.forEach(s => c.set(label(s), (c.get(label(s)) || 0) + 1)); return [...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, k]) => `${esc(n)} <span class="text-slate-400">${k}</span>`).join(' · '); };
+            const rows = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+            const th = 'text-right font-bold py-1 px-2';
+            const table = rows.length ? `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Source</th><th class="${th}">Sessions</th><th class="${th}">Finished</th><th class="${th}">Finish rate</th><th class="text-left font-bold py-1 px-2">Top things played</th></tr></thead><tbody>${rows.map(([k, list]) => { const fin = list.filter(s => s.completed).length; return `<tr class="border-t border-slate-50"><td class="py-1.5"><a href="#/sources/${encodeURIComponent(k)}" class="font-bold text-slate-700 hover:underline">${esc(k)}</a></td><td class="text-right px-2">${list.length}</td><td class="text-right px-2">${fin}</td><td class="text-right px-2 font-bold">${pct(fin, list.length)}%</td><td class="px-2">${top3(list)}</td></tr>`; }).join('')}</tbody></table>` : emptyMsg(`No sessions in the ${rangeLabel()}.`);
+            let detail = '';
+            const pick = arg ? decodeURIComponent(arg) : '';
+            if (pick && groups.has(pick)) {
+                const byCamp = new Map();
+                groups.get(pick).forEach(s => { const c = (s.source && s.source.utmCampaign) || '(no campaign)'; if (!byCamp.has(c)) byCamp.set(c, []); byCamp.get(c).push(s); });
+                detail = card(`${esc(pick)} · by campaign`, `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Campaign</th><th class="${th}">Sessions</th><th class="${th}">Finished</th><th class="text-left font-bold py-1 px-2">Top things played</th></tr></thead><tbody>${[...byCamp.entries()].sort((a, b) => b[1].length - a[1].length).map(([c, list]) => `<tr class="border-t border-slate-50"><td class="py-1.5 font-mono">${esc(c)}</td><td class="text-right px-2">${list.length}</td><td class="text-right px-2">${list.filter(s => s.completed).length}</td><td class="px-2">${top3(list)}</td></tr>`).join('')}</tbody></table>`);
+            }
+            const how = `<p class="text-[10px] text-slate-400 mt-2">Tag links so they show up here: <span class="font-mono">?src=email&amp;utm_campaign=outreach-2026-11</span>, <span class="font-mono">?src=facebook</span>, <span class="font-mono">?src=tpt</span>. A session opens at a learner's first interaction. Finished = reached the last step. Cookie-free: only the tag and the referring site's name are kept.</p>`;
+            return `${errorStrip()}<div class="space-y-4">${card(`Where visits come from · ${rangeLabel()}`, table + how)}${detail}</div>`;
+        }
+
         function renderUsers() {
             const list = filteredUsers();
             const cols = [['name', 'Name'], ['type', 'Type'], ['classroomCode', 'Classroom'], ['launches', 'Visits'], ['started', 'Started'], ['completed', 'Completed'], ['time', 'Time on task'], ['lastActive', 'Last active']];

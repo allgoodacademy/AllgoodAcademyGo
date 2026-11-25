@@ -548,11 +548,28 @@ service cloud.firestore {
     //     - CREATE: only naming yourself as the session's uid
     //     - UPDATE: only your own session, and the uid on it can never be reassigned
     //     - READ/LIST/DELETE: admin allowlist only
+    // Where a visit came from (2026-11-25, /js/telemetry.js detectSource): an optional map of
+    // up to five short lowercase tokens. No free text, nothing personal, and fixed once the
+    // session doc is created.
+    function sourceTokenOk(m, k) {
+      return !(k in m) || (m[k] is string && m[k].matches('^[a-z0-9._-]{1,40}$'));
+    }
+    function sourceOk() {
+      return !('source' in request.resource.data)
+        || (request.resource.data.source is map
+            && request.resource.data.source.keys().hasOnly(['src', 'utmSource', 'utmMedium', 'utmCampaign', 'refHost'])
+            && sourceTokenOk(request.resource.data.source, 'src')
+            && sourceTokenOk(request.resource.data.source, 'utmSource')
+            && sourceTokenOk(request.resource.data.source, 'utmMedium')
+            && sourceTokenOk(request.resource.data.source, 'utmCampaign')
+            && sourceTokenOk(request.resource.data.source, 'refHost'));
+    }
     match /artifacts/{appId}/sessions/{sessionId} {
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid && sourceOk();
       allow update: if request.auth != null
         && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == resource.data.uid;
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.get('source', null) == resource.data.get('source', null);
       allow read, delete: if isAllowlistedAdmin();
     }
 
