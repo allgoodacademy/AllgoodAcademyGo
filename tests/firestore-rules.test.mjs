@@ -964,6 +964,8 @@ await it('nobody else CAN set productUpdates on a teacher profile (not a student
   await assertFails(setDoc(U(other, 'teacher_1'), { productUpdates: { optedIn: true, source: 'setup', updatedAt: 1 } }, { merge: true }));
   const anon = env.authenticatedContext('anon_pu', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
   await assertFails(setDoc(U(anon, 'teacher_1'), { productUpdates: { optedIn: true, source: 'settings', updatedAt: 1 } }, { merge: true }));
+});
+
 // VISIT SOURCE on sessions (2026-11-25): short tokens only, fixed after create.
 const SESS = (db, id) => doc(db, 'artifacts', APP, 'sessions', id);
 await it('a session CAN carry a valid source map', async () => {
