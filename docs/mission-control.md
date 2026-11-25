@@ -77,7 +77,7 @@ records hold (rule #6); only simulation predictions need events.
 
 ### Pro turns on automatically (the Stripe webhook)
 
-`functions/` holds one 2nd-gen Cloud Function, `stripeWebhook` (Node 20), at
+`functions/` holds one 2nd-gen Cloud Function, `stripeWebhook` (Node 22), at
 `https://us-central1-allgood-academy.cloudfunctions.net/stripeWebhook`. Stripe calls it; it
 verifies the signature with the `STRIPE_WEBHOOK_SECRET` secret and never calls the Stripe API.
 
