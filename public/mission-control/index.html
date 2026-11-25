@@ -2037,28 +2037,34 @@ async function writeExtras(uid, { modules, games, sims }) {
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
-   TEACHER GUIDES (plan-config.js). Free guides free for everyone; paid guides are a plain
-   download link on Pro (downloadUrl), or one at a time on TPT on the free plan.
+   TEACHER GUIDES (plan-config.js). Every tile is the same: a title and ONE button,
+   "Download facilitator guide". Founder rule (2026-11-25): keep it that simple.
+   - The button is a <button>, not a visible <a href="….pdf">, on purpose: PDF-helper
+     browser extensions attach their own "Open" chips to visible PDF links. Clicking makes
+     a temporary download link and removes it.
+   - Paid guide, free plan: the same button goes to the guide's TPT listing instead.
+   - A guide with no file yet (Room to Think) isn't shown at all.
    ═════════════════════════════════════════════════════════════════════════════ */
-const tptLink = (url, label, cls = 'link') => `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
 function renderGuides() {
     const pro = state.plan.pro;
-    const cards = GUIDES.map((g) => {
-        const sheet = g.teacherSheet ? `<a class="text-btn" href="${esc(g.teacherSheet)}">Teacher sheet (free)</a>` : '';
-        let row;
-        if (g.tpt === 'FREE') row = tptLink(g.tptUrl, 'Free guide on TPT', 'btn sm');
-        else if (!g.tpt) row = '<span class="soon">Facilitator guide coming soon</span>';
-        // Pro already has every paid guide, so no TPT link here.
-        else if (pro) row = g.downloadUrl
-            ? `<a class="btn sm" href="${esc(g.downloadUrl)}" target="_blank" rel="noopener">Download facilitator guide</a>`
-            : '<span class="soon">Facilitator guide coming soon</span>';
-        else row = `<button class="btn sm" type="button" data-pro="guide">Included with Pro</button> ${tptLink(g.tptUrl, `or ${g.tpt} on TPT`, 'text-btn')}`;
-        return `<div class="gc"><div class="eyebrow">${esc(g.kind)}</div><h3>${esc(g.title)}</h3><div class="meta">${esc(g.sub)}</div>${sheet}<div class="row">${row}</div></div>`;
+    const cards = GUIDES.filter((g) => g.file || g.tptUrl).map((g) => {
+        const paid = g.tpt && g.tpt !== 'FREE';
+        const url = (!paid || pro) ? (g.file || g.tptUrl) : g.tptUrl;
+        const isFile = url === g.file;
+        return `<div class="gc"><div class="eyebrow">${esc(g.kind)}</div><h3>${esc(g.title)}</h3><div class="meta">${esc(g.sub)}</div>
+          <div class="row"><button class="btn sm" type="button" data-guide-url="${esc(url)}" data-guide-file="${isFile ? '1' : ''}" data-guide-name="${esc(`Allgood Academy - ${g.title} facilitator guide.pdf`)}">Download facilitator guide</button></div></div>`;
     }).join('');
-    $('pane-guides').innerHTML = `<p class="sub" style="font-size:13px;color:var(--soft)">Free guides are free for everyone. ${pro ? 'Every paid guide is included with your Pro plan.' : 'Paid guides are included with Pro, or you can buy them one at a time on Teachers Pay Teachers.'}</p>
-      <div class="gl">${cards}</div>
-      ${pro ? '' : `<p class="note">Want just the three paid simulation guides? ${tptLink(GUIDE_BUNDLE.tptUrl, `Simulation guides bundle, ${GUIDE_BUNDLE.tpt} on TPT`)}.</p>`}`;
+    $('pane-guides').innerHTML = `<div class="gl">${cards}</div>`;
 }
+document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-guide-url]');
+    if (!b) return;
+    e.preventDefault();
+    if (!b.dataset.guideFile) { window.open(b.dataset.guideUrl, '_blank', 'noopener'); return; }
+    const a = document.createElement('a');
+    a.href = b.dataset.guideUrl; a.download = b.dataset.guideName;
+    document.body.appendChild(a); a.click(); a.remove();
+});
 
 /* ═════════════════════════════════════════════════════════════════════════════
    CSV. The roster export is unchanged in shape for everyone: name, email, last active,
