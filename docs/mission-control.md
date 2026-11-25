@@ -73,8 +73,8 @@ records hold (rule #6); only simulation predictions need events.
 - Paid guides live in Firebase Storage at `facilitator-guides/` (`storagePath` in
   `plan-config.js`), uploaded in the Firebase console. `storage.rules` lets only an active Pro
   teacher read them; Mission Control asks for a download link on click. The PDFs are not in
-  `public/` and not in this repo (the repo is public). `storage.rules` deploys with the
-  Firestore rules on every push to main.
+  `public/` and not in this repo (the repo is public). `storage.rules` is published by hand in the
+  Firebase console (Storage → Rules); the CI deploy can't find the bucket. Tests still run in CI.
 - On the free plan the plan chip reads "FREE · Upgrade $49/yr" and opens the Pro panel.
 
 ### Pro turns on automatically (the Stripe webhook)
