@@ -130,6 +130,10 @@ h1,h2,h3{font-family:var(--font-display);font-weight:400;letter-spacing:-.02em;m
 .save-status.ok{border-color:var(--sage);background:var(--sage-wash)}
 .save-status.ok b{color:var(--sage)}
 .rail-foot .link{font-size:12px;text-align:left}
+.rail-out{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;width:100%;border:1.5px solid var(--hairline);background:var(--surface);border-radius:10px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
+.rail-out:hover{border-color:var(--teal-deep)}
+.rail-out svg,.pcard .btn svg{width:16px;height:16px}
+.sheet .stack{display:grid;gap:10px}
 
 /* ---------- main ---------- */
 .main{min-height:0;overflow-y:auto;padding:28px 30px 24px;-webkit-overflow-scrolling:touch}
@@ -416,6 +420,7 @@ body.present .nav-shell.activity{display:none}
         <div class="rail-foot">
           <div class="save-status" id="rail-save" hidden></div>
           <span id="rail-device">Progress saves on this device.</span>
+          <button class="rail-out" type="button" data-a="signout"><i data-lucide="log-out"></i>Sign out</button>
         </div>
       </nav>
 
@@ -477,6 +482,12 @@ body.present .nav-shell.activity{display:none}
               <p class="msg" id="rename-msg" role="status" aria-live="polite"></p>
             </div>
             <div class="pcard" id="save-card" hidden></div>
+            <div class="pcard" id="device-card">
+              <p class="k">This device</p>
+              <h2>Done for today?</h2>
+              <p id="device-text">Sign out so the next person on this computer starts fresh.</p>
+              <button class="btn ghost" type="button" data-a="signout"><i data-lucide="log-out"></i>Sign out on this device</button>
+            </div>
             <div class="pcard" id="class-card">
               <p class="k">My class</p>
               <div id="class-body">
@@ -871,7 +882,8 @@ async function renderClass(uid, profile) {
     try {
         const { loadAssignedItems } = await classroomJoin();
         const assigned = await loadAssignedItems(code, uid);
-        if (!assigned) return;
+        // The class is gone (its teacher deleted it): show the join form again.
+        if (!assigned) { bindJoin(); return; }
         const teacher = (assigned.classroom && assigned.classroom.teacherName) || '';
         $('me-class').textContent = assigned.name;
         $('class-body').innerHTML = `<h2>${esc(assigned.name)}</h2>
@@ -958,6 +970,11 @@ function renderSave() {
     $('rail-device').hidden = teacher || !!SAVE_STATE;
     // On Home, one quiet line — only once there's progress worth keeping.
     $('save-nudge').hidden = card.hidden || !!SAVE_STATE || !STATUS.size;
+    $('device-text').textContent = teacher
+        ? 'Signs you out of your dashboard and Mission Control on this computer.'
+        : SAVE_STATE
+            ? `Sign out so the next person on this computer starts fresh. Your progress stays saved ${SAVE_STATE === 'code' ? 'with your code' : 'with Google'}.`
+            : 'Sign out so the next person on this computer starts fresh. Save your progress first, or it stays on this device only.';
     if (card.hidden) return;
     if (!SAVE_STATE) {
         card.className = 'pcard warn';
@@ -976,15 +993,14 @@ function renderSave() {
                 <button class="link" type="button" data-a="copy">Copy</button></div>
             <p class="small">Only shown on this device. 📸 Take a screenshot or write it down — it's the only way back in on another device. Keep it somewhere safe: anyone with it can open your progress.</p>`
             : '<p class="small">This device doesn\'t have your code stored. Use the copy you wrote down.</p>'}
-            <p class="small"><button class="link" type="button" data-a="signout">Sign out on this device</button></p>`;
+`;
         rail.className = 'save-status ok';
         rail.innerHTML = '<b>✓ Progress saved</b>With your save code.';
     } else {
         const email = (auth.currentUser && auth.currentUser.email) || '';
         card.className = 'pcard';
         card.innerHTML = `<p class="k g">Saved ✓</p><h2>Signed in with Google</h2>
-            <p>${email ? `${esc(email)} — s` : 'S'}ign in with Google on any device to pick up where you left off.</p>
-            <button class="link" type="button" data-a="signout">Sign out on this device</button>`;
+            <p>${email ? `${esc(email)} — s` : 'S'}ign in with Google on any device to pick up where you left off.</p>`;
         rail.className = 'save-status ok';
         rail.innerHTML = '<b>✓ Progress saved</b>Signed in with Google.';
     }
@@ -1088,12 +1104,54 @@ function printCode(code) {
     setTimeout(() => document.body.classList.remove('printing-code'), 500);
 }
 
+// --- Sign out (2026-11-25): the rail button and Profile's "This device" card open the same
+// sheet, worded for the account. The one that matters is an unsaved student on a shared
+// Chromebook: signing out drops this device's anonymous session, so nothing can bring that
+// progress back. The sheet leads with saving first.
+const isTeacher = () => PROFILE.role === 'teacher' || SAVE_STATE === 'account';
+function openSignOut(opener) {
+    lastOpener = opener || document.activeElement;
+    const stay = '<button class="link" type="button" data-a="close" style="justify-self:center">Stay signed in</button>';
+    const go = (label) => `<button class="btn full" type="button" data-a="signout-go">${label}</button>`;
+    if (isTeacher()) {
+        sheet(`<p class="step">Sign out</p><h2 id="save-title">Sign out?</h2>
+            <p>You'll be signed out of your dashboard and Mission Control on this computer. Sign in with Google to get back in.</p>
+            <div class="stack">${go('Sign out')}${stay}</div>`);
+    } else if (SAVE_STATE) {
+        sheet(`<p class="step">Sign out</p><h2 id="save-title">Sign out on this device?</h2>
+            <p>Your progress is saved. ${SAVE_STATE === 'code' ? 'To get back in here, choose "I have a save code" and type your code.' : 'Sign in with Google to get back in.'}</p>
+            <div class="stack">${go('Sign out')}${stay}</div>`);
+    } else if (!STATUS.size) {
+        sheet(`<p class="step">Sign out</p><h2 id="save-title">Sign out on this device?</h2>
+            <p>You haven't finished anything yet, so there's nothing to lose. The next person starts fresh.</p>
+            <div class="stack">${go('Sign out')}${stay}</div>`);
+    } else {
+        sheet(`<p class="step">Sign out</p><h2 id="save-title">Save first, or it's gone</h2>
+            <p>Your progress is only on this device. If you sign out now, nobody can get it back, not even your teacher.</p>
+            <div class="stack"><button class="btn full" type="button" data-a="save">Save my progress first</button>
+            <button class="btn ghost full" type="button" data-a="signout-go">Sign out and erase it</button>${stay}</div>`);
+    }
+}
+async function signOutHere(btn) {
+    if (btn) btn.disabled = true;
+    const teacher = isTeacher();
+    try {
+        if (SAVE && !teacher) await SAVE.signOutDevice();
+        else { window.AuthCore.clearSignedIn(); await window.AuthCore.signOut(auth); }
+    } catch (err) { console.error('[Dashboard] sign out', err); }
+    if (teacher) { window.location.href = '/'; return; }
+    location.hash = '';
+    location.reload();
+}
+
 document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-a]');
     if (!b) return;
     const a = b.dataset.a;
     if (a === 'save' || a === 'have') { openSave(a); return; }
     if (a === 'close') { closeSave(); return; }
+    if (a === 'signout') { openSignOut(b); return; }
+    if (a === 'signout-go') { await signOutHere(b); return; }
     if (!SAVE) return;
     if (a === 'u13') { SAVE.setAgeAnswer('no'); STEPS.name(); return; }
     if (a === 'o13') { SAVE.setAgeAnswer('yes'); STEPS.google(); return; }
@@ -1163,16 +1221,6 @@ document.addEventListener('click', async (e) => {
         return;
     }
     if (a === 'reload') { location.reload(); return; }
-    if (a === 'signout') {
-        const warn = SAVE_STATE === 'code'
-            ? 'Sign out on this device? You\'ll need your save code to open your progress here again.'
-            : 'Sign out on this device? Sign in with Google to open your progress here again.';
-        if (!confirm(warn)) return;
-        try { await SAVE.signOutDevice(); } catch (err) { console.error('[Dashboard] sign out', err); }
-        location.hash = '';
-        location.reload();
-        return;
-    }
     if (a === 'joinname') {
         const name = firstWord($('join-name').value);
         if (!name) { saveMsg('Type a first name or nickname.'); return; }

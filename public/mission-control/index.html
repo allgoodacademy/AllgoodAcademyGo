@@ -39,6 +39,8 @@ a{color:var(--teal-deep)}
 .btn:hover{background:var(--orange-deep);border-color:var(--orange-deep)}
 .btn.ghost{background:var(--surface);color:var(--teal-deep);border-color:var(--line)}
 .btn.ghost:hover{border-color:var(--teal);background:var(--surface)}
+.btn.danger{background:#A8321F;border-color:#A8321F;color:#fff}
+.btn.danger:hover{background:#8A2818;border-color:#8A2818}
 .btn.sm{padding:7px 12px;font-size:12.5px}
 .btn[disabled],.btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 .link{background:none;border:0;padding:0;color:var(--teal-deep);font-weight:700;font-size:inherit;text-decoration:underline;cursor:pointer}
@@ -582,6 +584,17 @@ body.present .nav-shell.activity{display:none}
     <div class="screen-error" id="name-error" hidden></div>
     <button class="btn" id="btn-name-save" type="submit">Create class</button>
   </form>
+</div>
+
+<!-- Delete this class (2026-11-25). Opened from the class menu. -->
+<div class="modal" id="del-dlg" role="dialog" aria-modal="true" aria-labelledby="del-title" hidden>
+  <div class="card" style="max-width:460px">
+    <button class="x" id="btn-del-close" type="button" aria-label="Close">×</button>
+    <h2 id="del-title">Delete this class?</h2>
+    <div id="del-body"></div>
+    <div class="screen-error" id="del-error" hidden></div>
+    <div id="del-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"></div>
+  </div>
 </div>
 
 <!-- The wall poster's print path. Hidden on screen; the ONLY thing that prints (see
@@ -1332,7 +1345,8 @@ function renderClassMenu() {
     }).join('');
     menu.innerHTML = rows + '<hr>'
         + `<button type="button" role="menuitem" data-new-class><span>+ New class</span>${state.plan.pro ? '' : '<span class="plan pro">PRO</span>'}</button>`
-        + (state.readOnly ? '' : '<button type="button" role="menuitem" data-rename><span>Rename this class</span></button>');
+        + (state.readOnly ? '' : '<button type="button" role="menuitem" data-rename><span>Rename this class</span></button>'
+            + '<button type="button" role="menuitem" data-delete><span>Delete this class</span></button>');
 }
 function toggleMenu(open) {
     const menu = $('cls-menu');
@@ -1359,7 +1373,68 @@ $('cls-menu').addEventListener('click', async (e) => {
         return openNameDialog('new');
     }
     if (e.target.closest('[data-rename]')) { toggleMenu(false); openNameDialog('rename'); }
+    if (e.target.closest('[data-delete]')) { toggleMenu(false); openDeleteDialog(); }
 });
+
+/* ── deleting a class ─────────────────────────────────────────────────────────
+   firestore.rules (#5) lets a teacher delete their own writable class, except the one their
+   free-class marker names: the marker can't move, so losing that class would leave a free
+   teacher unable to make another. The only class, or the free class, gets Rename instead.
+   Order matters: the per-student extras go first (their delete rule checks the class still
+   exists), then the teacher's ACTIVE class moves to another one (the profile may only name a
+   class they own), then the class itself. Students keep everything they did; the dashboard
+   shows them the join form again (loadAssignedItems finds no class). */
+function openDeleteDialog() {
+    const code = state.code;
+    const name = className(state.classes.find((c) => c.code === code) || state.classroom);
+    const isFree = !!(state.marker && state.marker.firstClassCode === code);
+    const only = state.classes.length < 2;
+    $('del-error').hidden = true;
+    if (only || isFree) {
+        $('del-title').textContent = "This class can't be deleted";
+        $('del-body').innerHTML = only
+            ? `<p>${esc(name)} is your only class. You can rename it instead${state.plan.pro ? ', or make a new class first and then delete this one' : ''}.</p>`
+            : `<p>${esc(name)} is your first class, the one that stays free if Pro ever ends, so it can't be deleted. You can rename it instead.</p>`;
+        $('del-actions').innerHTML = '<button class="btn" type="button" data-del="rename">Rename this class</button><button class="btn ghost" type="button" data-del="close">Close</button>';
+    } else {
+        const n = (state.allStudents || []).length;
+        $('del-title').textContent = `Delete ${name}?`;
+        $('del-body').innerHTML = `<p>${n ? `${n} student${n === 1 ? ' is' : 's are'} in this class. They keep everything they've done, but they leave the class and their work stops showing here.` : 'No students have joined this class yet.'} What you assigned to it is removed.</p>
+            <p><strong>This can't be undone.</strong> The class code ${esc(code)} stops working.</p>`;
+        $('del-actions').innerHTML = '<button class="btn danger" type="button" data-del="go">Delete class</button><button class="btn ghost" type="button" data-del="close">Cancel</button>';
+    }
+    openModal('del-dlg', $('del-actions').querySelector('[data-del="close"]'));
+}
+$('del-actions').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-del]');
+    if (!b) return;
+    if (b.dataset.del === 'close') { closeModal('del-dlg'); return; }
+    if (b.dataset.del === 'rename') { closeModal('del-dlg'); openNameDialog('rename'); return; }
+    const code = state.code;
+    const name = className(state.classes.find((c) => c.code === code) || state.classroom);
+    const others = state.classes.filter((c) => c.code !== code);
+    const next = others.find((c) => state.plan.pro || !state.marker || c.code === state.marker.firstClassCode) || others[0];
+    if (!next) return;
+    b.disabled = true;
+    try {
+        const extras = await getDocs(query(collection(db, 'artifacts', appId, 'classroom_assignments'), where('classroomCode', '==', code)));
+        await Promise.all(extras.docs.map((d) => deleteDoc(d.ref)));
+        await setDoc(doc(db, 'artifacts', appId, 'users', state.user.uid), { classroomCode: next.code }, { merge: true });
+        await deleteDoc(doc(db, 'artifacts', appId, 'classrooms', code));
+        closeModal('del-dlg');
+        track('class_deleted');
+        showOnly('screen-loading');
+        $('loading-note').textContent = 'Deleting the class…';
+        await load();
+        toast(`${name} was deleted. Now showing ${className(next)}.`);
+    } catch (err) {
+        console.warn('[Mission Control] deleting the class failed', err);
+        $('del-error').textContent = "Couldn't delete the class. Please try again.";
+        $('del-error').hidden = false;
+        b.disabled = false;
+    }
+});
+$('btn-del-close').addEventListener('click', () => closeModal('del-dlg'));
 
 /* Switching writes the new code to users/{uid}.classroomCode — the ACTIVE class. The rules
    only accept a class whose teacherUid is this teacher (teacherCodeOk), and every teacher
@@ -1430,7 +1505,7 @@ function closeModal(id) {
     $(id).hidden = true;
     if (lastFocus && lastFocus.focus) lastFocus.focus();
 }
-for (const id of ['pro-panel', 'name-dlg']) {
+for (const id of ['pro-panel', 'name-dlg', 'del-dlg']) {
     $(id).addEventListener('click', (e) => { if (e.target === $(id)) closeModal(id); });
 }
 
@@ -2257,6 +2332,7 @@ document.addEventListener('keydown', (e) => {
     if (!$('wall').hidden) { showWall(false); return; }
     if (!$('pro-panel').hidden) { closeModal('pro-panel'); return; }
     if (!$('name-dlg').hidden) { closeModal('name-dlg'); return; }
+    if (!$('del-dlg').hidden) { closeModal('del-dlg'); return; }
     if (!$('cls-menu').hidden) { toggleMenu(false); $('cls-btn').focus(); return; }
     if (state.panelUid) closePanel();
 });
