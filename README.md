@@ -27,10 +27,10 @@ original local folder, added separately).
   Auth and this device's localStorage. A one-time, dismissible offer appears after a
   student's first finished lesson (`public/js/save-offer.js`). A saved student is still a
   student: no GA4, no teacher access (`firestore.rules` `hasTeacherSignIn`).
-- **Students from before the reset** (Recruit Codes, 13+ Google or email/password accounts)
-  use "Have an old code? Get your progress back" on `/dashboard/` until **2027-06-30**. It
-  copies their old progress into their anonymous session. Delete the `LEGACY RESTORE` section
-  of `auth-core.js`, the restore panel on the dashboard and rule #9's `get` after that date.
+- **Students from before the reset** (Recruit Codes, old 13+ accounts): the "Have an old
+  code?" restore was removed on 2026-11-25 (founder decision: very few used the old sign-ins).
+  Their old data is untouched; nothing reads `recruit_codes` any more, so rule #9's `get` can
+  be dropped whenever the rules are next changed.
 - `npm run check:invariants` (`[no-gate]`) fails a build that brings back a pre-play screen, the
   deleted `identity-gate.js`, or a student sign-in path.
 

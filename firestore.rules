@@ -432,11 +432,10 @@ service cloud.firestore {
     // 9. Recruit Codes — READ-ONLY, legacy (identity reset, 2026-11-23). The pre-2026-11
     //    model gave each under-13 Learner Recruit a passphrase (e.g. "arctic-fox-trot-4821")
     //    whose document held a portable copy of their progress. Nothing creates or updates
-    //    one any more. Until the sunset (2027-06-30) a returning student can type their
-    //    code on the dashboard ("Have an old code?") and AuthCore.restoreFromRecruitCode()
-    //    copies that progress into their anonymous session — which needs exactly one thing:
-    //    a single-document GET by the exact code. Knowing the code is the trust model, as
-    //    it always was.
+    //    one any more. The dashboard's "Have an old code?" restore, the only reader, was
+    //    removed on 2026-11-25, so the GET below is now unused and can be dropped (kept for
+    //    now so this change stays a no-op for the rules tests). Knowing the code was the
+    //    trust model.
     //    - GET: any signed-in session, one document by its exact id
     //    - LIST (any query or enumeration): admin allowlist only — codes are never browsable
     //    - CREATE / UPDATE: nobody (falls to the catch-all deny)
