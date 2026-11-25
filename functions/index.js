@@ -1,4 +1,4 @@
-// Cloud Functions for allgood-academy (2nd gen, Node 20).
+// Cloud Functions for allgood-academy (2nd gen, Node 22).
 //
 // stripeWebhook — Stripe calls this after a payment; it turns Mission Control Pro on.
 //   URL once deployed: https://us-central1-allgood-academy.cloudfunctions.net/stripeWebhook
