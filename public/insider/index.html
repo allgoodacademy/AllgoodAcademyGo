@@ -70,7 +70,7 @@
                 <a href="#/overview" data-route="overview" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>Overview</a>
                 <a href="#/users" data-route="users" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="users" class="w-4 h-4"></i>Users</a>
                 <a href="#/courses" data-route="courses" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="book-open" class="w-4 h-4"></i>Courses</a>
-                <a href="#/takethebait" data-route="takethebait" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="fish" class="w-4 h-4"></i>Take the Bait</a>
+                <a href="#/games" data-route="games" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="gamepad-2" class="w-4 h-4"></i>Games</a>
                 <a href="#/simulations" data-route="simulations" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="flask-conical" class="w-4 h-4"></i>Simulations</a>
                 <a href="#/sources" data-route="sources" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="signpost" class="w-4 h-4"></i>Sources</a>
                 <a href="#/classrooms" data-route="classrooms" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="school" class="w-4 h-4"></i>Classrooms</a>
@@ -336,6 +336,25 @@
             { stream: 'wolves-and-deer', name: 'Wolves & Deer', url: '/simulations/wolves-and-deer/', prefix: 'wd', stepsTotal: 6 },
             { stream: 'snowball', name: 'The Snowball', url: '/simulations/snowball/', prefix: 'sb', stepsTotal: 6 },
         ];
+        /* GAMES (2026-11-25): every game linked from /educational-games/, plus Pattern Lab.
+           The Games page is READ-ONLY reporting: it loads each game's sessions with its own
+           module-filtered query (so a busy shared 5,000-session window can't hide a game) and
+           never feeds anything back into the core arrays, so the off-funnel split below is
+           untouched. `module` = the game's Telemetry.init module id; `gameNames` = its
+           game_scores / feedback name(s), for plays recorded before telemetry. Take the Bait
+           keeps its own detail page (#/takethebait). Add a game here when it ships. */
+        const GAMES = [
+            { module: 'take-the-bait', name: 'Take the Bait', kind: 'Game', url: '/educational-games/takethebait/', gameNames: ['Take the Bait'], stepsTotal: 3, detail: '#/takethebait' },
+            { module: 'read-the-signal', name: 'Read the Signal', kind: 'Game', url: '/educational-games/read-the-signal/', gameNames: ['Read the Signal'], stepsTotal: 10 },
+            { module: 'before-you-send', name: 'Before You Send', kind: 'Game', url: '/educational-games/before-you-send/', gameNames: ['Before You Send'], stepsTotal: 10 },
+            { module: 'the-rumor-mill', name: 'The Rumor Mill', kind: 'Game', url: '/educational-games/the-rumor-mill/', gameNames: ['The Rumor Mill'], stepsTotal: 10 },
+            { module: 'money-moves', name: 'Money Moves', kind: 'Game', url: '/educational-games/money-moves/', gameNames: ['Money Moves'], stepsTotal: 10 },
+            { module: 'pattern-lab', name: 'Pattern Lab', kind: 'Game', url: null /* hidden page: never linked */, gameNames: ['Pattern Lab'], stepsTotal: null },
+            { module: 'digital-decisions', name: 'Digital Decisions Challenge', kind: 'Challenge', url: '/educational-games/digital-decisions/', gameNames: ['Digital Decisions Challenge'], stepsTotal: 28 },
+            { module: 'rwr-challenge', name: 'Real World Ready Challenge', kind: 'Challenge', url: '/educational-games/real-world-ready/', gameNames: ['Real World Ready Challenge'], stepsTotal: 24 },
+            { module: 'rtt-challenge', name: 'Room to Think Challenge', kind: 'Challenge', url: '/educational-games/room-to-think/', gameNames: ['Room to Think Challenge'], stepsTotal: 24 },
+        ];
+        const gameByModule = Object.fromEntries(GAMES.map(g => [g.module, g]));
         for (let i = COURSES.length - 1; i >= 0; i--) if (COURSES[i].offFunnel) COURSES.splice(i, 1);
         const OFF_FUNNEL_GAMENAMES = new Set(OFF_FUNNEL_COURSES.flatMap(c => c.gameNames));
         const courseByGameName = {};
@@ -365,6 +384,9 @@
             // The simulations' own data (public/simulations/*), one entry per stream in SIMS,
             // loaded by stream-filtered queries for the same reason as Take the Bait's.
             sims: {},
+            // Each game's own sessions (GAMES above), loaded by module-filtered queries; the
+            // Games page reads only this and the game_scores rows, never the core arrays.
+            games: {}, gameScores: [],
             errors: {}, loadedAt: null,
         };
         // Which telemetry streams this dashboard's numbers are computed from. A session or
@@ -596,6 +618,13 @@
                 return [sim.stream, { sessions: ss, events: ee }];
             }));
 
+            // Games: one sessions query per game (equality only, like Take the Bait's).
+            const gameData = await Promise.all(GAMES.filter(g => g.module !== 'take-the-bait').map(async g => {
+                const ss = await safe(`${g.module} sessions`, async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('module', '==', g.module), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() })));
+                ss.forEach(x => { x.startMs = toMs(x.startedAt); x.lastMs = toMs(x.lastSeenAt); });
+                return [g.module, ss];
+            }));
+
             /* THE EXCLUSION, DONE ONCE.
                Pattern Lab (/educational-games/pattern-lab/) writes to the same two
                collections as everything else, tagged stream: 'pattern-lab'. Its sessions
@@ -621,7 +650,11 @@
                 sessions: funnelSessions, events: funnelEvents, offFunnel, loadedAt: Date.now(),
                 ttb: { sessions: ttbSessions, events: ttbEvents },
                 sims: Object.fromEntries(simData),
+                games: Object.fromEntries(gameData),
             });
+            // Every game_scores row whose gameName is a game's, core or off-funnel, for the Games page only.
+            const gameNameSet = new Set(GAMES.flatMap(g => g.gameNames));
+            D.gameScores = scores.filter(s => gameNameSet.has(s.gameName)).map(s => ({ ...s, ms: toMs(s.lastUpdated) }));
             D.ttb.sessions.forEach(s => { s.startMs = toMs(s.startedAt); s.lastMs = toMs(s.lastSeenAt); });
             D.ttb.events.forEach(e => { e.ms = toMs(e.ts) || e.clientTs || 0; });
             D.offFunnel.sessions.forEach(s => { s.startMs = toMs(s.startedAt); s.lastMs = toMs(s.lastSeenAt); });
@@ -806,15 +839,15 @@
         // ------------------------------------------------------------------
         // ROUTER
         // ------------------------------------------------------------------
-        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', takethebait: 'Take the Bait', simulations: 'Simulations', sources: 'Where visits come from', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
+        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', games: 'Games', takethebait: 'Take the Bait', simulations: 'Simulations', sources: 'Where visits come from', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
         function route() {
             if (mainView.classList.contains('hidden')) return;
             const hash = location.hash.replace(/^#\/?/, '');
             const [section, arg] = hash.split('/');
             const page = TITLES[section] ? section : 'overview';
-            document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === page));
+            document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === (page === 'takethebait' ? 'games' : page)));
             $('page-title').textContent = TITLES[page];
-            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, takethebait: renderTakeTheBait, simulations: () => renderSimulations(arg), sources: () => renderSources(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
+            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, games: () => renderGames(arg), takethebait: () => gamesBackLink() + renderTakeTheBait(), simulations: () => renderSimulations(arg), sources: () => renderSources(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
             const out = typeof render === 'function' ? render() : '';
             $('page').innerHTML = typeof out === 'function' ? out() : out;
             if (window.lucide) lucide.createIcons();
@@ -864,6 +897,7 @@
                     ${tile('Module visits', sessionsInRange.length + launchesInRange.length, `${rangeLabel()} · ${fmtDuration(activeMs)} of active learning`)}
                     ${tile('Completions', completionsInRange, `${rangeLabel()} · avg rating ${rated.length ? (mean(rated.map(f => f.rating)).toFixed(1) + '★') : '—'}`)}
                 </div>
+                ${uniqueTiles()}
                 <div class="grid lg:grid-cols-3 gap-4 mb-6">
                     <div class="lg:col-span-2">${card(`Activity by day · ${rangeDays && rangeDays <= 30 ? rangeLabel() : 'last 30 days'}`, barChart({ ...daily, height: 110, yLabel: 'Module visits per day (telemetry sessions + dashboard launches)' }))}</div>
                     ${card('Who is here', `<div class="space-y-2 text-xs">${['Learner Recruit', '13+ Account', 'Teacher', 'Guest'].map(t => { const n = users.filter(u => u.type === t).length; return `<div class="flex items-center justify-between"><span>${typeBadge(t)}</span><span class="font-bold text-slate-700">${n} <span class="text-slate-400 font-normal">(${pct(n, users.length)}%)</span></span></div>`; }).join('')}<div class="flex items-center justify-between pt-2 border-t border-slate-100"><span class="text-slate-500">New sign-ins ${rangeLabel()}</span><span class="font-bold text-slate-700">${newInRange}</span></div><div class="flex items-center justify-between"><span class="text-slate-500">Classrooms</span><span class="font-bold text-slate-700">${D.classrooms.length}</span></div></div>`)}
@@ -895,6 +929,94 @@
                 const stepTxt = e.event === 'step' && e.meta && e.meta.step ? ` ${e.meta.step}` : '';
                 return `<div class="text-xs flex items-center justify-between gap-2"><span class="truncate"><a href="#/users/${esc(e.uid)}" class="font-bold text-slate-700 hover:underline">${esc(u ? u.name : 'Unknown')}</a> <span class="text-slate-500">${label[e.event] || esc(e.event)}${stepTxt}</span> <span class="text-slate-700">${esc(c ? c.name : (e.gameName || e.module || ''))}</span></span><span class="text-[10px] text-slate-400 shrink-0">${fmtAgo(e.ms)}</span></div>`;
             }).join('')}</div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // UNIQUE STUDENTS (Overview). Distinct uids in the selected range, per kind of thing.
+        // ------------------------------------------------------------------
+        function uniqueTiles() {
+            const start = rangeStart();
+            const gameUids = new Set(GAMES.flatMap(g => [...gameStats(g).players]));
+            const simUids = new Set(SIMS.flatMap(sim => simStats(sim).sessions.map(s => s.uid)).filter(Boolean));
+            const isLesson = c => c && /lab/i.test(c.category);
+            const lessonUids = new Set([
+                ...D.sessions.filter(s => isLesson(s.course) && (s.startMs || 0) >= start).map(s => s.uid),
+                ...D.launches.filter(l => isLesson(l.course) && l.ms >= start).map(l => l.uid),
+            ].filter(Boolean));
+            const note = `different students · ${rangeLabel()}`;
+            return `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <a href="#/games" class="block">${tile('Students who played a game', gameUids.size, note)}</a>
+                <a href="#/simulations" class="block">${tile('Students who used a simulation', simUids.size, note)}</a>
+                <a href="#/courses" class="block">${tile('Students who started a lesson', lessonUids.size, note)}</a>
+            </div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: GAMES (read-only; reads D.games, D.ttb and D.gameScores, never the core arrays)
+        // ------------------------------------------------------------------
+        function gameStats(g) {
+            const start = rangeStart();
+            const raw = g.module === 'take-the-bait' ? D.ttb.sessions : (D.games[g.module] || []);
+            const sessions = raw.filter(s => (s.startMs || 0) >= start);
+            const names = new Set(g.gameNames);
+            const sids = new Set(sessions.map(s => s.sessionId).filter(Boolean));
+            const scores = D.gameScores.filter(s => names.has(s.gameName) && s.ms >= start);
+            const legacy = scores.filter(s => !sids.has(s.sessionId));   // plays recorded only as a score row
+            const players = new Set([...sessions.map(s => s.uid), ...scores.map(s => s.uid)].filter(Boolean));
+            const finished = new Set([
+                ...sessions.filter(s => s.completed).map(s => s.sessionId),
+                ...scores.filter(s => s.completed || s.complete).map(s => s.sessionId),
+            ].filter(Boolean)).size;
+            const times = sessions.map(s => s.activeMs).filter(x => typeof x === 'number' && x > 0);
+            const pcts = scores.map(s => s.percentage).filter(x => typeof x === 'number');
+            const last = Math.max(0, ...sessions.map(s => s.lastMs || s.startMs || 0), ...scores.map(s => s.ms || 0));
+            return { g, sessions, scores, players, plays: sessions.length + legacy.length, finished,
+                medTime: times.length ? median(times) : null, avgScore: pcts.length ? Math.round(mean(pcts)) : null, last,
+                playMs: [...sessions.map(s => s.startMs), ...legacy.map(s => s.ms)] };
+        }
+        function gamesBackLink() {
+            return `<a href="#/games" class="inline-block text-[10px] font-bold uppercase tracking-wide text-[#357889] hover:underline mb-3">← All games</a>`;
+        }
+        function renderGames(arg) {
+            if (arg) return renderGameDetail(arg);
+            const all = GAMES.map(gameStats);
+            const th = 'text-right font-bold py-1 px-2', dash = '<span class="text-slate-300">—</span>';
+            const everyone = new Set(all.flatMap(x => [...x.players]));
+            const plays = all.reduce((a, x) => a + x.plays, 0);
+            const table = `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Game</th><th class="${th}">Players</th><th class="${th}">Plays</th><th class="${th}">Finished</th><th class="${th}">Median time</th><th class="${th}">Avg score</th><th class="${th}">Last played</th></tr></thead><tbody>${all.map(x => `<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" onclick="location.hash='${x.g.detail || '#/games/' + x.g.module}'"><td class="py-1.5 pr-2"><span class="font-bold text-slate-700">${esc(x.g.name)}</span></td><td class="text-right px-2 font-bold">${x.players.size}</td><td class="text-right px-2">${x.plays}</td><td class="text-right px-2">${x.plays ? `${x.finished} <span class="text-slate-400">(${pct(x.finished, x.plays)}%)</span>` : dash}</td><td class="text-right px-2">${x.medTime ? fmtDuration(x.medTime) : dash}</td><td class="text-right px-2">${x.avgScore !== null ? x.avgScore + '%' : dash}</td><td class="text-right px-2 text-slate-500">${x.last ? fmtAgo(x.last) : dash}</td></tr>`).join('')}</tbody></table></div>
+                <p class="text-[10px] text-slate-400 mt-2">Players = different students. A student who plays on two devices without a save code counts twice. Plays = sessions (a session opens at a player's first interaction), plus older plays recorded only as a score. Take the Bait and Pattern Lab stay out of the lesson figures on the other pages; the four funnel games and the three Challenges also appear under Courses.</p>`;
+            return `${errorStrip()}
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    ${tile('Students who played a game', everyone.size, `different students · ${rangeLabel()}`)}
+                    ${tile('Plays', plays, rangeLabel())}
+                    ${tile('Games', GAMES.length, 'on the games page, plus Pattern Lab')}
+                </div>
+                ${card(`Every game · ${rangeLabel()}`, table)}`;
+        }
+        function renderGameDetail(id) {
+            const g = gameByModule[id];
+            if (!g) return gamesBackLink() + emptyMsg('Unknown game.');
+            if (g.detail) { location.hash = g.detail; return ''; }
+            const x = gameStats(g), n = x.sessions.length;
+            const trend = weeklySeries(x.playMs, 12);
+            const total = g.stepsTotal || Math.max(0, ...x.sessions.map(s => s.stepsTotal || 0));
+            const reach = total ? Array.from({ length: total }, (_, i) => i + 1).map(k => { const c = x.sessions.filter(s => (s.maxStep || 0) >= k).length; return { label: `Step ${k}`, pct: pct(c, n), n: c, tip: `${c} of ${n} plays reached step ${k}` }; }) : [];
+            const buckets = [[0, 49], [50, 69], [70, 89], [90, 100]].map(([a, b]) => { const c = x.scores.filter(s => typeof s.percentage === 'number' && s.percentage >= a && s.percentage <= b).length; return { label: `${a}–${b}%`, n: c }; });
+            const scored = buckets.reduce((a, b) => a + b.n, 0);
+            return `${gamesBackLink()}${errorStrip()}
+                <div class="flex items-baseline gap-2 mb-4"><h2 class="font-bold text-slate-800 text-lg">${esc(g.name)}</h2><span class="text-[10px] text-slate-400 uppercase">${esc(g.kind)}</span>${g.url ? `<a href="${g.url}" target="_blank" rel="noopener" class="text-[10px] font-bold uppercase tracking-wide text-[#357889] hover:underline ml-2">Open game ↗</a>` : ''}</div>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    ${tile('Players', x.players.size, `different students · ${rangeLabel()}`)}
+                    ${tile('Plays', x.plays, rangeLabel())}
+                    ${tile('Finished', x.plays ? pct(x.finished, x.plays) + '%' : '—', `${x.finished} of ${x.plays}`)}
+                    ${tile('Median time', x.medTime ? fmtDuration(x.medTime) : '—', 'active time per play')}
+                    ${tile('Avg score', x.avgScore !== null ? x.avgScore + '%' : '—', `${x.scores.length} scored play${x.scores.length === 1 ? '' : 's'}`)}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4">
+                    ${card('Plays per week · last 12 weeks', barChart({ ...trend, height: 110 }))}
+                    ${card('How far they got', reach.length && n ? hbarRows(reach, r => `${r.pct}% <span class="text-slate-400 font-normal">(${r.n})</span>`) : emptyMsg('No step data in this range.'))}
+                    ${card('Score spread', scored ? hbarRows(buckets.map(b => ({ ...b, pct: pct(b.n, scored), tip: `${b.n} of ${scored} scored plays` })), r => `${r.n}`) : emptyMsg('No scores in this range.'))}
+                </div>`;
         }
 
         // ------------------------------------------------------------------
@@ -995,7 +1117,7 @@
             const all = SIMS.map(simStats);
             const th = 'text-right font-bold py-1 px-2', dash = '<span class="text-slate-300">—</span>';
             const tot = all.reduce((a, x) => ({ s: a.s + x.sessions.length, c: a.c + x.completed.length }), { s: 0, c: 0 });
-            const table = `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Simulation</th><th class="${th}">Sessions</th><th class="${th}">Learners</th><th class="${th}">Completed</th><th class="${th}">Median time</th><th class="${th}">Presented</th><th class="${th}">Guess matched</th></tr></thead><tbody>${all.map(x => `<tr class="border-t border-slate-50"><td class="py-1.5"><a href="#/simulations/${x.sim.stream}" class="font-bold text-slate-700 hover:underline">${esc(x.sim.name)}</a> <span class="text-[10px] text-slate-400 font-mono">${x.sim.stream}</span></td><td class="text-right px-2">${x.sessions.length}</td><td class="text-right px-2">${x.learners}</td><td class="text-right px-2 font-bold">${x.completed.length} <span class="text-slate-400 font-normal">${x.sessions.length ? '(' + pct(x.completed.length, x.sessions.length) + '%)' : ''}</span></td><td class="text-right px-2">${x.medActive ? fmtDuration(x.medActive) : dash}</td><td class="text-right px-2">${x.sessions.length ? pct(x.classN, x.sessions.length) + '%' : dash}</td><td class="text-right px-2">${x.reveals ? pct(x.matched, x.reveals) + '%' : dash}</td></tr>`).join('')}</tbody></table><p class="text-[10px] text-slate-400 mt-2">A session opens at a learner's first interaction, not on page load. Completed = reached the last step. Presented = the session used Present mode (a class on a projector) at least once. Guess matched = predictions that matched what the model then showed.</p>`;
+            const table = `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Simulation</th><th class="${th}">Sessions</th><th class="${th}">Unique learners</th><th class="${th}">Completed</th><th class="${th}">Median time</th><th class="${th}">Presented</th><th class="${th}">Guess matched</th></tr></thead><tbody>${all.map(x => `<tr class="border-t border-slate-50"><td class="py-1.5"><a href="#/simulations/${x.sim.stream}" class="font-bold text-slate-700 hover:underline">${esc(x.sim.name)}</a> <span class="text-[10px] text-slate-400 font-mono">${x.sim.stream}</span></td><td class="text-right px-2">${x.sessions.length}</td><td class="text-right px-2">${x.learners}</td><td class="text-right px-2 font-bold">${x.completed.length} <span class="text-slate-400 font-normal">${x.sessions.length ? '(' + pct(x.completed.length, x.sessions.length) + '%)' : ''}</span></td><td class="text-right px-2">${x.medActive ? fmtDuration(x.medActive) : dash}</td><td class="text-right px-2">${x.sessions.length ? pct(x.classN, x.sessions.length) + '%' : dash}</td><td class="text-right px-2">${x.reveals ? pct(x.matched, x.reveals) + '%' : dash}</td></tr>`).join('')}</tbody></table><p class="text-[10px] text-slate-400 mt-2">A session opens at a learner's first interaction, not on page load. Completed = reached the last step. Presented = the session used Present mode (a class on a projector) at least once. Guess matched = predictions that matched what the model then showed.</p>`;
             const x = all.find(a => a.sim.stream === arg) || all.slice().sort((a, b) => b.sessions.length - a.sessions.length)[0];
             const sim = x.sim, n = x.sessions.length;
             const chips = SIMS.map(s => `<a href="#/simulations/${s.stream}" class="chip border border-slate-200 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${s === sim ? 'active' : ''}">${esc(s.name)}</a>`).join('');
