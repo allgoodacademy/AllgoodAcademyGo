@@ -75,6 +75,14 @@ const SESSION_SCRIPT = `<script>
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
   if(s&&cta)cta.textContent='My dashboard';
   if(a&&signin)signin.textContent='Mission Control';
+  var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
+  if(!btn)return;
+  nav.classList.add('has-menu');
+  function set(o){nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false');btn.setAttribute('aria-label',o?'Close menu':'Menu');}
+  btn.addEventListener('click',function(){set(!nav.classList.contains('open'));});
+  nav.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('.nav-links a'))set(false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&nav.classList.contains('open')){set(false);btn.focus();}});
+  document.addEventListener('click',function(e){if(!nav.contains(e.target))set(false);});
 })();
 <\/script>`;
 
@@ -91,6 +99,7 @@ const SESSION_SCRIPT = `<script>
 // pages' own collapse rules without !important.
 const PHONE_STYLE = `<style>
 .site-nav .nav-links{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-menu{display:none}
 @media(max-width:960px){
   .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
   .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
@@ -99,6 +108,18 @@ const PHONE_STYLE = `<style>
   .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
   .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
   .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+  .nav-shell{padding-top:10px}
+  .nav-shell .wrap{padding-left:12px;padding-right:12px}
+  .site-nav.has-menu.nav{flex-wrap:wrap;gap:6px;row-gap:0;border-radius:26px;padding:6px 6px 6px 18px}
+  .site-nav.has-menu .wordmark{font-size:20px;margin-right:auto;min-width:0;overflow:hidden;text-overflow:clip}
+  .site-nav.has-menu .nav-cta{order:1;margin-left:0;padding:8px 16px}
+  .site-nav.has-menu .nav-menu{order:2;display:inline-flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;padding:0;margin:0;border:0;border-radius:999px;background:var(--color-teal-wash);color:var(--color-teal-deep);cursor:pointer}
+  .site-nav.has-menu .nav-menu svg{display:block;width:20px;height:20px}
+  .site-nav.has-menu .nav-menu .x,.site-nav.has-menu.open .nav-menu .bars{display:none}
+  .site-nav.has-menu.open .nav-menu .x{display:block}
+  .site-nav.has-menu .nav-links{order:3;display:none;margin:8px 0 4px;padding:6px 12px 0 0;border-top:1px solid var(--color-teal-wash)}
+  .site-nav.has-menu.open .nav-links{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+  .site-nav.has-menu.open .nav-links .nav-link{display:block;font-size:15px;line-height:1.4;padding:12px 14px;border-radius:14px;white-space:normal;max-width:none;text-align:left}
 }
 @media(max-width:380px){
   .nav-shell .wrap{padding-left:10px;padding-right:10px}
@@ -106,6 +127,10 @@ const PHONE_STYLE = `<style>
   .site-nav .wordmark{font-size:18px}
   .site-nav .nav-cta{padding-left:12px;padding-right:12px}
   .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+  .site-nav.has-menu.nav{padding-left:14px;padding-right:6px;gap:4px}
+  .site-nav.has-menu .wordmark{font-size:17px}
+  .site-nav.has-menu .nav-cta{padding:8px 11px;font-size:12px}
+  .site-nav.has-menu .nav-menu{width:38px;height:38px}
 }
 </style>`;
 
@@ -146,6 +171,13 @@ body.present .nav-shell.activity{display:none}
 @media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
 </style>`;
 
+// The phone/tablet menu button (hidden above 960px). Below 960px the session script
+// adds .has-menu and the bar becomes ONE row — wordmark, the button, this — with the
+// links dropping down under it on tap. Founder, 2026-11-25: the two-to-three-row
+// sticky card it replaces covered a quarter of a phone screen. Without JS the
+// button stays hidden and the links fall back to the wrapped rows above.
+const MENU_BUTTON = `        <button class="nav-menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-nav-links"><svg class="bars" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="x" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>`;
+
 // --- Skins. -----------------------------------------------------------------
 //
 // One treatment: the homepage's white pill. (A dark games-hub skin lived here until
@@ -162,7 +194,7 @@ const SKINS = {
     <nav class="nav site-nav">
       <a class="wordmark" href="/">Allgood<em>Academy</em></a>
       <div class="nav-right">
-        <div class="nav-links">
+        <div class="nav-links" id="site-nav-links">
 ${links}
         </div>
 ${actions}
@@ -174,7 +206,7 @@ ${actions}
         link: (href, label, active) =>
             `          <a class="nav-link${active ? ' here' : ''}" href="${href}">${label}</a>`,
         signin: href => `          <a class="nav-link nav-signin" href="${href}">${SIGNIN.label}</a>`,
-        cta: href => `        <a class="nav-cta" href="${href}">${CTA.label}</a>`,
+        cta: href => `        <a class="nav-cta" href="${href}">${CTA.label}</a>\n${MENU_BUTTON}`,
     },
 };
 
