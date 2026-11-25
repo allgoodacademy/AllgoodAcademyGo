@@ -71,6 +71,7 @@
                 <a href="#/users" data-route="users" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="users" class="w-4 h-4"></i>Users</a>
                 <a href="#/courses" data-route="courses" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="book-open" class="w-4 h-4"></i>Courses</a>
                 <a href="#/takethebait" data-route="takethebait" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="fish" class="w-4 h-4"></i>Take the Bait</a>
+                <a href="#/simulations" data-route="simulations" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="flask-conical" class="w-4 h-4"></i>Simulations</a>
                 <a href="#/classrooms" data-route="classrooms" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="school" class="w-4 h-4"></i>Classrooms</a>
                 <a href="#/inbox" data-route="inbox" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="inbox" class="w-4 h-4"></i>Inbox</a>
                 <a href="#/feedback" data-route="feedback" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="star" class="w-4 h-4"></i>Feedback</a>
@@ -285,6 +286,18 @@
            core figure (user status, completions, Courses page, Classrooms grid, exports)
            iterates COURSES, so none of them can see these. */
         const OFF_FUNNEL_COURSES = COURSES.filter(c => c.offFunnel);
+        /* SIMULATIONS (public/simulations/, listed in public/data/simulations.json). Each reports on
+           its own telemetry stream, so like every non-core stream they are partitioned out of the
+           core figures below; the Simulations page reads them from D.sims instead. `prefix` is
+           the sim's event-name prefix (wc_prediction, rs_reveal, ...): all four share one event
+           vocabulary, so one page reports all of them. stepsTotal matches each page's
+           Telemetry.init. Add a simulation here when it ships. */
+        const SIMS = [
+            { stream: 'water-cycle', name: 'Where rain comes from', url: '/simulations/watercycle/', prefix: 'wc', stepsTotal: 6 },
+            { stream: 'seasons', name: 'Reasons for the Seasons', url: '/simulations/seasons/', prefix: 'rs', stepsTotal: 7 },
+            { stream: 'wolves-and-deer', name: 'Wolves & Deer', url: '/simulations/wolves-and-deer/', prefix: 'wd', stepsTotal: 6 },
+            { stream: 'snowball', name: 'The Snowball', url: '/simulations/snowball/', prefix: 'sb', stepsTotal: 6 },
+        ];
         for (let i = COURSES.length - 1; i >= 0; i--) if (COURSES[i].offFunnel) COURSES.splice(i, 1);
         const OFF_FUNNEL_GAMENAMES = new Set(OFF_FUNNEL_COURSES.flatMap(c => c.gameNames));
         const courseByGameName = {};
@@ -311,6 +324,9 @@
             // Take the Bait's own data, loaded by its own module-filtered queries so the page
             // is complete no matter how busy the shared 5,000 / 3,000 windows above are.
             ttb: { sessions: [], events: [] },
+            // The simulations' own data (public/simulations/*), one entry per stream in SIMS,
+            // loaded by stream-filtered queries for the same reason as Take the Bait's.
+            sims: {},
             errors: {}, loadedAt: null,
         };
         // Which telemetry streams this dashboard's numbers are computed from. A session or
@@ -524,6 +540,18 @@
                 safe('take-the-bait events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), where('module', '==', 'take-the-bait'), limit(10000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
             ]);
 
+            // Simulations: one sessions + one events query per stream (equality only, so the
+            // automatic single-field index serves them; no composite index needed).
+            const simData = await Promise.all(SIMS.map(async sim => {
+                const [ss, ee] = await Promise.all([
+                    safe(`${sim.stream} sessions`, async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('stream', '==', sim.stream), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+                    safe(`${sim.stream} events`, async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), where('stream', '==', sim.stream), limit(10000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+                ]);
+                ss.forEach(x => { x.startMs = toMs(x.startedAt); x.lastMs = toMs(x.lastSeenAt); });
+                ee.forEach(x => { x.ms = toMs(x.ts) || x.clientTs || 0; });
+                return [sim.stream, { sessions: ss, events: ee }];
+            }));
+
             /* THE EXCLUSION, DONE ONCE.
                Pattern Lab (/educational-games/pattern-lab/) writes to the same two
                collections as everything else, tagged stream: 'pattern-lab'. Its sessions
@@ -548,6 +576,7 @@
                 users, classrooms, messages, feedback, launches, scores: funnelScores, attempts, progress,
                 sessions: funnelSessions, events: funnelEvents, offFunnel, loadedAt: Date.now(),
                 ttb: { sessions: ttbSessions, events: ttbEvents },
+                sims: Object.fromEntries(simData),
             });
             D.ttb.sessions.forEach(s => { s.startMs = toMs(s.startedAt); s.lastMs = toMs(s.lastSeenAt); });
             D.ttb.events.forEach(e => { e.ms = toMs(e.ts) || e.clientTs || 0; });
@@ -733,7 +762,7 @@
         // ------------------------------------------------------------------
         // ROUTER
         // ------------------------------------------------------------------
-        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', takethebait: 'Take the Bait', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
+        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', takethebait: 'Take the Bait', simulations: 'Simulations', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
         function route() {
             if (mainView.classList.contains('hidden')) return;
             const hash = location.hash.replace(/^#\/?/, '');
@@ -741,7 +770,7 @@
             const page = TITLES[section] ? section : 'overview';
             document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === page));
             $('page-title').textContent = TITLES[page];
-            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, takethebait: renderTakeTheBait, classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
+            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, takethebait: renderTakeTheBait, simulations: () => renderSimulations(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
             const out = typeof render === 'function' ? render() : '';
             $('page').innerHTML = typeof out === 'function' ? out() : out;
             if (window.lucide) lucide.createIcons();
@@ -898,6 +927,84 @@
                 <div class="grid lg:grid-cols-2 gap-4">
                     ${card('Device', hbarRows(Object.entries(dev).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ label: k, pct: pct(n, sessions.length), n, tip: `${n} sessions` })), r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
                     ${card('Speed setting (levels finished)', hbarRows(spTotal ? [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['fast', 'Fast']].map(([k, l]) => ({ label: l, pct: pct(sp[k], spTotal), n: sp[k], tip: `${sp[k]} levels` })) : [], r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
+                </div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: SIMULATIONS (off-funnel; reads only D.sims, never the core arrays)
+        // ------------------------------------------------------------------
+        function simStats(sim) {
+            const start = rangeStart(), raw = D.sims[sim.stream] || { sessions: [], events: [] };
+            const sessions = raw.sessions.filter(s => (s.startMs || 0) >= start);
+            const events = raw.events.filter(e => e.ms >= start);
+            const ev = n => events.filter(e => e.event === sim.prefix + '_' + n && e.meta);
+            const completed = sessions.filter(s => s.completed);
+            const act = completed.map(s => s.activeMs).filter(x => typeof x === 'number' && x > 0);
+            const classSessions = new Set([...ev('mode'), ...ev('prediction'), ...ev('step_start')].filter(e => e.meta.mode === 'class').map(e => e.sessionId));
+            const reveals = ev('reveal');
+            const matched = reveals.filter(e => e.meta.matched).length;
+            return { sim, sessions, events, ev, completed, learners: new Set(sessions.map(s => s.uid)).size,
+                medActive: act.length ? median(act) : null, classN: sessions.filter(s => classSessions.has(s.sessionId)).length,
+                reveals: reveals.length, matched };
+        }
+        function renderSimulations(arg) {
+            const all = SIMS.map(simStats);
+            const th = 'text-right font-bold py-1 px-2', dash = '<span class="text-slate-300">—</span>';
+            const tot = all.reduce((a, x) => ({ s: a.s + x.sessions.length, c: a.c + x.completed.length }), { s: 0, c: 0 });
+            const table = `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Simulation</th><th class="${th}">Sessions</th><th class="${th}">Learners</th><th class="${th}">Completed</th><th class="${th}">Median time</th><th class="${th}">Presented</th><th class="${th}">Guess matched</th></tr></thead><tbody>${all.map(x => `<tr class="border-t border-slate-50"><td class="py-1.5"><a href="#/simulations/${x.sim.stream}" class="font-bold text-slate-700 hover:underline">${esc(x.sim.name)}</a> <span class="text-[10px] text-slate-400 font-mono">${x.sim.stream}</span></td><td class="text-right px-2">${x.sessions.length}</td><td class="text-right px-2">${x.learners}</td><td class="text-right px-2 font-bold">${x.completed.length} <span class="text-slate-400 font-normal">${x.sessions.length ? '(' + pct(x.completed.length, x.sessions.length) + '%)' : ''}</span></td><td class="text-right px-2">${x.medActive ? fmtDuration(x.medActive) : dash}</td><td class="text-right px-2">${x.sessions.length ? pct(x.classN, x.sessions.length) + '%' : dash}</td><td class="text-right px-2">${x.reveals ? pct(x.matched, x.reveals) + '%' : dash}</td></tr>`).join('')}</tbody></table><p class="text-[10px] text-slate-400 mt-2">A session opens at a learner's first interaction, not on page load. Completed = reached the last step. Presented = the session used Present mode (a class on a projector) at least once. Guess matched = predictions that matched what the model then showed.</p>`;
+            const x = all.find(a => a.sim.stream === arg) || all.slice().sort((a, b) => b.sessions.length - a.sessions.length)[0];
+            const sim = x.sim, n = x.sessions.length;
+            const chips = SIMS.map(s => `<a href="#/simulations/${s.stream}" class="chip border border-slate-200 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${s === sim ? 'active' : ''}">${esc(s.name)}</a>`).join('');
+            // How far they got
+            const reach = Array.from({ length: sim.stepsTotal }, (_, i) => i + 1).map(k => { const c = x.sessions.filter(s => (s.maxStep || 0) >= k).length; return { label: `Step ${k}`, pct: pct(c, n), n: c, tip: `${c} of ${n} sessions reached step ${k}` }; });
+            // Predictions, by step
+            const preds = x.ev('prediction'), revs = x.ev('reveal');
+            const pSteps = [...new Set(preds.map(e => e.meta.step))].filter(v => v != null).sort((a, b) => a - b);
+            const predRows = pSteps.map(st => {
+                const ps = preds.filter(e => e.meta.step === st), rs = revs.filter(e => e.meta.step === st), m = rs.filter(e => e.meta.matched).length;
+                const dist = {}; ps.forEach(e => { const k = e.meta.choiceId == null ? '?' : String(e.meta.choiceId); dist[k] = (dist[k] || 0) + 1; });
+                return `<tr class="border-t border-slate-50"><td class="py-1.5 font-bold text-slate-700">Step ${st}</td><td class="text-right px-2">${ps.length}</td><td class="text-right px-2 font-bold">${rs.length ? pct(m, rs.length) + '%' : '—'} <span class="text-slate-400 font-normal">${rs.length ? '(' + m + '/' + rs.length + ')' : ''}</span></td><td class="px-2 text-slate-500">${Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="font-mono">${esc(k)}</span> ${pct(v, ps.length)}%`).join(' · ')}</td></tr>`;
+            }).join('');
+            // The try-it step
+            const att = x.ev('attempt'), bySess = {};
+            att.forEach(e => { (bySess[e.sessionId] = bySess[e.sessionId] || []).push(e); });
+            const tried = Object.values(bySess), firstOk = tried.filter(a => a.some(e => e.meta.attempt === 1 && e.meta.success)).length, everOk = tried.filter(a => a.some(e => e.meta.success)).length;
+            const counts = tried.map(a => a.length), fail = {};
+            att.filter(e => !e.meta.success).forEach(e => { const k = e.meta.failReason || 'other'; fail[k] = (fail[k] || 0) + 1; });
+            const failN = Object.values(fail).reduce((a, b) => a + b, 0);
+            // Explain it, use it somewhere new (first try only)
+            const firstTry = name => { const r = x.ev(name).filter(e => e.meta.firstTry); const b = r.filter(e => e.meta.isBest).length; return { n: r.length, b }; };
+            const ex = firstTry('explanation'), tr = firstTry('transfer');
+            const hints = new Set(x.ev('hint').map(e => e.sessionId)).size;
+            const dev = {}; x.sessions.forEach(s => { const d = s.device || 'unknown'; dev[d] = (dev[d] || 0) + 1; });
+            const row = (l, v) => `<div class="flex justify-between"><span class="text-slate-500">${l}</span><span class="font-bold">${v}</span></div>`;
+            return `${errorStrip()}
+                <p class="text-[11px] text-slate-500 mb-4">Each simulation reports on its own telemetry stream and is in none of the core figures on the other pages. ${rangeLabel()} · tests from the team count too, so a handful of sessions right after a release may be us.</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    ${tile('Simulation sessions', tot.s, `${SIMS.length} simulations`)}
+                    ${tile('Completed', tot.c, tot.s ? pct(tot.c, tot.s) + '% of sessions' : '')}
+                    ${tile('Presented to a class', all.reduce((a, y) => a + y.classN, 0), 'sessions that used Present')}
+                    ${tile('Guesses matched', all.reduce((a, y) => a + y.reveals, 0) ? pct(all.reduce((a, y) => a + y.matched, 0), all.reduce((a, y) => a + y.reveals, 0)) + '%' : '—', 'before the model showed the answer')}
+                </div>
+                <div class="mb-6">${card('All simulations', table)}</div>
+                <div class="flex flex-wrap gap-1 mb-4">${chips}</div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    ${tile('Sessions', n, `${x.learners} learner${x.learners === 1 ? '' : 's'}`)}
+                    ${tile('Completed', x.completed.length, n ? pct(x.completed.length, n) + '%' : '')}
+                    ${tile('Median time', x.medActive ? fmtDuration(x.medActive) : '—', 'active time, completed sessions')}
+                    ${tile('Presented', x.classN, n ? pct(x.classN, n) + '% of sessions' : '')}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-6">
+                    ${card(`How far they got · ${esc(sim.name)}`, n ? hbarRows(reach, r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`) : emptyMsg('No sessions in this range yet.'))}
+                    ${card('Predictions', predRows ? `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Step</th><th class="${th}">Guesses</th><th class="${th}">Matched</th><th class="text-left font-bold py-1 px-2">Answers picked</th></tr></thead><tbody>${predRows}</tbody></table><p class="text-[10px] text-slate-400 mt-2">Matched = the guess agreed with what the model then showed. A low number on an early step is the point: that is the misconception the step is there to surface.</p>` : emptyMsg('No predictions in this range yet.'))}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-6">
+                    ${card('The try-it step', tried.length ? `<div class="space-y-2 text-xs">${row('Sessions that tried', tried.length)}${row('Solved on the first try', pct(firstOk, tried.length) + '% <span class="text-slate-400 font-normal">(' + firstOk + ')</span>')}${row('Solved eventually', pct(everOk, tried.length) + '% <span class="text-slate-400 font-normal">(' + everOk + ')</span>')}${row('Median attempts', median(counts))}${row('Sessions that used a hint', hints)}</div><p class="text-[10px] text-slate-400 mt-3 mb-1 uppercase tracking-wide font-bold">Why attempts failed</p>${hbarRows(Object.entries(fail).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, pct: pct(v, failN), n: v, tip: `${v} failed attempts` })), r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`)}` : emptyMsg('Nobody has reached the try-it step in this range yet.'))}
+                    ${card('Explain it · use it somewhere new', `<div class="space-y-2 text-xs">${row('Picked the best explanation, first try', ex.n ? pct(ex.b, ex.n) + '% <span class="text-slate-400 font-normal">(' + ex.b + '/' + ex.n + ')</span>' : '—')}${row('Got the new-situation question, first try', tr.n ? pct(tr.b, tr.n) + '% <span class="text-slate-400 font-normal">(' + tr.b + '/' + tr.n + ')</span>' : '—')}<p class="text-[10px] text-slate-400 pt-2 border-t border-slate-100">These are the closest thing to a learning check: after the reveal, can they say why, and apply it to a case they have not seen?</p></div>`)}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4">
+                    ${card('Device', n ? hbarRows(Object.entries(dev).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, pct: pct(v, n), n: v, tip: `${v} sessions` })), r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`) : emptyMsg('No sessions in this range yet.'))}
+                    ${card('Where it lives', `<div class="space-y-2 text-xs">${row('Page', `<a class="hover:underline" href="${sim.url}" target="_blank" rel="noopener">${sim.url}</a>`)}${row('Telemetry stream', `<span class="font-mono">${sim.stream}</span>`)}${row('Event prefix', `<span class="font-mono">${sim.prefix}_</span>`)}${row('Steps', sim.stepsTotal)}${row('Events loaded (all time)', (D.sims[sim.stream] || { events: [] }).events.length)}</div>`)}
                 </div>`;
         }
 
