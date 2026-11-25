@@ -23,7 +23,7 @@ import {
     doc, getDoc, getDocs, setDoc, collection, query, where, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 import { loadRegistry } from '/js/skill-routing.js';
-import { effectiveAssignment, extrasFromDoc, GAME_MINUTES } from '/mission-control/derive.js';
+import { effectiveAssignment, extrasFromDoc, GAME_MINUTES, SIM_MINUTES } from '/mission-control/derive.js';
 
 const { db, appId, auth } = window.AuthCore;
 
@@ -131,14 +131,16 @@ export async function joinClassroom(rawCode, { nickname } = {}) {
 // Lesson order a student should meet them in: a game first (it's the diagnostic, and it
 // routes into the lesson that teaches what it found), then the lessons, then the Challenge
 // that tests the whole pack. The assignment arrays themselves carry no cross-type order.
-const TYPE_ORDER = { game: 0, lab: 1, challenge: 2 };
-const TYPE_LABEL = { game: 'Game', lab: 'Lesson', challenge: 'Challenge' };
+// A simulation (2026-11-25) comes last: it is its own activity, not part of a pack's sequence.
+const TYPE_ORDER = { game: 0, lab: 1, challenge: 2, sim: 3 };
+const TYPE_LABEL = { game: 'Game', lab: 'Lesson', challenge: 'Challenge', sim: 'Simulation' };
 
 /**
- * Everything assigned to this student in this Task Force: the class-wide modules AND games,
- * plus any per-student extras. Games live in classrooms.assignedGames, a separate array
- * from assignedModules (see saveAssignments in Mission Control) — reading only
- * assignedModules is what made the dashboard drop every assigned game.
+ * Everything assigned to this student in this Task Force: the class-wide modules, games AND
+ * simulations, plus any per-student extras. Games live in classrooms.assignedGames and
+ * simulations in classrooms.assignedSims, separate arrays from assignedModules (see
+ * saveAssignments in Mission Control) — reading only assignedModules is what made the
+ * dashboard drop every assigned game, and would drop every assigned simulation.
  *
  * Returns { code, classroom, name, items: [{ id, name, type, typeLabel, url, minutes, extra }] }
  * or null when the class does not exist. An id the registry no longer lists, or one with
@@ -169,12 +171,13 @@ export async function loadAssignedItems(rawCode, uid) {
 
     const classModules = Array.isArray(classroom.assignedModules) ? classroom.assignedModules : [];
     const classGames = Array.isArray(classroom.assignedGames) ? classroom.assignedGames : [];
-    const merged = effectiveAssignment({ classModules, classGames, extras });
-    const extraIds = new Set([...merged.extraModules, ...merged.extraGames]);
+    const classSims = Array.isArray(classroom.assignedSims) ? classroom.assignedSims : [];
+    const merged = effectiveAssignment({ classModules, classGames, classSims, extras });
+    const extraIds = new Set([...merged.extraModules, ...merged.extraGames, ...merged.extraSims]);
 
     const registry = await loadRegistry();
     const byId = new Map(registry.map((m) => [m.id, m]));
-    const items = [...merged.games, ...merged.modules]
+    const items = [...merged.games, ...merged.modules, ...merged.sims]
         .map((id) => byId.get(id))
         .filter((m) => m && m.url && !m.retired)
         .map((m) => ({
@@ -183,7 +186,8 @@ export async function loadAssignedItems(rawCode, uid) {
             type: m.type,
             typeLabel: TYPE_LABEL[m.type] || 'Activity',
             url: m.url,
-            minutes: m.type === 'game' ? GAME_MINUTES : (Number(m.durationMinutes) > 0 ? Number(m.durationMinutes) : null),
+            minutes: m.type === 'game' ? GAME_MINUTES
+                : (Number(m.durationMinutes) > 0 ? Number(m.durationMinutes) : (m.type === 'sim' ? SIM_MINUTES : null)),
             extra: extraIds.has(m.id),
         }))
         .sort((a, b) => (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9));

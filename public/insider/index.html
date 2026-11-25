@@ -114,7 +114,7 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, doc, collection, collectionGroup, getDocs, deleteDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getFirestore, doc, collection, collectionGroup, getDocs, deleteDoc, setDoc, query, where, orderBy, limit, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAf2SO8xovrApl52udUUoR1n9WBnERr_ko",
@@ -570,6 +570,9 @@
                 safe('sessions', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), orderBy('startedAt', 'desc'), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
                 safe('events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), orderBy('ts', 'desc'), limit(3000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
             ]);
+            // Mission Control Pro (2026-11-25): every teacher's plan. Admin-only (firestore.rules #13).
+            const plans = await safe('teacher_plans', async () => (await getDocs(collection(db, 'artifacts', appId, 'teacher_plans'))).docs.map(d => ({ uid: d.id, ...d.data() })));
+            D.plans = Object.fromEntries(plans.map(p => [p.uid, p]));
             // Equality-only filters: served by Firestore's automatic single-field index, so no
             // composite index is needed (an orderBy here would need one).
             const [ttbSessions, ttbEvents] = await Promise.all([
@@ -1143,6 +1146,7 @@
                         <div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Score history</h3>${scores.length ? `<div class="space-y-1">${scores.map(s => `<div class="text-xs flex items-center justify-between gap-2 border border-slate-100 rounded px-2 py-1.5"><span class="font-bold text-slate-700 truncate">${esc(s.gameName)}</span><span class="text-slate-500 shrink-0">${[typeof s.percentage === 'number' ? s.percentage + '%' : (typeof s.finalScore === 'number' ? s.finalScore + ' pts' : ''), s.rank ? esc(s.rank) : '', (s.completed || s.complete) ? 'completed ✓' : ''].filter(Boolean).join(' · ')}</span><span class="text-[10px] text-slate-400 shrink-0">${fmtAgo(s.ms)}</span></div>`).join('')}</div>` : emptyMsg('No score records.')}</div>
                         ${u.messages.length ? `<div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Messages sent (${u.messages.length})</h3>${u.messages.slice(0, 5).map(m => messageRow(m)).join('')}</div>` : ''}
                         ${u.feedback.length ? `<div><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-2">Feedback given (${u.feedback.length})</h3>${u.feedback.slice(0, 5).map(f => feedbackRow(f)).join('')}</div>` : ''}
+                        ${u.role === 'teacher' ? planControl(u) : ''}
                         <div class="border-t-4 border-red-200 rounded-lg p-3 bg-red-50/40">
                             <p class="text-[10px] font-bold uppercase tracking-wide text-red-600">Danger zone</p>
                             <p class="text-[11px] text-slate-500 mt-1">Permanently deletes this user's profile, scores, launches, progress, sessions, events, messages and feedback. For deletion requests only.</p>
@@ -1156,6 +1160,72 @@
             if (window.lucide) lucide.createIcons();
             const closeBtn = $('drawer-close'); if (closeBtn) closeBtn.onclick = closeDrawer;
             const del = $('drawer-delete'); if (del) del.onclick = () => deleteUserData(del.dataset.uid, $('drawer-delete-status'));
+            const planSave = $('plan-save'); if (planSave) planSave.onclick = () => savePlan(planSave.dataset.uid);
+        }
+
+        /* MISSION CONTROL PRO — the Plan control (2026-11-25). This is how the founder grants Pro
+           after a payment, until automatic webhooks exist. Writes teacher_plans/{uid}, which only
+           this admin allowlist can write (firestore.rules #13). Pro = plan 'pro' and proUntil in
+           the future; Mission Control and storage.rules both read exactly that. */
+        const planOf = (uid) => (D.plans || {})[uid] || null;
+        const planUntilMs = (p) => p && p.proUntil ? toMs(p.proUntil) : 0;
+        const planIsPro = (p) => !!p && p.plan === 'pro' && planUntilMs(p) > Date.now();
+        function planChip(p) {
+            if (!p || p.plan !== 'pro') return '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-100 text-slate-500">Free</span>';
+            return planIsPro(p) ? '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-[#D34716] text-white">Pro</span>'
+                : '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-100 text-amber-700">Pro ended</span>';
+        }
+        function planControl(u) {
+            const p = planOf(u.uid);
+            const until = planUntilMs(p) || (Date.now() + 365 * DAY);
+            const iso = new Date(until).toISOString().slice(0, 10);
+            return `<div class="border border-slate-200 rounded-lg p-3">
+                <div class="flex items-center justify-between gap-2"><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide">Mission Control plan</h3>${planChip(p)}</div>
+                <p class="text-[11px] text-slate-500 mt-1">Set Pro after a payment. Pro lasts until the end date; nothing is deleted when it ends.${p && p.grantedBy ? ` Last set by ${esc(p.grantedBy)}.` : ''}</p>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+                    <label class="flex flex-col gap-1"><span class="text-[10px] uppercase text-slate-400 font-bold">Plan</span>
+                        <select id="plan-plan" class="border border-slate-200 rounded px-2 py-1.5"><option value="free"${p && p.plan === 'pro' ? '' : ' selected'}>Free</option><option value="pro"${p && p.plan === 'pro' ? ' selected' : ''}>Pro</option></select></label>
+                    <label class="flex flex-col gap-1"><span class="text-[10px] uppercase text-slate-400 font-bold">Pro until</span>
+                        <input id="plan-until" type="date" value="${iso}" class="border border-slate-200 rounded px-2 py-1"></label>
+                    <label class="col-span-2 flex flex-col gap-1"><span class="text-[10px] uppercase text-slate-400 font-bold">Note</span>
+                        <input id="plan-note" type="text" maxlength="500" value="${esc((p && p.note) || '')}" placeholder="e.g. Stripe payment, receipt #…" class="border border-slate-200 rounded px-2 py-1.5"></label>
+                </div>
+                <button id="plan-save" data-uid="${esc(u.uid)}" class="mt-2 bg-[#357889] hover:bg-[#2D6473] text-white font-bold py-1.5 px-3 rounded text-[10px] uppercase tracking-wide">Save plan</button>
+                <span id="plan-status" class="text-[11px] ml-2"></span>
+            </div>`;
+        }
+        async function savePlan(uid) {
+            const status = $('plan-status');
+            const plan = $('plan-plan').value;
+            const day = $('plan-until').value;
+            if (plan === 'pro' && !day) { status.textContent = 'Pick an end date.'; status.className = 'text-[11px] ml-2 text-red-600'; return; }
+            // End of the chosen day, local time, so "until Nov 30" includes Nov 30.
+            const untilMs = day ? new Date(`${day}T23:59:59`).getTime() : 0;
+            const data = {
+                plan,
+                proUntil: plan === 'pro' ? Timestamp.fromMillis(untilMs) : null,
+                grantedBy: (auth.currentUser && auth.currentUser.email) || 'admin',
+                note: $('plan-note').value.trim().slice(0, 500),
+                updatedAt: serverTimestamp(),
+            };
+            status.textContent = 'Saving…'; status.className = 'text-[11px] ml-2 text-slate-500';
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'teacher_plans', uid), data);
+                D.plans = { ...(D.plans || {}), [uid]: { uid, ...data, proUntil: data.proUntil, updatedAt: Date.now() } };
+                status.textContent = plan === 'pro' ? `Saved — Pro until ${new Date(untilMs).toLocaleDateString()}.` : 'Saved — free plan.';
+                status.className = 'text-[11px] ml-2 text-emerald-700';
+            } catch (e) {
+                console.error('[Insider] saving plan failed', e);
+                status.textContent = `Not saved: ${e.code || e.message}`;
+                status.className = 'text-[11px] ml-2 text-red-600';
+            }
+        }
+        function proTeachersCard() {
+            const rows = Object.values(D.plans || {}).filter(p => p.plan === 'pro')
+                .sort((a, b) => planUntilMs(b) - planUntilMs(a));
+            const body = rows.length ? `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Teacher</th><th class="text-left font-bold py-1 px-2">Plan</th><th class="text-right font-bold py-1 px-2">Until</th><th class="text-left font-bold py-1 pl-2">Note</th></tr></thead><tbody>${rows.map(p => { const u = userIndex[p.uid]; return `<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" onclick="location.hash='#/users/${esc(p.uid)}'"><td class="py-1.5"><span class="font-bold text-slate-700">${esc(u ? u.name : p.uid)}</span><span class="block text-[10px] text-slate-400">${esc(u && u.email ? u.email : '')}</span></td><td class="px-2">${planChip(p)}</td><td class="px-2 text-right">${planUntilMs(p) ? new Date(planUntilMs(p)).toLocaleDateString() : '—'}</td><td class="pl-2 text-slate-500">${esc(p.note || '')}</td></tr>`; }).join('')}</tbody></table>`
+                : emptyMsg('No Pro teachers yet. Open a teacher in Users and set their plan.');
+            return card(`Pro teachers · ${rows.filter(planIsPro).length} active`, body);
         }
         function closeDrawer() {
             $('drawer').classList.add('closed');
@@ -1284,6 +1354,7 @@
         function renderTools() {
             const src = (name, n) => `<div class="flex items-center justify-between text-xs border-b border-slate-50 py-1.5"><span class="font-mono text-slate-600">${name}</span><span>${D.errors[name] ? `<span class="text-amber-600 font-bold">error</span>` : `<span class="text-slate-700 font-bold">${n}</span> <span class="text-slate-400">docs</span>`}</span></div>`;
             return errorStrip() + `
+                <div class="mb-4">${proTeachersCard()}</div>
                 <div class="grid lg:grid-cols-2 gap-4">
                     ${card('Export to your BI tool', `
                         <p class="text-xs text-slate-500 mb-3">Each button downloads a CSV you can drop into Google Sheets, Looker Studio, Excel or any BI tool. Column names match the Firestore fields.</p>

@@ -19,6 +19,8 @@ import {
     perStepTiming, STEP_GAP_CEILING_MS,
     MODULE_MINUTES, GAME_MINUTES,
     effectiveAssignment, unionAssigned, hasAnyExtras, extrasFromDoc,
+    choiceTag, choicesFor, drillLesson, drillChallenge, drillGame, drillSim, simProgress,
+    worthFiveMinutes, checkInReason, capRoster, activeMsThisWeek, choiceLevelRows,
 } from '../public/mission-control/derive.js';
 import { readFileSync } from 'node:fs';
 import { MODULE_DATA } from '../public/mission-control/module-data.js';
@@ -941,7 +943,194 @@ test('extrasFromDoc collapses "no extras" and "malformed" to the same null', () 
     assert.equal(extrasFromDoc({}), null);
     assert.equal(extrasFromDoc({ modules: [], games: [] }), null);
     assert.equal(extrasFromDoc({ modules: 'not-a-list' }), null);
-    assert.deepEqual(extrasFromDoc({ modules: ['a'], games: [] }), { modules: ['a'], games: [] });
+    assert.deepEqual(extrasFromDoc({ modules: ['a'], games: [] }), { modules: ['a'], games: [], sims: [] });
     // Non-string entries are dropped rather than carried into a document path.
-    assert.deepEqual(extrasFromDoc({ modules: ['a', 7, null], games: ['g'] }), { modules: ['a'], games: ['g'] });
+    assert.deepEqual(extrasFromDoc({ modules: ['a', 7, null], games: ['g'] }), { modules: ['a'], games: ['g'], sims: [] });
+    // Simulations (2026-11-25): optional, and enough on their own to count as extras.
+    assert.deepEqual(extrasFromDoc({ modules: [], games: [], sims: ['snowball'] }), { modules: [], games: [], sims: ['snowball'] });
+    assert.equal(extrasFromDoc({ modules: [], games: [], sims: [] }), null);
+});
+
+test('simulations are assignable: buildCatalog lists every registry sim with its stream and steps', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const sims = cat.simPacks.flatMap((p) => p.items);
+    assert.deepEqual(sims.map((x) => x.id).sort(), ['reasons-for-the-seasons', 'snowball', 'water-cycle', 'wolves-and-deer']);
+    for (const x of sims) {
+        assert.equal(x.type, 'sim');
+        assert.ok(x.stream && x.eventPrefix && x.stepsTotal > 0, `${x.id} carries stream/prefix/steps`);
+    }
+    // ...and never leak into the module or game lists, whose consumers assume steps or a bank.
+    const others = [...cat.packs, ...cat.gamePacks].flatMap((p) => p.items.map((i) => i.id));
+    for (const x of sims) assert.ok(!others.includes(x.id));
+});
+
+test('effectiveAssignment merges class-wide and per-student simulations like games', () => {
+    const e = effectiveAssignment({ classModules: [], classGames: [], classSims: ['water-cycle'], extras: { modules: [], games: [], sims: ['snowball', 'water-cycle'] } });
+    assert.deepEqual(e.sims, ['water-cycle', 'snowball']);
+    assert.deepEqual(e.extraSims, ['snowball']);
+});
+
+test('assignmentSummary counts simulations separately', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const s = assignmentSummary({ modules: [], games: [], sims: ['snowball', 'water-cycle'], catalog: cat });
+    assert.equal(s.simCount, 2);
+    assert.match(s.label, /2 simulations/);
+});
+
+/* ═══ THE DRILL-DOWN (Mission Control Pro) ═══════════════════════════════════════════ */
+
+// A student as the page holds one: buildStudent's shape plus events / sessions / games.
+function drillStudent(uid, name, { moduleId, maxStep = 0, completed = false, events = null, attempts = {}, sessions = [], games = [] } = {}) {
+    const modules = moduleId ? { [moduleId]: { id: moduleId, maxStep, completed, attempts } } : {};
+    return { uid, name, modules, events, raw: { sessions }, games };
+}
+const choiceEv = (slug, scenarioIndex, choiceIndex, score, t, extra = {}) => ({
+    event: 'choice', module: slug, clientTs: t, meta: { scenarioIndex, choiceIndex, score, ...extra },
+});
+
+test('choiceTag: 3 is BEST, 1-2 OK, 0 RISKY — never "wrong"', () => {
+    assert.equal(choiceTag(3), 'BEST');
+    assert.equal(choiceTag(2), 'OK');
+    assert.equal(choiceTag(1), 'OK');
+    assert.equal(choiceTag(0), 'RISKY');
+    assert.equal(choiceTag(null), null);
+});
+
+test('drillLesson: real step titles, who stopped where, and first-try rate from events', () => {
+    const meta = MODULE_DATA['privacy-security'];
+    const ps = meta.slug;
+    const students = [
+        // Scam Sort (Case 2, scenarioIndex 1): two items, both right first time.
+        drillStudent('a', 'Ana', { moduleId: meta.id, maxStep: 6, completed: true, events: [
+            choiceEv(ps, 1, 0, 3, 1, { attemptKey: 'x1' }), choiceEv(ps, 1, 0, 3, 2, { attemptKey: 'x2' })] }),
+        // One item let past, then fixed on a replay: NOT a first-try success.
+        drillStudent('b', 'Ben', { moduleId: meta.id, maxStep: 2, events: [
+            choiceEv(ps, 1, 1, 0, 1), choiceEv(ps, 1, 0, 3, 2, { replay: true })] }),
+        drillStudent('c', 'Cy', { moduleId: meta.id, maxStep: 0, events: [] }),
+    ];
+    const d = drillLesson(meta, students);
+    assert.deepEqual(d.steps.map((x) => x.title), meta.steps.map((x) => x.title));
+    assert.equal(d.steps[1].title, 'The Scam Sort');
+    assert.equal(d.steps[0].reached, 2);
+    assert.deepEqual(d.steps[1].stopped.map((x) => x.name), ['Ben']);
+    assert.deepEqual(d.notStarted.map((x) => x.name), ['Cy']);
+    assert.equal(d.finished, 1);
+    const scam = d.checks.find((c) => c.index === 1);
+    assert.equal(scam.label, 'Called it correctly');
+    assert.equal(scam.attempted, 2);
+    assert.equal(scam.rate, 50);
+});
+
+test('drillLesson falls back to scenario_attempts when events could not be read', () => {
+    const meta = MODULE_DATA['privacy-security'];
+    const s = drillStudent('a', 'Ana', { moduleId: meta.id, maxStep: 3, events: null,
+        attempts: { 1: [{ scenarioIndex: 1, choiceIndex: 0, score: 3, timestamp: 1 }] } });
+    const d = drillLesson(meta, [s]);
+    assert.equal(d.checks.find((c) => c.index === 1).rate, 100);
+});
+
+test('drillChallenge: groups of seven, and the riskiest scenarios with their real text, hardest first', () => {
+    const meta = MODULE_DATA.ddc;
+    const slug = meta.slug;
+    // Scenario 1 (index 1, 1-based): option scores are 3/1/0 in module-data order.
+    const riskyIdx = meta.steps[0].choices.findIndex((c) => c.score === 0);
+    const bestIdx = meta.steps[0].choices.findIndex((c) => c.score === 3);
+    const students = ['Ava', 'Noah', 'Zoe', 'Finn'].map((n, i) => drillStudent(`u${i}`, n, {
+        moduleId: meta.id, maxStep: i < 2 ? 14 : 7,
+        events: [choiceEv(slug, 1, i < 3 ? riskyIdx : bestIdx, i < 3 ? 0 : 3, 1),
+                 choiceEv(slug, 2, meta.steps[1].choices.findIndex((c) => c.score === 3), 3, 2)],
+    }));
+    const d = drillChallenge(meta, students);
+    assert.equal(d.groups.length, Math.ceil(meta.stepsTotal / 7));
+    assert.deepEqual(d.groups[0], { start: 1, end: 7, through: 4 });
+    assert.equal(d.groups[1].through, 2);
+    assert.equal(d.hardest.length, 1, 'scenario 2 had no risky picks, so only scenario 1 splits');
+    const h = d.hardest[0];
+    assert.equal(h.number, 1);
+    assert.equal(h.title, meta.steps[0].title);
+    assert.equal(h.riskyShare, 75);
+    assert.deepEqual(h.riskyNames.map((x) => x.name), ['Ava', 'Noah', 'Zoe']);
+    assert.deepEqual(h.options.map((o) => o.tag), ['BEST', 'OK', 'RISKY']);
+    assert.deepEqual(h.options.map((o) => o.text).sort(), meta.steps[0].choices.map((c) => c.text).sort());
+    assert.match(worthFiveMinutes(d), /^75% picked the risky answer in Scenario 1\./);
+});
+
+test('drillGame: score spread and the low scorers', () => {
+    const g = (pct) => [{ id: 'read-the-signal', bestPct: pct, plays: 1 }];
+    const students = [
+        drillStudent('a', 'Ana', { games: g(90) }), drillStudent('b', 'Ben', { games: g(40) }),
+        drillStudent('c', 'Cy', { games: g(60) }), drillStudent('d', 'Di', { games: [] }),
+    ];
+    const d = drillGame('read-the-signal', students);
+    assert.equal(d.played, 3);
+    assert.deepEqual(d.buckets.map((b) => b.n), [1, 1, 1]);
+    assert.deepEqual(d.low.map((x) => x.name), ['Ben']);
+    assert.equal(d.avg, 63);
+    assert.match(worthFiveMinutes(d, { name: 'Read the Signal', lessonName: 'Privacy & Security' }), /1 student scored under 50% in Read the Signal\. Privacy & Security/);
+});
+
+test('drillSim: steps from the sim\'s own sessions, predictions and Present mode from its own events', () => {
+    const sim = { id: 'water-cycle', stream: 'water-cycle', eventPrefix: 'wc', stepsTotal: 6 };
+    const sess = (maxStep, completed = false) => [{ module: 'water-cycle', stream: 'water-cycle', maxStep, completed, activeMs: 60000, lastSeenAt: 5 },
+        { module: 'privacy-security', maxStep: 6 }];
+    const ev = (event, meta, sessionId = 's1', t = 1) => ({ event, module: 'water-cycle', stream: 'water-cycle', sessionId, clientTs: t, meta });
+    const students = [
+        drillStudent('a', 'Ana', { sessions: sess(6, true), events: [ev('wc_reveal', { step: 2, matched: false }), ev('wc_reveal', { step: 2, matched: true }, 's1', 2), ev('wc_mode', { mode: 'class' })] }),
+        drillStudent('b', 'Ben', { sessions: sess(3), events: [ev('wc_reveal', { step: 2, matched: true })] }),
+    ];
+    assert.equal(simProgress(students[1], sim).maxStep, 3);
+    const d = drillSim(sim, students);
+    assert.deepEqual(d.steps.map((x) => x.reached), [2, 2, 2, 1, 1, 1]);
+    assert.equal(d.finished, 1);
+    assert.deepEqual(d.predictions, [{ step: 2, revealed: 2, matched: 1, rate: 50 }], "each student's FIRST reveal counts");
+    assert.equal(d.presentSessions, 1);
+    assert.match(worthFiveMinutes(d), /Only 50% predicted Step 2/);
+});
+
+test('worthFiveMinutes says nothing when nothing has been recorded', () => {
+    const meta = MODULE_DATA['privacy-security'];
+    assert.equal(worthFiveMinutes(drillLesson(meta, [])), null);
+    assert.equal(worthFiveMinutes(drillChallenge(MODULE_DATA.ddc, [])), null);
+});
+
+test('checkInReason is plain language, never "at risk"', () => {
+    const rows = [
+        { fact: { kind: 'never-started' } },
+        { fact: { kind: 'silent', days: 9, moduleName: 'Privacy & Security' } },
+        { fact: { kind: 'stalled', step: 2, stepsTotal: 6, moduleName: 'Privacy & Security', opens: 2 } },
+    ];
+    const text = rows.map(checkInReason);
+    assert.equal(text[0], "Joined, but hasn't opened anything yet");
+    assert.equal(text[1], 'No activity in 9 days, part-way through Privacy & Security');
+    assert.equal(text[2], 'Stopped at step 2 of 6 in Privacy & Security, 2 sessions in a row');
+    for (const t of text) assert.doesNotMatch(t, /risk/i);
+});
+
+test('capRoster: the free plan shows the first N by join time; Pro shows everyone; nobody is dropped', () => {
+    const kids = Array.from({ length: 33 }, (_, i) => ({ uid: `k${i}`, joinedAt: 1000 - i }));
+    const free = capRoster(kids, { limit: 30, pro: false });
+    assert.equal(free.shown.length, 30);
+    assert.equal(free.hidden.length, 3);
+    assert.deepEqual(free.hidden.map((k) => k.uid), ['k2', 'k1', 'k0'], 'the latest joiners are the ones not shown');
+    assert.equal(capRoster(kids, { limit: 30, pro: true }).shown.length, 33);
+    // A legacy student with no join time counts as earliest.
+    assert.equal(capRoster([{ uid: 'new', joinedAt: 5 }, { uid: 'old' }], { limit: 1, pro: false }).shown[0].uid, 'old');
+});
+
+test('activeMsThisWeek counts only sessions seen in the last 7 days', () => {
+    const now = NOW;
+    assert.equal(activeMsThisWeek([{ activeMs: 1000, lastSeenAt: now - DAY }, { activeMs: 5000, lastSeenAt: now - 9 * DAY }], now), 1000);
+});
+
+test('choiceLevelRows: one row per student per scored step, with the real choice text and tag', () => {
+    const meta = MODULE_DATA.ddc;
+    const riskyIdx = meta.steps[0].choices.findIndex((c) => c.score === 0);
+    const s = drillStudent('a', 'Ana', { moduleId: meta.id, maxStep: 1, events: [choiceEv(meta.slug, 1, riskyIdx, 0, 1)] });
+    const rows = choiceLevelRows([s], [meta]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].step, 1);
+    assert.equal(rows[0].stepTitle, meta.steps[0].title);
+    assert.equal(rows[0].choice, meta.steps[0].choices[riskyIdx].text);
+    assert.equal(rows[0].tag, 'RISKY');
+    assert.equal(choicesFor(s, MODULE_DATA['privacy-security']).length, 0, 'another module\'s events are not mixed in');
 });

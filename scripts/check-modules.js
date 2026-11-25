@@ -88,7 +88,7 @@ try {
 } catch (e) {
   fail(`public/data/modules-registry.json: not valid JSON — ${e.message}`);
 }
-const TYPES = new Set(['game', 'lab', 'challenge']);
+const TYPES = new Set(['game', 'lab', 'challenge', 'sim']);
 const seenIds = new Set();
 for (const m of REGISTRY) {
   if (!m.id) { fail('registry: an entry has no id'); continue; }
@@ -116,13 +116,14 @@ for (const m of REGISTRY) {
   // A STREAMED game is visible and assignable but reports outside the core funnel (see the
   // `stream` contract in the registry's _comment). Like `hidden`, it is a decision someone
   // made, so it must say why; unlike `hidden`, it stays on every surface a teacher uses.
-  if (m.stream !== undefined) {
+  if (m.stream !== undefined && m.type !== 'sim') {
     if (m.type !== 'game') fail(`registry: "${m.id}" has a \`stream\` but only games may report on their own stream`);
     if (typeof m.stream !== 'string' || !m.stream.trim() || m.stream === 'core') fail(`registry: "${m.id}" \`stream\` must be a non-empty string other than 'core', got ${JSON.stringify(m.stream)}`);
     if (m.hidden === true) fail(`registry: "${m.id}" is both hidden and streamed — pick one (hidden = off every surface; streamed = visible but off the funnel)`);
     if (!(m.streamReason && String(m.streamReason).trim().length > 30)) fail(`registry: streamed game "${m.id}" needs a \`streamReason\` saying why it is outside the core funnel`);
   }
-  if (m.type !== 'game' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
+  if (m.type === 'sim' && m.pack !== null) fail(`registry: sim "${m.id}" must have pack: null (got ${JSON.stringify(m.pack)})`);
+  if (m.type !== 'game' && m.type !== 'sim' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
   if (m.pack && !PACKS[m.pack]) fail(`registry: "${m.id}" has unknown pack "${m.pack}"`);
   if (m.retired) {
     if (m.url) fail(`registry: retired "${m.id}" should have url: null — it has no live page`);
@@ -657,6 +658,52 @@ try {
 } catch (e) {
   fail('public/mission-control/module-data.js is stale or invalid — run: node scripts/build-mission-control-data.js'
     + ((e.stderr && e.stderr.toString().trim()) ? `\n     (${e.stderr.toString().trim().split('\n')[0]})` : ''));
+}
+
+// --- simulations in the registry (type 'sim', 2026-11-25)
+// Registered so Mission Control can assign and track them. Each must agree with the three
+// other places a simulation is described: its own page's Telemetry.init, the simulations
+// list the dashboard and hub render from, and Insider's SIMS (stream, prefix, stepsTotal).
+{
+  const simEntries = REGISTRY.filter((m) => m.type === 'sim' && !m.retired);
+  const simsList = (() => { try { return JSON.parse(read('public/data/simulations.json')).simulations || []; } catch (e) { return []; } })();
+  const insiderSrc = read('public/insider/index.html');
+  const insiderSims = [...(insiderSrc.match(/const SIMS = \[([\s\S]*?)\n\s*\];/) || ['', ''])[1]
+    .matchAll(/stream:\s*'([^']+)'[^}]*?prefix:\s*'([^']+)'[^}]*?stepsTotal:\s*(\d+)/g)]
+    .map((x) => ({ stream: x[1], prefix: x[2], stepsTotal: Number(x[3]) }));
+  if (!insiderSims.length) fail('insider: SIMS not found — Mission Control\'s simulation entries cannot be cross-checked');
+  for (const m of simEntries) {
+    for (const k of ['stream', 'eventPrefix', 'simulationId']) {
+      if (typeof m[k] !== 'string' || !m[k].trim()) fail(`registry: sim "${m.id}" needs a \`${k}\``);
+    }
+    if (!(Number(m.stepsTotal) > 0)) fail(`registry: sim "${m.id}" needs a numeric \`stepsTotal\``);
+    if ((m.skillTags || []).some((t) => t && t.framework === 'internal')) fail(`registry: sim "${m.id}" carries an internal skillTag — simulations do no skill routing`);
+    const row = simsList.find((x) => x.id === m.simulationId);
+    if (!row) fail(`registry: sim "${m.id}" names simulationId "${m.simulationId}", which is not in public/data/simulations.json`);
+    else {
+      if (row.url !== m.url) fail(`registry: sim "${m.id}" url "${m.url}" != simulations.json url "${row.url}"`);
+      if (row.name !== m.name) fail(`registry: sim "${m.id}" name "${m.name}" != simulations.json name "${row.name}"`);
+    }
+    const ins = insiderSims.find((x) => x.stream === m.stream);
+    if (!ins) fail(`insider: SIMS has no entry for stream "${m.stream}" (registry sim "${m.id}")`);
+    else {
+      if (ins.prefix !== m.eventPrefix) fail(`registry: sim "${m.id}" eventPrefix "${m.eventPrefix}" != Insider SIMS prefix "${ins.prefix}"`);
+      if (ins.stepsTotal !== Number(m.stepsTotal)) fail(`registry: sim "${m.id}" stepsTotal ${m.stepsTotal} != Insider SIMS stepsTotal ${ins.stepsTotal}`);
+    }
+    if (m.url && fs.existsSync(path.join(root, 'public', m.url, 'index.html'))) {
+      const init = (read(path.join('public', m.url, 'index.html')).match(/Telemetry\.init\(\{[^}]*\}\)/) || [''])[0];
+      const mod = (init.match(/module:\s*'([^']+)'/) || [])[1];
+      const st = (init.match(/stream:\s*'([^']+)'/) || [])[1];
+      const steps = Number((init.match(/stepsTotal:\s*(\d+)/) || [])[1]);
+      if (mod !== m.id) fail(`public${m.url}index.html: Telemetry module "${mod}" != registry sim id "${m.id}"`);
+      if (st !== m.stream) fail(`public${m.url}index.html: Telemetry stream "${st}" != registry sim stream "${m.stream}"`);
+      if (steps !== Number(m.stepsTotal)) fail(`public${m.url}index.html: Telemetry stepsTotal ${steps} != registry sim stepsTotal ${m.stepsTotal}`);
+    }
+  }
+  // Every simulation the site lists must be assignable.
+  for (const row of simsList) {
+    if (!simEntries.some((m) => m.simulationId === row.id)) fail(`registry: simulation "${row.id}" is in public/data/simulations.json but has no type 'sim' registry entry, so Mission Control cannot assign it`);
+  }
 }
 
 // Printed BEFORE the pass/fail verdict and to stderr, so a warning cannot scroll off behind

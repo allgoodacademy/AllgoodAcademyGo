@@ -411,6 +411,9 @@ export function choiceTextFor(step, attempt) {
    88 minutes" wrong in the direction that matters (a teacher planning a 50-minute period). */
 export const MODULE_MINUTES = 20;
 export const GAME_MINUTES = 8;
+// A simulation's own durationMinutes is preferred (the registry carries one for each); this is
+// only the fallback.
+export const SIM_MINUTES = 15;
 
 // Display names for the registry's pack slugs. The registry stores the slug and nothing
 // else, so the human name has to live somewhere; an unknown slug falls back to a
@@ -539,6 +542,21 @@ export function buildCatalog(registryModules = []) {
         });
     }
 
+    // Simulations (registry type 'sim', 2026-11-25). One group, after the games: a simulation
+    // belongs to no Lab Pack and routes nowhere. Carries its stream, event prefix and
+    // stepsTotal, because Mission Control reads a simulation's progress from its own
+    // telemetry stream rather than from the core modules.
+    const sims = live.filter((m) => m.type === 'sim').map((m) => ({
+        id: m.id,
+        name: m.name,
+        type: 'sim',
+        url: m.url || null,
+        minutes: Number(m.durationMinutes) > 0 ? Number(m.durationMinutes) : SIM_MINUTES,
+        stream: m.stream || null,
+        eventPrefix: m.eventPrefix || null,
+        stepsTotal: Number(m.stepsTotal) || 0,
+    }));
+
     return {
         // A capstone always renders last within its pack, whatever order the registry
         // happens to list it in — the registry orders rwr-challenge before the Room to
@@ -553,8 +571,10 @@ export function buildCatalog(registryModules = []) {
             name: slug ? `${packLabel(slug)} games` : 'Other games',
             items: gamesByPack.get(slug),
         })),
+        simPacks: sims.length ? [{ slug: 'simulations', name: 'Simulations', items: sims }] : [],
         moduleIds: live.filter((m) => m.type === 'lab' || m.type === 'challenge').map((m) => m.id),
         gameIds: live.filter((m) => m.type === 'game').map((m) => m.id),
+        simIds: sims.map((m) => m.id),
         byId: new Map(live.map((m) => [m.id, m])),
     };
 }
@@ -562,22 +582,26 @@ export function buildCatalog(registryModules = []) {
 /* The live count on the save bar. Modules and games are counted separately and the minutes
    are the sum of each item's own estimate, so a 30-minute Challenge is not billed as a
    20-minute lab. */
-export function assignmentSummary({ modules = [], games = [], catalog }) {
+export function assignmentSummary({ modules = [], games = [], sims = [], catalog }) {
     const flat = new Map();
     for (const p of catalog.packs) for (const it of p.items) flat.set(it.id, it);
     for (const p of catalog.gamePacks) for (const it of p.items) flat.set(it.id, it);
+    for (const p of (catalog.simPacks || [])) for (const it of p.items) flat.set(it.id, it);
 
-    const picked = [...modules, ...games].map((id) => flat.get(id)).filter(Boolean);
-    const mods = picked.filter((it) => it.type !== 'game');
+    const picked = [...modules, ...games, ...sims].map((id) => flat.get(id)).filter(Boolean);
+    const mods = picked.filter((it) => it.type !== 'game' && it.type !== 'sim');
     const gms = picked.filter((it) => it.type === 'game');
+    const sms = picked.filter((it) => it.type === 'sim');
     const minutes = picked.reduce((n, it) => n + it.minutes, 0);
 
     const parts = [];
     if (mods.length) parts.push(`${mods.length} module${mods.length === 1 ? '' : 's'}`);
     if (gms.length) parts.push(`${gms.length} game${gms.length === 1 ? '' : 's'}`);
+    if (sms.length) parts.push(`${sms.length} simulation${sms.length === 1 ? '' : 's'}`);
     return {
         moduleCount: mods.length,
         gameCount: gms.length,
+        simCount: sms.length,
         minutes,
         label: parts.length
             ? `${parts.join(' + ')} assigned · about ${minutes} minute${minutes === 1 ? '' : 's'} of class time`
@@ -829,7 +853,7 @@ export function perStepTiming(module) {
    the same reading order as the roster grid itself. A duplicate (a teacher assigns
    an extra that later becomes class-wide) collapses to one entry rather than being
    counted twice in "3 of 5 complete". */
-export function effectiveAssignment({ classModules = [], classGames = [], extras = null } = {}) {
+export function effectiveAssignment({ classModules = [], classGames = [], classSims = [], extras = null } = {}) {
     const merge = (base, extra) => {
         const out = [...base];
         for (const id of (extra || [])) if (!out.includes(id)) out.push(id);
@@ -838,10 +862,12 @@ export function effectiveAssignment({ classModules = [], classGames = [], extras
     return {
         modules: merge(classModules, extras && extras.modules),
         games: merge(classGames, extras && extras.games),
+        sims: merge(classSims, extras && extras.sims),
         // What this student has that the class does not — the UI marks these, and the
         // student-detail page needs to tell an extra apart from class work to explain it.
         extraModules: (extras && extras.modules ? extras.modules : []).filter((id) => !classModules.includes(id)),
         extraGames: (extras && extras.games ? extras.games : []).filter((id) => !classGames.includes(id)),
+        extraSims: (extras && extras.sims ? extras.sims : []).filter((id) => !classSims.includes(id)),
     };
 }
 
@@ -868,7 +894,7 @@ export function unionAssigned(classModules = [], extrasByUid = {}) {
    anywhere, every column applies to everyone and the export stays exactly as it was. */
 export function hasAnyExtras(extrasByUid = {}) {
     return Object.values(extrasByUid || {}).some(
-        (e) => e && ((e.modules && e.modules.length) || (e.games && e.games.length)),
+        (e) => e && ((e.modules && e.modules.length) || (e.games && e.games.length) || (e.sims && e.sims.length)),
     );
 }
 
@@ -880,6 +906,334 @@ export function extrasFromDoc(docData) {
     if (!docData || typeof docData !== 'object') return null;
     const modules = Array.isArray(docData.modules) ? docData.modules.filter((x) => typeof x === 'string') : [];
     const games = Array.isArray(docData.games) ? docData.games.filter((x) => typeof x === 'string') : [];
-    if (!modules.length && !games.length) return null;
-    return { modules, games };
+    // `sims` (2026-11-25) is optional: every extras document written before simulations were
+    // assignable has no such field, and must parse exactly as it did.
+    const sims = Array.isArray(docData.sims) ? docData.sims.filter((x) => typeof x === 'string') : [];
+    if (!modules.length && !games.length && !sims.length) return null;
+    return { modules, games, sims };
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   THE DRILL-DOWN (Mission Control Pro, 2026-11-25)
+
+   Tap an assignment on Overview and see where the class got stuck. Everything here is a
+   pure function of documents Mission Control already holds for each student:
+     s.modules[id]   — buildStudent's per-module shape (maxStep, completed, attempts)
+     s.events        — that student's telemetry events (firestore.rules #11b), or null when
+                       the read was denied; every function below falls back to the
+                       scenario_attempts the student's own records hold (rule #6)
+     s.raw.sessions  — that student's telemetry sessions (rule #10b), for simulations
+     s.games         — summarizeGameSessions(), for games
+   Step titles, scenario text and choice wording come from module-data.js only.
+
+   Words matter here: a low-scoring choice is RISKY, never "wrong" — these are judgment
+   calls, and nothing on this page is a grade.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* BEST / OK / RISKY from a 0–3 score. The Challenge scores its three options 3 / 1 / 0; a
+   lab's Case can also write 2, which reads as OK. Null when there is no score. */
+export function choiceTag(score) {
+    if (typeof score !== 'number') return null;
+    if (score >= 3) return 'BEST';
+    if (score >= 1) return 'OK';
+    return 'RISKY';
+}
+
+const evMs = (e) => toMillis(e && (e.ts || e.clientTs || e.timestamp)) || Number(e && e.clientTs) || 0;
+
+/* One student's graded choices in one module, as { step, choiceIndex, score, replay, ms }:
+   from telemetry `choice` events when they could be read, otherwise from the
+   scenario_attempts buildStudent already bucketed. Oldest first. `step` is 0-based. */
+export function choicesFor(student, meta) {
+    if (!student || !meta) return [];
+    if (Array.isArray(student.events)) {
+        return student.events
+            .filter((e) => e && e.event === 'choice' && e.module === meta.slug && e.meta && typeof e.meta.scenarioIndex === 'number')
+            .map((e) => ({
+                step: e.meta.scenarioIndex - meta.indexBase,
+                choiceIndex: typeof e.meta.choiceIndex === 'number' ? e.meta.choiceIndex : null,
+                score: typeof e.meta.score === 'number' ? e.meta.score : null,
+                replay: e.meta.replay === true,
+                key: e.meta.attemptKey || null,
+                ms: evMs(e),
+            }))
+            .filter((c) => c.step >= 0 && c.step < meta.stepsTotal)
+            .sort((a, b) => a.ms - b.ms);
+    }
+    const m = student.modules && student.modules[meta.id];
+    if (!m || !m.attempts) return [];
+    const out = [];
+    for (const [k, rows] of Object.entries(m.attempts)) {
+        for (const a of rows) {
+            out.push({
+                step: Number(k),
+                choiceIndex: typeof a.choiceIndex === 'number' ? a.choiceIndex : null,
+                score: typeof a.score === 'number' ? a.score : null,
+                replay: a.replay === true,
+                key: a.attemptKey || null,
+                ms: toMillis(a.timestamp),
+            });
+        }
+    }
+    return out.sort((a, b) => a.ms - b.ms);
+}
+
+/* A student's FIRST pass at one step: every non-replay choice (several for a Case that
+   grades items one by one, like the Scam Sort), or the very first choice if all of them
+   were replays. */
+function firstPass(choices, step) {
+    const at = choices.filter((c) => c.step === step);
+    const first = at.filter((c) => !c.replay);
+    return first.length ? first : at.slice(0, 1);
+}
+
+const nameOf = (s) => s.name || 'A student';
+
+/* LESSONS: how far the class got, step by step, and the first-try rate on each check. */
+export function drillLesson(meta, students = []) {
+    const n = students.length;
+    const steps = meta.steps.map((st, i) => {
+        const k = i + 1;
+        const reached = students.filter((s) => (s.modules[meta.id] ? s.modules[meta.id].maxStep : 0) >= k);
+        // Stopped here: furthest step is this one, and not finished.
+        const stopped = students.filter((s) => {
+            const m = s.modules[meta.id];
+            return m && !m.completed && m.maxStep === k && k < meta.stepsTotal;
+        });
+        return { index: i, title: st.title, reached: reached.length, stopped: stopped.map((s) => ({ uid: s.uid, name: nameOf(s) })) };
+    });
+    const notStarted = students.filter((s) => !s.modules[meta.id] || s.modules[meta.id].maxStep === 0)
+        .map((s) => ({ uid: s.uid, name: nameOf(s) }));
+    const finished = students.filter((s) => s.modules[meta.id] && s.modules[meta.id].completed).length;
+
+    const checks = [];
+    meta.steps.forEach((st, i) => {
+        if (!st.choices || !st.choices.length) return;
+        let attempted = 0, firstTry = 0;
+        for (const s of students) {
+            const pass = firstPass(choicesFor(s, meta), i).filter((c) => typeof c.score === 'number');
+            if (!pass.length) continue;
+            attempted += 1;
+            if (pass.every((c) => c.score >= 3)) firstTry += 1;
+        }
+        if (!attempted) return;
+        checks.push({ index: i, title: st.title, label: st.choices[0].text, attempted, firstTry, rate: Math.round((firstTry / attempted) * 100) });
+    });
+    return { kind: 'lesson', n, finished, steps, notStarted, checks };
+}
+
+/* THE CHALLENGE: progress in groups of seven scenarios, and where the class split — the
+   scenarios with the highest share of risky picks, hardest first. */
+export const SCENARIO_GROUP = 7;
+export function drillChallenge(meta, students = [], { top = 3 } = {}) {
+    const n = students.length;
+    const groups = [];
+    for (let start = 1; start <= meta.stepsTotal; start += SCENARIO_GROUP) {
+        const end = Math.min(meta.stepsTotal, start + SCENARIO_GROUP - 1);
+        const through = students.filter((s) => (s.modules[meta.id] ? s.modules[meta.id].maxStep : 0) >= end).length;
+        groups.push({ start, end, through });
+    }
+    const finished = students.filter((s) => s.modules[meta.id] && s.modules[meta.id].completed).length;
+
+    const splits = meta.steps.map((st, i) => {
+        const options = (st.choices || []).map((c) => ({ text: c.text, score: c.score, tag: choiceTag(c.score), n: 0, names: [] }));
+        let answered = 0;
+        for (const s of students) {
+            const pick = firstPass(choicesFor(s, meta), i).find((c) => c.choiceIndex != null);
+            if (!pick || !options[pick.choiceIndex]) continue;
+            answered += 1;
+            options[pick.choiceIndex].n += 1;
+            options[pick.choiceIndex].names.push({ uid: s.uid, name: nameOf(s) });
+        }
+        for (const o of options) o.share = answered ? Math.round((o.n / answered) * 100) : 0;
+        const risky = options.filter((o) => o.tag === 'RISKY');
+        const riskyN = risky.reduce((a, o) => a + o.n, 0);
+        return {
+            index: i, number: i + 1, title: st.title, answered, options,
+            riskyShare: answered ? Math.round((riskyN / answered) * 100) : 0,
+            riskyNames: risky.flatMap((o) => o.names),
+        };
+    });
+    const hardest = splits.filter((x) => x.answered > 0 && x.riskyShare > 0)
+        .sort((a, b) => b.riskyShare - a.riskyShare || b.answered - a.answered || a.index - b.index)
+        .slice(0, top)
+        // The options in the order BEST, OK, RISKY, so every scenario reads the same way.
+        .map((x) => ({ ...x, options: x.options.slice().sort((a, b) => (b.score ?? -1) - (a.score ?? -1)) }));
+    return { kind: 'challenge', n, finished, groups, hardest, answeredAny: splits.some((x) => x.answered > 0) };
+}
+
+/* GAMES: the spread of each student's best score, and who scored low. */
+export const GAME_LOW_PCT = 50;
+export function drillGame(gameId, students = []) {
+    const n = students.length;
+    const played = [];
+    for (const s of students) {
+        const g = (s.games || []).find((x) => x.id === gameId);
+        if (g) played.push({ uid: s.uid, name: nameOf(s), best: g.bestPct, plays: g.plays });
+    }
+    const scored = played.filter((p) => typeof p.best === 'number');
+    const buckets = [
+        { label: '80–100%', min: 80, max: 101 },
+        { label: '50–79%', min: GAME_LOW_PCT, max: 80 },
+        { label: `Under ${GAME_LOW_PCT}%`, min: -1, max: GAME_LOW_PCT },
+    ].map((b) => ({ label: b.label, n: scored.filter((p) => p.best >= b.min && p.best < b.max).length }));
+    const low = scored.filter((p) => p.best < GAME_LOW_PCT).sort((a, b) => a.best - b.best);
+    const avg = scored.length ? Math.round(scored.reduce((a, p) => a + p.best, 0) / scored.length) : null;
+    return { kind: 'game', n, played: played.length, buckets, low, avg };
+}
+
+/* SIMULATIONS: steps reached, how often a prediction matched what the model then showed,
+   and whether Present mode (a class on a projector) was used. Read from the simulation's
+   OWN telemetry stream — its sessions (rule #10b) and its `<prefix>_*` events (#11b) — not
+   from the core modules. */
+export function simSessionsOf(student, sim) {
+    const sessions = (student && student.raw && student.raw.sessions) || [];
+    return sessions.filter((x) => x && (x.module === sim.id || (sim.stream && x.stream === sim.stream)));
+}
+export function simProgress(student, sim) {
+    const ss = simSessionsOf(student, sim);
+    const maxStep = Math.min(sim.stepsTotal || Infinity, Math.max(0, ...ss.map((x) => Number(x.maxStep) || 0)));
+    return {
+        maxStep,
+        completed: ss.some((x) => x.completed === true) || (sim.stepsTotal > 0 && maxStep >= sim.stepsTotal),
+        activeMs: ss.reduce((a, x) => a + (Number(x.activeMs) || 0), 0),
+        sessions: ss.length,
+        lastSeen: Math.max(0, ...ss.map((x) => toMillis(x.lastSeenAt) || toMillis(x.startedAt))),
+    };
+}
+export function drillSim(sim, students = []) {
+    const n = students.length;
+    const prog = students.map((s) => ({ s, p: simProgress(s, sim) }));
+    const steps = Array.from({ length: sim.stepsTotal || 0 }, (_, i) => ({
+        step: i + 1,
+        reached: prog.filter(({ p }) => p.maxStep >= i + 1).length,
+    }));
+    const finished = prog.filter(({ p }) => p.completed).length;
+    const played = prog.filter(({ p }) => p.sessions > 0).length;
+
+    // Predictions: per student, their first reveal at each step (matched or not).
+    const eventsKnown = students.some((s) => Array.isArray(s.events));
+    const byStep = new Map();
+    let presentSessions = new Set();
+    for (const s of students) {
+        if (!Array.isArray(s.events)) continue;
+        const mine = s.events.filter((e) => e && (e.module === sim.id || (sim.stream && e.stream === sim.stream)))
+            .sort((a, b) => evMs(a) - evMs(b));
+        const seen = new Set();
+        for (const e of mine) {
+            if (e.meta && e.meta.mode === 'class') presentSessions.add(`${s.uid}|${e.sessionId}`);
+            if (e.event !== `${sim.eventPrefix}_reveal` || !e.meta || e.meta.step == null) continue;
+            if (seen.has(e.meta.step)) continue;
+            seen.add(e.meta.step);
+            const row = byStep.get(e.meta.step) || { step: e.meta.step, revealed: 0, matched: 0 };
+            row.revealed += 1;
+            if (e.meta.matched) row.matched += 1;
+            byStep.set(e.meta.step, row);
+        }
+    }
+    const predictions = [...byStep.values()].sort((a, b) => a.step - b.step)
+        .map((r) => ({ ...r, rate: Math.round((r.matched / r.revealed) * 100) }));
+    return { kind: 'sim', n, played, finished, steps, predictions, eventsKnown, presentSessions: presentSessions.size };
+}
+
+/* "Worth five minutes tomorrow": ONE sentence, built from a template and real labels,
+   naming the step or scenario with the weakest result. No AI. Null when nothing has been
+   recorded yet, so the page says nothing rather than something invented. */
+export function worthFiveMinutes(drill, { name = '', lessonName = '' } = {}) {
+    if (!drill) return null;
+    if (drill.kind === 'lesson') {
+        const weakest = drill.checks.slice().sort((a, b) => a.rate - b.rate || b.attempted - a.attempted)[0];
+        if (weakest && weakest.rate < 100) {
+            return `Only ${weakest.rate}% got "${weakest.label}" on the first try in ${weakest.title}. Walk through ${weakest.title} together and ask the class what they would look for next time.`;
+        }
+        const stall = drill.steps.slice().sort((a, b) => b.stopped.length - a.stopped.length)[0];
+        if (stall && stall.stopped.length) {
+            return `${stall.stopped.length} student${stall.stopped.length === 1 ? '' : 's'} stopped at ${stall.title}. Start tomorrow there, together.`;
+        }
+        return null;
+    }
+    if (drill.kind === 'challenge') {
+        const h = drill.hardest[0];
+        if (!h) return null;
+        return `${h.riskyShare}% picked the risky answer in Scenario ${h.number}. Put it on the board and ask, "What could go wrong, and how would you know?"`;
+    }
+    if (drill.kind === 'game') {
+        if (!drill.low.length) return null;
+        return `${drill.low.length} student${drill.low.length === 1 ? '' : 's'} scored under ${GAME_LOW_PCT}% in ${name || 'this game'}.${lessonName ? ` ${lessonName} teaches what it checks.` : ''}`;
+    }
+    if (drill.kind === 'sim') {
+        const weakest = drill.predictions.slice().sort((a, b) => a.rate - b.rate || b.revealed - a.revealed)[0];
+        if (weakest && weakest.rate < 100) {
+            return `Only ${weakest.rate}% predicted Step ${weakest.step} before the model showed it. Ask the class what they expected at Step ${weakest.step}, and why.`;
+        }
+        const stuck = drill.steps.find((x, i) => i > 0 && x.reached < drill.steps[i - 1].reached);
+        if (stuck) return `Fewer students got past Step ${stuck.step - 1} than any other step. Try Step ${stuck.step - 1} in Present mode with the whole class.`;
+        return null;
+    }
+    return null;
+}
+
+/* The plain reason a student is on "Could use a check-in". Built from attentionList()'s
+   facts, without any word like "at risk": these are where to look, not verdicts. */
+export function checkInReason(row) {
+    const f = row && row.fact;
+    if (!f) return '';
+    switch (f.kind) {
+        case 'never-started': return "Joined, but hasn't opened anything yet";
+        case 'silent': return `No activity ${f.days === 1 ? 'since yesterday' : `in ${f.days} days`}${f.moduleName ? `, part-way through ${f.moduleName}` : ''}`;
+        case 'stalled': return `Stopped at step ${f.step} of ${f.stepsTotal} in ${f.moduleName}${f.opens > 1 ? `, ${f.opens} sessions in a row` : ''}`;
+        case 'slowing': return `Quiet for ${f.days != null ? `${f.days} day${f.days === 1 ? '' : 's'}` : 'a while'}, with nothing in progress`;
+        default: return '';
+    }
+}
+
+/* THE FREE PLAN'S SOFT LIMIT. Joining is never refused and every student's progress is
+   recorded; on the free plan the roster and every figure use the first `limit` students by
+   join time. A student with no join time (joined before the join table existed) counts as
+   earliest. Pro shows everyone. */
+export function capRoster(students = [], { limit, pro }) {
+    const ordered = students.slice().sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0) || String(a.uid).localeCompare(String(b.uid)));
+    if (pro || !(limit > 0) || ordered.length <= limit) return { shown: ordered, hidden: [] };
+    return { shown: ordered.slice(0, limit), hidden: ordered.slice(limit) };
+}
+
+/* Time on task in the last 7 days, from session activeMs (counted only while the tab is in
+   use — see /js/telemetry.js). */
+export function activeMsThisWeek(sessions = [], now = Date.now()) {
+    return sessions
+        .filter((x) => x && (now - (toMillis(x.lastSeenAt) || toMillis(x.startedAt))) < ACTIVE_WINDOW_DAYS * DAY)
+        .reduce((a, x) => a + (Number(x.activeMs) || 0), 0);
+}
+
+/* THE CHOICE-LEVEL CSV (Pro): one row per student per scored step or scenario. */
+export function choiceLevelRows(students = [], metas = []) {
+    const rows = [];
+    for (const s of students) {
+        for (const meta of metas) {
+            const choices = choicesFor(s, meta);
+            const steps = [...new Set(choices.map((c) => c.step))].sort((a, b) => a - b);
+            for (const step of steps) {
+                const at = choices.filter((c) => c.step === step);
+                const pass = firstPass(choices, step);
+                const last = at[at.length - 1];
+                const st = meta.steps[step] || {};
+                const text = last && last.choiceIndex != null && st.choices && st.choices[last.choiceIndex]
+                    ? st.choices[last.choiceIndex].text : '';
+                rows.push({
+                    student: s.name,
+                    module: meta.name,
+                    kind: meta.kind,
+                    step: step + 1,
+                    stepTitle: st.title || '',
+                    choice: text,
+                    tag: choiceTag(last ? last.score : null) || '',
+                    score: last && typeof last.score === 'number' ? last.score : '',
+                    tries: at.length,
+                    firstTry: pass.length && pass.every((c) => typeof c.score === 'number' && c.score >= 3) ? 'yes' : 'no',
+                    at: last && last.ms ? new Date(last.ms).toISOString() : '',
+                });
+            }
+        }
+    }
+    return rows;
 }

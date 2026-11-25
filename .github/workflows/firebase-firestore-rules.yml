@@ -74,3 +74,26 @@ jobs:
         run: node_modules/.bin/firebase deploy --only firestore:rules --project allgood-academy
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+
+  # storage.rules (2026-11-25): the paid facilitator guides are readable only by a Pro teacher.
+  # Its own job, after the Firestore deploy and independent of it: Storage is new to this
+  # project, and a first-time problem here (the bucket, or the IAM grant that lets Storage
+  # rules call firestore.get) must never stop a Firestore rules change from shipping. Same
+  # tests gate it — run-rules-tests.sh runs the Storage suite beside the Firestore one.
+  deploy_storage_rules:
+    needs: [test_rules, deploy_rules]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm ci
+      - name: Write service account credentials
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}' > "${{ runner.temp }}/firebase-service-account.json"
+      - name: Deploy Storage rules
+        run: node_modules/.bin/firebase deploy --only storage --project allgood-academy --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
