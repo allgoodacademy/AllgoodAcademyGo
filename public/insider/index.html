@@ -963,8 +963,11 @@
             const scores = D.gameScores.filter(s => names.has(s.gameName) && s.ms >= start);
             const legacy = scores.filter(s => !sids.has(s.sessionId));   // plays recorded only as a score row
             const players = new Set([...sessions.map(s => s.uid), ...scores.map(s => s.uid)].filter(Boolean));
+            // Take the Bait opens one session per level and never sets `completed`; a level it
+            // finished is one with a level_end event (the same rule as its own page).
+            const ttbEnded = g.module === 'take-the-bait' ? new Set(D.ttb.events.filter(e => e.event === 'level_end').map(e => e.sessionId)) : null;
             const finished = new Set([
-                ...sessions.filter(s => s.completed).map(s => s.sessionId),
+                ...sessions.filter(s => s.completed || (ttbEnded && ttbEnded.has(s.sessionId))).map(s => s.sessionId),
                 ...scores.filter(s => s.completed || s.complete).map(s => s.sessionId),
             ].filter(Boolean)).size;
             const times = sessions.map(s => s.activeMs).filter(x => typeof x === 'number' && x > 0);
