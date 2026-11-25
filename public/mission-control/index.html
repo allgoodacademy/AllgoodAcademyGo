@@ -63,6 +63,9 @@ a{color:var(--teal-deep)}
 .who .nm{max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .plan{font-size:10.5px;font-weight:700;letter-spacing:.06em;border-radius:6px;padding:2px 7px;background:var(--line);color:var(--soft)}
 .plan.pro{background:var(--orange);color:#fff}
+button.plan{border:0;font-family:inherit;cursor:default}
+button.plan.up{cursor:pointer;background:var(--orange-wash);color:var(--orange-deep)}
+button.plan.up:hover{background:var(--orange);color:#fff}
 .code{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 14px;width:100%}
 .code .lbl{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--faint)}
 .code b{font-family:'Courier New',Courier,monospace;font-size:22px;letter-spacing:.14em;color:var(--teal-deep)}
@@ -231,6 +234,10 @@ details.as .body{padding:10px 12px 12px;font-size:12.5px}
 .gc .row{display:flex;gap:8px 10px;flex-wrap:wrap;align-items:center;margin-top:auto;padding-top:6px}
 .gc .soon{font-size:12px;color:var(--faint)}
 .gc .row .text-btn{align-self:center}
+.gc .incl{font-size:12px;font-weight:700;color:var(--orange-deep);background:var(--orange-wash);border-radius:6px;padding:3px 8px}
+.gbanner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--orange-wash);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:12px;font-size:13.5px}
+.gbundle{margin:14px 2px 0;font-size:13px;color:var(--soft)}
+.gbundle a{color:var(--teal-deep);font-weight:700}
 
 /* ---------- overlays: Pro panel, class code on screen, new class ---------- */
 .modal{position:fixed;inset:0;z-index:70;background:rgba(15,20,23,.5);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -499,7 +506,7 @@ body.present .nav-shell.activity{display:none}
       </button>
       <div class="menu" id="cls-menu" role="menu" hidden></div>
     </div>
-    <div class="who"><span class="av" id="who-av" aria-hidden="true">T</span><span class="nm" id="who-name">Teacher</span><span class="plan" id="plan-chip">FREE</span><button class="link" id="btn-signout" type="button">Sign out</button></div>
+    <div class="who"><span class="av" id="who-av" aria-hidden="true">T</span><span class="nm" id="who-name">Teacher</span><button class="plan" id="plan-chip" type="button" data-pro="upgrade">FREE</button><button class="link" id="btn-signout" type="button">Sign out</button></div>
     <div class="code">
       <div><div class="lbl">CLASS CODE</div><b id="code-value">—</b></div>
       <div class="how">Students go to <strong>allgoodacademy.com/join</strong> and type it.</div>
@@ -1290,8 +1297,12 @@ function paintHeader() {
     $('who-name').textContent = teacher;
     $('who-av').textContent = initialsOf(teacher).slice(0, 1);
     const chip = $('plan-chip');
-    chip.textContent = state.plan.pro ? 'PRO' : 'FREE';
+    // Free: the chip is the always-visible way in to Pro. Pro: a plain label.
+    chip.textContent = state.plan.pro ? 'PRO' : `FREE · Upgrade ${PRO_PRICE_LABEL.replace('/year', '/yr')}`;
     chip.classList.toggle('pro', state.plan.pro);
+    chip.classList.toggle('up', !state.plan.pro);
+    chip.disabled = !!state.plan.pro;
+    if (state.plan.pro) chip.removeAttribute('data-pro'); else chip.dataset.pro = 'upgrade';
     document.title = `${name} — Mission Control`;
     // A signed-in teacher: the nav's "Teacher sign in" reads "Mission Control" from now on
     // (the same flag the nav's session script reads on every page).
@@ -1430,6 +1441,8 @@ const PRO_WHY = {
     guide: 'Every facilitator guide is included with Pro',
     csv: 'The choice-level CSV is a Pro feature',
     renew: 'Renew Mission Control Pro',
+    upgrade: 'Mission Control Pro',
+    guides: 'Every facilitator guide is included with Pro',
 };
 /* The Stripe Payment Link, with what lets the founder match the payment to this teacher in
    Insider: their sign-in email prefilled (skipped when there is none) and their uid as
@@ -2119,24 +2132,61 @@ async function writeExtras(uid, { modules, games, sims }) {
    ═════════════════════════════════════════════════════════════════════════════ */
 function renderGuides() {
     const pro = state.plan.pro;
-    const cards = GUIDES.filter((g) => g.file || g.tptUrl).map((g) => {
+    const visible = GUIDES.filter((g) => g.storagePath || g.tptUrl);
+    const cards = visible.map((g) => {
         const paid = g.tpt && g.tpt !== 'FREE';
-        const url = (!paid || pro) ? (g.file || g.tptUrl) : g.tptUrl;
-        const isFile = url === g.file;
-        return `<div class="gc"><div class="eyebrow">${esc(g.kind)}</div><h3>${esc(g.title)}</h3><div class="meta">${esc(g.sub)}</div>
-          <div class="row"><button class="btn sm" type="button" data-guide-url="${esc(url)}" data-guide-file="${isFile ? '1' : ''}" data-guide-name="${esc(`Allgood Academy - ${g.title} facilitator guide.pdf`)}">Download facilitator guide</button></div></div>`;
+        const head = `<div class="eyebrow">${esc(g.kind)}</div><h3>${esc(g.title)}</h3><div class="meta">${esc(g.sub)}</div>`;
+        let row;
+        if (!paid) {
+            row = `<a class="btn sm" href="${esc(g.tptUrl)}" target="_blank" rel="noopener" data-guide-track="${esc(g.id)}">Get it free on TPT</a>`;
+        } else if (pro && g.storagePath) {
+            row = `<button class="btn sm" type="button" data-guide-path="${esc(g.storagePath)}" data-guide-id="${esc(g.id)}" data-guide-name="${esc(`Allgood Academy - ${g.title} facilitator guide.pdf`)}">Download facilitator guide</button>`;
+        } else {
+            row = `<span class="incl">Included with Pro</span><button class="btn sm" type="button" data-pro="guides">Get Pro</button>`
+                + (g.tptUrl ? `<a class="text-btn" href="${esc(g.tptUrl)}" target="_blank" rel="noopener" data-guide-track="${esc(g.id)}">or ${esc(g.tpt)} on TPT</a>` : '');
+        }
+        return `<div class="gc">${head}<div class="row">${row}</div></div>`;
     }).join('');
-    $('pane-guides').innerHTML = `<div class="gl">${cards}</div>`;
+    const banner = pro ? '' : `<div class="gbanner"><div><b>Every paid facilitator guide is included with Pro.</b> Free guides stay free for everyone.</div><button class="btn sm" type="button" data-pro="guides">Get Pro · ${esc(PRO_PRICE_LABEL)}</button></div>`;
+    const bundle = (!pro && GUIDE_BUNDLE && GUIDE_BUNDLE.tptUrl)
+        ? `<p class="gbundle">Just the guides? <a href="${esc(GUIDE_BUNDLE.tptUrl)}" target="_blank" rel="noopener">${esc(GUIDE_BUNDLE.title)} — ${esc(GUIDE_BUNDLE.tpt)} on TPT</a></p>` : '';
+    $('pane-guides').innerHTML = `${banner}<div class="gl">${cards}</div>${bundle}`;
 }
-document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-guide-url]');
+// A Pro download: Storage hands back a short-lived link only if storage.rules says this
+// teacher is Pro. The Storage SDK loads on the first click, not with the page.
+let storageApi = null;
+async function guideLink(path) {
+    if (!storageApi) {
+        const [{ getApp }, st] = await Promise.all([
+            import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js'),
+            import('https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js'),
+        ]);
+        storageApi = { st, storage: st.getStorage(getApp()) };
+    }
+    return storageApi.st.getDownloadURL(storageApi.st.ref(storageApi.storage, path));
+}
+document.addEventListener('click', async (e) => {
+    const t = e.target.closest('[data-guide-track]');
+    if (t) { track('guide_download', { guide: t.dataset.guideTrack, via: 'tpt' }); return; }
+    const b = e.target.closest('[data-guide-path]');
     if (!b) return;
     e.preventDefault();
-    track('guide_download', { guide: String(b.dataset.guideName || '').replace(/^Allgood Academy - | facilitator guide\.pdf$/g, '').slice(0, 60) });
-    if (!b.dataset.guideFile) { window.open(b.dataset.guideUrl, '_blank', 'noopener'); return; }
-    const a = document.createElement('a');
-    a.href = b.dataset.guideUrl; a.download = b.dataset.guideName;
-    document.body.appendChild(a); a.click(); a.remove();
+    track('guide_download', { guide: b.dataset.guideId, via: 'pro' });
+    const label = b.textContent;
+    b.disabled = true; b.textContent = 'Preparing…';
+    try {
+        const url = await guideLink(b.dataset.guidePath);
+        // A cross-origin link ignores the download attribute, so it opens in a new tab,
+        // where the PDF viewer has its own download button.
+        window.open(url, '_blank', 'noopener');
+    } catch (err) {
+        console.warn('[Mission Control] guide download failed', err && err.code);
+        toast(err && err.code === 'storage/unauthorized'
+            ? 'That guide is part of Pro. If you just upgraded, reload the page.'
+            : "Couldn't get that guide just now. Try again in a moment.", true);
+    } finally {
+        b.disabled = false; b.textContent = label;
+    }
 });
 
 /* ═════════════════════════════════════════════════════════════════════════════
