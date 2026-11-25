@@ -9,10 +9,10 @@
 <style>
 /*
  VOICE: a calm, trustworthy shelf of free classroom tools from a teacher who cares.
- IDEA: a shelf of hands-on models, any subject: one featured simulation, labeled like a kit.
- PICTURE: the Water Cycle scene itself (sun, ocean, mountain, clouds, rain shadow) drawn large.
+ IDEA: a shelf of hands-on models, any subject: one card per simulation, labeled like a kit.
+ PICTURE: the Water Cycle scene (sun, ocean, mountain, clouds, rain shadow) as the hub's hero.
  COLOUR and TYPE: Allgood teal and cream with orange for actions; Georgia display, Verdana UI.
- LAYOUT: brand nav, featured simulation card with picture, how-to-use strip, teacher notes.
+ LAYOUT: brand nav, intro with picture, a card per simulation (from /data/simulations.json), how-to-use strip, teacher notes.
 */
 :root{
   --bg:var(--color-canvas); --card:var(--color-surface); --panel:var(--color-cream); --panel-b:var(--color-cream-border);
@@ -66,30 +66,33 @@ a{color:var(--accent-text)}
 .iconbtn svg{width:22px;height:22px}
 
 /* Intro */
-.intro{padding:34px 0 18px}
+.intro{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;align-items:center;padding:34px 0 22px}
 .eyebrow{font-size:13px;font-weight:700;color:var(--accent-text);margin:0 0 8px}
 .intro h1{font-size:clamp(32px,4.6vw,48px);max-width:18ch}
 .intro p{max-width:60ch;color:var(--ink2);font-size:17px;margin:12px 0 0}
+.hero{position:relative;aspect-ratio:640/400;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+.hero svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 
-/* Featured simulation */
-.feature{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin:10px 0 28px}
-.feature .fig{position:relative;min-height:340px;background:var(--panel)}
-.feature .fig svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-.fbody{padding:28px 28px 26px;display:flex;flex-direction:column;gap:14px}
+/* Simulation cards: one per entry in /data/simulations.json, in that order */
+.sims{margin:6px 0 30px}
+.sims h2{font-size:clamp(24px,2.6vw,30px);margin-bottom:14px}
+.count{font-family:var(--font-ui);font-size:14px;font-weight:700;color:var(--accent-text);margin-left:8px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.simcard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:12px}
 .tagrow{display:flex;flex-wrap:wrap;gap:6px}
 .tag{font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--accent-wash);color:var(--accent-text);white-space:nowrap}
-.tag.new{background:var(--cta);color:var(--color-surface)}
-.fbody h2{font-size:clamp(28px,3.2vw,36px)}
-.fbody p{margin:0;color:var(--ink2)}
+.simcard h3{font-size:clamp(24px,2.6vw,30px)}
+.simcard p{margin:0;color:var(--ink2)}
 .learn{margin:0;padding-left:20px;color:var(--ink)}
 .learn li{margin-bottom:4px}
-.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:auto;padding-top:4px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 20px;border-radius:14px;font-weight:700;text-decoration:none;border:1px solid var(--line);background:var(--card);color:var(--ink)}
 .btn:hover{border-color:var(--accent)}
 .btn.cta{background:var(--cta);color:var(--color-surface);border:0;box-shadow:0 4px 0 var(--cta-d);font-size:19px}
 .btn.cta:hover{filter:brightness(1.05)}
 .btn svg{width:20px;height:20px}
 .fine{font-size:13px;color:var(--ink2)}
+.empty{color:var(--ink2)}
 
 /* How to use */
 .how{margin:0 0 28px}
@@ -117,13 +120,13 @@ a{color:var(--accent-text)}
 .toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:50;background:var(--card);color:var(--ink);border:1px solid var(--panel-b);border-radius:12px;padding:10px 14px;font-size:14px;box-shadow:0 6px 18px color-mix(in srgb, var(--color-ink) 22%, transparent);max-width:calc(100vw - 24px)}
 
 @media (max-width:900px){
-  .feature{grid-template-columns:1fr}
-  .feature .fig{min-height:0;aspect-ratio:640/400}
+  .intro{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr}
   .teach{grid-template-columns:1fr}
 }
 @media (max-width:600px){
   .steps{grid-template-columns:1fr}
-  .fbody{padding:20px}
+  .simcard{padding:20px}
   .wm-sub{display:none}
   .intro{padding-top:24px}
   .actions .btn{flex:1 1 100%}
@@ -189,13 +192,12 @@ a{color:var(--accent-text)}
 
 <main class="wrap">
   <section class="intro">
+    <div>
     <p class="eyebrow">Free for every classroom · No sign-in</p>
     <h1>Guess first. Then find out why.</h1>
     <p>Each simulation puts a working model in front of your class. Students predict what will happen, test it, and figure out why. Project one for the whole class, or let students play on their own devices.</p>
-  </section>
-
-  <article class="feature" aria-labelledby="wc-title">
-    <div class="fig">
+    </div>
+    <div class="hero">
       <svg viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A simulation scene: the sun over a warm ocean, clouds piling up against a tall mountain with rain falling on the side facing the wind, and a dry valley beyond.">
         <defs>
           <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky-top)"/><stop offset="1" style="stop-color:var(--sky-bot)"/></linearGradient>
@@ -221,25 +223,12 @@ a{color:var(--accent-text)}
         <g fill="none" stroke="var(--ink2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M120 150h44m-8-6 8 6-8 6"/><path d="M120 172h44m-8-6 8 6-8 6"/></g><text x="120" y="138" font-family="Verdana, Geneva, sans-serif" font-size="13" font-weight="700" fill="var(--ink2)">Wind</text>
       </svg>
     </div>
-    <div class="fbody">
-      <div class="tagrow"><span class="tag new">New</span><span class="tag">Science</span><span class="tag">Grades 6–8</span><span class="tag">10–15 min</span><span class="tag">NGSS MS-ESS2-4</span></div>
-      <h2 id="wc-title">Where rain comes from</h2>
-      <p>Why does one side of a mountain get soaked while the other side stays dry? Students warm an ocean, turn on the wind, and figure out the water cycle and the rain shadow for themselves.</p>
-      <ul class="learn">
-        <li>Evaporation, condensation, precipitation, and runoff</li>
-        <li>Why rising air makes clouds and rain</li>
-        <li>Rain shadows, tested on a real island</li>
-      </ul>
-      <div class="actions">
-        <a class="btn cta" href="/simulations/watercycle/">Start</a>
-        <a class="btn" href="/simulations/watercycle/#present">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg>
-          Present to your class
-        </a>
-      </div>
-      <p class="fine">Science checked against USGS, NOAA, and the National Weather Service. The rain shadow step also supports NGSS MS-ESS2-5.</p>
-    </div>
-  </article>
+  </section>
+
+  <section class="sims" aria-labelledby="sims-title">
+    <h2 id="sims-title">Pick a simulation <span class="count" id="simCount"></span></h2>
+    <div class="grid" id="simGrid" aria-live="polite"><p class="empty">Loading simulations…</p></div>
+  </section>
 
   <section class="how" aria-labelledby="how-title">
     <h2 id="how-title">How it works in class</h2>
@@ -283,6 +272,25 @@ a{color:var(--accent-text)}
     if(window.openComms) window.openComms(); else if(window.openMessageModal) window.openMessageModal();
     else toast("Comms opens your Allgood Academy inbox on allgoodacademy.com.");
   });
+  // Cards: one per simulation in /data/simulations.json, in that order.
+  const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const PRESENT_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg>';
+  const grid=document.getElementById("simGrid");
+  fetch("/data/simulations.json").then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); }).then(d=>{
+    const sims=(d.simulations||[]).filter(s=>s.url);
+    if(!sims.length) throw new Error("empty");
+    document.getElementById("simCount").textContent=sims.length+" live";
+    grid.innerHTML=sims.map((s,i)=>{
+      const tags=[s.grades,s.minutes,s.standard].filter(Boolean).map(t=>'<span class="tag">'+esc(t)+'</span>').join("");
+      const learn=(s.learn||[]).length?'<ul class="learn">'+s.learn.map(l=>"<li>"+esc(l)+"</li>").join("")+"</ul>":"";
+      return '<article class="simcard" aria-labelledby="sim-'+i+'">'
+        +'<div class="tagrow">'+(s.subject?'<span class="tag">'+esc(s.subject)+'</span>':'')+tags+'</div>'
+        +'<h3 id="sim-'+i+'">'+esc(s.name)+'</h3><p>'+esc(s.blurb)+'</p>'+learn
+        +'<div class="actions"><a class="btn cta" href="'+esc(s.url)+'">Start</a><a class="btn" href="'+esc(s.url)+'#present">'+PRESENT_ICON+' Present to your class</a></div>'
+        +(s.note?'<p class="fine">'+esc(s.note)+'</p>':'')
+        +'</article>';
+    }).join("");
+  }).catch(e=>{ console.error("[Simulations] list",e); grid.innerHTML='<p class="empty">The simulations list could not load just now. Try reloading the page.</p>'; });
   // In this preview the site links can't leave the page, so explain instead of failing silently.
   if(!IS_PROD){
     document.querySelectorAll('a[href^="/"]').forEach(a=>a.addEventListener("click",e=>{ e.preventDefault(); toast("This link goes to allgoodacademy.com"+a.getAttribute("href")+" on the live site."); }));
