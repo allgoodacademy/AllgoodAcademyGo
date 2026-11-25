@@ -24,7 +24,7 @@ export const PRO_CHECKOUT_URL = 'https://buy.stripe.com/6oUaEZafNdV1alkfZN2go00'
 export const PRO_CONTACT_EMAIL = 'learning@allgoodacademy.com';
 // true once the Stripe webhook (functions/stripeWebhook) is deployed and its Stripe endpoint
 // is set up. Until then the Pro panel keeps the honest "by hand" line; flip it the same day.
-export const PRO_AUTO_ON = false;
+export const PRO_AUTO_ON = true;  // webhook live 2026-11-25
 
 /* THE TEACHER GUIDES TAB. One line per guide.
  *   kind         'Lab Pack' | 'Simulation' — the small label above the title
