@@ -74,10 +74,21 @@ which is what every figure on Insider is computed from. A module that passes `st
 | `core` | the four games, every GoodBlock, every Challenge | yes — this is the funnel |
 | `pattern-lab` | Pattern Lab (`/educational-games/pattern-lab/`) | **no** — held in `D.offFunnel` |
 | `take-the-bait` | Take the Bait (`/educational-games/takethebait/`) | **no** — its own Insider page, from its own queries |
-| `water-cycle` | Where rain comes from (`/simulations/watercycle/`) | **no** — partitioned out like any non-`core` stream; anonymous session only, no name or free text |
-| `seasons` | Reasons for the Seasons (`/simulations/seasons/`) | **no** — partitioned out like any non-`core` stream; anonymous session only, no name or free text |
-| `wolves-and-deer` | Wolves & Deer (`/simulations/wolves-and-deer/`) | **no** — partitioned out like any non-`core` stream; anonymous session only, no name or free text |
-| `snowball` | The Snowball (`/simulations/snowball/`) | **no** — partitioned out like any non-`core` stream; anonymous session only, no name or free text |
+| `water-cycle` | Where rain comes from (`/simulations/watercycle/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
+| `seasons` | Reasons for the Seasons (`/simulations/seasons/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
+| `wolves-and-deer` | Wolves & Deer (`/simulations/wolves-and-deer/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
+| `snowball` | The Snowball (`/simulations/snowball/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
+
+**Simulations** (`/simulations/*`) each report on their own stream and are in none of the core
+figures. Insider's Simulations page (`#/simulations`) loads every simulation's sessions and events
+with `where('stream', '==', …)` queries of its own (the `SIMS` list in `public/insider/index.html`:
+stream, name, page, event prefix, step count) and shows, across all four and per simulation:
+sessions, learners, completions, median active time, Present-mode use, how far learners got,
+each prediction's answer split and how often the guess matched the model, the try-it step
+(first-try and eventual success, attempts, failure reasons, hints), and the explain-it /
+new-situation questions answered best on the first try. All four simulations share one event
+vocabulary (`<prefix>_prediction`, `_reveal`, `_attempt`, `_hint`, `_mode`, `_explanation`,
+`_transfer`), so a new simulation that keeps it needs one `SIMS` row and nothing else.
 
 **Take the Bait** is a Mob Control-style battle (fire your crew through multiplier gates, smash Scam HQ) followed by three Real or Bait? messages and Jodi's recap after every level. It is visible on the games hub and assignable
 in Mission Control, but on its own stream so holiday-scale play cannot skew the core funnel.
