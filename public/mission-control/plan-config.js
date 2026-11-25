@@ -13,10 +13,13 @@ export const FREE_CLASS_LIMIT = 1;
 export const FREE_STUDENT_LIMIT = 30;   // The board floated 17; see the storyboard. One line to change.
 
 export const PRO_PRICE_LABEL = '$49/year';
-// A Stripe Payment Link the founder creates (Stripe Dashboard → Payment Links). Until it is
-// set, "Get Pro" becomes "Email us to get Pro" with the mailto below. Never build card fields
+// The LIVE Stripe Payment Link (founder, 2026-11-25). "Get Pro" opens it in a new tab with
+// two query parameters added by the page, so a payment can be matched to the teacher in
+// Insider: prefilled_email (their sign-in email, when they have one) and
+// client_reference_id (their uid). Pro is then turned on by hand in Insider. Set this to ''
+// and "Get Pro" becomes "Email us to get Pro" with the mailto below. Never build card fields
 // into this page.
-export const PRO_CHECKOUT_URL = '';
+export const PRO_CHECKOUT_URL = 'https://buy.stripe.com/6oUaEZafNdV1alkfZN2go00';
 export const PRO_CONTACT_EMAIL = 'learning@allgoodacademy.com';
 
 /* THE TEACHER GUIDES TAB. One line per guide.

@@ -1366,6 +1366,16 @@ const PRO_WHY = {
     csv: 'The choice-level CSV is a Pro feature',
     renew: 'Renew Mission Control Pro',
 };
+/* The Stripe Payment Link, with what lets the founder match the payment to this teacher in
+   Insider: their sign-in email prefilled (skipped when there is none) and their uid as
+   client_reference_id. Card details are only ever typed on Stripe's own page. */
+function checkoutUrl() {
+    const url = new URL(PRO_CHECKOUT_URL);
+    const email = state.user && state.user.email;
+    if (email) url.searchParams.set('prefilled_email', email);
+    if (state.user && state.user.uid) url.searchParams.set('client_reference_id', state.user.uid);
+    return url.toString();
+}
 function openPro(reason) {
     $('pro-why').textContent = PRO_WHY[reason] || 'Mission Control Pro';
     $('cmp-classes').textContent = String(FREE_CLASS_LIMIT);
@@ -1373,10 +1383,11 @@ function openPro(reason) {
     $('pro-price').textContent = PRO_PRICE_LABEL;
     const get = $('btn-get-pro');
     if (PRO_CHECKOUT_URL) {
-        get.href = PRO_CHECKOUT_URL;
+        get.href = checkoutUrl();
         get.textContent = state.plan.expired ? 'Renew Pro' : 'Get Pro';
         get.target = '_blank';
-        $('pro-after').textContent = 'Pay by card. Schools can ask for an invoice.';
+        get.rel = 'noopener';
+        $('pro-after').textContent = 'Pay by card on Stripe. We turn Pro on for your account by hand within one business day.';
     } else {
         // No Payment Link yet: never card fields on this page, just an email.
         const subject = encodeURIComponent('Mission Control Pro');

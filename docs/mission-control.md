@@ -65,7 +65,10 @@ records hold (rule #6); only simulation predictions need events.
   (rules `classWritable`: only the marker's class takes assignment writes); the free class keeps
   working.
 - Limits, price, checkout link and the guide list are in `public/mission-control/plan-config.js`.
-  With `PRO_CHECKOUT_URL` empty, **Get Pro** is "Email us to get Pro" (a mailto).
+  `PRO_CHECKOUT_URL` is the live Stripe Payment Link; **Get Pro** opens it in a new tab with
+  `prefilled_email` (the teacher's sign-in email, if any) and `client_reference_id` (their
+  uid), so the founder can match the payment in Insider and turn Pro on by hand. Set it to ''
+  and Get Pro becomes "Email us to get Pro" (a mailto).
 - Paid guides are in Firebase Storage under `facilitator-guides/`, readable only by a Pro
   teacher (`storage.rules`). Nothing paid is under `public/`.
 
