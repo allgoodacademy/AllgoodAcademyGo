@@ -167,6 +167,20 @@ test('a full refund ends Pro now (found via the payment intent); a partial refun
     assert.match(after.note, /Partial refund ch_part \(10\.00 USD\)/);
 });
 
+test('a full refund for a Founding Teacher takes back only the paid year, not their free months', async () => {
+    // teacher_founding had free Pro to June 2027, then paid (+1 year) in the test above.
+    const june2027 = Date.parse('2027-06-30T23:59:59Z');
+    const q = await col('stripe_events').where('uid', '==', 'teacher_founding').limit(1).get();
+    const pi = q.docs[0].data().paymentIntent;
+    assert.ok(pi);
+    const res = await send(evt('charge.refunded', { id: 'ch_founding', object: 'charge', amount: 4900, amount_refunded: 4900, refunded: true, currency: 'usd', customer: null, payment_intent: pi }));
+    assert.equal(res.body, 'paid_year_refunded');
+    const p = await plan('teacher_founding');
+    assert.equal(p.plan, 'pro');
+    assert.equal(ms(p.proUntil), june2027);
+    assert.match(p.note, /Refunded ch_founding/);
+});
+
 test('a checkout that has not been paid yet grants nothing and is listed for the founder', async () => {
     await auth.createUser({ uid: 'teacher_unpaid', email: 'unpaid@school.org' });
     const res = await send(evt('checkout.session.completed', checkout({ client_reference_id: 'teacher_unpaid', payment_status: 'unpaid' }), 'evt_unpaid'));

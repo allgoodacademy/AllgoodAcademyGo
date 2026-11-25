@@ -337,3 +337,9 @@ The page queries sessions **one uid at a time**, and that is load-bearing. Rules
 single uid every returned document resolves the same two paths. A classroom-wide query would
 need a fresh user lookup per document and would begin failing once a classroom passed a
 handful of students.
+
+## Teacher email choices (2026-11-25)
+
+- **Product updates (opt-in).** `users/{uid}.productUpdates = { optedIn, source: 'setup'|'settings', updatedAt }`, written by the teacher only (`AuthCore.setProductUpdates`). Offered unchecked on the setup screen and as a toggle at the bottom of Mission Control. No field means "not asked yet", which is **not** opted in. Privacy policy section 5 describes it.
+- **Counting teachers.** `scripts/report-teacher-accounts.js` (or Actions → "Teacher accounts report") is read-only and prints counts only; per-account detail goes to the gitignored `reports/` folder.
+- **Refunds.** A full Stripe refund takes back only the paid year: `proUntil` goes back one year, never earlier than now. A Founding Teacher who paid and was refunded keeps their free months.

@@ -191,16 +191,22 @@ function createStripeWebhookHandler({ db, auth, appId, getSecret, now = () => Da
                 }, { merge: true });
                 return 'partial_refund_noted';
             }
-            // Full refund: Pro ends now. The plan stays 'pro' with an end date of now, so
-            // Mission Control reads it as "ended" and nothing is deleted.
+            // Full refund: take back only the year that was paid for (founder decision,
+            // 2026-11-25). A teacher who just paid ends at about now; a Founding Teacher whose
+            // free Pro ran to June 2027 and who then paid and was refunded goes back to June
+            // 2027 instead of losing the free months. Never earlier than now. The plan stays
+            // 'pro' with its end date, so Mission Control reads an ended plan as "ended" and
+            // nothing is deleted.
+            const curUntil = cur.plan === 'pro' ? toMs(cur.proUntil) : 0;
+            const until = Math.max(now(), curUntil - YEAR_MS);
             tx.set(planRef(uid), {
                 plan: cur.plan === 'pro' ? 'pro' : 'free',
-                proUntil: Timestamp.fromMillis(now()),
+                proUntil: Timestamp.fromMillis(until),
                 grantedBy: 'stripe',
-                note: `Refunded ${ch.id}`.slice(0, NOTE_MAX),
+                note: `${until > now() && cur.note ? `${cur.note} · ` : ''}Refunded ${ch.id}`.slice(0, NOTE_MAX),
                 updatedAt: FieldValue.serverTimestamp(),
             });
-            return 'pro_ended_refund';
+            return until > now() ? 'paid_year_refunded' : 'pro_ended_refund';
         });
     }
 

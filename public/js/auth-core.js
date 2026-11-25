@@ -302,6 +302,15 @@ async function recordTeacherConsent(uid) {
     }, { merge: true });
 }
 
+// A teacher's choice about occasional product-update emails (privacy policy section 5).
+// Opt-in only: a teacher with no productUpdates field has not been asked and is NOT opted in.
+// Lives on the teacher's own profile, which only they can write (firestore.rules #2).
+async function setProductUpdates(uid, optedIn, source) {
+    await setDoc(userRef(uid), {
+        productUpdates: { optedIn: !!optedIn, source: source === 'setup' ? 'setup' : 'settings', updatedAt: serverTimestamp() }
+    }, { merge: true });
+}
+
 // --- MESSAGE HQ: flat top-level collection, tagged by portal ---
 async function sendMessage({ text, source }) {
     const user = auth.currentUser;
@@ -491,7 +500,7 @@ window.AuthCore = {
     whenEngaged: () => engaged,
     teacherGoogleSignIn, teacherEmailSignIn, teacherPasswordReset, getAccount,
     markSignedIn, markAccount, clearSignedIn,
-    hasAcceptedTeacherConsent, recordTeacherConsent,
+    hasAcceptedTeacherConsent, recordTeacherConsent, setProductUpdates,
     sendMessage, submitCourseFeedback, recordTopicSelection,
     recordCommsReceipt, loadCommsReceipts, loadCommsRead, saveCommsRead,
     saveModuleProgress, loadModuleProgress, recordContinuityEntry,
