@@ -918,6 +918,42 @@ await it('...and a new class is DENIED until Pro is renewed', async () => {
   await assertSucceeds(setDoc(CLASS(proT, 'PRO002'), { assignedSims: [] }, { merge: true }));
 });
 
+console.log('\nSTRIPE (15) — only the webhook function writes; the admin may read unmatched payments');
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'artifacts', APP, 'stripe_events', 'evt_1'), { type: 'checkout.session.completed', uid: 'pro_1', result: 'pro_extended' });
+  await setDoc(doc(db, 'artifacts', APP, 'stripe_customers', 'cus_1'), { uid: 'pro_1' });
+  await setDoc(doc(db, 'artifacts', APP, 'stripe_unmatched', 'evt_2'), { email: 'x@y.org', amount: 4900, reason: 'no_account' });
+});
+const STRIPE = (db, c, id) => doc(db, 'artifacts', APP, c, id);
+await it('a teacher CANNOT read stripe_events, stripe_customers or stripe_unmatched (get or list)', async () => {
+  for (const c of ['stripe_events', 'stripe_customers', 'stripe_unmatched']) {
+    await assertFails(getDoc(STRIPE(proT, c, c === 'stripe_events' ? 'evt_1' : c === 'stripe_customers' ? 'cus_1' : 'evt_2')));
+    await assertFails(getDocs(collection(proT, 'artifacts', APP, c)));
+  }
+});
+await it('a teacher CANNOT write any Stripe collection', async () => {
+  await assertFails(setDoc(STRIPE(proT, 'stripe_events', 'evt_fake'), { uid: 'pro_1' }));
+  await assertFails(setDoc(STRIPE(proT, 'stripe_customers', 'cus_fake'), { uid: 'pro_1' }));
+  await assertFails(setDoc(STRIPE(proT, 'stripe_unmatched', 'evt_fake'), { email: 'a@b.org' }));
+});
+await it('a teacher CANNOT write teacher_plans (not even to extend a plan they have)', async () => {
+  await assertFails(setDoc(PLAN(proT, 'pro_1'), { plan: 'pro', proUntil: FUTURE(), grantedBy: 'stripe', note: 'Stripe cs_fake', updatedAt: 1 }));
+  await assertFails(setDoc(PLAN(freeT, 'free_1'), { plan: 'pro', proUntil: FUTURE(), grantedBy: 'stripe', note: 'Stripe cs_fake', updatedAt: 1 }));
+});
+await it('an anonymous student CANNOT read any Stripe collection', async () => {
+  const anon = env.authenticatedContext('anon_s', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await assertFails(getDocs(collection(anon, 'artifacts', APP, 'stripe_unmatched')));
+  await assertFails(getDoc(STRIPE(anon, 'stripe_customers', 'cus_1')));
+});
+await it('the admin CAN read stripe_unmatched (Insider) but CANNOT write it, nor read the other two', async () => {
+  await assertSucceeds(getDocs(collection(admin, 'artifacts', APP, 'stripe_unmatched')));
+  await assertFails(setDoc(STRIPE(admin, 'stripe_unmatched', 'evt_3'), { email: 'a@b.org' }));
+  await assertFails(deleteDoc(STRIPE(admin, 'stripe_unmatched', 'evt_2')));
+  await assertFails(getDocs(collection(admin, 'artifacts', APP, 'stripe_events')));
+  await assertFails(getDocs(collection(admin, 'artifacts', APP, 'stripe_customers')));
+});
+
 await env.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

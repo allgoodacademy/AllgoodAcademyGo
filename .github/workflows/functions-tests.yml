@@ -1,0 +1,29 @@
+# Runs the Cloud Functions tests (functions/test/) on every pull request and every push to
+# main, against the Firestore and Auth emulators. Testing only: functions are deployed by
+# hand (`firebase deploy --only functions`), never from a workflow.
+name: Functions tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test_functions:
+    name: test-functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        run: npm ci && (cd functions && npm ci)
+      - name: Run functions tests (against the emulators)
+        run: npm run test:functions

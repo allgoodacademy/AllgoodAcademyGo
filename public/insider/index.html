@@ -573,6 +573,9 @@
             // Mission Control Pro (2026-11-25): every teacher's plan. Admin-only (firestore.rules #13).
             const plans = await safe('teacher_plans', async () => (await getDocs(collection(db, 'artifacts', appId, 'teacher_plans'))).docs.map(d => ({ uid: d.id, ...d.data() })));
             D.plans = Object.fromEntries(plans.map(p => [p.uid, p]));
+            // Payments the Stripe webhook couldn't tie to an account (functions/). Admin read-only
+            // (firestore.rules #15); the founder turns Pro on by hand with the Plan control.
+            D.unmatched = await safe('stripe_unmatched', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'stripe_unmatched'), orderBy('date', 'desc'), limit(200)))).docs.map(d => ({ id: d.id, ...d.data() })));
             // Equality-only filters: served by Firestore's automatic single-field index, so no
             // composite index is needed (an orderBy here would need one).
             const [ttbSessions, ttbEvents] = await Promise.all([
@@ -1163,8 +1166,8 @@
             const planSave = $('plan-save'); if (planSave) planSave.onclick = () => savePlan(planSave.dataset.uid);
         }
 
-        /* MISSION CONTROL PRO — the Plan control (2026-11-25). This is how the founder grants Pro
-           after a payment, until automatic webhooks exist. Writes teacher_plans/{uid}, which only
+        /* MISSION CONTROL PRO — the Plan control (2026-11-25). Since the Stripe webhook
+           (functions/), payments turn Pro on by themselves; this is the manual override. Writes teacher_plans/{uid}, which only
            this admin allowlist can write (firestore.rules #13). Pro = plan 'pro' and proUntil in
            the future; Mission Control and storage.rules both read exactly that. */
         const planOf = (uid) => (D.plans || {})[uid] || null;
@@ -1181,7 +1184,8 @@
             const iso = new Date(until).toISOString().slice(0, 10);
             return `<div class="border border-slate-200 rounded-lg p-3">
                 <div class="flex items-center justify-between gap-2"><h3 class="font-bold text-slate-800 text-xs uppercase tracking-wide">Mission Control plan</h3>${planChip(p)}</div>
-                <p class="text-[11px] text-slate-500 mt-1">Set Pro after a payment. Pro lasts until the end date; nothing is deleted when it ends.${p && p.grantedBy ? ` Last set by ${esc(p.grantedBy)}.` : ''}</p>
+                <p class="text-[11px] text-slate-500 mt-1">Stripe payments turn Pro on by themselves. Use this to override: Founding Teachers, invoices, or a payment listed under Payments to match (Tools).${p && p.grantedBy ? ` Last set by ${esc(p.grantedBy)}.` : ''}</p>
+                ${(() => { const mine = unmatchedRows().filter(r => r.user && r.user.uid === u.uid && !r.done); return mine.length ? `<div class="mt-2 rounded border border-amber-200 bg-amber-50 p-2"><p class="text-[10px] uppercase font-bold text-amber-700 mb-1">Payments to match for this email</p>${unmatchedTable(mine)}</div>` : ''; })()}
                 <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
                     <label class="flex flex-col gap-1"><span class="text-[10px] uppercase text-slate-400 font-bold">Plan</span>
                         <select id="plan-plan" class="border border-slate-200 rounded px-2 py-1.5"><option value="free"${p && p.plan === 'pro' ? '' : ' selected'}>Free</option><option value="pro"${p && p.plan === 'pro' ? ' selected' : ''}>Pro</option></select></label>
@@ -1220,6 +1224,35 @@
                 status.textContent = `Not saved: ${e.code || e.message}`;
                 status.className = 'text-[11px] ml-2 text-red-600';
             }
+        }
+        /* Payments to match: Stripe payments the webhook couldn't tie to an account (no uid and
+           no account with that email, or not paid yet). A row reads "Pro on" once an account with
+           that email has an active plan, so the list clears itself as the founder works it. */
+        const UNMATCHED_REASON = {
+            no_account: 'No account with this email',
+            not_paid_yet: 'Checkout not paid yet',
+            renewal_no_account: 'Renewal, no account found',
+            refund_no_account: 'Refund, no account found',
+        };
+        function unmatchedRows() {
+            const byEmail = {};
+            Object.values(userIndex).forEach(u => { if (u.email) byEmail[String(u.email).toLowerCase()] = u; });
+            return (D.unmatched || []).map(r => {
+                const u = r.email ? byEmail[String(r.email).toLowerCase()] : null;
+                return { ...r, user: u || null, done: !!u && planIsPro(planOf(u.uid)) };
+            });
+        }
+        function unmatchedTable(rows) {
+            const money = (r) => typeof r.amount === 'number' ? `${(r.amount / 100).toFixed(2)} ${esc(String(r.currency || '').toUpperCase())}` : '—';
+            return `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Paid</th><th class="text-left font-bold py-1 px-2">Email</th><th class="text-right font-bold py-1 px-2">Amount</th><th class="text-left font-bold py-1 pl-2">Why</th></tr></thead><tbody>${rows.map(r => `<tr class="border-t border-slate-50${r.user ? ' hover:bg-slate-50 cursor-pointer' : ''}"${r.user ? ` onclick="location.hash='#/users/${esc(r.user.uid)}'"` : ''}><td class="py-1.5">${fmtDate(toMs(r.date))}</td><td class="px-2"><span class="font-bold text-slate-700">${esc(r.email || '(no email)')}</span>${r.user ? `<span class="block text-[10px] text-slate-400">Account: ${esc(r.user.name || r.user.uid)}</span>` : ''}</td><td class="px-2 text-right">${money(r)}</td><td class="pl-2">${r.done ? '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-100 text-emerald-700">Pro on</span>' : `<span class="text-slate-500">${esc(UNMATCHED_REASON[r.reason] || r.reason || '')}</span><span class="block text-[10px] text-slate-400 font-mono">${esc(r.stripeId || '')}</span>`}</td></tr>`).join('')}</tbody></table>`;
+        }
+        function paymentsToMatchCard() {
+            const rows = unmatchedRows();
+            const open = rows.filter(r => !r.done);
+            const body = rows.length
+                ? `<p class="text-[11px] text-slate-500 mb-2">Stripe payments that couldn't be tied to a Mission Control account. Find the teacher in Users and set Pro with the Plan control (paste the Stripe ID in the note). A row shows "Pro on" once an account with that email is Pro.</p>${unmatchedTable(rows)}`
+                : emptyMsg('Nothing to match. Every Stripe payment so far turned Pro on by itself.');
+            return card(`Payments to match · ${open.length} open`, body);
         }
         function proTeachersCard() {
             const rows = Object.values(D.plans || {}).filter(p => p.plan === 'pro')
@@ -1355,7 +1388,7 @@
         function renderTools() {
             const src = (name, n) => `<div class="flex items-center justify-between text-xs border-b border-slate-50 py-1.5"><span class="font-mono text-slate-600">${name}</span><span>${D.errors[name] ? `<span class="text-amber-600 font-bold">error</span>` : `<span class="text-slate-700 font-bold">${n}</span> <span class="text-slate-400">docs</span>`}</span></div>`;
             return errorStrip() + `
-                <div class="mb-4">${proTeachersCard()}</div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-4">${proTeachersCard()}${paymentsToMatchCard()}</div>
                 <div class="grid lg:grid-cols-2 gap-4">
                     ${card('Export to your BI tool', `
                         <p class="text-xs text-slate-500 mb-3">Each button downloads a CSV you can drop into Google Sheets, Looker Studio, Excel or any BI tool. Column names match the Firestore fields.</p>

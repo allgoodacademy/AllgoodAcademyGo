@@ -53,8 +53,9 @@ records hold (rule #6); only simulation predictions need events.
 ### The Pro plan
 
 - The plan lives in `artifacts/{appId}/teacher_plans/{uid}` (`plan`, `proUntil`, `grantedBy`,
-  `note`): only the admin allowlist writes it (Insider's Plan control in the user drawer;
-  later, the payment system). A teacher reads their own. Pro = `plan == 'pro' && proUntil > now`.
+  `note`): written by the Stripe webhook after a payment (see "Pro turns on automatically"
+  below) and by the admin allowlist (Insider's Plan control in the user drawer, the manual
+  override). A teacher reads their own. Pro = `plan == 'pro' && proUntil > now`.
 - **Classes:** the free plan has one, enforced in the rules — a free teacher's class create must
   write their create-only `teacher_free_class/{uid}` marker in the same batch (`getAfter`), and
   can only do so while no marker exists. Pro creates any number.
@@ -67,12 +68,38 @@ records hold (rule #6); only simulation predictions need events.
 - Limits, price, checkout link and the guide list are in `public/mission-control/plan-config.js`.
   `PRO_CHECKOUT_URL` is the live Stripe Payment Link; **Get Pro** opens it in a new tab with
   `prefilled_email` (the teacher's sign-in email, if any) and `client_reference_id` (their
-  uid), so the founder can match the payment in Insider and turn Pro on by hand. Set it to ''
-  and Get Pro becomes "Email us to get Pro" (a mailto).
+  uid), which the Stripe webhook uses to find the teacher. Set it to '' and Get Pro becomes
+  "Email us to get Pro" (a mailto).
 - Paid guides are plain links (`downloadUrl` in `plan-config.js`, e.g. Google Drive shares),
   shown only to Pro teachers. Anyone who has a link can open the PDF. Nothing paid is under
   `public/`. `storage.rules` and its deploy job are still in the repo but unused since
   2026-11-25 (the project has no Storage bucket).
+
+### Pro turns on automatically (the Stripe webhook)
+
+`functions/` holds one 2nd-gen Cloud Function, `stripeWebhook` (Node 20), at
+`https://us-central1-allgood-academy.cloudfunctions.net/stripeWebhook`. Stripe calls it; it
+verifies the signature with the `STRIPE_WEBHOOK_SECRET` secret and never calls the Stripe API.
+
+| Stripe event | What happens |
+| --- | --- |
+| `checkout.session.completed` (paid) | teacher by `client_reference_id`, else the Auth user with that email; `proUntil` = one year from max(now, current `proUntil`), `grantedBy: 'stripe'`, `note: 'Stripe <session id>'`; customer id saved in `stripe_customers` |
+| `invoice.paid`, `billing_reason: subscription_cycle` | renewal: uid via `stripe_customers` (else email), extended a year the same way. The first invoice of a subscription is ignored (checkout already granted that year) |
+| `customer.subscription.deleted` | nothing: Pro runs to `proUntil` and lapses on its own |
+| `charge.refunded` | full refund: `proUntil` = now, note `Refunded <charge id>`. Partial: a note only |
+| anything else | 200, ignored |
+
+- Every event id is recorded in `stripe_events/{eventId}` in the same transaction as the plan
+  change, so a Stripe retry changes nothing.
+- A payment with no matching account (or a checkout not paid yet) goes to
+  `stripe_unmatched/{eventId}` (email, amount, date, reason). Insider shows it as **Payments to
+  match** on the Tools page and inside the matching teacher's Plan control.
+- Rules #15: no client reads or writes `stripe_events`, `stripe_customers`, `stripe_unmatched`,
+  except the admin allowlist may read `stripe_unmatched`.
+- Mission Control opened with `?pro=welcome` (the Payment Link's after-payment redirect) shows
+  "Payment received — turning on Pro…" and re-reads the plan every 4 s for up to 60 s.
+- Tests: `npm run test:functions` (Firestore + Auth emulators, signed test payloads).
+- Deploy is manual: `firebase deploy --only functions` (not in any workflow).
 
 ### Simulations are assignable
 
@@ -200,7 +227,7 @@ which is indistinguishable from a failed write.
 | `sessions` where `uid == studentUid` | `activeMs` (time on task), most accurate `maxStep`, simulation progress |
 | `events` where `uid == studentUid` | the drill-down's choices and simulation predictions (rule 11b) |
 | `classrooms` where `teacherUid == uid` | the class switcher (rule #5's list grant) |
-| `teacher_plans/{uid}` | the plan (rule #13) |
+| `teacher_plans/{uid}` | the plan (rule #13), re-read every 4 s for a minute after `?pro=welcome` |
 
 Three of those overlap on purpose, because each holds something the others do not, and a
 module's progress takes the **highest** step any of them can prove. `game_scores` alone would

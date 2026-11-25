@@ -70,6 +70,8 @@ a{color:var(--teal-deep)}
 .code .acts{display:flex;gap:8px;flex-wrap:wrap}
 .cbanner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;border-radius:12px;padding:10px 14px;margin:8px 0 0;font-size:13px;background:var(--gold-wash);color:var(--ink)}
 .cbanner .btn{margin-left:auto}
+.cbanner[data-tone="ok"]{background:var(--sage-wash)}
+.cbanner[data-tone="wait"]{background:var(--teal-wash)}
 .tabs{display:flex;gap:4px;margin-top:16px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tabs button{white-space:nowrap;background:none;border:0;padding:10px 14px;border-bottom:3px solid transparent;font-size:14px;color:var(--soft);font-weight:700;margin-bottom:-1px}
@@ -673,7 +675,7 @@ import {
     ACTIVE_WINDOW_DAYS, DAY,
 } from './derive.js';
 import {
-    FREE_STUDENT_LIMIT, FREE_CLASS_LIMIT, PRO_PRICE_LABEL, PRO_CHECKOUT_URL, PRO_CONTACT_EMAIL,
+    FREE_STUDENT_LIMIT, FREE_CLASS_LIMIT, PRO_PRICE_LABEL, PRO_CHECKOUT_URL, PRO_CONTACT_EMAIL, PRO_AUTO_ON,
     GUIDES, GUIDE_BUNDLE,
 } from './plan-config.js';
 // The registry loader the games already share: one cached fetch of /data/modules-registry.json.
@@ -1386,7 +1388,9 @@ function openPro(reason) {
         get.textContent = state.plan.expired ? 'Renew Pro' : 'Get Pro';
         get.target = '_blank';
         get.rel = 'noopener';
-        $('pro-after').textContent = 'Pay by card on Stripe. We turn Pro on for your account by hand within one business day.';
+        $('pro-after').textContent = PRO_AUTO_ON
+            ? 'Pay by card on Stripe. Pro turns on automatically, usually within a minute.'
+            : 'Pay by card on Stripe. We turn Pro on for your account by hand within one business day.';
     } else {
         // No Payment Link yet: never card fields on this page, just an email.
         const subject = encodeURIComponent('Mission Control Pro');
@@ -2138,7 +2142,50 @@ document.addEventListener('keydown', (e) => {
     if (state.panelUid) closePanel();
 });
 
-load().catch((err) => {
+/* ── back from Stripe: ?pro=welcome ─────────────────────────────────────────
+   The Payment Link's after-payment redirect lands here. The Stripe webhook (functions/)
+   writes teacher_plans/{uid} within seconds, so re-read the plan every few seconds for up
+   to a minute, then repaint. The page still grants nothing itself: only the plan doc does. */
+const PRO_WELCOME_WAIT_MS = 60 * 1000;
+const PRO_WELCOME_EVERY_MS = 4 * 1000;
+function proNotice(html, tone) {
+    let el = $('pro-welcome');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'pro-welcome';
+        el.className = 'cbanner';
+        el.setAttribute('role', 'status');
+        el.setAttribute('aria-live', 'polite');
+        const host = $('class-banner');
+        host.parentNode.insertBefore(el, host);
+    }
+    el.innerHTML = html;
+    el.dataset.tone = tone || '';
+}
+async function welcomePro() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('pro') !== 'welcome' || !state.user || !$('class-banner')) return;
+    // Drop the parameter so a reload doesn't start the wait again.
+    params.delete('pro');
+    const qs = params.toString();
+    history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash);
+    const started = Date.now();
+    proNotice('<span><strong>Payment received — turning on Pro…</strong></span>');
+    let plan = state.plan;
+    while (!plan.pro && Date.now() - started < PRO_WELCOME_WAIT_MS) {
+        await new Promise((r) => setTimeout(r, PRO_WELCOME_EVERY_MS));
+        plan = await readPlan(state.user.uid);
+    }
+    if (plan.pro) {
+        if (!state.plan.pro) await load();
+        const until = new Date(plan.until).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+        proNotice(`<span><strong>Pro is on.</strong> Thank you! Your plan runs through ${esc(until)}.</span>`, 'ok');
+    } else {
+        proNotice(`<span><strong>Taking longer than usual.</strong> It'll be on shortly; email <a href="mailto:${esc(PRO_CONTACT_EMAIL)}">${esc(PRO_CONTACT_EMAIL)}</a> if not.</span>`, 'wait');
+    }
+}
+
+load().then(welcomePro).catch((err) => {
     console.warn('[Mission Control] load failed', err);
     showGate(
         'Could not load Mission Control',
