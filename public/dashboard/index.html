@@ -405,7 +405,7 @@ body.present .nav-shell.activity{display:none}
 
           <section class="sec" aria-labelledby="badges-title">
             <div class="sechead"><h2 id="badges-title">Badges</h2><span class="count" id="badges-count"></span></div>
-            <p>Earn them by finishing lessons, whole Lab Packs and Challenges.</p>
+            <p>Earn them by finishing lessons, games, whole Lab Packs and Challenges.</p>
             <div class="badges" id="badges"></div>
           </section>
 
@@ -635,8 +635,8 @@ const isDone = (m) => (STATUS.get(m.id) || {}).state === 'done';
 function badgeList() {
     const labs = MODULES.filter((m) => m.type === 'lab');
     const labsDone = labs.filter(isDone).length;
-    // Games are not in here: most games record only telemetry, which a student can't read
-    // back, so a game badge could never be earned honestly yet.
+    const games = MODULES.filter((m) => m.type === 'game');
+    const gamesDone = games.filter(isDone).length;
     const milestone = (name, icon, n) => ({ name, icon, tone: 'teal', earned: labsDone >= n,
         hint: labsDone >= n ? `${n === labs.length ? 'Every' : n} lesson${n === 1 ? '' : 's'} done` : (n === 1 ? 'Finish any lesson' : `Finish ${n} lessons (${labsDone}/${n})`),
         progress: Math.min(1, labsDone / n) });
@@ -644,6 +644,9 @@ function badgeList() {
         milestone('First Steps', 'footprints', 1),
         milestone('On a Roll', 'flame', Math.min(5, labs.length)),
         milestone('Every Lesson', 'award', labs.length),
+        { name: 'Game On', icon: 'gamepad-2', tone: 'plum', earned: gamesDone >= 1, hint: gamesDone >= 1 ? 'Finished a first game' : 'Finish any game' },
+        { name: 'Full Arcade', icon: 'joystick', tone: 'plum', earned: games.length > 0 && gamesDone === games.length,
+            hint: gamesDone === games.length ? 'Every game finished' : `Finish every game (${gamesDone}/${games.length})`, progress: games.length ? gamesDone / games.length : 0 },
     ];
     for (const p of PACKS) {
         const inPack = labs.filter((m) => m.pack === p.id);
@@ -665,7 +668,7 @@ function badgeList() {
 function renderProgress() {
     const labs = MODULES.filter((m) => m.type === 'lab');
     const challenges = MODULES.filter((m) => m.type === 'challenge');
-    const packsDone = PACKS.filter((p) => { const l = labs.filter((m) => m.pack === p.id); return l.length && l.every(isDone); }).length;
+    const games = MODULES.filter((m) => m.type === 'game');
     const badges = badgeList();
     const earned = badges.filter((b) => b.earned).length;
     const tile = (label, n, of, tone) => `<div class="stat t-${tone}"><span class="lbl">${esc(label)}</span>
@@ -673,7 +676,7 @@ function renderProgress() {
         <span class="bar" aria-hidden="true"><i style="width:${of ? Math.round((n / of) * 100) : 0}%"></i></span></div>`;
     $('stats').innerHTML = tile('Lessons done', labs.filter(isDone).length, labs.length, 'lab')
         + tile('Challenges passed', challenges.filter(isDone).length, challenges.length, 'challenge')
-        + tile('Lab Packs complete', packsDone, PACKS.length, 'game')
+        + tile('Games finished', games.filter(isDone).length, games.length, 'game')
         + tile('Badges', earned, badges.length, 'badge');
     $('badges-count').textContent = `${earned} of ${badges.length} earned`;
     $('badges').innerHTML = badges.map((b) => `<div class="badge tone-${b.tone}${b.earned ? ' on' : ''}" role="listitem">
@@ -749,8 +752,12 @@ async function loadStatus(uid) {
         getDocs(collection(db, 'artifacts', appId, 'users', uid, 'game_scores')).catch(() => ({ docs: [] })),
     ]);
     for (const d of progress.docs) {
-        if (!MODULES.some((m) => m.id === d.id)) continue;
-        bump(d.id, { at: Math.max(ms(d.data().lastUpdated), (status.get(d.id) || {}).at || 0), frac: fractionOf(d.data()) });
+        const m = MODULES.find((x) => x.id === d.id);
+        if (!m) continue;
+        const data = d.data();
+        // A finished game writes { completed: true } here (/js/game-finish.js).
+        const gameDone = m.type === 'game' && data.completed === true;
+        bump(d.id, { at: Math.max(ms(data.lastUpdated), (status.get(d.id) || {}).at || 0), frac: fractionOf(data), ...(gameDone ? { state: 'done' } : {}) });
     }
     for (const d of scores.docs) {
         const data = d.data();

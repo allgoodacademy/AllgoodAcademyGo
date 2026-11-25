@@ -446,6 +446,9 @@ function complete(meta) {
     // Never for Pattern Lab, which is outside the student product. Loaded only here, after
     // completion, so it can never stand in front of content.
     if (state.stream !== 'pattern-lab') {
+        // A finished GAME also gets a readable per-student record (games otherwise leave
+        // only telemetry, which a student can't read back). See game-finish.js.
+        import('/js/game-finish.js').then((g) => g.recordGameFinish({ module: state.module, gameName: state.gameName })).catch(() => {});
         import('/js/save-offer.js').then((o) => o.maybeOffer({ module: state.module, gameName: state.gameName })).catch(() => {});
     }
 }

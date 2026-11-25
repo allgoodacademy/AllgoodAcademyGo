@@ -162,6 +162,10 @@ the moments that matter. Steps per module:
 | Where You Say It | cases reached | 6 |
 | The Cost of Later | cases reached | 6 |
 | Room to Think Challenge | scenarios answered | 24 |
+| Read the Signal | rounds played | 10 |
+| Before You Send | rounds played | 10 |
+| The Rumor Mill | rounds played | 10 |
+| Money Moves | rounds played | 10 |
 | Take the Bait | Real or Bait answers | 3 |
 
 The table above is hand-written but no longer hand-*checked*: `node scripts/check-modules.js`
