@@ -358,8 +358,17 @@ service cloud.firestore {
                 && getAfter(freeMarkerPath(appId, request.auth.uid)).data.get('firstClassCode', NONE()) == code));
       // Updating is the class's own teacher, and only while the class is writable on their
       // plan: an extra class becomes read-only when Pro lapses (classWritable).
-      allow update, delete: if request.auth != null && resource.data.teacherUid == request.auth.uid
+      allow update: if request.auth != null && resource.data.teacherUid == request.auth.uid
         && classWritable(appId, code, request.auth.uid);
+      // DELETING A CLASS (Mission Control, 2026-11-25): the same, and never the class the
+      // teacher's free-class marker names (#14). The marker can't be moved or removed by the
+      // teacher, so deleting that class would leave a free teacher with no class and no way
+      // to create one, and every other class read-only if Pro lapsed. Mission Control offers
+      // Rename for it instead.
+      allow delete: if request.auth != null && resource.data.teacherUid == request.auth.uid
+        && classWritable(appId, code, request.auth.uid)
+        && !(exists(freeMarkerPath(appId, request.auth.uid))
+             && get(freeMarkerPath(appId, request.auth.uid)).data.get('firstClassCode', NONE()) == code);
       // LIST: the admin allowlist (Insider), or a teacher listing THEIR OWN classes for the
       // class switcher — query classrooms where teacherUid == uid. Written against
       // resource.data (populated per returned document on a list), never the {code}

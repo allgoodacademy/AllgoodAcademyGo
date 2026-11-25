@@ -918,6 +918,24 @@ await it('...and a new class is DENIED until Pro is renewed', async () => {
   await assertSucceeds(setDoc(CLASS(proT, 'PRO002'), { assignedSims: [] }, { merge: true }));
 });
 
+console.log('\nDELETING A CLASS — the teacher may, except their free class');
+await it('a Pro teacher CAN delete an extra class (its extras first, then the class)', async () => {
+  await assertSucceeds(setDoc(U(proT, 'pro_1'), { classroomCode: 'PRO001' }, { merge: true }));
+  await assertSucceeds(deleteDoc(ASSIGN(proT, 'PRO002', 'kid_9')));
+  await assertSucceeds(deleteDoc(CLASS(proT, 'PRO002')));
+});
+await it('a teacher CANNOT delete their free class (the one the marker names), Pro or not', async () => {
+  await assertFails(deleteDoc(CLASS(proT, 'PRO001')));
+  await assertFails(deleteDoc(CLASS(freeT, 'FREE01')));
+});
+await it('a teacher CANNOT delete somebody else\'s class', async () => {
+  await assertFails(deleteDoc(CLASS(proT, 'KM7QPD')));
+  await assertFails(deleteDoc(CLASS(freeT, 'PRO003')));
+});
+await it('a student CANNOT delete their class', async () => {
+  await assertFails(deleteDoc(CLASS(env.authenticatedContext('student_1', { firebase: { sign_in_provider: 'anonymous' } }).firestore(), 'KM7QPD')));
+});
+
 console.log('\nSTRIPE (15) — only the webhook function writes; the admin may read unmatched payments');
 await env.withSecurityRulesDisabled(async (ctx) => {
   const db = ctx.firestore();
