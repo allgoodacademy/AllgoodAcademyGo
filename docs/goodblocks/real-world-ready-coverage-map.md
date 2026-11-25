@@ -1,6 +1,6 @@
 # Real World Ready — Coverage Map v1
 
-**Status:** Awaiting sign-off — Instructional Designer / Curriculum & Learning Science
+**Status:** Signed off — William Allgood (founder; instructional designer), for Instructional Design and Curriculum & Learning Science, 2026-11-25
 **Authored:** 2026-09-07
 **Authority:** This document is the single source both the Real World Ready Challenge and all three GoodBlocks draw from. Per the GoodBlock Builder skill (Phase 1, item 0), when a challenge and its labs are designed together the mapping is *authored* rather than discovered, and whichever is written first is authoritative.
 
@@ -269,8 +269,8 @@ Second person throughout — the overview says *"Not a character. Every one of t
 - [x] CASEL competency named exactly as the live For Teachers table claims it
 - [x] Trait names verified against Challenge source, not against this document
 - [x] ISTE deliberately not claimed — the live page scopes ISTE to Digital Decisions only
-- [ ] **Instructional Designer** — read against the live modules and sign
-- [ ] **Curriculum & Learning Science** — read against the live modules and sign
+- [x] **Instructional Designer** — signed off by William Allgood, 2026-11-25
+- [x] **Curriculum & Learning Science** — signed off by William Allgood, 2026-11-25
 
 **Until both signatures are present this section is not a standards alignment.** It is an evidenced draft of one.
 
@@ -349,5 +349,7 @@ Recording the resemblance is the point — the registry only works as a differen
 - [x] Q1 resolved — HUD metrics Judgment / Composure / Perspective, category-derived 1:1
 - [x] Q4 resolved — Case numbering locked to Privacy & Security convention
 - [ ] Q2 partially resolved — **icons for Conflict Has a Winner and Reading the Room still unassigned**
+
+- [x] **Standards mapping signed off** by William Allgood (founder; instructional designer), 2026-11-25
 
 **One flag remains open.** Phase 2 storyboarding can begin, but the two icons must be chosen and verified against the live Lucide library before either GoodBlock is implemented.

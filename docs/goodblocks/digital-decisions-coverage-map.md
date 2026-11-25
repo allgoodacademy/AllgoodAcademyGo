@@ -1,6 +1,6 @@
 # Digital Decisions — Standards Coverage Map v2
 
-**Status:** Awaiting sign-off — Instructional Designer / Curriculum & Learning Science
+**Status:** Signed off — William Allgood (founder; instructional designer), for Instructional Design and Curriculum & Learning Science, 2026-11-25
 **Authored:** 2026-09-11 (v1) · **Updated:** 2026-09-12 (v2, Digital Decisions Challenge v2 rebuild)
 **Covers:** Social Intelligence, Privacy & Security, Digital Citizenship, Professional Brand
 
@@ -193,7 +193,7 @@ Counted from the live `SCENARIO_DATA`, not inferred: `social_intelligence` 7, `p
 - [x] Trait names verified against Challenge source, not against the coverage map
 - [x] **Founder/board decision resolved:** the Professional Brand row is widened to `Self-Awareness · Responsible Decision-Making` (v2) — see the note under Professional Brand
 - [x] **Finding 2 (blended Integrity number) closed** — the fourth HUD bar (Foresight) removes the merge; see Finding 2
-- [ ] **Instructional Designer** — read against the live modules and sign
-- [ ] **Curriculum & Learning Science** — read against the live modules and sign
+- [x] **Instructional Designer** — signed off by William Allgood, 2026-11-25
+- [x] **Curriculum & Learning Science** — signed off by William Allgood, 2026-11-25
 
 **Until both signatures are present this document is not a standards alignment.** It is an evidenced draft of one. This is why the For Teachers page's draft-mapping disclaimer ("Do you have standards documentation for my department?") stays in place for now — both sign-offs are still open, unrelated to the content changes above.
