@@ -75,6 +75,14 @@ h1,h2,h3{font-family:Georgia,'Times New Roman',serif;font-weight:700;margin:0;li
 .founder .sig{font-family:Verdana,Geneva,sans-serif;font-size:12.5px;color:var(--ink-faint);line-height:1.9;margin:18px 0 0}
 .founder .sig a{color:var(--teal-deep);text-decoration:none}
 .founder .sig a:hover{text-decoration:underline}
+/* Founder portrait beside the note (stacked above it on phones) and the "who I am" line.
+   The who line is generated from nav/founder.js — the job line lives in one place. */
+.founder-note{display:grid;grid-template-columns:120px minmax(0,1fr);gap:26px;align-items:start;margin-top:30px}
+.founder-note > img{width:120px;height:120px;border-radius:16px;object-fit:cover;display:block}
+.founder-note .founder{margin-top:0}
+.founder .who{background:var(--teal-wash);color:var(--ink);border-radius:10px;padding:12px 14px;font-size:15px}
+.founder .founder-disc{font-family:Verdana,Geneva,sans-serif;font-size:11.5px;color:var(--ink-faint)}
+@media(max-width:560px){.founder-note{grid-template-columns:1fr;gap:18px}}
 
 /* stance */
 .stance{background:var(--teal-deep);color:#fff;padding:74px 0}
@@ -251,10 +259,16 @@ body.present .nav-shell.activity{display:none}
     <div class="mission-grid">
       <div>
         <p class="pull">We're building the thing we wish someone had handed us at twelve.</p>
+        <div class="founder-note">
+        <img src="/assets/founder/william-portrait.jpg" alt="William Allgood, smiling, in a winter hat on a hiking trail" width="120" height="120" loading="lazy" decoding="async">
         <div class="founder">
           <p>Nobody sat me down and explained how a group chat actually works, what a purchase really costs, or why being right in front of an audience doesn't get you anywhere. I learned all of it the slow way.</p>
           <p>Those aren't soft skills. They're the ones that decide how a life goes. They can be taught deliberately, and there's no good reason a kid should have to pay to learn them.</p>
+<!-- BEGIN GENERATED FOUNDER WHO (nav/founder.js; npm run build:founder) -->
+<p class="who">Before Allgood Academy, I was a classroom teacher, then an instructional designer for software companies. Today I lead instructional design at a national education nonprofit, and I build Allgood Academy on the side.</p>
+<!-- END GENERATED FOUNDER WHO -->
           <p class="sig">— William Allgood, founder<br><a href="https://www.linkedin.com/in/william-allgood-ms-81575196/">Message me on LinkedIn</a></p>
+        </div>
         </div>
       </div>
       <div>

@@ -6,16 +6,16 @@
 //   - STUDENTS NEVER SIGN IN. Every visitor gets a silent anonymous Firebase session the
 //     moment a page loads (startSession), and everything just plays. Progress lives in that
 //     session on that device. No name, email, age or code is asked before content.
-//   - A student joins a teacher's class with a class code + a nickname (/join/, see
-//     /js/classroom-join.js). That is the only thing a student is ever asked.
+//   - A student joins a teacher's class with a class code + a nickname (/join/ or the
+//     dashboard, see /js/classroom-join.js).
+//   - OPTIONAL SAVE (2026-11-24): from the dashboard, and only if they ask, a student can
+//     keep their progress across devices with a save code or (13+) Google. That LINKS a
+//     sign-in onto this same anonymous user — same uid, same progress — and lives in
+//     /js/student-save.js, not here. Nothing is ever asked before content.
 //   - TEACHERS ARE THE ONLY PEOPLE WHO SIGN IN — with Google (teacherGoogleSignIn) or, for a
 //     teacher without Google, an email and password (teacherEmailSignIn) — from one place:
 //     "Teacher sign in" -> /mission-control/. A teacher accepts the consent notice once
 //     before their first class is created.
-//   - Students from the old model (Recruit Codes, 13+ Google or email/password accounts)
-//     get their progress back with the restore functions at the bottom of the identity
-//     section. They copy the old progress INTO this device's anonymous session; the
-//     student stays anonymous. They are deleted at the sunset, LEGACY_RESTORE_UNTIL.
 //
 // Every page loads this file (`<script type="module" src="/js/auth-core.js">`) instead of
 // inlining its own Firebase config, so a policy or schema change happens in one place.
@@ -25,10 +25,10 @@ import {
     getAuth, signInAnonymously, onAuthStateChanged, updateProfile, signOut,
     GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithPopup,
     EmailAuthProvider, linkWithCredential, createUserWithEmailAndPassword,
-    signInWithEmailAndPassword, sendPasswordResetEmail, updateCurrentUser, getAdditionalUserInfo,
+    signInWithEmailAndPassword, sendPasswordResetEmail,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-    getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, query, where, serverTimestamp,
+    getFirestore, doc, setDoc, getDoc, getDocs, addDoc, collection, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -77,6 +77,13 @@ function markEngaged() { if (resolveEngaged) { resolveEngaged(); resolveEngaged 
 
 const ADJECTIVES = ['Swift', 'Brave', 'Clever', 'Quiet', 'Bold', 'Curious', 'Bright', 'Calm', 'Sharp', 'Steady'];
 const ANIMALS = ['Falcon', 'Otter', 'Panther', 'Fox', 'Owl', 'Wolf', 'Hawk', 'Lynx', 'Heron', 'Badger'];
+
+// True for a name startSession() made up ("Swift Falcon 42"), i.e. the student has not
+// told us what to call them yet. The dashboard asks once, for joining a class or saving.
+function isGeneratedNickname(name) {
+    const m = /^(\w+) (\w+) (\d{2})$/.exec(String(name || ''));
+    return !!m && ADJECTIVES.includes(m[1]) && ANIMALS.includes(m[2]);
+}
 
 function randomNickname() {
     const a = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
@@ -273,123 +280,16 @@ async function getAccount(uid) {
         role: data.role || 'student',
         displayName: data.displayName || null,
         classroomCode: data.classroomCode || null,
+        // A student who saved their progress (student-save.js) is no longer an anonymous
+        // Firebase user but is still a guest: their profile keeps isGuest: true, so
+        // telemetry and analytics treat them exactly as before they saved.
+        isGuest: data.isGuest === true,
     };
 }
 
-// --- LEGACY RESTORE (sunset LEGACY_RESTORE_UNTIL; delete this section then). ----------------
-// Students from the pre-2026-11 model get their work back on this device. All three paths
-// end the same way: the old progress, name and class are copied INTO the current anonymous
-// session, and the student stays anonymous. Nothing is written to the old account or to
-// recruit_codes (read-only by rule #9 from this release on), and no old data is deleted.
-const LEGACY_RESTORE_UNTIL = '2027-06-30';
-
-function legacyRestoreOpen() {
-    return new Date() <= new Date(LEGACY_RESTORE_UNTIL + 'T23:59:59');
-}
-
-// Forgiving: case, spaces and hyphens all normalize to the stored key ("Arctic Fox Trot
-// 4821" -> "arctic-fox-trot-4821"), since a child is retyping this from memory.
-function normalizeRecruitCode(raw) {
-    return String(raw || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-}
-
-function codeToDisplayName(code) {
-    return code.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
-// Copies { displayName, progress, classroomCodes } into `user`'s own documents. A module
-// that already has progress on THIS device is left alone — restoring must never overwrite
-// work the student has done since.
-async function copyIntoSession(user, { displayName, progress, classroomCodes }) {
-    let restoredModules = 0;
-    for (const [slug, data] of Object.entries(progress || {})) {
-        const ref = moduleProgressRef(user.uid, slug);
-        if ((await getDoc(ref)).exists()) continue;
-        await setDoc(ref, { ...data, lastUpdated: serverTimestamp() });
-        restoredModules++;
-    }
-
-    // Class membership: a new roster row under this uid, so the teacher sees new work. A
-    // class that no longer exists is skipped (the rules would refuse it anyway).
-    const codes = [...new Set((classroomCodes || []).filter(Boolean))];
-    let lastJoined = null;
-    for (const code of codes) {
-        try {
-            await setDoc(doc(db, 'artifacts', appId, 'classroom_members', `${code}_${user.uid}`), {
-                classroomCode: code, uid: user.uid, joinedAt: serverTimestamp(),
-            }, { merge: true });
-            lastJoined = code;
-        } catch (e) {
-            console.warn('[AuthCore] restore: class', code, 'not rejoined', e);
-        }
-    }
-    await writeStudentProfile(user, { displayName, ...(lastJoined ? { classroomCode: lastJoined } : {}) });
-    return restoredModules;
-}
-
-// Path 1: an old Recruit Code. A single-document get by the exact code (rule #9).
-async function restoreFromRecruitCode(rawCode) {
-    const code = normalizeRecruitCode(rawCode);
-    if (!code) return { ok: false, reason: 'empty' };
-    const user = await startSession();
-    if (!user) return { ok: false, reason: 'error' };
-    const snap = await getDoc(doc(db, 'artifacts', appId, 'recruit_codes', code));
-    if (!snap.exists()) return { ok: false, reason: 'not_found' };
-    const data = snap.data();
-    const displayName = data.displayName || codeToDisplayName(code);
-    const restoredModules = await copyIntoSession(user, {
-        displayName,
-        progress: data.progress || {},
-        classroomCodes: [data.classroomCode],
-    });
-    return { ok: true, displayName, restoredModules };
-}
-
-// Paths 2 and 3: an old 13+ account (Google, or email + password). Signs in to the old
-// account just long enough to read its own documents, then puts this device's anonymous
-// session back as the current user (updateCurrentUser) and copies into it. A Google
-// sign-in that turns out to CREATE an account (nobody had one) is deleted on the spot, so
-// this path can never mint a new student account.
-async function restoreFromAccount(signInToOldAccount) {
-    const session = await startSession();
-    if (!session) return { ok: false, reason: 'error' };
-    let found;
-    try {
-        const result = await signInToOldAccount();
-        const old = result.user;
-        if (old.uid === session.uid) return { ok: true, displayName: old.displayName, restoredModules: 0 };
-        const info = getAdditionalUserInfo(result);
-        if (info && info.isNewUser) {
-            try { await old.delete(); } catch (e) { console.warn('[AuthCore] restore: could not remove new account', e); }
-            return { ok: false, reason: 'not_found' };
-        }
-        const profileSnap = await getDoc(userRef(old.uid));
-        const profile = profileSnap.exists() ? profileSnap.data() : {};
-        if (profile.role === 'teacher') return { ok: false, reason: 'teacher' };
-        const progress = {};
-        (await getDocs(collection(db, 'artifacts', appId, 'users', old.uid, 'module_progress')))
-            .forEach((d) => { progress[d.id] = d.data(); });
-        const memberships = await getDocs(query(collection(db, 'artifacts', appId, 'classroom_members'), where('uid', '==', old.uid)));
-        found = {
-            displayName: profile.displayName || old.displayName || null,
-            progress,
-            classroomCodes: [profile.classroomCode, ...memberships.docs.map((d) => d.data().classroomCode)],
-        };
-    } finally {
-        if (!auth.currentUser || auth.currentUser.uid !== session.uid) await updateCurrentUser(auth, session);
-    }
-    const restoredModules = await copyIntoSession(session, found);
-    return { ok: true, displayName: found.displayName, restoredModules };
-}
-
-function restoreWithGoogle() {
-    return restoreFromAccount(() => signInWithPopup(auth, new GoogleAuthProvider()));
-}
-
-function restoreWithEmail(email, password) {
-    return restoreFromAccount(() => signInWithEmailAndPassword(auth, email, password));
-}
-// --- END LEGACY RESTORE ---------------------------------------------------------------------
+// The legacy restore ("Have an old code?") that copied a pre-2026-11 Recruit Code's or old
+// account's progress into this session was removed on 2026-11-25 (founder decision: very
+// few students used the old sign-ins). Old accounts and recruit_codes are untouched.
 
 async function hasAcceptedTeacherConsent(uid) {
     const snap = await getDoc(userRef(uid));
@@ -587,12 +487,11 @@ async function loadModuleProgress(moduleSlug) {
 
 window.AuthCore = {
     auth, db, appId,
-    startSession, anonymousSessionOnly, waitForAuthReady, markEngaged, writeStudentProfile,
+    startSession, anonymousSessionOnly, waitForAuthReady, markEngaged, writeStudentProfile, isGeneratedNickname,
     whenEngaged: () => engaged,
     teacherGoogleSignIn, teacherEmailSignIn, teacherPasswordReset, getAccount,
     markSignedIn, markAccount, clearSignedIn,
     hasAcceptedTeacherConsent, recordTeacherConsent,
-    legacyRestoreOpen, LEGACY_RESTORE_UNTIL, restoreFromRecruitCode, restoreWithGoogle, restoreWithEmail,
     sendMessage, submitCourseFeedback, recordTopicSelection,
     recordCommsReceipt, loadCommsReceipts, loadCommsRead, saveCommsRead,
     saveModuleProgress, loadModuleProgress, recordContinuityEntry,

@@ -202,6 +202,42 @@ h1,h2,h3{font-family:Georgia,'Times New Roman',serif;font-weight:700;margin:0;li
 .flow-note{font-family:Verdana,Geneva,sans-serif;font-size:13.5px;color:var(--ink-faint);margin:40px 0 0;line-height:1.65}
 .flow-note a{color:var(--teal-deep)}
 
+/* ---------- founder: hero byline + "Who's behind this" strip (2026-11-24) ----------
+   A face on the first screen without taking it over: a 34px photo under the trust chips
+   that jumps down to the strip. The travel photo sits behind a tap on the portrait's
+   mountain button (tap/click, never hover, so it works on phones) — an inline card, not a
+   modal. The job line inside the strip is generated from nav/founder.js. */
+.byline{display:inline-flex;align-items:center;gap:10px;margin-top:14px;padding:4px 16px 4px 4px;border-radius:999px;background:var(--surface);border:1px solid var(--hairline);font-family:Verdana,Geneva,sans-serif;font-size:13px;color:var(--ink-soft);text-decoration:none;line-height:1.4}
+.byline img{width:34px;height:34px;border-radius:50%;object-fit:cover;flex:none}
+.byline b{color:var(--ink)}
+.byline:hover{border-color:var(--teal)}
+.founder{padding:24px 0 84px}
+.founder .wrap{display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px;align-items:center;border-top:1px solid var(--hairline);padding-top:64px}
+.founder-ph{position:relative;width:200px;height:200px}
+.founder-ph > img{width:200px;height:200px;border-radius:20px;object-fit:cover;display:block}
+.founder-pin{position:absolute;right:-10px;bottom:-10px;width:44px;height:44px;border-radius:50%;background:var(--surface);border:1px solid var(--hairline);box-shadow:var(--shadow-pill);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--teal-deep);padding:0}
+.founder-pin:hover,.founder-pin[aria-expanded="true"]{border-color:var(--teal)}
+.founder-pin svg{width:20px;height:20px}
+.founder-card{position:absolute;left:0;top:calc(100% + 18px);width:300px;background:var(--surface);border:1px solid var(--hairline);border-radius:14px;box-shadow:var(--shadow-card);overflow:hidden;z-index:5}
+.founder-card img{width:100%;height:auto;display:block}
+.founder-card p{margin:0;padding:12px 14px 14px;font-size:15px;line-height:1.5}
+.founder-card button{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(23,39,44,.66);color:#fff;font-size:20px;line-height:1;cursor:pointer}
+.founder-eyebrow{font-family:Verdana,Geneva,sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--teal-deep);text-transform:uppercase}
+.founder h2{font-size:clamp(28px,3.2vw,36px);margin:10px 0 14px}
+.founder-body{font-size:17px;color:var(--ink-soft);margin:0 0 14px;max-width:38em;line-height:1.65}
+.founder-path{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Verdana,Geneva,sans-serif;font-size:12px;margin:4px 0 20px;padding:0;list-style:none}
+.founder-path{gap:8px 26px}
+.founder-path li{position:relative;background:var(--teal-wash);color:var(--teal-deep);padding:5px 10px;border-radius:999px;font-weight:700}
+.founder-path li + li::before{content:"→";position:absolute;left:-19px;top:5px;color:var(--ink-faint);font-weight:400}
+.founder-more{font-family:Verdana,Geneva,sans-serif;font-size:14px;font-weight:700;color:var(--orange-deep);text-decoration:none}
+.founder-more:hover{text-decoration:underline}
+@media(max-width:720px){
+  .founder .wrap{grid-template-columns:1fr;gap:28px;padding-top:44px;justify-items:start}
+  .founder-ph,.founder-ph > img{width:150px;height:150px}
+  .founder-card{width:min(300px,calc(100vw - 48px))}
+  .founder{padding-bottom:60px}
+}
+
 /* proof */
 .proof{background:var(--surface);padding:76px 0;border-radius:44px 44px 0 0}
 /* Two columns. The old single-column head capped the h2 at 23ch, which is ~460px of a
@@ -354,6 +390,7 @@ body.present .nav-shell.activity{display:none}
         <span><svg class="tick" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.4l3.2 3.2L13 5" stroke="#357889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>No ads</span>
         <span><svg class="tick" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.4l3.2 3.2L13 5" stroke="#357889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>No email to start</span>
       </p>
+      <a class="byline" href="#founder"><img src="/assets/founder/william-portrait-72.jpg" alt="" width="34" height="34"><span>Made by <b>William Allgood</b>, a former teacher</span></a>
     </div>
 
     <div class="demo">
@@ -424,6 +461,46 @@ body.present .nav-shell.activity{display:none}
     <p class="flow-note">Curious what we call all of this? <a href="/for-teachers/#words-we-use">See the glossary on our teacher page.</a></p>
   </div>
 </section>
+
+<section class="founder" id="founder" aria-labelledby="founder-title">
+  <div class="wrap">
+    <div class="founder-ph">
+      <img src="/assets/founder/william-portrait.jpg" alt="William Allgood, smiling, in a winter hat on a hiking trail" width="200" height="200" loading="lazy" decoding="async">
+      <button class="founder-pin" id="founder-pin" type="button" aria-expanded="false" aria-controls="founder-card" aria-label="About this photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20 L9.5 8 L13 14 L15.5 10 L21 20 Z"/><circle cx="17" cy="5.5" r="1.6"/></svg>
+      </button>
+      <div class="founder-card" id="founder-card" role="group" aria-label="About this photo" hidden>
+        <img src="/assets/founder/william-patagonia-wide.jpg" alt="William on a hiking trail in Patagonia, with granite peaks and a glacier lake behind him" width="480" height="362" loading="lazy" decoding="async">
+        <button type="button" id="founder-card-x" aria-label="Close">&times;</button>
+        <p>I love to travel. This is me on a recent hiking trip in Patagonia.</p>
+      </div>
+    </div>
+    <div>
+      <div class="founder-eyebrow">Who's behind this</div>
+      <h2 id="founder-title">A teacher built this.</h2>
+<!-- BEGIN GENERATED FOUNDER STORY (nav/founder.js; npm run build:founder) -->
+<p class="founder-body">I'm William. I started in the classroom, moved into instructional design for software companies, and now lead instructional design at a national education nonprofit. Allgood Academy is what I wish my students had: lessons that show what happens, instead of telling them what not to do.</p>
+<!-- END GENERATED FOUNDER STORY -->
+      <ol class="founder-path" aria-label="William's path">
+        <li>Classroom teacher</li><li>Instructional designer</li><li>Director of instructional design</li>
+      </ol>
+      <a class="founder-more" href="/about/">Read why I started Allgood Academy →</a>
+    </div>
+  </div>
+</section>
+<script>
+/* The travel card: opens on tap or click (never hover), closes with the ×, Escape or a tap
+   outside it. Inline and non-modal — nothing on the page is blocked while it is open. */
+(function(){
+  var pin=document.getElementById('founder-pin'),card=document.getElementById('founder-card'),x=document.getElementById('founder-card-x');
+  if(!pin||!card)return;
+  function set(open,refocus){card.hidden=!open;pin.setAttribute('aria-expanded',String(open));if(open)x.focus();else if(refocus)pin.focus();}
+  pin.addEventListener('click',function(e){e.stopPropagation();set(card.hidden,true);});
+  x.addEventListener('click',function(e){e.stopPropagation();set(false,true);});
+  document.addEventListener('click',function(e){if(!card.hidden&&!card.contains(e.target))set(false,false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!card.hidden)set(false,true);});
+})();
+</script>
 
 <section class="proof">
   <div class="wrap">

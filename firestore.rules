@@ -136,8 +136,18 @@ service cloud.firestore {
     // session signed in with it or linked it onto an earlier anonymous session — and false
     // for a purely anonymous session (a student). Read with get() defaults so a token
     // without the claim is a plain false, never an error.
+    //
+    //    A STUDENT SAVE CODE is not a teacher sign-in. Since 2026-11-24 a student may save
+    //    their progress (public/js/student-save.js) by linking an email/password credential
+    //    whose address is at save.allgoodacademy.com — a synthetic address derived from
+    //    their save code, never a real mailbox. That puts 'email' among the token's
+    //    identities, so those addresses are excluded here: a save code can never create a
+    //    classroom or become a teacher. (A 13+ student who saves with Google has the same
+    //    standing as anyone else with a Google account, exactly as before.)
     function hasTeacherSignIn() {
-      return request.auth.token.get('firebase', {}).get('identities', {}).keys().hasAny(['google.com', 'email']);
+      return request.auth.token.get('firebase', {}).get('identities', {}).keys().hasAny(['google.com', 'email'])
+        && !(request.auth.token.get('email', '') is string
+             && request.auth.token.get('email', '').matches('.*@save[.]allgoodacademy[.]com$'));
     }
 
     function profileFieldsOk(appId, priorRole, priorCode) {
@@ -275,6 +285,11 @@ service cloud.firestore {
     // 6. NEW — Teachers can READ (not write) a classroom member's subcollections too
     //    (game_scores, launches) — needed so the roster can show real completion/scores,
     //    not just names. Still fully scoped to the teacher's own classroom, still read-only.
+    // SAVE CODES ARE NEVER STORED UNDER users/{uid}. This rule and the teacher get on the
+    // profile above are why: a student's save code (public/js/student-save.js) works like a
+    // password, and everything under users/{uid} is readable by that student's teacher. The
+    // code lives only in Firebase Auth (as a credential) and in the student's own browser
+    // storage. scripts/check-invariants.js ("save-code") keeps it out of Firestore.
     match /artifacts/{appId}/users/{userId}/{subcollection}/{document=**} {
       //    Same pivot as #4: the teacher is identified by the classroom document (via
       //    myClassroomCode + classroom_members, OR the legacy fallback), never by fields the
@@ -417,11 +432,10 @@ service cloud.firestore {
     // 9. Recruit Codes — READ-ONLY, legacy (identity reset, 2026-11-23). The pre-2026-11
     //    model gave each under-13 Learner Recruit a passphrase (e.g. "arctic-fox-trot-4821")
     //    whose document held a portable copy of their progress. Nothing creates or updates
-    //    one any more. Until the sunset (2027-06-30) a returning student can type their
-    //    code on the dashboard ("Have an old code?") and AuthCore.restoreFromRecruitCode()
-    //    copies that progress into their anonymous session — which needs exactly one thing:
-    //    a single-document GET by the exact code. Knowing the code is the trust model, as
-    //    it always was.
+    //    one any more. The dashboard's "Have an old code?" restore, the only reader, was
+    //    removed on 2026-11-25, so the GET below is now unused and can be dropped (kept for
+    //    now so this change stays a no-op for the rules tests). Knowing the code was the
+    //    trust model.
     //    - GET: any signed-in session, one document by its exact id
     //    - LIST (any query or enumeration): admin allowlist only — codes are never browsable
     //    - CREATE / UPDATE: nobody (falls to the catch-all deny)

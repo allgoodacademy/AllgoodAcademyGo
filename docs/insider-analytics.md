@@ -26,8 +26,8 @@ stopped signing in at all (founder decision, 2026-11-23, Decisions & Context Log
 - **User mix freezes.** Insider's "Learner Recruit" and "13+ Account" counts stop growing;
   every new student is a "Guest" (anonymous) — in a classroom if they joined one. "Teacher"
   is unchanged.
-- **No new Recruit Codes.** `recruit_codes` is read-only (rule #9) and only read by the legacy
-  restore until 2027-06-30. A restore copies old progress into the student's current
+- **No new Recruit Codes.** `recruit_codes` is read-only (rule #9). Nothing reads it since the
+  legacy restore was removed on 2026-11-25; before that, a restore copied old progress into the student's current
   anonymous uid, so a restored student appears as a new Guest row with the old work, and
   their teacher's roster can show both the old and the new row.
 - **Fewer split sessions.** Nobody signs in or links an account mid-visit any more, so a
@@ -51,7 +51,7 @@ All data lives in Firestore under `artifacts/allgood-academy/…`. Two kinds of 
 | `course_feedback/{id}` | DDC only today | rating 1 to 5 plus free text |
 | `messages/{id}` | Message HQ on every portal | free-text messages with source portal |
 | `classrooms/{code}` | Mission Control | a teacher's class and what it is assigned |
-| `recruit_codes/{code}` | legacy (pre-2026-11), read-only | old Learner Recruit passphrases and their progress copy, read only by the legacy restore until 2027-06-30 |
+| `recruit_codes/{code}` | legacy (pre-2026-11), read-only | old Learner Recruit passphrases and their progress copy; nothing reads it since the legacy restore was removed (2026-11-25) |
 
 What this could NOT answer: time spent, where in a module people quit, how they arrived,
 what device they used, or anything about a lab visit that did not end in completion.
@@ -162,6 +162,10 @@ the moments that matter. Steps per module:
 | Where You Say It | cases reached | 6 |
 | The Cost of Later | cases reached | 6 |
 | Room to Think Challenge | scenarios answered | 24 |
+| Read the Signal | rounds played | 10 |
+| Before You Send | rounds played | 10 |
+| The Rumor Mill | rounds played | 10 |
+| Money Moves | rounds played | 10 |
 | Take the Bait | Real or Bait answers | 3 |
 
 The table above is hand-written but no longer hand-*checked*: `node scripts/check-modules.js`

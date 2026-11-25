@@ -18,10 +18,19 @@ original local folder, added separately).
 - **Teachers are the only people who sign in**, with Google or with an email and password,
   from "Teacher sign in" in the site nav, which goes to `/mission-control/`. A new teacher accepts the consent notice
   once and creates their class there.
-- **Students from before the reset** (Recruit Codes, 13+ Google or email/password accounts)
-  use "Have an old code? Get your progress back" on `/dashboard/` until **2027-06-30**. It
-  copies their old progress into their anonymous session. Delete the `LEGACY RESTORE` section
-  of `auth-core.js`, the restore panel on the dashboard and rule #9's `get` after that date.
+- **A student may choose to save their progress** (2026-11-24) from "Keep your progress" on
+  `/dashboard/` — never before content, never required. Under 13: a first name and a save code
+  (three words + four digits). 13+: Google, or a save code. It **links** the sign-in onto the
+  student's existing anonymous user (`public/js/student-save.js`), so it is the same uid —
+  same progress, scores and class — on every device. The save code is **never stored in
+  Firestore** (a teacher can read everything under `users/{uid}`); it lives only in Firebase
+  Auth and this device's localStorage. A one-time, dismissible offer appears after a
+  student's first finished lesson (`public/js/save-offer.js`). A saved student is still a
+  student: no GA4, no teacher access (`firestore.rules` `hasTeacherSignIn`).
+- **Students from before the reset** (Recruit Codes, old 13+ accounts): the "Have an old
+  code?" restore was removed on 2026-11-25 (founder decision: very few used the old sign-ins).
+  Their old data is untouched; nothing reads `recruit_codes` any more, so rule #9's `get` can
+  be dropped whenever the rules are next changed.
 - `npm run check:invariants` (`[no-gate]`) fails a build that brings back a pre-play screen, the
   deleted `identity-gate.js`, or a student sign-in path.
 
@@ -32,7 +41,7 @@ public/
   index.html                                     # Marketing landing page — zero third-party requests on the render path
   for-teachers/index.html                        # Marketing: teacher-facing page
   about/index.html                               # Marketing: about + contact
-  dashboard/index.html                           # The student dashboard: every lesson, Challenge, game and simulation, with this device's progress (no sign-in)
+  dashboard/index.html                           # The student dashboard (the Tablet): every lesson, Challenge, game and simulation, with progress; optional save + join a class
   join/index.html                                # Join a class: class code + nickname
   mission-control/index.html                     # Teacher sign in (Google) and the teacher's class view
   insider/index.html                             # Insider (owner BI dashboard: users, courses, classrooms, inbox, tools)
@@ -52,6 +61,13 @@ Firebase Hosting project: `allgood-academy` (see `.firebaserc`) — this is the 
 already serving `allgoodacademy.com` and `www.allgoodacademy.com`, currently updated by manual
 `firebase deploy` runs. Connecting this repo's GitHub integration to it replaces those manual
 deploys with auto-deploy on push to `main`.
+
+## The founder's job line
+
+The founder story on `/` ("Who's behind this") and `/about/` is generated from
+`nav/founder.js`. Edit it there and run `npm run build:founder`; `npm run check:founder` fails
+CI when a page drifts. The employer is described ("a national education nonprofit"), not named,
+until the founder clears it — `check:invariants` (`[founder-employer]`) enforces that.
 
 ## The site nav
 

@@ -307,8 +307,15 @@ for (const cfg of Object.values(PACKS)) {
 // both directions: a streamed game without it would be counted, and a flagged row that is
 // not a streamed game would silently drop a funnel module from the numbers.
 const offFunnelIds = new Set([...(coursesSrc || '').matchAll(/id:\s*'([^']+)'[^{}]*?offFunnel:\s*true/g)].map(m => m[1]));
-for (const g of streamedGames) {
+// Every visible game is reported in Insider like a course (2026-11-25): it must have a
+// COURSES row under its registry id and name, so its Telemetry.init is checked below.
+for (const g of visibleGames) {
   modulePages[g.id] = GAME_PAGES[g.id];
+  const c = courses.find(x => x.id === g.id);
+  if (!c) fail(`insider: game "${g.id}" has no COURSES entry — Insider would not report it`);
+  else if (c.name !== g.name) fail(`insider: game "${g.id}" name "${c.name}" != registry "${g.name}"`);
+}
+for (const g of streamedGames) {
   if (!courses.find(c => c.id === g.id)) fail(`insider: streamed game "${g.id}" has no COURSES entry`);
   else if (!offFunnelIds.has(g.id)) fail(`insider: COURSES "${g.id}" must carry offFunnel: true — it is a streamed game and must stay out of the core figures`);
 }
@@ -318,11 +325,13 @@ for (const c of courses) {
   const page = modulePages[c.id];
   if (!page) { fail(`insider: course "${c.id}" has no known page to check Telemetry.init against`); continue; }
   const src = read(page);
-  const m = src.match(/Telemetry\.init\(\{\s*module:\s*'([^']+)',\s*gameName:\s*'([^']+)',\s*stepsTotal:\s*(\d+)/);
+  const m = src.match(/Telemetry\.init\(\{\s*module:\s*'([^']+)',\s*gameName:\s*'([^']+)',\s*stepsTotal:\s*([A-Za-z_$][\w$]*|\d+)/);
   if (!m) { fail(`${page}: no Telemetry.init({ module, gameName, stepsTotal }) call found`); continue; }
   if (m[1] !== c.id) fail(`${page}: Telemetry module "${m[1]}" != Insider id "${c.id}"`);
   if (!c.gameNames.includes(m[2])) fail(`${page}: Telemetry gameName "${m[2]}" not in Insider gameNames ${JSON.stringify(c.gameNames)}`);
-  if (Number(m[3]) !== c.stepsTotal) fail(`${page}: Telemetry stepsTotal ${m[3]} != Insider stepsTotal ${c.stepsTotal}`);
+  // A game may hold its round size in a named constant (const ROUND_SIZE = 10;).
+  const steps = /^\d+$/.test(m[3]) ? Number(m[3]) : Number((src.match(new RegExp(`const ${m[3]} = (\\d+);`)) || [])[1]);
+  if (steps !== c.stepsTotal) fail(`${page}: Telemetry stepsTotal ${m[3]} (${steps}) != Insider stepsTotal ${c.stepsTotal}`);
 }
 
 // --- the four games' Telemetry.init

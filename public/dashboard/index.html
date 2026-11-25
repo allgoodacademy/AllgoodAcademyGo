@@ -7,7 +7,17 @@
 <meta name="description" content="Every Allgood Academy lesson, game and simulation in one place. No account, no sign-in.">
 <link rel="icon" type="image/png" href="/favicon.png">
 <!--
-  /dashboard/ — THE STUDENT DASHBOARD (rebuilt 2026-11-24, identity reset).
+  /dashboard/ — THE STUDENT DASHBOARD. The Tablet (2026-11-24, storyboard v1.3): the old
+  dashboard's "floating in space" look — the Earth-from-orbit photo behind a brushed-aluminum
+  tablet — around a cleaner screen: a left rail (Home, Lab Packs, Games, Simulations) and
+  short views instead of one long scroll. Below 820px the photo and bezel drop away and the
+  screen goes full width, with the rail as tabs.
+
+  The orbit photo is SELF-HOSTED at /assets/dashboard/orbit.jpg (Unsplash photo
+  1446776811953-b23d57bd21aa, "Orbital View", downloaded once; the Unsplash license permits
+  this). Never hotlink images.unsplash.com: school content filters block image hosts, and
+  it would add an outside request to a page every student loads. The page's own fallback
+  is the deep-space blue #0f172a, which renders on its own if the photo does not load.
 
   One page that reaches everything a student can play: every Lab Pack lesson and Challenge,
   every game and every simulation, each with this device's progress on it. Nothing is asked
@@ -17,15 +27,19 @@
   appears here. scripts/check-modules.js fails the build if this page stops reading either
   file or hardcodes a module link.
 
-  Also here: the student's class (what their teacher assigned, from /js/classroom-join.js),
-  their nickname, Comms (/js/message-hq.js), and the legacy "Have an old code?" restore panel
-  (until AuthCore.LEGACY_RESTORE_UNTIL). A signed-in teacher sees a way back to Mission
-  Control; nobody signs in on this page.
+  Also here: the student's class (joining with a class code, through /js/classroom-join.js,
+  and what their teacher assigned), their name, Comms (/js/message-hq.js), the OPTIONAL
+  "Keep your progress" save (/js/student-save.js — offered here and only when the student
+  asks; nothing is ever asked before content). Home is the student's progress at a glance
+  (stats, badges, keep going); the name, the save and the class live under Profile. The
+  legacy "Have an old code?" restore was removed 2026-11-25 (founder decision: very few
+  students used the old sign-ins). A signed-in teacher sees a way back to Mission Control.
 
   GA4 / CHILDREN'S PRIVACY. Two GA4 properties, never on the same page:
     - G-EN4M7T3BLQ (product) loads here only, and only behind the ag_account gate below.
-      ag_account is set only by AuthCore.markAccount(), i.e. for a signed-in teacher. Every
-      student is anonymous, so GA4 never loads or fires for a student. Fails closed.
+      ag_account is set only by AuthCore.markAccount(), i.e. for a signed-in teacher. A
+      student who saves their progress is still a student: student-save.js clears
+      ag_account, so GA4 never loads or fires for a student. Fails closed.
     - G-P6DZJ685W6 (public marketing) is on /, /for-teachers/ and /about/ only.
 -->
 <script>
@@ -52,110 +66,231 @@
 <script src="/js/message-hq.js" data-message-source="Dashboard"></script>
 <style>
 :root{
-  --canvas:var(--color-canvas); --surface:var(--color-surface); --ink:var(--color-ink);
-  --ink-soft:var(--color-ink-soft); --ink-faint:var(--color-ink-faint); --hairline:var(--color-hairline);
-  --teal-deep:var(--color-teal-deep); --teal-wash:var(--color-teal-wash); --orange:var(--color-orange);
-  --shadow:0 18px 40px -28px rgba(23,39,44,.45);
+  /* The screen inside the tablet is the site's cream, not the old grey-blue glass. */
+  --screen:var(--color-cream); --surface:var(--color-surface); --ink:var(--color-ink);
+  --ink-soft:var(--color-ink-soft); --hairline:var(--color-cream-border);
+  --teal:var(--color-teal); --teal-deep:var(--color-teal-deep); --teal-wash:var(--color-teal-wash);
+  --orange:var(--color-orange); --orange-deep:var(--color-orange-deep); --orange-wash:#FBE9E2;
+  --plum:#5B4B8A; --plum-wash:#ECE8F5; --sage:#2E7D52; --sage-wash:#E7F0E9;
+  --space:#0f172a;
+  --shadow:0 14px 34px -22px rgba(23,39,44,.45);
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
-body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-ui);line-height:1.5}
+html{-webkit-text-size-adjust:100%}
+/* Wide screens: deep space behind everything (the fallback if the photo fails), and the
+   generated nav's fade made transparent so the pill floats over the photo. */
+body{margin:0;min-height:100vh;background:var(--space);color:var(--ink);font-family:var(--font-ui);font-size:14px;line-height:1.5;--nav-fade:transparent}
 a{color:inherit}
+h1,h2,h3{font-family:var(--font-display);font-weight:400;letter-spacing:-.02em;margin:0}
 [hidden]{display:none !important}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px;border-radius:6px}
+:focus:not(:focus-visible){outline:none}
 /* Required by Comms (/js/message-hq.js): its modal shows and hides itself only by toggling
    these class names, which are not Tailwind utilities, so every host page defines them.
    Without them the closed modal is an invisible full-screen layer that swallows every tap. */
 .modal-transition{transition:opacity .2s ease-in-out,transform .2s ease-in-out}
 .hidden-modal{opacity:0;pointer-events:none;transform:translateY(-10px)}
 .visible-modal{opacity:1;pointer-events:auto;transform:translateY(0)}
-.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
 
-/* Top bar */
-/* The page's own row, under the generated site nav: jump links, Comms, Join a class. */
-.bar{position:relative;z-index:20;margin-top:10px;border-bottom:1px solid var(--hairline)}
-.bar .wrap{display:flex;align-items:center;gap:14px;height:60px}
-.jump{display:flex;gap:4px;margin-left:-10px}
-.jump a{font-size:14px;font-weight:700;color:var(--ink-soft);text-decoration:none;padding:8px 10px;border-radius:8px}
-.jump a:hover{background:var(--teal-wash);color:var(--teal-deep)}
-.bar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.icon-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;border:1px solid var(--hairline);background:var(--surface);color:var(--ink);cursor:pointer}
-.icon-btn:hover{border-color:var(--teal-deep)}
-.icon-btn svg{width:20px;height:20px}
-#message-notification{position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--orange)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-size:14px;font-weight:700;text-decoration:none;border-radius:10px;padding:10px 14px;border:0;cursor:pointer;background:var(--teal-deep);color:#fff;white-space:nowrap}
-.btn:hover{filter:brightness(1.08)}
+/* ---------- the space backdrop ---------- */
+/* A CSS background inside a min-width query, so phones (which never show it) never download it. */
+.orbit{position:fixed;inset:0;z-index:0;pointer-events:none}
+@media (min-width:821px){.orbit{background:var(--space) url(/assets/dashboard/orbit.jpg) center/cover no-repeat}}
+
+/* ---------- the tablet: bezel copied from the old .tablet-frame (prototype .A.space .dev) ---------- */
+.stage{position:relative;z-index:1;display:flex;justify-content:center;padding:14px 16px 24px}
+.dev{position:relative;width:min(1320px,calc(100vw - 32px),calc((100vh - 120px) * 1.6));aspect-ratio:16/10;max-height:88vh;
+  border-radius:12px;padding:12px;border:1px solid #333;
+  background-image:radial-gradient(circle at 0% 0%,rgba(211,71,22,.35) 0%,transparent 30%),radial-gradient(circle at 100% 100%,rgba(211,71,22,.35) 0%,transparent 30%),linear-gradient(135deg,#5c5c5c 0%,#d6d6d6 25%,#8a8a8a 50%,#e0e0e0 75%,#5c5c5c 100%);
+  box-shadow:inset 1px 1px 2px rgba(255,255,255,.6),inset -1px -1px 2px rgba(0,0,0,.8),0 40px 80px -20px rgba(0,0,0,.85),0 0 0 1px #111}
+.dev::before{content:"";position:absolute;inset:10px;border-radius:6px;background:#111}
+.scr{position:relative;height:100%;border-radius:4px;box-shadow:inset 0 0 10px rgba(0,0,0,.5);background:var(--screen);display:grid;grid-template-columns:220px minmax(0,1fr);overflow:hidden}
+
+/* ---------- rail ---------- */
+.rail{background:var(--surface);border-right:1px solid var(--hairline);padding:20px 14px 16px;display:flex;flex-direction:column;gap:4px;min-height:0;overflow-y:auto}
+.me{display:flex;gap:10px;align-items:center;padding:0 4px 16px;border-bottom:1px solid var(--hairline);margin-bottom:10px}
+.av{flex:none;width:40px;height:40px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--font-display);font-size:18px}
+.me-txt{flex:1;min-width:0}
+.me-txt b{display:block;font-size:14px;overflow-wrap:anywhere;line-height:1.3}
+.me-txt small{display:block;font-size:11.5px;color:var(--ink-soft);overflow-wrap:anywhere}
+.comms{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--hairline);background:var(--surface);color:var(--ink);cursor:pointer;padding:0}
+.comms:hover{border-color:var(--teal-deep)}
+.comms svg{width:18px;height:18px}
+#message-notification{position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:var(--orange)}
+.tabs{display:flex;flex-direction:column;gap:2px}
+.tab{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:10px 12px;border-radius:10px;font:inherit;font-size:13.5px;color:var(--ink-soft);cursor:pointer;text-decoration:none}
+.tab svg{width:18px;height:18px;flex:none}
+.tab .n{margin-left:auto;font-size:11px;color:var(--ink-soft)}
+.tab:hover{background:var(--teal-wash);color:var(--teal-deep)}
+.tab[aria-current="true"]{background:var(--teal-wash);color:var(--teal-deep);font-weight:700}
+.rail-foot{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;gap:10px;font-size:12px;color:var(--ink-soft)}
+.save-status{border:1.5px solid var(--hairline);border-radius:12px;padding:11px 12px}
+.save-status b{display:block;color:var(--ink);font-size:12.5px;margin-bottom:2px}
+.save-status .btn{margin-top:8px;width:100%;padding:8px 12px;font-size:12.5px}
+.save-status.ok{border-color:var(--sage);background:var(--sage-wash)}
+.save-status.ok b{color:var(--sage)}
+.rail-foot .link{font-size:12px;text-align:left}
+
+/* ---------- main ---------- */
+.main{min-height:0;overflow-y:auto;padding:28px 30px 24px;-webkit-overflow-scrolling:touch}
+.view-title{font-size:30px;line-height:1.15;overflow-wrap:anywhere}
+.sub{margin:4px 0 20px;color:var(--ink-soft);font-size:14px}
+.sec{margin:0 0 26px}
+.sechead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 4px}
+.sechead h2,.sechead h3{font-size:22px}
+.sechead a,.sechead .count{font-size:12.5px;font-weight:700;color:var(--teal-deep)}
+.sechead + p{margin:0 0 14px;color:var(--ink-soft);font-size:13.5px;max-width:640px}
+.packlbl{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--ink-soft);margin:6px 0 8px;text-transform:uppercase}
+.packlbl a{letter-spacing:0;text-transform:none;color:var(--teal-deep);margin-left:4px}
+.packlbl .done-n{letter-spacing:0;text-transform:none;color:var(--teal-deep);margin-left:4px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-size:13.5px;font-weight:700;text-decoration:none;border-radius:999px;padding:10px 18px;border:0;cursor:pointer;background:var(--orange);color:#fff;white-space:nowrap;line-height:1.3}
+.btn:hover{background:var(--orange-deep)}
 .btn.ghost{background:var(--surface);color:var(--teal-deep);border:1.5px solid var(--hairline)}
-.btn:focus-visible,.card:focus-visible,.icon-btn:focus-visible,.link:focus-visible{outline:3px solid var(--teal-deep);outline-offset:2px}
-@media (max-width:720px){.jump{display:none}}
+.btn.ghost:hover{border-color:var(--teal-deep)}
+.btn.teal{background:var(--teal-deep)}
+.btn[disabled]{opacity:.6;cursor:progress}
+.link{background:none;border:0;padding:0;font:inherit;font-size:13px;font-weight:700;color:var(--teal-deep);text-decoration:underline;cursor:pointer}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.inp{flex:1;min-width:0;font:inherit;font-size:16px;padding:9px 12px;border:1.5px solid var(--hairline);border-radius:10px;background:var(--surface);color:var(--ink)}
+.inp:focus{border-color:var(--teal-deep)}
+.inp.code{text-transform:uppercase;letter-spacing:.08em;font-family:'Courier New',monospace;font-weight:700}
+.small{font-size:12px;color:var(--ink-soft);margin:8px 0 0}
+.msg{font-size:13px;margin:8px 0 0;min-height:0}
+.msg.ok{color:var(--sage);font-weight:700}.msg.bad{color:var(--orange-deep);font-weight:700}
 
-/* Hello */
-.hello{padding:28px 0 8px}
-.hello h1{font-family:var(--font-display);font-weight:400;font-size:clamp(28px,4vw,38px);line-height:1.15;margin:0 0 6px;overflow-wrap:anywhere}
-.hello p{margin:0;color:var(--ink-soft);font-size:15px}
-.link{background:none;border:0;padding:0;font:inherit;font-size:14px;font-weight:700;color:var(--teal-deep);text-decoration:underline;cursor:pointer}
-.rename{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
-.rename input{font:inherit;font-size:16px;padding:9px 12px;border:1.5px solid var(--hairline);border-radius:10px;min-width:0;width:220px}
-.rename small{flex-basis:100%;color:var(--ink-faint);font-size:12px}
+/* Rail: the name block opens Profile */
+.me-link{flex:1;min-width:0;display:flex;gap:10px;align-items:center;text-decoration:none;border-radius:10px;padding:2px}
+.me-link:hover .me-txt b{text-decoration:underline}
+/* Home: one quiet save line, the stat tiles and the badge shelf */
+.nudge{display:flex;align-items:center;gap:12px;background:var(--surface);border:1.5px solid var(--orange);border-radius:14px;padding:12px 14px;margin:0 0 18px;text-decoration:none;font-size:13.5px;color:var(--ink-soft)}
+.nudge svg{flex:none;width:22px;height:22px;color:var(--orange-deep)}
+.nudge b{color:var(--ink)}
+.nudge .go{margin-left:auto;font-weight:700;color:var(--orange-deep);white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 22px}
+.stat{background:var(--surface);border:1px solid var(--hairline);border-radius:14px;padding:14px}
+.stat .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ink-soft);text-transform:uppercase}
+.stat .num{display:block;font-family:var(--font-display);font-size:28px;line-height:1.2;margin:4px 0 2px}
+.stat .num small{font-size:15px;color:var(--ink-soft)}
+.stat.t-challenge .bar i{background:var(--orange)}.stat.t-game .bar i{background:var(--plum)}.stat.t-badge .bar i{background:var(--sage)}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.badge{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;background:var(--surface);border:1px solid var(--hairline);border-radius:16px;padding:16px 10px 14px}
+.badge .medal{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 0 8px;background:var(--screen);color:var(--ink-soft);border:2px dashed var(--hairline)}
+.badge .medal svg{width:26px;height:26px}
+.badge b{font-size:13px;line-height:1.3}
+.badge small{font-size:11.5px;color:var(--ink-soft);line-height:1.35}
+.badge .bar{width:70%;margin-top:6px}
+.badge.on .medal{border:3px solid #fff;box-shadow:0 0 0 2px currentColor,0 8px 18px -8px rgba(23,39,44,.5)}
+.badge.on.tone-teal .medal{background:var(--teal-wash);color:var(--teal-deep)}
+.badge.on.tone-plum .medal{background:var(--plum-wash);color:var(--plum)}
+.badge.on.tone-sage .medal{background:var(--sage-wash);color:var(--sage)}
+.badge.on.tone-orange .medal{background:var(--orange-wash);color:var(--orange-deep)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#name-card .rename{margin-top:0}
 
-/* Panels */
-.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:20px 0 8px}
-.panel{background:var(--surface);border:1px solid var(--hairline);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
-.panel h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px}
-.panel .big{font-family:var(--font-display);font-size:22px;margin:0 0 6px;overflow-wrap:anywhere}
-.panel p{margin:0 0 12px;color:var(--ink-soft);font-size:14px}
-.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.rows a{display:flex;align-items:center;gap:10px;text-decoration:none;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px}
-.rows a:hover{border-color:var(--teal-deep)}
-.rows .nm{flex:1;min-width:0;font-weight:700;font-size:14px;overflow-wrap:anywhere}
-.rows .mt{display:block;font-weight:400;font-size:12px;color:var(--ink-faint)}
-.teacher{background:var(--teal-wash);border-color:var(--teal-deep)}
+/* Profile: the name, save and class cards */
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 26px}
+.pcard{background:var(--surface);border:1px solid var(--hairline);border-radius:16px;padding:18px}
+.pcard h2{font-size:19px;margin:0 0 4px;overflow-wrap:anywhere}
+.pcard p{margin:0 0 12px;color:var(--ink-soft);font-size:13.5px}
+.pcard.warn{border-color:var(--orange)}
+.pcard.teacher{background:var(--teal-wash);border-color:var(--teal-deep);grid-column:1/-1}
+.k{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--ink-soft);text-transform:uppercase;margin:0 0 6px}
+.k.o{color:var(--orange-deep)}.k.g{color:var(--sage)}
+.codebox{display:flex;align-items:center;gap:12px;background:var(--teal-wash);border-radius:12px;padding:10px 12px;font-family:'Courier New',monospace;font-weight:700;font-size:15px;letter-spacing:.06em;color:var(--teal-deep);flex-wrap:wrap}
+.codebox span{flex:1;min-width:0;overflow-wrap:anywhere}
+.rename{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0;max-width:460px}
+.rename small{flex-basis:100%;color:var(--ink-soft);font-size:12px}
 
-/* Sections and cards */
-section.cat{padding:22px 0 6px;scroll-margin-top:70px}
-.cat-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0 0 4px}
-.cat-head h2{font-family:var(--font-display);font-weight:400;font-size:26px;margin:0}
-.cat-head .count{font-size:13px;font-weight:700;color:var(--teal-deep)}
-.cat-head a{font-size:13px;font-weight:700;color:var(--teal-deep)}
-.cat > p{margin:0 0 14px;color:var(--ink-soft);font-size:14px;max-width:720px}
-.pack{margin:0 0 22px}
-.pack h3{font-size:17px;margin:14px 0 2px}
-.pack h3 + p{margin:0 0 10px;color:var(--ink-soft);font-size:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
-.card{display:flex;gap:12px;align-items:flex-start;text-decoration:none;background:var(--surface);border:1.5px solid var(--hairline);border-radius:12px;padding:14px;min-height:96px}
-.card:hover{border-color:var(--teal-deep);box-shadow:var(--shadow)}
-.ic{flex:none;width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--teal-wash);color:var(--teal-deep);border:1px solid var(--hairline)}
-.ic svg{width:22px;height:22px}
-.cb{flex:1;min-width:0}
-.top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.kind{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint)}
-.name{display:block;font-weight:700;font-size:16px;line-height:1.3;margin:2px 0 4px;overflow-wrap:anywhere}
-.blurb{display:block;font-size:13px;color:var(--ink-soft);line-height:1.45}
-.chip{flex:none;align-self:flex-start;font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap;background:var(--canvas);color:var(--ink-faint);border:1px solid var(--hairline)}
-.chip.go{background:var(--teal-wash);color:var(--teal-deep);border-color:var(--teal-wash)}
-.chip.done{background:var(--teal-deep);color:#fff;border-color:var(--teal-deep)}
+/* Keep going */
+.cont{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 26px}
+.bigc{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--hairline);border-radius:16px;padding:16px;box-shadow:var(--shadow);text-decoration:none}
+.bigc:hover{border-color:var(--teal)}
+.bigc .ic{width:52px;height:52px;border-radius:14px}
+.bigc .ic svg{width:26px;height:26px}
+.bigc b{font-family:var(--font-display);font-weight:400;font-size:18px;display:block;line-height:1.25;overflow-wrap:anywhere}
+.grow{flex:1;min-width:0}
+.bar{display:block;height:6px;border-radius:3px;background:var(--hairline);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--teal);border-radius:3px}
+.t-game .bar i{background:var(--plum)}
+
+/* Cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:0 0 22px}
+.card{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1.5px solid var(--hairline);border-radius:14px;padding:14px;text-decoration:none;transition:border-color .15s,transform .15s}
+.card:hover{border-color:var(--teal);transform:translateY(-1px)}
+@media(prefers-reduced-motion:reduce){.card,.card:hover{transition:none;transform:none}}
+.card b{display:block;font-size:14px;line-height:1.3;margin-bottom:3px;overflow-wrap:anywhere}
+.meta{display:block;font-size:12px;color:var(--ink-soft)}
+.ic{flex:none;width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center}
+.ic svg{width:21px;height:21px}
+.t-lab .ic{background:var(--teal-wash);color:var(--teal-deep)}
+.t-challenge .ic{background:var(--orange-wash);color:var(--orange-deep)}
+.t-game .ic{background:var(--plum-wash);color:var(--plum)}
+.t-simulation .ic{background:var(--sage-wash);color:var(--sage)}
+.pill{flex:none;align-self:flex-start;display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.done{background:var(--sage-wash);color:var(--sage)}
+.pill.going{background:var(--orange-wash);color:var(--orange-deep)}
+.pill.new{background:var(--teal-wash);color:var(--teal-deep)}
+.pill.todo{background:var(--screen);color:var(--ink-soft);border:1px solid var(--hairline)}
 .empty{color:var(--ink-soft);font-size:14px;border:1.5px dashed var(--hairline);border-radius:12px;padding:16px}
+.view-foot{margin:30px 0 0;padding-top:14px;border-top:1px solid var(--hairline);display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12px;color:var(--ink-soft)}
+.view-foot a{color:var(--ink-soft)}
+.phone-only{display:none}
 
-footer{margin:34px 0 0;border-top:1px solid var(--hairline);padding:20px 0 calc(28px + env(safe-area-inset-bottom));font-size:13px;color:var(--ink-faint)}
-footer .wrap{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
-footer a{color:var(--ink-soft)}
-
-/* Old-progress panel (legacy restore) */
-.overlay{position:fixed;inset:0;z-index:50;background:rgba(23,39,44,.55);display:flex;align-items:center;justify-content:center;padding:16px}
-.sheet{background:var(--surface);border-radius:14px;max-width:420px;width:100%;max-height:100%;overflow-y:auto;padding:22px;position:relative;border-top:4px solid var(--teal-deep)}
-.sheet h2{font-family:var(--font-display);font-weight:400;font-size:24px;margin:0 30px 6px 0}
+/* ---------- the save sheet ---------- */
+.overlay{position:fixed;inset:0;z-index:60;background:rgba(15,25,35,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.sheet{background:var(--surface);border-radius:20px;max-width:440px;width:100%;max-height:100%;overflow-y:auto;padding:26px 24px 22px;position:relative;box-shadow:0 40px 80px -30px rgba(0,0,0,.6)}
+.sheet h2{font-size:24px;margin:0 34px 6px 0;line-height:1.2}
 .sheet p{color:var(--ink-soft);font-size:14px;margin:0 0 14px}
 .sheet label{display:block;font-weight:700;font-size:14px;margin:0 0 6px}
-.sheet input{display:block;width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1.5px solid var(--hairline);border-radius:10px;margin:0 0 8px}
-.sheet .btn{width:100%}
+.sheet .inp{display:block;width:100%;margin:0 0 8px}
 .sheet hr{border:0;border-top:1px solid var(--hairline);margin:16px 0}
-.sheet .x{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;font-size:26px;line-height:1;color:var(--ink-faint);cursor:pointer}
-#restore-status{font-size:14px;margin:12px 0 0}
-#restore-status.ok{color:var(--teal-deep);font-weight:700}
-#restore-status.bad{color:var(--color-orange-deep)}
+.sheet .x{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:0;background:var(--teal-wash);color:var(--teal-deep);font-size:22px;line-height:1;cursor:pointer}
+.step{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--teal-deep);margin:0 0 8px;text-transform:uppercase}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two .btn{padding:14px;font-size:15px}
+.bigcode{font-family:'Courier New',monospace;font-weight:700;font-size:24px;letter-spacing:.08em;text-align:center;background:var(--teal-wash);color:var(--teal-deep);border-radius:14px;padding:18px 10px;margin:4px 0 12px;overflow-wrap:anywhere}
+.btn.goog{width:100%;background:var(--surface);color:var(--ink);border:1.5px solid var(--hairline)}
+.btn.goog:hover{border-color:var(--teal-deep)}
+.btn.goog svg{width:18px;height:18px}
+.sheet .full{width:100%}
+/* Print just the save code card. */
+#print-card{display:none}
+@media print{
+  body.printing-code > *:not(#print-card){display:none !important}
+  body.printing-code #print-card{display:block;font-family:var(--font-ui);padding:24px;border:2px dashed #333;max-width:420px;margin:24px auto}
+  #print-card .bigcode{background:none;border:2px solid #333;color:#000}
+}
+
+/* ---------- 1366 and narrower laptops: keep two cards across inside the screen ---------- */
+@media (max-width:1400px){ .rail{padding:18px 10px 14px} .main{padding:24px 24px 20px} .scr{grid-template-columns:200px minmax(0,1fr)} }
+
+/* ---------- phones and small tablets: no photo, no bezel, full-width screen, rail as tabs ---------- */
+@media (max-width:820px){
+  body{background:var(--screen);--nav-fade:var(--screen)}
+  .orbit{display:none}
+  .stage{padding:6px 0 0;display:block}
+  .dev{width:auto;aspect-ratio:auto;max-height:none;padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+  .dev::before{display:none}
+  .scr{display:block;height:auto;border-radius:0;box-shadow:none;overflow:visible;background:transparent}
+  .rail{border-right:0;border-bottom:1px solid var(--hairline);background:var(--screen);padding:8px 16px 0;overflow:visible}
+  .me{border-bottom:0;padding:4px 0 8px;margin:0}
+  .tabs{flex-direction:row;overflow-x:auto;gap:4px;margin:0 -16px;padding:0 16px 8px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{width:auto;white-space:nowrap;padding:9px 13px;border:1px solid var(--hairline);background:var(--surface);border-radius:999px}
+  .tab .n{display:none}
+  .rail-foot{display:none}
+  .main{overflow:visible;padding:20px 16px calc(28px + env(safe-area-inset-bottom))}
+  .cards,.cont{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .nudge{flex-wrap:wrap}.nudge .go{margin-left:34px}
+  .view-title{font-size:26px}
+  .phone-only{display:inline}
+}
 </style>
 </head>
 <body>
-
+<div class="orbit" aria-hidden="true"></div>
 <!-- BEGIN GENERATED NAV -->
 <!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
      build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
@@ -227,115 +362,158 @@ body.present .nav-shell.activity{display:none}
 })();
 </script>
 <!-- END GENERATED NAV -->
-<header class="bar">
-  <div class="wrap">
-    <nav class="jump" aria-label="On this page">
-      <a href="#packs">Lab Packs</a>
-      <a href="#games">Games</a>
-      <a href="#sims">Simulations</a>
-    </nav>
-    <div class="bar-right">
-      <button class="icon-btn" type="button" title="Comms" aria-label="Comms" onclick="window.openMessageModal()">
-        <i data-lucide="message-square"></i><span id="message-notification" style="display:none;"></span>
-      </button>
-      <a class="btn" href="/join/">Join a class</a>
+
+<div class="stage">
+  <div class="dev">
+    <div class="scr">
+      <nav class="rail" aria-label="Dashboard">
+        <div class="me">
+          <a class="me-link" href="#profile" data-view="profile" aria-label="Your profile">
+            <span class="av" id="av" aria-hidden="true">?</span>
+            <span class="me-txt"><b id="me-name">Welcome</b><small id="me-class">Not in a class yet</small></span>
+          </a>
+          <button class="comms" type="button" title="Comms" aria-label="Comms" onclick="window.openMessageModal()">
+            <i data-lucide="message-square"></i><span id="message-notification" style="display:none;"></span>
+          </button>
+        </div>
+        <div class="tabs">
+          <a class="tab" href="#home" data-view="home" aria-current="true"><i data-lucide="home"></i>Home</a>
+          <a class="tab" href="#packs" data-view="packs"><i data-lucide="book-open"></i>Lab Packs<span class="n" id="n-packs"></span></a>
+          <a class="tab" href="#games" data-view="games"><i data-lucide="gamepad-2"></i>Games<span class="n" id="n-games"></span></a>
+          <a class="tab" href="#sims" data-view="sims"><i data-lucide="globe"></i>Simulations<span class="n" id="n-sims"></span></a>
+          <a class="tab" href="#profile" data-view="profile"><i data-lucide="user-round"></i>Profile</a>
+        </div>
+        <div class="rail-foot">
+          <div class="save-status" id="rail-save" hidden></div>
+          <span id="rail-device">Progress saves on this device.</span>
+        </div>
+      </nav>
+
+      <main class="main" id="main">
+        <!-- HOME: how you're doing. Progress, badges, what's next. -->
+        <section class="view" data-view="home" aria-labelledby="hello">
+          <h1 class="view-title" id="hello" tabindex="-1">Welcome.</h1>
+          <p class="sub" id="hello-sub">Pick up where you left off, or start something new.</p>
+
+          <a class="nudge" id="save-nudge" href="#profile" data-view="profile" hidden>
+            <i data-lucide="cloud-upload"></i><span><b>Your progress is only on this device.</b> Save it so it follows you to any computer, phone or Chromebook.</span><span class="go">Save it →</span>
+          </a>
+
+          <div class="stats" id="stats"></div>
+
+          <div class="cont" id="continue" hidden></div>
+
+          <section class="sec" aria-labelledby="badges-title">
+            <div class="sechead"><h2 id="badges-title">Badges</h2><span class="count" id="badges-count"></span></div>
+            <p>Earn them by finishing lessons, games, whole Lab Packs and Challenges.</p>
+            <div class="badges" id="badges"></div>
+          </section>
+
+          <section class="sec" id="assigned" hidden aria-labelledby="assigned-title">
+            <div class="sechead"><h2 id="assigned-title">Assigned by your teacher</h2></div>
+            <p id="assigned-sub">Anything you do counts, in any order.</p>
+            <div class="grid" id="assigned-body"></div>
+          </section>
+
+          <section class="sec" id="new" aria-labelledby="new-title">
+            <div class="sechead"><h2 id="new-title">New on Allgood Academy</h2></div>
+            <p>Fresh simulations and games.</p>
+            <div class="grid" id="new-body"></div>
+          </section>
+        </section>
+
+        <!-- PROFILE: your name, saving your progress, your class. -->
+        <section class="view" data-view="profile" aria-labelledby="profile-title" hidden>
+          <h1 class="view-title" id="profile-title" tabindex="-1">Your profile</h1>
+          <p class="sub">Your name, your class, and keeping your progress.</p>
+          <div class="cards">
+            <div class="pcard teacher" id="teacher-panel" hidden>
+              <p class="k">Teacher</p>
+              <h2>You're signed in as a teacher.</h2>
+              <p>Your class, your class code and what to assign are in Mission Control. This page is what your students see.</p>
+              <a class="btn teal" href="/mission-control/">Open Mission Control</a>
+            </div>
+            <div class="pcard" id="name-card">
+              <p class="k">Your name</p>
+              <h2 id="name-shown">Not set yet</h2>
+              <p>Your first name or a nickname. Your teacher sees this name.</p>
+              <button class="btn ghost" type="button" id="rename-open">Change my name</button>
+              <form class="rename" id="rename-form" hidden>
+                <input class="inp" id="rename-input" maxlength="24" autocomplete="off" aria-label="Your name" placeholder="Nickname or first name">
+                <button class="btn teal" type="submit">Save</button>
+                <button class="btn ghost" type="button" id="rename-cancel">Cancel</button>
+                <small>Nickname or first name. No last names.</small>
+              </form>
+              <p class="msg" id="rename-msg" role="status" aria-live="polite"></p>
+            </div>
+            <div class="pcard" id="save-card" hidden></div>
+            <div class="pcard" id="class-card">
+              <p class="k">My class</p>
+              <div id="class-body">
+                <h2>Join your class</h2>
+                <p>Type the code your teacher put on the board. Your work shows up for them.</p>
+                <form class="row" id="join-form" novalidate>
+                  <input class="inp code" id="join-code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Class code" aria-label="Class code">
+                  <button class="btn ghost" type="submit">Join</button>
+                </form>
+                <p class="msg" id="join-msg" role="status" aria-live="polite"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- LAB PACKS -->
+        <section class="view" data-view="packs" aria-labelledby="packs-title" hidden>
+          <div class="sechead"><h1 class="view-title" id="packs-title" tabindex="-1">Lab Packs</h1><span class="count" id="packs-count"></span></div>
+          <p>Short lessons with Jodi, each about one real decision, then a Challenge to see where you land. Take them in any order.</p>
+          <div id="packs-body"><p class="empty">Loading lessons…</p></div>
+        </section>
+
+        <!-- GAMES -->
+        <section class="view" data-view="games" aria-labelledby="games-title" hidden>
+          <div class="sechead"><h1 class="view-title" id="games-title" tabindex="-1">Games</h1><a href="/educational-games/">All games</a></div>
+          <p>Quick games, about 5 to 10 minutes. Each one ends by pointing you at the lesson for whatever it found you need.</p>
+          <div class="grid" id="games-body"></div>
+        </section>
+
+        <!-- SIMULATIONS -->
+        <section class="view" data-view="sims" aria-labelledby="sims-title" hidden>
+          <div class="sechead"><h1 class="view-title" id="sims-title" tabindex="-1">Simulations</h1><a href="/simulations/">All simulations</a></div>
+          <p>Predict what will happen, run it, and find out why.</p>
+          <div class="grid" id="sims-body"></div>
+        </section>
+
+        <div class="view-foot">
+          <a href="/">Home</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="/terms.html">Terms</a>
+        </div>
+      </main>
     </div>
-  </div>
-</header>
-
-<main class="wrap">
-  <div class="hello">
-    <h1 id="hello">Welcome.</h1>
-    <p>Everything Allgood Academy has, in one place. No account needed. Your progress stays on this device.
-      <button class="link" type="button" id="rename-open">Change my name</button></p>
-    <form class="rename" id="rename-form" hidden>
-      <input id="rename-input" maxlength="24" autocomplete="off" aria-label="Your name" placeholder="Nickname or first name">
-      <button class="btn" type="submit">Save</button>
-      <button class="btn ghost" type="button" id="rename-cancel">Cancel</button>
-      <small>Nickname or first name. No last names. Your teacher sees this name.</small>
-    </form>
-  </div>
-
-  <div class="panels">
-    <div class="panel teacher" id="teacher-panel" hidden>
-      <h2>Teacher</h2>
-      <p class="big">You're signed in as a teacher.</p>
-      <p>Your class, your class code and what to assign are in Mission Control. This page is what your students see.</p>
-      <a class="btn" href="/mission-control/">Open Mission Control</a>
-    </div>
-    <div class="panel" id="class-panel">
-      <h2>My class</h2>
-      <div id="class-body">
-        <p class="big">Not in a class yet.</p>
-        <p>If your teacher gave you a class code, join and your work shows up for them. Nothing else is asked.</p>
-        <a class="btn ghost" href="/join/">Join with a class code</a>
-      </div>
-    </div>
-    <div class="panel" id="continue-panel" hidden>
-      <h2>Keep going</h2>
-      <ul class="rows" id="continue-list"></ul>
-    </div>
-  </div>
-
-  <section class="cat" id="packs" aria-labelledby="packs-title">
-    <div class="cat-head"><h2 id="packs-title">Lab Packs</h2><span class="count" id="packs-count"></span></div>
-    <p>Short lessons with Jodi, each about one real decision. Then a Challenge to see where you land. Take them in any order.</p>
-    <div id="packs-body"><p class="empty">Loading lessons…</p></div>
-  </section>
-
-  <section class="cat" id="games" aria-labelledby="games-title">
-    <div class="cat-head"><h2 id="games-title">Games</h2><a href="/educational-games/">All games</a></div>
-    <p>Quick games, about 5 to 10 minutes. Each one ends by pointing you at the lesson for whatever it found you need.</p>
-    <div class="grid" id="games-body"></div>
-  </section>
-
-  <section class="cat" id="sims" aria-labelledby="sims-title">
-    <div class="cat-head"><h2 id="sims-title">Simulations</h2><a href="/simulations/">All simulations</a></div>
-    <p>Predict what will happen, run it, and find out why.</p>
-    <div class="grid" id="sims-body"></div>
-  </section>
-</main>
-
-<footer>
-  <div class="wrap">
-    <button class="link" type="button" id="restore-link" hidden onclick="window.openRestore()">Have an old code? Get your progress back</button>
-    <a href="/">Home</a>
-    <a href="/privacy.html">Privacy</a>
-    <a href="/terms.html">Terms</a>
-  </div>
-</footer>
-
-<!-- OLD PROGRESS: the legacy restore panel. Deleted at the sunset, with AuthCore's
-     LEGACY RESTORE section (see AuthCore.LEGACY_RESTORE_UNTIL). -->
-<div class="overlay" id="restore-modal" hidden onclick="if(event.target === this) window.closeRestore()">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="restore-title">
-    <button class="x" type="button" aria-label="Close" onclick="window.closeRestore()">&times;</button>
-    <h2 id="restore-title">Get your old progress back</h2>
-    <p>Used Allgood Academy before? Your old work is copied onto this device. Nothing else changes, and you don't need to sign in again after this.</p>
-    <label for="restore-code">I have a Recruit Code</label>
-    <input type="text" id="restore-code" autocomplete="off" placeholder="e.g. arctic-fox-trot-4821" onkeydown="if(event.key==='Enter')document.getElementById('restore-code-btn').click()">
-    <button class="btn" id="restore-code-btn" type="button" onclick="window.restoreWithCode(this)">Get my progress back</button>
-    <hr>
-    <button class="btn ghost" type="button" onclick="window.restoreWithGoogle(this)">Signed in with Google before?</button>
-    <p style="text-align:center;margin:12px 0 0"><button class="link" type="button" onclick="window.showRestoreEmail()">Used an email and password?</button></p>
-    <div id="restore-email-form" hidden style="margin-top:12px">
-      <input type="email" id="restore-email" autocomplete="email" placeholder="Email" aria-label="Email">
-      <input type="password" id="restore-password" autocomplete="current-password" placeholder="Password" aria-label="Password" onkeydown="if(event.key==='Enter')document.getElementById('restore-email-btn').click()">
-      <button class="btn" id="restore-email-btn" type="button" onclick="window.restoreWithEmail(this)">Get my progress back</button>
-    </div>
-    <p id="restore-status" role="status" aria-live="polite"></p>
   </div>
 </div>
 
+<!-- SAVE YOUR PROGRESS: the optional save flow (/js/student-save.js). Opened only by the
+     student, from this page. -->
+<div class="overlay" id="save-modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="save-title">
+    <button class="x" type="button" aria-label="Close" data-a="close">&times;</button>
+    <div id="save-sheet"></div>
+  </div>
+</div>
+<div id="print-card" aria-hidden="true"></div>
+
+
 <script type="module">
 import {
-    doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, deleteField, collection, query, where, serverTimestamp,
+    doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, deleteField, collection, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 import { updateProfile } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 
 const { auth, db, appId } = window.AuthCore;
-// Lazily imported: a failure there must never stop the catalog rendering.
+// Lazily imported: a failure in either must never stop the catalog rendering.
 const classroomJoin = () => import('/js/classroom-join.js');
+const studentSave = () => import('/js/student-save.js');
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const icons = () => { if (window.lucide) window.lucide.createIcons(); };
@@ -366,31 +544,60 @@ const [registryData, simsData] = await Promise.all([
 // Everything live and listed: retired modules have no page, and a hidden module (Pattern
 // Lab) is deliberately on no surface of the site, this one included.
 const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden);
-const SIMS = (simsData.simulations || []).filter((s) => s.url);
+const SIMS = (simsData.simulations || []).filter((s) => s.url).map((s) => ({ ...s, type: 'simulation' }));
 // Comms (/js/message-hq.js) builds its topic chips from this.
 window.MODULE_REGISTRY = MODULES.filter((m) => m.type !== 'game').map((m) => ({ ...m, category: m.type }));
 
-let STATUS = new Map();   // module id -> { state: 'go' | 'done', best, at }
+let STATUS = new Map();   // module id -> { state: 'go' | 'done', best, frac, at }
 
-function chipFor(m) {
+function pillFor(m) {
     const s = STATUS.get(m.id);
-    if (!s) return m.type === 'game' || m.type === 'simulation' ? '' : '<span class="chip">Not started</span>';
-    if (s.state === 'done') return `<span class="chip done">${m.type === 'challenge' && s.best != null ? `Done · ${s.best}/${m.maxScore}` : 'Done'}</span>`;
-    return `<span class="chip go">${m.type === 'challenge' && s.best != null ? `Best ${s.best}/${m.maxScore}` : 'In progress'}</span>`;
+    if (!s) return m.type === 'game' || m.type === 'simulation' ? '' : '<span class="pill todo">Not started</span>';
+    if (s.state === 'done') return `<span class="pill done">${m.type === 'challenge' && s.best != null ? `Done · ${s.best}/${m.maxScore}` : 'Done ✓'}</span>`;
+    return `<span class="pill going">${m.type === 'challenge' && s.best != null ? `Best ${s.best}/${m.maxScore}` : 'In progress'}</span>`;
 }
 
-function card(m) {
+function minutesOf(m) {
+    if (m.minutes) return String(m.minutes);
+    if (m.durationMinutes) return `${m.durationMinutes} min`;
+    return m.type === 'game' ? '5–10 min' : '';
+}
+
+function card(m, { where, pill } = {}) {
     const type = m.type || 'simulation';
     const hub = m.hub || {};
-    const iconStyle = hub.iconColor ? ` style="color:${esc(hub.iconColor)};background:${esc(hub.iconBg || '')};border-color:${esc(hub.iconBorder || '')}"` : '';
-    const minutes = m.minutes || (m.durationMinutes ? `${m.durationMinutes} min` : (type === 'game' ? '5–10 min' : ''));
-    const meta = [KIND[type], m.subject, minutes].filter(Boolean).join(' · ');
-    const blurb = (hub.cardBlurb || m.blurb || '');
-    return `<a class="card" href="${esc(m.url)}" data-name="${esc(m.name)}">
-        <span class="ic"${iconStyle}><i data-lucide="${esc(hub.icon || FALLBACK_ICON[type])}"></i></span>
-        <span class="cb"><span class="top"><span class="kind">${esc(meta)}</span>${chipFor(m)}</span><span class="name">${esc(m.name)}</span><span class="blurb">${esc(blurb)}</span></span>
+    const meta = [KIND[type], minutesOf(m), where].filter(Boolean).join(' · ');
+    return `<a class="card t-${esc(type)}" href="${esc(m.url)}" data-name="${esc(m.name)}">
+        <span class="ic"><i data-lucide="${esc(hub.icon || FALLBACK_ICON[type])}"></i></span>
+        <span class="grow"><b>${esc(m.name)}</b><span class="meta">${esc(meta)}</span></span>${pill != null ? pill : pillFor(m)}
     </a>`;
 }
+
+// --- Views: Home, Lab Packs, Games, Simulations. One short view at a time. -----------------
+const VIEWS = ['home', 'packs', 'games', 'sims', 'profile'];
+function showView(name, { focus } = {}) {
+    const view = VIEWS.includes(name) ? name : 'home';
+    document.querySelectorAll('section.view').forEach((s) => { s.hidden = s.dataset.view !== view; });
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', String(t.dataset.view === view)));
+    $('main').scrollTop = 0;
+    if (focus) {
+        const h = document.querySelector(`section.view[data-view="${view}"] .view-title`);
+        if (h) h.focus({ preventScroll: true });
+        if (window.matchMedia('(max-width:820px)').matches) window.scrollTo({ top: 0 });
+    }
+}
+// Rail tabs, the name block (-> Profile) and the Home save nudge all switch views.
+document.addEventListener('click', (e) => {
+    const t = e.target.closest('a[data-view]');
+    if (!t) return;
+    e.preventDefault();
+    history.replaceState(null, '', `#${t.dataset.view}`);
+    showView(t.dataset.view, { focus: true });
+});
+// Back/forward and typed #links switch views too.
+window.addEventListener('hashchange', () => showView(location.hash.slice(1) === 'save' ? 'profile' : location.hash.slice(1)));
+const initialHash = location.hash.slice(1);
+showView(initialHash === 'save' ? 'profile' : initialHash);
 
 function renderCatalog() {
     const packHtml = PACKS.map((p) => {
@@ -400,30 +607,123 @@ function renderCatalog() {
         if (!items.length) return '';
         const lessons = items.filter((m) => m.type === 'lab');
         const done = lessons.filter((m) => (STATUS.get(m.id) || {}).state === 'done').length;
-        return `<div class="pack">
-            <h3>${esc(p.name)} <span class="count" style="font-size:13px;color:var(--teal-deep)">${done} of ${lessons.length} lessons done</span></h3>
-            <p>${esc(p.tagline)} <a href="${esc(p.hub)}">About this pack</a></p>
-            <div class="grid">${items.map(card).join('')}</div>
-        </div>`;
+        return `<div class="packlbl">${esc(p.name)} <span class="done-n">${done} of ${lessons.length} lessons done</span> <a href="${esc(p.hub)}">About this pack</a></div>
+            <p class="sub" style="margin:-4px 0 10px">${esc(p.tagline)}</p>
+            <div class="grid">${items.map((m) => card(m)).join('')}</div>`;
     }).join('');
     const unpacked = MODULES.filter((m) => m.type !== 'game' && !PACKS.some((p) => p.id === m.pack));
-    $('packs-body').innerHTML = (packHtml + (unpacked.length ? `<div class="grid">${unpacked.map(card).join('')}</div>` : ''))
+    $('packs-body').innerHTML = (packHtml + (unpacked.length ? `<div class="packlbl">More Challenges</div><div class="grid">${unpacked.map((m) => card(m)).join('')}</div>` : ''))
         || '<p class="empty">Lessons could not load just now. Refresh the page to try again.</p>';
     const lessonsTotal = MODULES.filter((m) => m.type === 'lab').length;
-    $('packs-count').textContent = `${lessonsTotal} lessons · ${MODULES.filter((m) => m.type === 'challenge').length} Challenges`;
+    const challengesTotal = MODULES.filter((m) => m.type === 'challenge').length;
+    $('packs-count').textContent = `${lessonsTotal} lessons · ${challengesTotal} Challenges`;
     const games = MODULES.filter((m) => m.type === 'game');
-    $('games-body').innerHTML = games.length ? games.map(card).join('') : '<p class="empty">Games could not load just now.</p>';
-    $('sims-body').innerHTML = SIMS.length ? SIMS.map((s) => card({ ...s, type: 'simulation' })).join('') : '<p class="empty">Simulations could not load just now.</p>';
+    $('games-body').innerHTML = games.length ? games.map((m) => card(m)).join('') : '<p class="empty">Games could not load just now.</p>';
+    $('sims-body').innerHTML = SIMS.length ? SIMS.map((s) => card(s)).join('') : '<p class="empty">Simulations could not load just now.</p>';
+    $('n-packs').textContent = lessonsTotal + challengesTotal || '';
+    $('n-games').textContent = games.length || '';
+    $('n-sims').textContent = SIMS.length || '';
+    renderNew();
+    renderProgress();
     icons();
 }
 
+// --- Home: progress at a glance and badges. Everything here is computed from this
+// student's real progress (STATUS); nothing is stored for it. A Challenge badge is earned
+// at the registry's badgeThreshold, the same rule the Challenge card uses. --------------
+const isDone = (m) => (STATUS.get(m.id) || {}).state === 'done';
+function badgeList() {
+    const labs = MODULES.filter((m) => m.type === 'lab');
+    const labsDone = labs.filter(isDone).length;
+    const games = MODULES.filter((m) => m.type === 'game');
+    const gamesDone = games.filter(isDone).length;
+    const milestone = (name, icon, n) => ({ name, icon, tone: 'teal', earned: labsDone >= n,
+        hint: labsDone >= n ? `${n === labs.length ? 'Every' : n} lesson${n === 1 ? '' : 's'} done` : (n === 1 ? 'Finish any lesson' : `Finish ${n} lessons (${labsDone}/${n})`),
+        progress: Math.min(1, labsDone / n) });
+    const list = [
+        milestone('First Steps', 'footprints', 1),
+        milestone('On a Roll', 'flame', Math.min(5, labs.length)),
+        milestone('Every Lesson', 'award', labs.length),
+        { name: 'Game On', icon: 'gamepad-2', tone: 'plum', earned: gamesDone >= 1, hint: gamesDone >= 1 ? 'Finished a first game' : 'Finish any game' },
+        { name: 'Full Arcade', icon: 'joystick', tone: 'plum', earned: games.length > 0 && gamesDone === games.length,
+            hint: gamesDone === games.length ? 'Every game finished' : `Finish every game (${gamesDone}/${games.length})`, progress: games.length ? gamesDone / games.length : 0 },
+    ];
+    for (const p of PACKS) {
+        const inPack = labs.filter((m) => m.pack === p.id);
+        if (!inPack.length) continue;
+        const n = inPack.filter(isDone).length;
+        list.push({ name: `${p.name} Pack`, icon: 'book-open-check', tone: 'sage', earned: n === inPack.length, hint: n === inPack.length ? 'Every lesson done' : `${n} of ${inPack.length} lessons done`, progress: n / inPack.length });
+    }
+    for (const c of MODULES.filter((m) => m.type === 'challenge')) {
+        const st = STATUS.get(c.id) || {};
+        const earned = st.state === 'done';
+        const hint = !c.badgeThreshold ? (earned ? 'Finished' : 'Finish it to earn it')
+            : earned ? `Best ${st.best}/${c.maxScore}`
+            : st.best != null ? `${Math.max(0, c.badgeThreshold - st.best)} points to go`
+            : `Score ${c.badgeThreshold}+ to earn it`;
+        list.push({ name: /challenge$/i.test(c.name) ? c.name : `${c.name} Challenge`, icon: 'trophy', tone: 'orange', earned, hint, progress: earned ? 1 : (st.best != null && c.badgeThreshold ? st.best / c.badgeThreshold : 0) });
+    }
+    return list;
+}
+function renderProgress() {
+    const labs = MODULES.filter((m) => m.type === 'lab');
+    const challenges = MODULES.filter((m) => m.type === 'challenge');
+    const games = MODULES.filter((m) => m.type === 'game');
+    const badges = badgeList();
+    const earned = badges.filter((b) => b.earned).length;
+    const tile = (label, n, of, tone) => `<div class="stat t-${tone}"><span class="lbl">${esc(label)}</span>
+        <span class="num">${n}<small> / ${of}</small></span>
+        <span class="bar" aria-hidden="true"><i style="width:${of ? Math.round((n / of) * 100) : 0}%"></i></span></div>`;
+    $('stats').innerHTML = tile('Lessons done', labs.filter(isDone).length, labs.length, 'lab')
+        + tile('Challenges passed', challenges.filter(isDone).length, challenges.length, 'challenge')
+        + tile('Games finished', games.filter(isDone).length, games.length, 'game')
+        + tile('Badges', earned, badges.length, 'badge');
+    $('badges-count').textContent = `${earned} of ${badges.length} earned`;
+    $('badges').innerHTML = badges.map((b) => `<div class="badge tone-${b.tone}${b.earned ? ' on' : ''}" role="listitem">
+        <span class="medal"><i data-lucide="${b.earned ? b.icon : 'lock'}"></i></span>
+        <b>${esc(b.name)}</b><small>${esc(b.hint)}</small>
+        ${!b.earned && b.progress ? `<span class="bar" aria-hidden="true"><i style="width:${Math.round(Math.min(1, b.progress) * 100)}%"></i></span>` : ''}
+        <span class="sr">${b.earned ? 'Earned' : 'Not earned yet'}</span>
+    </div>`).join('');
+    $('badges').setAttribute('role', 'list');
+    const labsDone = labs.filter(isDone).length;
+    $('hello-sub').textContent = !STATUS.size ? 'Pick something to play. Your progress and badges show up here.'
+        : labsDone ? `${labsDone} lesson${labsDone === 1 ? '' : 's'} done and ${earned} badge${earned === 1 ? '' : 's'} so far. Keep it going.`
+        : 'Pick up where you left off, or start something new.';
+}
+
+// "New on Allgood Academy": the newest simulations and games this student hasn't opened.
+// simulations.json and the registry are both append-ordered, so the last entries are the
+// newest; nothing here names a module.
+function renderNew() {
+    const fresh = [...SIMS.slice(-2).reverse(), ...MODULES.filter((m) => m.type === 'game').slice(-2).reverse()]
+        .filter((m) => !STATUS.has(m.id)).slice(0, 3);
+    $('new').hidden = !fresh.length;
+    $('new-body').innerHTML = fresh.map((m) => card(m, { pill: '<span class="pill new">New</span>' })).join('');
+}
+
+// Keep going: the most recent unfinished lesson or Challenge, and the most recent game.
 function renderContinue() {
-    const going = [...STATUS.entries()].filter(([, s]) => s.state === 'go')
-        .sort((a, b) => (b[1].at || 0) - (a[1].at || 0))
-        .map(([id]) => MODULES.find((m) => m.id === id)).filter(Boolean).slice(0, 3);
-    $('continue-panel').hidden = !going.length;
-    $('continue-list').innerHTML = going.map((m) => `<li><a href="${esc(m.url)}" data-name="${esc(m.name)}">
-        <span class="nm">${esc(m.name)}<span class="mt">${esc(KIND[m.type])}</span></span><span aria-hidden="true">→</span></a></li>`).join('');
+    const recent = (types) => [...STATUS.entries()]
+        .filter(([, s]) => s.state === 'go')
+        .map(([id, s]) => ({ m: MODULES.find((x) => x.id === id), s }))
+        .filter(({ m }) => m && types.includes(m.type))
+        .sort((a, b) => (b.s.at || 0) - (a.s.at || 0))[0];
+    const big = (pick, kicker) => {
+        if (!pick) return '';
+        const { m, s } = pick;
+        const pack = PACKS.find((p) => p.id === m.pack);
+        const frac = s.frac != null ? s.frac : (s.best != null && m.maxScore ? s.best / m.maxScore : null);
+        const detail = s.best != null && m.maxScore ? `Best: ${s.best} of ${m.maxScore}` : (s.frac != null ? `${Math.round(s.frac * 100)}% done` : 'In progress');
+        return `<a class="bigc t-${esc(m.type)}" href="${esc(m.url)}" data-name="${esc(m.name)}">
+            <span class="ic"><i data-lucide="${esc((m.hub || {}).icon || FALLBACK_ICON[m.type])}"></i></span>
+            <span class="grow"><span class="meta">${esc(kicker)}${pack ? ` · ${esc(pack.name)}` : ''}</span><b>${esc(m.name)}</b><span class="meta">${esc(detail)}</span>
+            ${frac != null ? `<span class="bar" aria-hidden="true"><i style="width:${Math.max(4, Math.min(100, Math.round(frac * 100)))}%"></i></span>` : ''}</span>
+        </a>`;
+    };
+    const html = big(recent(['lab', 'challenge']), 'KEEP GOING') + big(recent(['game']), 'PLAY AGAIN');
+    $('continue').hidden = !html;
+    $('continue').innerHTML = html;
 }
 
 // This device's progress: module_progress (opened, and where they got to) and game_scores
@@ -436,6 +736,14 @@ function isComplete(m, d) {
     if (CURRENT_VERSION[m.id] && d.challengeVersion !== CURRENT_VERSION[m.id]) return false;
     return typeof d.finalScore === 'number' && d.finalScore >= (m.badgeThreshold || 0);
 }
+// How far through a lesson: the share of its pages marked complete, when the lesson
+// records them (pageCompletion). Otherwise unknown, and no bar is drawn.
+function fractionOf(data) {
+    const pc = data && data.pageCompletion;
+    if (!pc || typeof pc !== 'object') return null;
+    const vals = Object.values(pc);
+    return vals.length ? vals.filter((v) => v === true).length / vals.length : null;
+}
 async function loadStatus(uid) {
     const status = new Map();
     const bump = (id, patch) => status.set(id, { ...(status.get(id) || { state: 'go' }), ...patch });
@@ -444,42 +752,112 @@ async function loadStatus(uid) {
         getDocs(collection(db, 'artifacts', appId, 'users', uid, 'game_scores')).catch(() => ({ docs: [] })),
     ]);
     for (const d of progress.docs) {
-        if (!MODULES.some((m) => m.id === d.id)) continue;
-        bump(d.id, { at: Math.max(ms(d.data().lastUpdated), (status.get(d.id) || {}).at || 0) });
+        const m = MODULES.find((x) => x.id === d.id);
+        if (!m) continue;
+        const data = d.data();
+        // A finished game writes { completed: true } here (/js/game-finish.js).
+        const gameDone = m.type === 'game' && data.completed === true;
+        bump(d.id, { at: Math.max(ms(data.lastUpdated), (status.get(d.id) || {}).at || 0), frac: fractionOf(data), ...(gameDone ? { state: 'done' } : {}) });
     }
     for (const d of scores.docs) {
         const data = d.data();
         for (const m of MODULES) {
             if (!(m.gameNames || []).includes(data.gameName)) continue;
             const prev = status.get(m.id) || { state: 'go' };
-            const best = m.type === 'challenge' && typeof data.finalScore === 'number' && data.completed === true
+            const best = (m.type === 'challenge' || m.type === 'game') && typeof data.finalScore === 'number' && data.completed === true
                 ? Math.max(prev.best ?? 0, data.finalScore) : prev.best;
-            bump(m.id, { best, state: prev.state === 'done' || isComplete(m, data) ? 'done' : 'go', at: Math.max(prev.at || 0, ms(data.lastUpdated || data.timestamp)) });
+            bump(m.id, { best: m.maxScore ? best : undefined, state: prev.state === 'done' || isComplete(m, data) ? 'done' : 'go', at: Math.max(prev.at || 0, ms(data.lastUpdated || data.timestamp)) });
         }
     }
     return status;
 }
 
-// --- My class -------------------------------------------------------------------------
+// --- Name -----------------------------------------------------------------------------
+// The name a student chose (join, save or rename). A made-up startSession() nickname
+// ("Swift Falcon 42") doesn't count: we ask once, the first time a name is needed.
+let PROFILE = {};
+let currentName = '';
+const chosenName = () => (currentName && !window.AuthCore.isGeneratedNickname(currentName) ? currentName : '');
+function showName(name) {
+    currentName = name || '';
+    const chosen = chosenName();
+    $('hello').textContent = chosen ? `${STATUS.size ? 'Welcome back' : 'Hi'}, ${chosen}.` : (currentName ? `Hi, ${currentName}.` : 'Welcome.');
+    $('me-name').textContent = currentName || 'Welcome';
+    $('name-shown').textContent = chosen || 'Not set yet';
+    $('av').textContent = currentName ? currentName.charAt(0).toUpperCase() : '?';
+}
+const cleanName = (raw) => String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+// Returns true once the name is really stored. It used to return silently when there was
+// no session (e.g. sign-in blocked), so the new name showed and then vanished on reload.
+async function saveName(name) {
+    if (!name) return false;
+    const user = auth.currentUser || await window.AuthCore.startSession();
+    if (!user) return false;
+    try {
+        await updateProfile(user, { displayName: name });
+        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { displayName: name }, { merge: true });
+        showName(name);
+        return true;
+    } catch (err) {
+        console.error('[Dashboard] rename', err);
+        return false;
+    }
+}
+$('rename-open').onclick = () => { $('rename-form').hidden = false; $('rename-open').hidden = true; $('rename-msg').textContent = ''; $('rename-input').value = chosenName(); $('rename-input').focus(); };
+$('rename-cancel').onclick = () => { $('rename-form').hidden = true; $('rename-open').hidden = false; };
+$('rename-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const name = cleanName($('rename-input').value);
+    const msg = $('rename-msg');
+    if (!name) { msg.className = 'msg bad'; msg.textContent = 'Type a first name or nickname.'; return; }
+    const btn = $('rename-form').querySelector('button[type="submit"]');
+    btn.disabled = true;
+    const ok = await saveName(name);
+    btn.disabled = false;
+    if (!ok) {
+        msg.className = 'msg bad';
+        msg.textContent = "We couldn't save your name just now. Check your internet connection and try again.";
+        return;
+    }
+    $('rename-form').hidden = true;
+    $('rename-open').hidden = false;
+    // Redraw everything that shows the name (the class card says what the teacher sees).
+    await refresh();
+    // Saved — and if their progress isn't saved yet, this is the moment to offer it.
+    msg.className = 'msg ok';
+    msg.innerHTML = !SAVE_STATE && PROFILE.role !== 'teacher'
+        ? `Saved. You're ${esc(name)} on this device. <button class="link" type="button" data-a="save">Save your progress</button> to be ${esc(name)} on every device.`
+        : `Saved. You're ${esc(name)}.`;
+};
+
+// --- My class: join with a code (classroom-join.js, the same logic /join/ uses), what the
+// teacher assigned, and leaving. ------------------------------------------------------
 async function renderClass(uid, profile) {
     const code = profile.role !== 'teacher' ? profile.classroomCode : null;
-    if (!code) return;
+    $('assigned').hidden = true;
+    if (!code) { $('me-class').textContent = profile.role === 'teacher' ? 'Teacher' : 'Not in a class yet'; return; }
     try {
         const { loadAssignedItems } = await classroomJoin();
         const assigned = await loadAssignedItems(code, uid);
         if (!assigned) return;
-        const rows = assigned.items.map((it) => {
-            const m = MODULES.find((x) => x.id === it.id);
-            return `<li><a href="${esc(it.url)}" data-name="${esc(it.name)}"><span class="nm">${esc(it.name)}<span class="mt">${esc(it.typeLabel)}${it.minutes ? ` · about ${it.minutes} min` : ''}${it.extra ? ' · just for you' : ''}</span></span>${m ? chipFor(m) : ''}</a></li>`;
-        }).join('');
-        $('class-body').innerHTML = `<p class="big">${esc(assigned.name)}</p>
-            <p>Your teacher sees you as <strong>${esc(profile.displayName || '')}</strong>.</p>
-            ${rows ? `<ul class="rows">${rows}</ul>` : '<p>Nothing assigned yet. Anything you do now still counts.</p>'}
-            <p style="margin:12px 0 0"><button class="link" type="button" id="leave-class">Leave this class</button></p>`;
+        const teacher = (assigned.classroom && assigned.classroom.teacherName) || '';
+        $('me-class').textContent = assigned.name;
+        $('class-body').innerHTML = `<h2>${esc(assigned.name)}</h2>
+            <p>Your teacher sees your progress under the name <strong>${esc(profile.displayName || '')}</strong>.</p>
+            <button class="link" type="button" id="leave-class">Leave this class</button>`;
         $('leave-class').onclick = () => leaveClass(uid, code);
+        if (assigned.items.length) {
+            $('assigned-title').textContent = teacher ? `Assigned by ${teacher}` : 'Assigned by your teacher';
+            $('assigned-body').innerHTML = assigned.items.map((it) => {
+                const m = MODULES.find((x) => x.id === it.id) || { ...it, type: it.type };
+                return card({ ...m, url: it.url, name: it.name }, { where: it.extra ? 'just for you' : '' });
+            }).join('');
+            $('assigned').hidden = false;
+            icons();
+        }
     } catch (e) {
         console.error('[Dashboard] class', e);
-        $('class-body').innerHTML = '<p class="big">You\'re in a class.</p><p>We couldn\'t load what\'s assigned just now. Refresh to try again.</p>';
+        $('class-body').innerHTML = '<h2>You\'re in a class.</h2><p>We couldn\'t load what\'s assigned just now. Refresh to try again.</p>';
     }
 }
 async function leaveClass(uid, code) {
@@ -491,26 +869,279 @@ async function leaveClass(uid, code) {
     } catch (e) { console.error('[Dashboard] leave class', e); }
 }
 
-// --- Name -----------------------------------------------------------------------------
-let currentName = '';
-function showName(name) {
-    currentName = name || '';
-    $('hello').textContent = currentName ? `Hi, ${currentName}.` : 'Welcome.';
-}
-$('rename-open').onclick = () => { $('rename-form').hidden = false; $('rename-input').value = currentName; $('rename-input').focus(); };
-$('rename-cancel').onclick = () => { $('rename-form').hidden = true; };
-$('rename-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const name = $('rename-input').value.replace(/\s+/g, ' ').trim().slice(0, 24);
-    const user = auth.currentUser;
-    if (!name || !user) return;
-    showName(name);
-    $('rename-form').hidden = true;
+async function joinWith(code, nickname, msgEl, btn) {
+    const label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Joining…'; }
     try {
-        await updateProfile(user, { displayName: name });
-        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { displayName: name }, { merge: true });
-    } catch (err) { console.error('[Dashboard] rename', err); }
+        const { joinClassroom } = await classroomJoin();
+        const result = await joinClassroom(code, { nickname });
+        if (!result.ok) {
+            msgEl.className = 'msg bad';
+            msgEl.textContent = result.message;
+            return false;
+        }
+        closeSave();
+        $('join-msg').className = 'msg ok';
+        $('join-msg').textContent = `You're in ${result.name}.`;
+        await refresh();
+        return true;
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+    }
+}
+// Re-bound after every render of the class card (it is replaced when a student leaves).
+function bindJoin() {
+    const form = $('join-form');
+    if (!form) return;
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const code = $('join-code').value;
+        const msg = $('join-msg');
+        msg.textContent = '';
+        if (!code.trim()) { msg.className = 'msg bad'; msg.textContent = 'Type the class code from the board first.'; return; }
+        // One name for both jobs: if the student hasn't told us what to call them yet, ask
+        // once. The same name is what a save code is made under.
+        if (chosenName()) { await joinWith(code, chosenName(), msg, form.querySelector('button')); return; }
+        openSave('joinname', { code });
+    };
+}
+bindJoin();
+
+// --- Keep your progress: the optional save (/js/student-save.js). ------------------------
+let SAVE = null;        // the loaded student-save module
+let SAVE_STATE = null;  // null (not saved) | 'code' | 'google' | 'account'
+let showCode = false;
+let lastCode = '';        // the code just made, in case this browser blocks storage
+const GOOGLE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.5z"/><path fill="#34A853" d="M12 23.5c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.4 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3a11.5 11.5 0 0 0 10.2 6.3z"/><path fill="#FBBC05" d="M5.6 14.2a6.9 6.9 0 0 1 0-4.4v-3H1.8a11.5 11.5 0 0 0 0 10.4z"/><path fill="#EA4335" d="M12 4.6c1.7 0 3.2.6 4.4 1.7l3.3-3.3A11.5 11.5 0 0 0 1.8 6.8l3.8 3c.9-2.7 3.4-5.2 6.4-5.2z"/></svg>';
+
+function renderSave() {
+    const card = $('save-card');
+    const rail = $('rail-save');
+    const teacher = PROFILE.role === 'teacher' || SAVE_STATE === 'account';
+    card.hidden = teacher || !SAVE;
+    rail.hidden = teacher || !SAVE;
+    $('rail-device').hidden = teacher || !!SAVE_STATE;
+    // On Home, one quiet line — only once there's progress worth keeping.
+    $('save-nudge').hidden = card.hidden || !!SAVE_STATE || !STATUS.size;
+    if (card.hidden) return;
+    if (!SAVE_STATE) {
+        card.className = 'pcard warn';
+        card.innerHTML = `<p class="k o">Keep your progress</p><h2>Save it so it follows you</h2>
+            <p>Right now everything you've done lives on this device only. Save it, and you can pick up on any computer, phone or Chromebook.</p>
+            <div class="row"><button class="btn" type="button" data-a="save">Save my progress</button><button class="link" type="button" data-a="have">I have a save code</button></div>`;
+        rail.className = 'save-status';
+        rail.innerHTML = '<b>Not saved yet</b>Your progress is only on this device.<button class="btn" type="button" data-a="save">Save my progress</button>';
+    } else if (SAVE_STATE === 'code') {
+        const code = SAVE.shownCode();
+        card.className = 'pcard';
+        card.innerHTML = `<p class="k g">Saved ✓</p><h2>Your save code</h2>
+            <p>On another device, open your dashboard and choose "I have a save code."</p>
+            ${code ? `<div class="codebox"><span id="code-text">${showCode ? esc(code) : '••••-••••-••••-••••'}</span>
+                <button class="link" type="button" data-a="show" aria-pressed="${showCode}">${showCode ? 'Hide' : 'Show'}</button>
+                <button class="link" type="button" data-a="copy">Copy</button></div>
+            <p class="small">Only shown on this device. Keep it somewhere safe — anyone with it can open your progress.</p>`
+            : '<p class="small">This device doesn\'t have your code stored. Use the copy you wrote down.</p>'}
+            <p class="small"><button class="link" type="button" data-a="signout">Sign out on this device</button></p>`;
+        rail.className = 'save-status ok';
+        rail.innerHTML = '<b>✓ Progress saved</b>With your save code.';
+    } else {
+        const email = (auth.currentUser && auth.currentUser.email) || '';
+        card.className = 'pcard';
+        card.innerHTML = `<p class="k g">Saved ✓</p><h2>Signed in with Google</h2>
+            <p>${email ? `${esc(email)} — s` : 'S'}ign in with Google on any device to pick up where you left off.</p>
+            <button class="link" type="button" data-a="signout">Sign out on this device</button>`;
+        rail.className = 'save-status ok';
+        rail.innerHTML = '<b>✓ Progress saved</b>Signed in with Google.';
+    }
+}
+
+// The save sheet: one step at a time.
+let lastOpener = null;
+let pendingJoin = null;
+function sheet(html) {
+    $('save-sheet').innerHTML = html;
+    $('save-modal').hidden = false;
+    const first = $('save-sheet').querySelector('input, .btn');
+    if (first) first.focus();
+}
+function closeSave() {
+    if ($('save-modal').hidden) return;
+    $('save-modal').hidden = true;
+    pendingJoin = null;
+    if (lastOpener && document.contains(lastOpener)) lastOpener.focus();
+}
+const STEPS = {
+    age: () => sheet(`<p class="step">Save your progress</p><h2 id="save-title">Are you 13 or older?</h2>
+        <p>We ask so we know which way of saving to offer. Either answer is fine.</p>
+        <div class="two"><button class="btn ghost" type="button" data-a="u13">No</button><button class="btn ghost" type="button" data-a="o13">Yes</button></div>`),
+    name: () => sheet(`<p class="step">Save with a code · 1 of 2</p><h2 id="save-title">What should we call you?</h2>
+        <p>Your first name or a nickname. No last names.</p>
+        <input class="inp" id="save-name" maxlength="24" autocomplete="off" placeholder="First name or nickname" aria-label="First name or nickname" value="${esc(chosenName())}">
+        <p class="msg bad" id="save-msg" role="status" aria-live="polite"></p>
+        <div class="row" style="margin-top:12px"><button class="btn" type="button" data-a="mkcode">Get my save code</button></div>`),
+    code: (code, name) => sheet(`<p class="step">Save with a code · 2 of 2</p><h2 id="save-title">Here's your save code${name ? `, ${esc(name)}` : ''}</h2>
+        <p>Write it down, or take a picture of it. You'll need it to open your progress on a different device.</p>
+        <div class="bigcode" id="big-code">${esc(code)}</div>
+        <div class="row"><button class="btn ghost" type="button" data-a="copy">Copy</button><button class="btn ghost" type="button" data-a="print">Print</button><button class="btn" type="button" data-a="done" style="margin-left:auto">I saved it</button></div>
+        <p class="small">You can see it again any time on your dashboard on this device.</p>`),
+    google: () => sheet(`<p class="step">Save your progress</p><h2 id="save-title">Save with Google</h2>
+        <p>Use your school or personal Google account. Your progress comes with you.</p>
+        <button class="btn goog" type="button" data-a="gsave">${GOOGLE_SVG}Continue with Google</button>
+        <p class="msg bad" id="save-msg" role="status" aria-live="polite"></p>
+        <p class="small" style="text-align:center;margin-top:14px"><button class="link" type="button" data-a="usecode">Use a save code instead</button></p>`),
+    have: () => sheet(`<p class="step">Welcome back</p><h2 id="save-title">Enter your save code</h2>
+        <p>It looks like <b>WORD-WORD-WORD-1234</b>.</p>
+        <input class="inp code" id="have-code" maxlength="48" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Save code" aria-label="Save code">
+        <p class="msg bad" id="save-msg" role="status" aria-live="polite"></p>
+        <div class="row" style="margin-top:12px"><button class="btn" type="button" data-a="open">Open my progress</button>
+        ${SAVE && SAVE.googleAllowed() ? '<span class="small" style="margin:0">Saved with Google? <button class="link" type="button" data-a="gopen">Use Google</button></span>' : ''}</div>
+        <p class="small">Anything done on this device before you open your save stays with this device.</p>`),
+    joinname: () => sheet(`<p class="step">Join your class</p><h2 id="save-title">What should your teacher call you?</h2>
+        <p>Your first name or a nickname. No last names.</p>
+        <input class="inp" id="join-name" maxlength="24" autocomplete="off" placeholder="First name or nickname" aria-label="First name or nickname">
+        <p class="msg bad" id="save-msg" role="status" aria-live="polite"></p>
+        <div class="row" style="margin-top:12px"><button class="btn" type="button" data-a="joinname">Join my class</button></div>`),
 };
+async function openSave(step, extra) {
+    lastOpener = document.activeElement;
+    if (!SAVE) { try { SAVE = await studentSave(); } catch (e) { console.error('[Dashboard] save module', e); return; } }
+    if (step === 'joinname') { pendingJoin = extra; STEPS.joinname(); return; }
+    if (step === 'save') {
+        // A student who already answered this session is not asked again, so "No" can't be
+        // changed by asking again; "Yes" goes straight to Google.
+        const answered = SAVE.ageAnswer();
+        if (answered === 'no') return STEPS.name();
+        if (answered === 'yes') return STEPS.google();
+        return STEPS.age();
+    }
+    STEPS[step]();
+}
+const firstWord = (raw) => cleanName(raw).split(' ')[0];
+const saveMsg = (text) => { const el = $('save-msg'); if (el) { el.className = 'msg bad'; el.textContent = text; } };
+const SAVE_ERRORS = {
+    'auth/network-request-failed': 'Check your internet connection and try again.',
+    'auth/too-many-requests': 'Too many tries. Wait a few minutes, then try again.',
+    'auth/popup-blocked': 'Your browser blocked the Google window. Allow pop-ups for this site and try again.',
+    'auth/operation-not-allowed': 'Saving isn\'t switched on yet. Ask your teacher to let us know.',
+};
+const errText = (e) => SAVE_ERRORS[e && e.code] || 'Something went wrong. Try again in a moment.';
+async function copyText(text, btn) {
+    try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied ✓'; } catch (e) { btn.textContent = 'Select it and copy'; }
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+}
+function printCode(code) {
+    $('print-card').innerHTML = `<p><b>Allgood Academy save code</b></p><div class="bigcode">${esc(code)}</div>
+        <p>To open your progress on another device: go to allgoodacademy.com/dashboard and choose "I have a save code."</p>
+        <p>Keep this somewhere safe. Anyone with this code can open your progress.</p>`;
+    document.body.classList.add('printing-code');
+    window.print();
+    setTimeout(() => document.body.classList.remove('printing-code'), 500);
+}
+
+document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-a]');
+    if (!b) return;
+    const a = b.dataset.a;
+    if (a === 'save' || a === 'have') { openSave(a); return; }
+    if (a === 'close') { closeSave(); return; }
+    if (!SAVE) return;
+    if (a === 'u13') { SAVE.setAgeAnswer('no'); STEPS.name(); return; }
+    if (a === 'o13') { SAVE.setAgeAnswer('yes'); STEPS.google(); return; }
+    if (a === 'usecode') { STEPS.name(); return; }
+    if (a === 'mkcode') {
+        const name = firstWord($('save-name').value);
+        if (!name) { saveMsg('Type a first name or nickname.'); return; }
+        b.disabled = true; b.textContent = 'Saving…';
+        try {
+            const { code } = await SAVE.saveWithCode(name);
+            lastCode = code;
+            showName(name);
+            SAVE_STATE = 'code';
+            renderSave();
+            STEPS.code(code, name);
+        } catch (err) {
+            console.error('[Dashboard] save with code', err);
+            saveMsg(errText(err));
+            b.disabled = false; b.textContent = 'Get my save code';
+        }
+        return;
+    }
+    if (a === 'copy') { const code = SAVE.shownCode() || lastCode; if (code) copyText(code, b); return; }
+    if (a === 'print') { const code = SAVE.shownCode() || lastCode; if (code) printCode(code); return; }
+    if (a === 'done') { closeSave(); refresh(); return; }
+    if (a === 'show') { showCode = !showCode; renderSave(); const t = document.querySelector('[data-a="show"]'); if (t) t.focus(); return; }
+    if (a === 'gsave') {
+        // The popup has to open on this click, before anything else is awaited.
+        const pending = SAVE.saveWithGoogle();
+        b.disabled = true;
+        try {
+            const { existing } = await pending;
+            if (existing) {
+                sheet(`<p class="step">Saved with Google</p><h2 id="save-title">Welcome back</h2>
+                    <p>That Google account already had saved progress, so we opened it. Anything done on this device before stays with this device.</p>
+                    <button class="btn" type="button" data-a="reload">Open my dashboard</button>`);
+                return;
+            }
+            closeSave();
+            await refresh();
+        } catch (err) {
+            if (!/popup-closed-by-user|cancelled-popup-request/.test(err.code || '')) { console.error('[Dashboard] save with Google', err); saveMsg(errText(err)); }
+        } finally { b.disabled = false; }
+        return;
+    }
+    if (a === 'open') {
+        b.disabled = true; b.textContent = 'Checking…';
+        try {
+            const r = await SAVE.openWithCode($('have-code').value);
+            if (r.ok) { location.reload(); return; }
+            saveMsg(r.reason === 'format' ? "That doesn't look like a save code. Check the spelling and the dashes."
+                : r.reason === 'rate' ? SAVE_ERRORS['auth/too-many-requests']
+                : "We couldn't find that save code. Check it and try again.");
+        } catch (err) { console.error('[Dashboard] open save', err); saveMsg(errText(err)); }
+        b.disabled = false; b.textContent = 'Open my progress';
+        return;
+    }
+    if (a === 'gopen') {
+        const pending = SAVE.openWithGoogle();
+        try {
+            const r = await pending;
+            if (r.ok) { location.reload(); return; }
+            saveMsg(r.reason === 'not_found' ? 'That Google account has no saved progress yet.' : errText(null));
+        } catch (err) {
+            if (!/popup-closed-by-user|cancelled-popup-request/.test(err.code || '')) { console.error('[Dashboard] open with Google', err); saveMsg(errText(err)); }
+        }
+        return;
+    }
+    if (a === 'reload') { location.reload(); return; }
+    if (a === 'signout') {
+        const warn = SAVE_STATE === 'code'
+            ? 'Sign out on this device? You\'ll need your save code to open your progress here again.'
+            : 'Sign out on this device? Sign in with Google to open your progress here again.';
+        if (!confirm(warn)) return;
+        try { await SAVE.signOutDevice(); } catch (err) { console.error('[Dashboard] sign out', err); }
+        location.hash = '';
+        location.reload();
+        return;
+    }
+    if (a === 'joinname') {
+        const name = firstWord($('join-name').value);
+        if (!name) { saveMsg('Type a first name or nickname.'); return; }
+        const code = pendingJoin && pendingJoin.code;
+        if (!code) { closeSave(); return; }
+        await joinWith(code, name, $('save-msg'), b);
+    }
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('save-modal').hidden) closeSave();
+});
+$('save-modal').addEventListener('click', (e) => { if (e.target === $('save-modal')) closeSave(); });
+$('save-sheet').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+    const go = { 'save-name': 'mkcode', 'have-code': 'open', 'join-name': 'joinname' }[e.target.id];
+    const btn = go && $('save-sheet').querySelector(`[data-a="${go}"]`);
+    if (btn) { e.preventDefault(); btn.click(); }
+});
 
 // --- Launch log: what Insider's "dashboard launches" counts. Never blocks the navigation. --
 document.addEventListener('click', (e) => {
@@ -523,58 +1154,6 @@ document.addEventListener('click', (e) => {
     }).catch(() => {});
 });
 
-// --- OLD PROGRESS (legacy restore; delete with AuthCore's legacy section after
-// AuthCore.LEGACY_RESTORE_UNTIL). Copies a Recruit Code's, an old Google account's or an
-// old email-and-password account's work into this device's session. They stay anonymous.
-const RESTORE_ERRORS = {
-    empty: 'Type your code first.',
-    not_found: "We couldn't find that. Check it and try again.",
-    teacher: 'That is a teacher account. Teachers use "Teacher sign in" on the homepage.',
-    error: 'Something went wrong. Check your internet connection and try again.',
-};
-function restoreMessage(text, ok) {
-    const el = $('restore-status');
-    el.textContent = text;
-    el.className = ok ? 'ok' : 'bad';
-}
-window.openRestore = () => {
-    $('restore-status').textContent = '';
-    $('restore-email-form').hidden = true;
-    $('restore-modal').hidden = false;
-    $('restore-code').focus();
-};
-window.closeRestore = () => { $('restore-modal').hidden = true; };
-window.showRestoreEmail = () => { $('restore-email-form').hidden = false; $('restore-email').focus(); };
-async function runRestore(btn, action) {
-    const label = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Checking…';
-    let result;
-    try {
-        result = await action();
-    } catch (e) {
-        console.error('[Dashboard] restore failed', e);
-        const wrong = e && /wrong-password|invalid-credential|user-not-found|invalid-email/.test(e.code || '');
-        const closed = e && /popup-closed-by-user|cancelled-popup-request/.test(e.code || '');
-        result = { ok: false, reason: closed ? null : (wrong ? 'not_found' : 'error') };
-    } finally {
-        btn.disabled = false;
-        btn.textContent = label;
-    }
-    if (!result.ok) {
-        if (result.reason) restoreMessage(RESTORE_ERRORS[result.reason] || RESTORE_ERRORS.error, false);
-        return;
-    }
-    const n = result.restoredModules;
-    restoreMessage(`Welcome back, ${result.displayName || 'you'}. ${n === 1 ? '1 lesson' : n + ' lessons'} of progress restored on this device.`, true);
-    if (result.displayName) showName(result.displayName);
-    refresh();
-}
-window.restoreWithCode = (btn) => runRestore(btn, () => window.AuthCore.restoreFromRecruitCode($('restore-code').value));
-window.restoreWithGoogle = (btn) => runRestore(btn, () => window.AuthCore.restoreWithGoogle());
-window.restoreWithEmail = (btn) => runRestore(btn, () => window.AuthCore.restoreWithEmail($('restore-email').value.trim(), $('restore-password').value));
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('restore-modal').hidden) window.closeRestore(); });
-$('restore-link').hidden = !window.AuthCore.legacyRestoreOpen();
 
 // --- Start: the catalog renders straight away; this device's progress fills in after. ---
 renderCatalog();
@@ -586,17 +1165,28 @@ async function refresh() {
         const snap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid));
         profile = snap.exists() ? snap.data() : {};
     } catch (e) { console.warn('[Dashboard] profile', e); }
-    showName(profile.displayName || user.displayName);
+    PROFILE = profile;
     $('teacher-panel').hidden = profile.role !== 'teacher';
-    $('class-panel').hidden = profile.role === 'teacher';
+    $('class-card').hidden = profile.role === 'teacher';
     STATUS = await loadStatus(user.uid);
+    showName(profile.displayName || user.displayName);
     renderCatalog();
     renderContinue();
+    if (!profile.classroomCode) bindJoin();
     await renderClass(user.uid, profile);
+    try {
+        if (!SAVE) SAVE = await studentSave();
+        SAVE_STATE = SAVE.saveState(auth.currentUser);
+    } catch (e) { console.error('[Dashboard] save module', e); }
+    renderSave();
     icons();
 }
 const user = await window.AuthCore.startSession();
-if (user) refresh();
+if (user) {
+    await refresh();
+    // From the one-time end-of-lesson offer (/js/save-offer.js): open the save flow.
+    if (location.hash === '#save' && SAVE && !SAVE_STATE && PROFILE.role !== 'teacher') openSave('save');
+}
 </script>
 </body>
 </html>

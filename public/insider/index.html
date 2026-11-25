@@ -268,6 +268,43 @@
                 scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
                 progressStep: p => Object.keys(p.answeredScenarioScores || {}).length,
             },
+            // ---- The four funnel games (2026-11-25). Same shape as a course, so every Insider
+            // page (Courses, a learner's status, the Classrooms grid, exports) reports them the
+            // way it reports lessons. Status comes from their telemetry sessions (module = id)
+            // and, from this release, a module_progress/{id} { completed } record written when
+            // a game is finished (/js/game-finish.js). Take the Bait stays off-funnel below.
+            {
+                id: 'read-the-signal', name: 'Read the Signal', category: 'Game',
+                gameNames: ['Read the Signal'], launchNames: ['Read the Signal'],
+                stepsTotal: 10, stepLabel: 'rounds played', stepBucket: 1, scored: false,
+                isComplete: d => d.completed === true,
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: p => (p.completed === true ? 10 : 0),
+            },
+            {
+                id: 'before-you-send', name: 'Before You Send', category: 'Game',
+                gameNames: ['Before You Send'], launchNames: ['Before You Send'],
+                stepsTotal: 10, stepLabel: 'rounds played', stepBucket: 1, scored: false,
+                isComplete: d => d.completed === true,
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: p => (p.completed === true ? 10 : 0),
+            },
+            {
+                id: 'the-rumor-mill', name: 'The Rumor Mill', category: 'Game',
+                gameNames: ['The Rumor Mill'], launchNames: ['The Rumor Mill'],
+                stepsTotal: 10, stepLabel: 'rounds played', stepBucket: 1, scored: false,
+                isComplete: d => d.completed === true,
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: p => (p.completed === true ? 10 : 0),
+            },
+            {
+                id: 'money-moves', name: 'Money Moves', category: 'Game',
+                gameNames: ['Money Moves'], launchNames: ['Money Moves'],
+                stepsTotal: 10, stepLabel: 'rounds played', stepBucket: 1, scored: false,
+                isComplete: d => d.completed === true,
+                scoreOf: d => typeof d.percentage === 'number' ? d.percentage : null,
+                progressStep: p => (p.completed === true ? 10 : 0),
+            },
             {
                 // OFF-FUNNEL. Take the Bait reports on its own telemetry stream and is split
                 // out of every core figure (see OFF_FUNNEL_COURSES below and the Take the Bait

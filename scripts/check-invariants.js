@@ -23,6 +23,10 @@
 //   8. the permanent join address    — /join/ is printed on classroom walls and in the TPT
 //      guide; it must exist, and the wall poster must send students there. The poster once
 //      said a lesson would ask for the code, and none did (UAT 2026-09-27)
+//   9. save code stays out of Firestore — a student's optional save code works like a
+//      password, and a teacher can read everything under users/{uid} (2026-11-24)
+//  10. founder employer not named      — the founder's employer stays off the site until
+//      its outside-activity policy is checked (2026-11-24)
 //
 // No dependencies; run with `node scripts/check-invariants.js`. Exits 1 on any violation.
 const fs = require('fs');
@@ -251,7 +255,8 @@ if (claimingPages.length) {
 // /mission-control/. The old shared gate (age question, 13+ sign-in, Recruit Codes,
 // save offer) and the tap-to-power-up screens it sat behind are deleted, and this keeps
 // them deleted. The failure it guards against is the one that recurred three times: a
-// child closing a pre-play identity screen and losing their work.
+// child closing a pre-play identity screen and losing their work. The optional save added
+// 2026-11-24 is offered after content, on the dashboard, when a student asks — check 9.
 {
   if (exists('public/js/identity-gate.js')) {
     fail('no-gate', `public/js/identity-gate.js is back. Students never sign in and nothing is asked ` +
@@ -503,6 +508,64 @@ function isScheduled(file) {
     if (/when it asks/i.test(sheet)) {
       fail('join', `${MC}: the poster says a lesson will ask for the code. No lesson asks — students ` +
         `join at /join/.`);
+    }
+  }
+}
+
+// --- 9. The optional student save: never before content, code never in Firestore ---
+// Student save (2026-11-24) lets a student who CHOOSES to keep their progress link a save
+// code or (13+) Google onto their anonymous session, from the dashboard only. Check 5 still
+// holds — nothing is asked before content — and these keep the save itself honest:
+//   - the save module never touches Firestore. Teachers can read a student's profile and
+//     every subcollection under it, and a save code is a password. The only thing it may
+//     pass on is the student's chosen name, through AuthCore.writeStudentProfile.
+//   - the code's storage key appears in the save module and nowhere else, so no page can
+//     start writing it somewhere a teacher (or telemetry) could read it.
+//   - only the dashboard loads the save module; the end-of-lesson offer is a link to it.
+//   - the word list stays large enough for the code to work as a password (1,000+ words).
+//   - Google is offered only after the age question, and not after a "No".
+{
+  const SAVE = 'public/js/student-save.js';
+  if (exists(SAVE)) {
+    const src = read(SAVE);
+    if (/firebase-firestore|\b(setDoc|addDoc|updateDoc|writeBatch|runTransaction)\b/.test(src)) {
+      fail('save-code', `${SAVE}: imports or writes to Firestore. The save module may only link Auth ` +
+        `credentials; a teacher can read everything under users/{uid}, and a save code is a password.`);
+    }
+    if (!/googleAllowed\(\)/.test(src) || !/sessionStorage/.test(src)) {
+      fail('save-code', `${SAVE}: the Google save no longer checks the session's age answer. Once a ` +
+        `student answers "No", Google must not be offered again in that session.`);
+    }
+    const key = (src.match(/const CODE_KEY = '([^']+)'/) || [])[1];
+    if (!key) fail('save-code', `${SAVE}: CODE_KEY is gone — the save code's only storage must be named in one place.`);
+    for (const file of walk('public').filter((f) => /\.(html|js|mjs)$/.test(f) && f !== SAVE)) {
+      const other = read(file);
+      if (key && other.includes(key)) {
+        fail('save-code', `${file}: mentions the save code's storage key "${key}". Only ${SAVE} may read or ` +
+          `write it (the dashboard reads it through StudentSave.shownCode()).`);
+      }
+      if (/(src=|import\(|from\s*)['"]\/js\/student-save\.js/.test(other) && file !== 'public/dashboard/index.html') {
+        fail('save-code', `${file}: loads the student save module. Saving is offered on /dashboard/ only, ` +
+          `when the student asks — never on a lesson, and never before content.`);
+      }
+    }
+    const words = exists('public/js/save-words.js')
+      ? (read('public/js/save-words.js').match(/'([a-z]+)'/g) || []).map((w) => w.slice(1, -1)) : [];
+    if (words.length < 1000) fail('save-code', `public/js/save-words.js: ${words.length} words. A save code works like a password; the list needs 1,000+.`);
+    if (new Set(words).size !== words.length) fail('save-code', 'public/js/save-words.js: has a duplicate word.');
+  }
+}
+
+// --- 10. The founder's employer is described, never named -------------------------
+// Founder decision 2026-11-24: until the employer's outside-activity and brand policy is
+// checked, the founder story says "a national education nonprofit". The job line lives in
+// nav/founder.js. When it is cleared, change it there and delete this check in the same commit.
+{
+  const FOUNDER_SURFACES = ['nav/founder.js', 'public/index.html', 'public/about/index.html', 'public/for-teachers/index.html', 'public/privacy.html', 'public/terms.html'];
+  for (const file of FOUNDER_SURFACES.filter(exists)) {
+    if (/college\s*board/i.test(read(file))) {
+      fail('founder-employer', `${file}: names College Board. The founder's employer is not named on the ` +
+        `site until its policy is checked — use the wording in nav/founder.js.`);
     }
   }
 }
