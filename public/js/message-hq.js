@@ -152,12 +152,12 @@
     var TEMPLATE =
         '<div id="message-modal" style="' + MODAL_STYLE + '" class="hidden-modal fixed inset-0 z-[9999] bg-allgood-dark/90 flex items-center justify-center p-6 modal-transition backdrop-blur-sm" onclick="window.closeComms()">' +
             '<div style="' + PANEL_STYLE + '" class="bg-white rounded-lg shadow-2xl border-t-4 border-allgood-primary relative" onclick="event.stopPropagation()">' +
-                '<button onclick="window.closeComms()" style="' + CLOSE_STYLE + '" class="text-gray-400 hover:text-red-500 transition-colors" title="Close" aria-label="Close">' +
+                '<button onclick="window.closeComms()" style="' + CLOSE_STYLE + '" class="text-ink-soft hover:text-red-500 transition-colors" title="Close" aria-label="Close">' +
                     '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
                 '</button>' +
                 '<div class="px-6 pt-6 pb-3 shrink-0">' +
                     '<h3 class="text-xl font-heading font-bold text-allgood-dark uppercase">Comms</h3>' +
-                    '<p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">From Allgood HQ</p>' +
+                    '<p class="text-[10px] text-ink-soft uppercase tracking-widest font-bold mt-1">From Allgood HQ</p>' +
                 '</div>' +
                 '<div id="comms-body" style="' + LIST_STYLE + '" class="px-6"></div>' +
                 '<div id="comms-foot" class="px-6 py-4 border-t border-gray-100 shrink-0"></div>' +
@@ -180,7 +180,7 @@
                     '<div class="min-w-0">' +
                         '<p class="text-sm font-bold ' + (unread ? 'text-allgood-dark' : 'text-gray-500') + ' font-heading">' + esc(it.title) + '</p>' +
                         '<p class="text-xs text-gray-500 mt-1 leading-snug">' + esc(it.body) + '</p>' +
-                        (it.excerpt ? '<p class="text-xs text-gray-400 mt-1 italic break-words">“' + esc(it.excerpt) + '”</p>' : '') +
+                        (it.excerpt ? '<p class="text-xs text-ink-soft mt-1 italic break-words">“' + esc(it.excerpt) + '”</p>' : '') +
                     '</div>' +
                 '</div>' +
             '</button>';
@@ -250,7 +250,7 @@
         showPanel(
             '<p class="text-sm font-bold text-allgood-dark font-heading mb-2">' + esc(it.title) + '</p>' +
             '<p class="text-xs text-gray-500 leading-relaxed">' + esc(it.body) + '</p>' +
-            (it.excerpt ? '<p class="text-xs text-gray-400 mt-3 italic break-words">“' + esc(it.excerpt) + '”</p>' : '')
+            (it.excerpt ? '<p class="text-xs text-ink-soft mt-3 italic break-words">“' + esc(it.excerpt) + '”</p>' : '')
         );
     }
 
@@ -278,11 +278,11 @@
         if (!m) return;
         var mins = typeof m.durationMinutes === 'number' ? m.durationMinutes + ' min' : '';
         showPanel(
-            '<p class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-2">Try this</p>' +
+            '<p class="text-xs text-ink-soft uppercase tracking-widest font-bold mb-2">Try this</p>' +
             '<div class="border-l-4 border-allgood-secondary bg-gray-50 rounded-r p-3">' +
                 '<p class="text-sm font-bold text-allgood-dark font-heading">' + esc(m.name) + '</p>' +
                 '<p class="text-xs text-gray-500 mt-1 leading-snug">' + esc(m.blurb || '') + '</p>' +
-                (mins ? '<p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-2">' + esc(mins) + '</p>' : '') +
+                (mins ? '<p class="text-[10px] text-ink-soft uppercase tracking-widest font-bold mt-2">' + esc(mins) + '</p>' : '') +
             '</div>' +
             '<button type="button" data-comms-go="' + esc(m.id) + '" ' +
                 'class="w-full mt-4 bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-3 rounded text-xs shadow-md transition-all active:scale-95 uppercase tracking-wide">' +

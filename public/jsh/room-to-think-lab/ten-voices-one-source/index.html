@@ -84,9 +84,12 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/assets/css/fonts.css">
     <style>
         body {
-            font-family: Verdana, Geneva, sans-serif;
+            font-family: var(--font-ui);
             background-color: #F7F7F7;
             min-height: 100vh;
             min-height: 100dvh;
@@ -96,7 +99,7 @@
         }
         input, textarea { -webkit-user-select: text; user-select: text; }
 
-        h1, h2, h3, h4, h5, h6 { font-family: Georgia, 'Times New Roman', serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); }
 
         .app-shell {
             width: 100%; height: 100dvh;
@@ -284,12 +287,12 @@
         .believe-btn:active:not(:disabled) { transform: scale(.985); }
         .believe-btn.is-logged { background: #ECFDF5; border-color: #059669; color: #065f46; }
         #c2-readout { font-size: 13px; line-height: 1.5; color: #111827; }
-        .c2-number { font-size: 30px; font-weight: 800; color: #9B3B5A; font-family: Georgia, 'Times New Roman', serif; }
+        .c2-number { font-size: 30px; font-weight: 800; color: #9B3B5A; font-family: var(--font-display); }
 
         /* ---- Cases 3 & 4: source merge with a live independence counter (registry #30) ---- */
         .count-panel { background: #0f172a; color: #fff; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .count-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: #f9a8c4; }
-        .count-value { font-size: 34px; font-weight: 800; font-family: Georgia, 'Times New Roman', serif; line-height: 1; transition: color .25s ease, transform .25s ease; }
+        .count-value { font-size: 34px; font-weight: 800; font-family: var(--font-display); line-height: 1; transition: color .25s ease, transform .25s ease; }
         .count-value.pulse { animation: countPulse .5s ease-out; }
         @keyframes countPulse { 0% { transform: scale(1); } 40% { transform: scale(1.25); color: #fbcfe8; } 100% { transform: scale(1); } }
         .count-value.stuck { animation: countStuck .5s ease-out; }
@@ -329,7 +332,7 @@
         .act-card .act-title { font-size: 12.5px; font-weight: 700; color: #111827; line-height: 1.35; }
         .act-used-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #64748b; }
         #c5-result { font-size: 12.5px; line-height: 1.55; }
-        .history-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; border-radius: 10px; font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 16px; animation: fadeIn .35s ease-out; }
+        .history-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; border-radius: 10px; font-family: var(--font-display); font-weight: 800; font-size: 16px; animation: fadeIn .35s ease-out; }
         .history-chip.past { background: #E2E8F0; color: #475569; }
         .history-chip.now { background: #9B3B5A; color: #fff; }
         .history-arrow { color: #94a3b8; font-size: 13px; }
@@ -379,15 +382,15 @@ body.present .nav-shell.activity{display:none}
 .nav-shell,.nav-shell *{box-sizing:border-box}
 .nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
 .nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
-.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
 .nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
 .nav-shell .nav-right{display:flex;align-items:center;gap:4px}
-.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
 .nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
 .nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
 .nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
-.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
 .nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
 .nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
 @media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
@@ -458,7 +461,7 @@ body.present .nav-shell.activity{display:none}
                         <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">Ten Voices, One Source</span>
                     </div>
                     <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
-                        <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
+                        <span class="text-[10px] uppercase tracking-wider text-white/80 mr-2 font-heading font-bold">Case</span>
                         <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 6</span>
                     </div>
                 </div>
@@ -520,8 +523,8 @@ body.present .nav-shell.activity{display:none}
                             <div class="phone-screen">
                                 <div class="phone-notch"></div>
                                 <div class="px-3 pb-1 flex items-center justify-between">
-                                    <span class="text-[9px] font-bold uppercase tracking-widest text-gray-400">Feed</span>
-                                    <span class="text-[9px] text-gray-400">08:14</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-widest text-ink-soft">Feed</span>
+                                    <span class="text-[9px] text-ink-soft">08:14</span>
                                 </div>
                                 <div class="feed-post">
                                     <div class="flex items-center gap-2">
@@ -532,7 +535,7 @@ body.present .nav-shell.activity{display:none}
                                         </div>
                                     </div>
                                     <p class="feed-body">Somebody's been taking out of the Year 9 trip fund. I'd say more but you all know who.</p>
-                                    <div class="flex items-center gap-3 mt-2.5 text-[9px] text-gray-400 font-bold uppercase tracking-wide">
+                                    <div class="flex items-center gap-3 mt-2.5 text-[9px] text-ink-soft font-bold uppercase tracking-wide">
                                         <span>41 reposts</span><span>112 likes</span>
                                     </div>
                                 </div>
@@ -586,7 +589,7 @@ body.present .nav-shell.activity{display:none}
                         <div id="step-2" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Start the morning, then <strong>press the button the second you'd believe it</strong> &mdash; not when you're certain. There is no right number here.</span></div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="c2-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Not started</span>
+                            <span id="c2-status" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Not started</span>
                             <button onclick="window.resetCase2()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
                                 <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Watch it again</span>
                             </button>
@@ -653,7 +656,7 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="c3-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Nothing stacked yet</span>
+                            <span id="c3-status" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Nothing stacked yet</span>
                             <button onclick="window.resetCase3()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
                                 <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Unstack them all</span>
                             </button>
@@ -709,7 +712,7 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="c4-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Nothing stacked yet</span>
+                            <span id="c4-status" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Nothing stacked yet</span>
                             <button onclick="window.resetCase4()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
                                 <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Unstack them all</span>
                             </button>
@@ -764,7 +767,7 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="c5-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Nothing tried yet</span>
+                            <span id="c5-status" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Nothing tried yet</span>
                             <button onclick="window.resetCase5()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
                                 <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Put them all back</span>
                             </button>
@@ -844,7 +847,7 @@ body.present .nav-shell.activity{display:none}
                                 <button onclick="window.returnToLabPack()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2">
                                     <span>Back to Room to Think</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
                                 </button>
-                                <button onclick="window.launchRoomToThinkChallenge()" class="w-full text-gray-400 hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
+                                <button onclick="window.launchRoomToThinkChallenge()" class="w-full text-ink-soft hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
                                     Or jump straight to the Room to Think Challenge
                                 </button>
                             </div>
@@ -863,7 +866,7 @@ body.present .nav-shell.activity{display:none}
 
         <!-- Footer -->
         <footer class="footer-content flex items-center justify-center px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
-            <p class="text-gray-400 text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
+            <p class="text-ink-soft text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
         </footer>
 
         <!-- HOME MODAL -->
@@ -876,7 +879,7 @@ body.present .nav-shell.activity{display:none}
                     <button onclick="window.restartModule()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart Lab</button>
                     <button onclick="window.returnToLabPack()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="layers" class="w-4 h-4 mr-2"></i> Room to Think Hub</button>
                     <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm flex items-center justify-center"><i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Dashboard</button>
-                    <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                    <button onclick="window.closeSystemMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
                 </div>
             </div>
         </div>
@@ -887,7 +890,7 @@ body.present .nav-shell.activity{display:none}
                 <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Case</h2>
                 <p class="text-xs text-gray-500 mb-4 font-body">Only cases you've already cleared are open for review.</p>
                 <div id="case-menu-list" class="space-y-2"></div>
-                <button onclick="window.closeCaseMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+                <button onclick="window.closeCaseMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
             </div>
         </div>
 
@@ -905,7 +908,7 @@ body.present .nav-shell.activity{display:none}
                 const btn = document.createElement('button');
                 btn.disabled = !unlocked;
                 btn.className = `w-full text-left p-3 rounded-lg border flex items-center justify-between text-xs font-bold transition-colors ${
-                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-ink-soft cursor-not-allowed'
                 } ${isCurrent ? 'ring-2 ring-allgood-primary' : ''}`;
                 btn.innerHTML = `<span>Case ${i + 1}: ${CASE_TITLES[i]}</span>${unlocked ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : '<i data-lucide="lock" class="w-3.5 h-3.5"></i>'}`;
                 if (unlocked) btn.onclick = () => {
@@ -1358,7 +1361,7 @@ body.present .nav-shell.activity{display:none}
             btn.textContent = 'Logged';
             document.getElementById('c2-readout').className = 'card-shimmer rounded-2xl border p-4';
             document.getElementById('c2-readout').innerHTML =
-                `<p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Your number</p>
+                `<p class="text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-1">Your number</p>
                  <p class="c2-number">${n}</p>
                  <p class="text-xs text-gray-600 mt-1">You'd have believed it after <strong>${n}</strong> ${n === 1 ? 'post' : 'posts'}.</p>`;
             document.getElementById('c2-status').textContent = `You said ${n}`;
@@ -1376,7 +1379,7 @@ body.present .nav-shell.activity{display:none}
             btn.textContent = 'Feed stopped';
             document.getElementById('c2-readout').className = 'card-shimmer rounded-2xl border p-4';
             document.getElementById('c2-readout').innerHTML =
-                `<p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Your number</p>
+                `<p class="text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-1">Your number</p>
                  <p class="c2-number">&mdash;</p>
                  <p class="text-xs text-gray-600 mt-1"><strong>Nine posts and you didn't bite.</strong> Hold onto that.</p>`;
             document.getElementById('c2-status').textContent = 'Nine posts, never pressed';
@@ -1807,7 +1810,7 @@ body.present .nav-shell.activity{display:none}
             const moved = a.to !== 2;
             document.getElementById('c5-result').className = 'card-shimmer rounded-2xl border p-4 mb-3';
             document.getElementById('c5-result').innerHTML =
-                `<p class="text-[10px] font-bold uppercase tracking-widest ${moved ? 'text-emerald-600' : 'text-gray-400'} mb-1">${wasUsed ? 'Again — ' : ''}${moved ? 'The number moved' : 'The number did not move'}</p>
+                `<p class="text-[10px] font-bold uppercase tracking-widest ${moved ? 'text-emerald-600' : 'text-ink-soft'} mb-1">${wasUsed ? 'Again — ' : ''}${moved ? 'The number moved' : 'The number did not move'}</p>
                  <p class="text-gray-800">${esc(a.line)}</p>`;
             window.sayJodi(a.line, moved ? 'happy' : 'neutral');
             c5RenderCards();

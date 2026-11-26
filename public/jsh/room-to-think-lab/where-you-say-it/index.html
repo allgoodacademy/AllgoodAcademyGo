@@ -68,14 +68,17 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/assets/css/fonts.css">
     <style>
         body {
-            font-family: Verdana, Geneva, sans-serif; background-color: #F7F7F7;
+            font-family: var(--font-ui); background-color: #F7F7F7;
             min-height: 100vh; min-height: 100dvh; margin: 0; padding: 0; overflow: hidden;
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
         input, textarea { -webkit-user-select: text; user-select: text; }
-        h1, h2, h3, h4, h5, h6 { font-family: Georgia, 'Times New Roman', serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); }
 
         .app-shell { width: 100%; height: 100dvh; display: flex; flex-direction: column; background-color: #F7F7F7; position: relative; overflow: hidden; }
         .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
@@ -294,15 +297,15 @@ body.present .nav-shell.activity{display:none}
 .nav-shell,.nav-shell *{box-sizing:border-box}
 .nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
 .nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
-.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
 .nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
 .nav-shell .nav-right{display:flex;align-items:center;gap:4px}
-.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
 .nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
 .nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
 .nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
-.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
 .nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
 .nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
 @media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
@@ -373,7 +376,7 @@ body.present .nav-shell.activity{display:none}
                         <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">Where You Say It</span>
                     </div>
                     <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
-                        <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
+                        <span class="text-[10px] uppercase tracking-wider text-white/80 mr-2 font-heading font-bold">Case</span>
                         <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 6</span>
                     </div>
                 </div>
@@ -423,7 +426,7 @@ body.present .nav-shell.activity{display:none}
 
                         <div class="card-shimmer rounded-2xl border p-4 mb-5">
                             <div class="flex items-center justify-between mb-3">
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Group project &mdash; 4 members</span>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Group project &mdash; 4 members</span>
                                 <span class="clock-pill"><i data-lucide="clock" class="w-3 h-3"></i> 3 days left</span>
                             </div>
                             <div class="space-y-1.5">
@@ -485,7 +488,7 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="c2-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">No rooms used yet</span>
+                            <span id="c2-status" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">No rooms used yet</span>
                             <button onclick="window.resetCase2()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
                                 <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Put everyone back</span>
                             </button>
@@ -586,7 +589,7 @@ body.present .nav-shell.activity{display:none}
                         <div id="step-4" class="step-bar mb-4"><span class="step-num">1</span><span class="step-text">Tap a card, then tap where it goes. <strong>You can move a card after you've placed it</strong> &mdash; nothing here is one-shot.</span></div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="c4-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Nothing placed yet</span>
+                            <span id="c4-status" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Nothing placed yet</span>
                             <button onclick="window.resetCase4()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
                                 <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span>Take them all back</span>
                             </button>
@@ -641,7 +644,7 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="c5-status" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Nothing sent yet</span>
+                            <span id="c5-status" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Nothing sent yet</span>
                             <div class="flex items-center gap-2">
                                 <button onclick="window.compareDrafts()" class="small-btn"><i data-lucide="git-compare" class="w-3 h-3 inline"></i> Compare the two</button>
                                 <button onclick="window.resetCase5()" class="case-reset flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gb-accent-dark bg-white border border-gray-200 hover:border-gb-accent rounded-full px-3 py-1.5">
@@ -721,7 +724,7 @@ body.present .nav-shell.activity{display:none}
                                 <button onclick="window.returnToLabPack()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2">
                                     <span>Back to Room to Think</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
                                 </button>
-                                <button onclick="window.launchRoomToThinkChallenge()" class="w-full text-gray-400 hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
+                                <button onclick="window.launchRoomToThinkChallenge()" class="w-full text-ink-soft hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
                                     Or jump straight to the Room to Think Challenge
                                 </button>
                             </div>
@@ -739,7 +742,7 @@ body.present .nav-shell.activity{display:none}
         </div>
 
         <footer class="footer-content flex items-center justify-center px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
-            <p class="text-gray-400 text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
+            <p class="text-ink-soft text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
         </footer>
 
         <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
@@ -751,7 +754,7 @@ body.present .nav-shell.activity{display:none}
                     <button onclick="window.restartModule()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart Lab</button>
                     <button onclick="window.returnToLabPack()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="layers" class="w-4 h-4 mr-2"></i> Room to Think Hub</button>
                     <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm flex items-center justify-center"><i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Dashboard</button>
-                    <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                    <button onclick="window.closeSystemMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
                 </div>
             </div>
         </div>
@@ -761,7 +764,7 @@ body.present .nav-shell.activity{display:none}
                 <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Case</h2>
                 <p class="text-xs text-gray-500 mb-4 font-body">Only cases you've already cleared are open for review.</p>
                 <div id="case-menu-list" class="space-y-2"></div>
-                <button onclick="window.closeCaseMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+                <button onclick="window.closeCaseMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
             </div>
         </div>
 
@@ -779,7 +782,7 @@ body.present .nav-shell.activity{display:none}
                 const btn = document.createElement('button');
                 btn.disabled = !unlocked;
                 btn.className = `w-full text-left p-3 rounded-lg border flex items-center justify-between text-xs font-bold transition-colors ${
-                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-ink-soft cursor-not-allowed'
                 } ${isCurrent ? 'ring-2 ring-allgood-primary' : ''}`;
                 btn.innerHTML = `<span>Case ${i + 1}: ${CASE_TITLES[i]}</span>${unlocked ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : '<i data-lucide="lock" class="w-3.5 h-3.5"></i>'}`;
                 if (unlocked) btn.onclick = () => {
@@ -1129,7 +1132,7 @@ body.present .nav-shell.activity{display:none}
                         <div class="chat-me">${esc(C2_MESSAGE)}</div>
                         ${t.reply.map(r => r.from === 'sys'
                             ? `<p class="chat-sys">${esc(r.text)}</p>`
-                            : `<div class="chat-them">${r.from === 'other' ? '<span class="text-[9px] font-bold uppercase tracking-wide text-gray-400 block">someone else</span>' : ''}${esc(r.text)}</div>`).join('')}
+                            : `<div class="chat-them">${r.from === 'other' ? '<span class="text-[9px] font-bold uppercase tracking-wide text-ink-soft block">someone else</span>' : ''}${esc(r.text)}</div>`).join('')}
                     </div>
                     <p class="text-[11px] text-gray-500 italic mt-2">${esc(t.note)}</p>`;
                 box.appendChild(el);
@@ -1140,7 +1143,7 @@ body.present .nav-shell.activity{display:none}
             const box = document.getElementById('c2-roster');
             if (!c2Used.has('class')) { box.classList.add('hidden'); return; }
             box.classList.remove('hidden');
-            box.innerHTML = `<p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Take somebody out of the class channel and send it again</p>
+            box.innerHTML = `<p class="text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-2">Take somebody out of the class channel and send it again</p>
                 <div class="flex flex-wrap gap-2" id="c2-roster-btns"></div>`;
             const btns = box.querySelector('#c2-roster-btns');
             C2_ROSTER.forEach(p => {
@@ -1325,7 +1328,7 @@ body.present .nav-shell.activity{display:none}
             if (c3Turn >= C3_TURNS.length) return;
             const turn = C3_TURNS[c3Turn];
             const head = document.createElement('p');
-            head.className = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1';
+            head.className = 'text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-1';
             head.textContent = turn.prompt;
             box.appendChild(head);
             turn.options.forEach((o, i) => {
@@ -1505,7 +1508,7 @@ body.present .nav-shell.activity{display:none}
                 window.sayJodi(line, 'thinking');
             }
             document.getElementById('c4-result').className = 'card-shimmer rounded-2xl border p-4 mb-3';
-            document.getElementById('c4-result').innerHTML = `<p class="text-[10px] font-bold uppercase tracking-widest ${binId === card.correct ? 'text-emerald-600' : 'text-gray-400'} mb-1">${esc(card.text)} &rarr; ${esc((C4_BINS.find(b => b.id === binId) || {}).label)}</p><p class="text-gray-800 text-xs">${esc(line)}</p>`;
+            document.getElementById('c4-result').innerHTML = `<p class="text-[10px] font-bold uppercase tracking-widest ${binId === card.correct ? 'text-emerald-600' : 'text-ink-soft'} mb-1">${esc(card.text)} &rarr; ${esc((C4_BINS.find(b => b.id === binId) || {}).label)}</p><p class="text-gray-800 text-xs">${esc(line)}</p>`;
             document.getElementById('c4-status').textContent = `${Object.keys(c4Placed).length} of 4 placed`;
             if (window.sfx) { binId === card.correct ? window.sfx.success() : window.sfx.tick(); }
             c4CheckDone();
@@ -1654,7 +1657,7 @@ body.present .nav-shell.activity{display:none}
             const d = C5_DRAFTS[key];
             const box = document.getElementById('c5-outcome');
             box.innerHTML = `<div class="card-shimmer rounded-2xl border p-4 chat-line">
-                <p class="text-[10px] font-bold uppercase tracking-widest ${isWhatIf ? 'text-gray-400' : 'text-gb-accent'} mb-2">${isWhatIf ? 'What ' + esc(d.label) + ' would have done' : esc(d.outcomeTitle)}</p>
+                <p class="text-[10px] font-bold uppercase tracking-widest ${isWhatIf ? 'text-ink-soft' : 'text-gb-accent'} mb-2">${isWhatIf ? 'What ' + esc(d.label) + ' would have done' : esc(d.outcomeTitle)}</p>
                 <div class="space-y-1.5 mb-2">
                     <div class="chat-me">${esc(d.plain)}</div>
                     <p class="cc-line ${d.cc ? 'filled' : 'empty'}">${d.cc ? esc(d.cc) : 'Cc: nobody'}</p>

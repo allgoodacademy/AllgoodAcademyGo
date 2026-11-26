@@ -68,14 +68,17 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/assets/css/fonts.css">
     <style>
         body {
-            font-family: Verdana, Geneva, sans-serif; background-color: #F7F7F7;
+            font-family: var(--font-ui); background-color: #F7F7F7;
             min-height: 100vh; min-height: 100dvh; margin: 0; padding: 0; overflow: hidden;
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
         input, textarea { -webkit-user-select: text; user-select: text; }
-        h1, h2, h3, h4, h5, h6 { font-family: Georgia, 'Times New Roman', serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); }
 
         .app-shell { width: 100%; height: 100dvh; display: flex; flex-direction: column; background-color: #F7F7F7; position: relative; overflow: hidden; }
         .modal-transition { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
@@ -195,7 +198,7 @@
         .doc-sheet { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); overflow: hidden; }
         .doc-bar { background: #F3F4F6; border-bottom: 1px solid #e5e7eb; padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #6b7280; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .doc-body { padding: 16px 18px; }
-        .doc-title { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; font-weight: 700; color: #111827; }
+        .doc-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: #111827; }
         .caret { display: inline-block; width: 1px; height: 15px; background: #9B3B5A; vertical-align: -2px; animation: caretBlink 1s step-end infinite; }
         @keyframes caretBlink { 50% { opacity: 0; } }
         .doc-fill { margin-top: 10px; font-size: 12.5px; color: #7A2B45; background: #FBEAF0; border-left: 3px solid #9B3B5A; border-radius: 0 8px 8px 0; padding: 9px 12px; line-height: 1.5; display: none; }
@@ -241,7 +244,7 @@
         /* ---- Case 4: word-level strike editing (registry #34) ----
            Over-striking a neutral word un-strikes ITSELF, with a visible animation. Without
            the animation the restore reads as a dead tap or a bug. Storyboard do-not-undo #4. */
-        .q-line { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 2; color: #111827; }
+        .q-line { font-family: var(--font-display); font-size: 17px; line-height: 2; color: #111827; }
         .q-word { display: inline-block; padding: 2px 5px; border-radius: 6px; cursor: pointer; transition: background-color .15s ease, color .15s ease, opacity .2s ease; }
         .q-word.load { background: #FBEAF0; color: #7A2B45; }
         .q-word.load:hover { background: #F3CCD9; }
@@ -318,15 +321,15 @@ body.present .nav-shell.activity{display:none}
 .nav-shell,.nav-shell *{box-sizing:border-box}
 .nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
 .nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
-.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
 .nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
 .nav-shell .nav-right{display:flex;align-items:center;gap:4px}
-.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
 .nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
 .nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
 .nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
-.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
 .nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
 .nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
 @media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
@@ -397,7 +400,7 @@ body.present .nav-shell.activity{display:none}
                         <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">The Question</span>
                     </div>
                     <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
-                        <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
+                        <span class="text-[10px] uppercase tracking-wider text-white/80 mr-2 font-heading font-bold">Case</span>
                         <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 6</span>
                     </div>
                 </div>
@@ -454,7 +457,7 @@ body.present .nav-shell.activity{display:none}
                             </div>
                             <div class="doc-body">
                                 <p class="doc-title">Should our school keep the uniform?</p>
-                                <p class="text-xs text-gray-400 mt-3">Tom&aacute;s R. &middot; Year 10 &middot; 0 words</p>
+                                <p class="text-xs text-ink-soft mt-3">Tom&aacute;s R. &middot; Year 10 &middot; 0 words</p>
                                 <p class="mt-4 text-sm text-gray-300">|<span class="caret"></span></p>
                             </div>
                         </div>
@@ -502,17 +505,17 @@ body.present .nav-shell.activity{display:none}
                         <div class="doc-sheet mb-4">
                             <div class="doc-bar"><span>Should our school keep the uniform?</span><span>Due Friday</span></div>
                             <div class="doc-body">
-                                <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Going in</p>
+                                <p class="text-xs font-bold uppercase tracking-widest text-ink-soft">Going in</p>
                                 <div id="c2-doc-fill" class="doc-fill"></div>
                                 <p id="c2-doc-empty" class="mt-3 text-sm text-gray-300">|<span class="caret"></span></p>
                             </div>
                         </div>
 
-                        <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Should they keep it?</p>
+                        <p class="text-xs font-bold uppercase tracking-widest text-ink-soft mb-2">Should they keep it?</p>
                         <div id="c2-position" class="pick-row cols-2 mb-4"></div>
 
                         <div id="c2-confidence-wrap" class="hidden">
-                            <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">How sure are you?</p>
+                            <p class="text-xs font-bold uppercase tracking-widest text-ink-soft mb-2">How sure are you?</p>
                             <div id="c2-confidence" class="pick-row cols-3 mb-4"></div>
                         </div>
 
@@ -614,7 +617,7 @@ body.present .nav-shell.activity{display:none}
                         <div id="c4-results" class="space-y-2 mb-3"></div>
 
                         <div id="c4-rebuild" class="hidden mb-3">
-                            <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Finish the question</p>
+                            <p class="text-xs font-bold uppercase tracking-widest text-ink-soft mb-2">Finish the question</p>
                             <div id="c4-rebuild-row" class="space-y-2"></div>
                         </div>
 
@@ -661,14 +664,14 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="sheet mb-3" id="c5-sheet">
-                            <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Sources you&rsquo;re submitting</p>
+                            <p class="text-xs font-bold uppercase tracking-widest text-ink-soft mb-2">Sources you&rsquo;re submitting</p>
                             <div id="c5-slots" class="space-y-2"></div>
                         </div>
 
                         <div id="c5-framing" class="framing-readout mb-3">Nothing on the sheet yet.</div>
                         <div id="c5-note" class="verdict-strip mb-3 hidden"></div>
 
-                        <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">What came back &mdash; all twelve</p>
+                        <p class="text-xs font-bold uppercase tracking-widest text-ink-soft mb-2">What came back &mdash; all twelve</p>
                         <div id="c5-pool" class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3"></div>
 
                         <div id="mobile-wb-5" class="mobile-wb hidden bg-slate-900 rounded-xl p-4 text-white text-xs space-y-1 mb-3">
@@ -750,7 +753,7 @@ body.present .nav-shell.activity{display:none}
                                 <button onclick="window.returnToLabPack()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2">
                                     <span>Back to Room to Think</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
                                 </button>
-                                <button onclick="window.launchRoomToThinkChallenge()" class="w-full text-gray-400 hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
+                                <button onclick="window.launchRoomToThinkChallenge()" class="w-full text-ink-soft hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
                                     Or jump straight to the Room to Think Challenge
                                 </button>
                             </div>
@@ -768,7 +771,7 @@ body.present .nav-shell.activity{display:none}
         </div>
 
         <footer class="footer-content flex items-center justify-center px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
-            <p class="text-gray-400 text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
+            <p class="text-ink-soft text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
         </footer>
 
         <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
@@ -780,7 +783,7 @@ body.present .nav-shell.activity{display:none}
                     <button onclick="window.restartModule()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart Lab</button>
                     <button onclick="window.returnToLabPack()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="layers" class="w-4 h-4 mr-2"></i> Room to Think Hub</button>
                     <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm flex items-center justify-center"><i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Dashboard</button>
-                    <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                    <button onclick="window.closeSystemMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
                 </div>
             </div>
         </div>
@@ -790,7 +793,7 @@ body.present .nav-shell.activity{display:none}
                 <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Case</h2>
                 <p class="text-xs text-gray-500 mb-4 font-body">Only cases you've already cleared are open for review.</p>
                 <div id="case-menu-list" class="space-y-2"></div>
-                <button onclick="window.closeCaseMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+                <button onclick="window.closeCaseMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
             </div>
         </div>
 
@@ -807,7 +810,7 @@ body.present .nav-shell.activity{display:none}
                 const btn = document.createElement('button');
                 btn.disabled = !unlocked;
                 btn.className = `w-full text-left p-3 rounded-lg border flex items-center justify-between text-xs font-bold transition-colors ${
-                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-ink-soft cursor-not-allowed'
                 } ${isCurrent ? 'ring-2 ring-allgood-primary' : ''}`;
                 btn.innerHTML = `<span>Case ${i + 1}: ${CASE_TITLES[i]}</span>${unlocked ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : '<i data-lucide="lock" class="w-3.5 h-3.5"></i>'}`;
                 if (unlocked) btn.onclick = () => {
@@ -1305,7 +1308,7 @@ body.present .nav-shell.activity{display:none}
                             <p class="run-num mb-1">Run ${run.n} of 3</p>
                             <div class="search-bar mb-2"><i data-lucide="search" class="w-3.5 h-3.5 text-gray-400"></i><span>${run.q}</span></div>
                             <div class="flex flex-wrap gap-1.5 items-center">
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mr-1">Guess:</span>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-ink-soft mr-1">Guess:</span>
                                 ${predRow}
                                 <button class="small-btn primary ml-auto" data-search="${run.n}" ${(!pred || searched) ? 'disabled' : ''} onclick="window.runSearch(${run.n})">
                                     ${searched ? 'Searched' : 'Search'}
