@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Español · Allgood Academy</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<style>
+/*
+VOICE: a teacher's travel journal: warm, personal, a little nostalgic, never salesy.
+IDEA: the hub behaves like an open passport + route map; every story is a stamped stop.
+PICTURE: a night route map with pins (Atlanta home, Monterrey live, empty stops for stories still being written).
+COLOUR and TYPE: El Viaje family: night grid #141414, bronze #B0773A, burnt orange (--color-orange), cyan (--color-teal), cream (--color-cream) from design-tokens.css. Gelasio + Atkinson Hyperlegible Next (fonts.css), Georgia + Verdana fallbacks.
+LAYOUT: hero map → founder note → stories (postcards) → for teachers → "¿A dónde vamos después?"
+*/
+:root{--orange:var(--color-orange);--orange2:#EB8D69;--cyan:var(--color-teal);--cyan2:#2D6473;--dark:#4C4C4C;--cream:var(--color-cream);--creamb:#E8DFCE;--bronze:#B0773A;--bronze2:#E0B07A;--ink:#141414;--amber:#FFCF6B}
+*{box-sizing:border-box;min-width:0}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--ink);color:#EDEDED;font:16px/1.6 var(--font-ui);overflow-x:clip;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:20px 20px}
+h1,h2,h3{font-family:var(--font-display);margin:0;line-height:1.1}
+a{color:inherit}
+.nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:12px max(5vw,16px);background:rgba(14,14,14,.85);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.07)}
+.nav .brand{font:700 18px var(--font-display);text-decoration:none}.nav .brand b{color:var(--orange)}
+.nav .sp{flex:1}.nav a.l{font-size:13px;color:#cfcfcf;text-decoration:none}.nav a.l:hover{color:#fff}
+.av{width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.85)}
+.av svg{width:19px;height:19px;color:#fff}
+.band{padding:clamp(28px,5vw,70px) max(5vw,16px)}
+.wrap{max-width:1180px;margin:0 auto}
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr);gap:34px;align-items:center}
+.kick{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange2)}
+.hero h1{font-size:clamp(44px,7vw,84px);margin:12px 0 14px;letter-spacing:-.02em}
+.hero h1 span{color:var(--orange)}
+.hero p{color:#cfcfcf;font-size:17px;max-width:480px;margin:0 0 22px}
+.cta{display:inline-block;background:var(--orange);color:#fff;text-decoration:none;border-radius:10px;padding:13px 20px;font-size:15px;box-shadow:0 8px 22px rgba(207,70,22,.35)}
+.cta.ghost{background:transparent;border:1px solid var(--bronze2);color:var(--bronze2);box-shadow:none;margin-left:8px}
+.map{position:relative;aspect-ratio:12/9;border-radius:18px;overflow:hidden;background:#0f1c24;box-shadow:0 30px 60px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
+.map svg{position:absolute;inset:0;width:100%;height:100%}
+.pin{cursor:pointer}
+.pin:focus-visible circle.ring{stroke:var(--amber);stroke-width:4}
+.maptip{position:absolute;left:14px;bottom:14px;right:14px;background:rgba(20,20,20,.88);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;font-size:14px;min-height:46px}
+.maptip b{font-family:var(--font-display);color:#fff}
+/* note */
+.note{display:grid;grid-template-columns:120px minmax(0,1fr);gap:26px;align-items:start;background:var(--cream);color:var(--dark);border-radius:18px;padding:28px 30px;box-shadow:0 20px 50px rgba(0,0,0,.35);position:relative}
+.note::after{content:"";position:absolute;right:26px;top:-14px;width:110px;height:28px;background:rgba(224,176,122,.55);transform:rotate(3deg)}
+.photo{width:120px;height:140px;border-radius:8px;background:#e9e1d4;border:6px solid #fff;box-shadow:0 8px 20px rgba(0,0,0,.18);transform:rotate(-3deg);display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;color:#9a8a74;padding:8px}
+.note h2{font-size:30px;color:var(--cyan2);margin-bottom:8px}
+.note p{font:18px/1.6 var(--font-display);margin:0 0 10px}
+.note .sig{font:italic 22px var(--font-display);color:var(--bronze)}
+.draft{display:inline-block;font:11px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;background:#fff3d6;color:#8a5a12;border:1px dashed #d9a84a;border-radius:6px;padding:2px 8px;margin-bottom:10px}
+/* stories */
+.sh{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.sh h2{font-size:clamp(28px,4vw,40px)}
+.sh p{margin:6px 0 0;color:#bdbdbd;max-width:560px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.post{position:relative;background:#fff;color:var(--dark);border-radius:14px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.4);display:flex;flex-direction:column;text-decoration:none;transition:transform .2s}
+a.post:hover{transform:translateY(-3px) rotate(-.4deg)}
+.post .pic{aspect-ratio:16/10;position:relative}
+.post .pic svg{width:100%;height:100%;display:block}
+.stampc{position:absolute;right:12px;top:12px;width:64px;height:64px;border-radius:50%;border:3px solid var(--bronze2);color:var(--bronze2);display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 13px var(--font-display);transform:rotate(-10deg);background:rgba(20,14,8,.55);text-align:center;line-height:1}
+.stampc small{font:8px var(--font-ui);letter-spacing:.12em;margin-top:3px}
+.post .body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:6px;flex:1}
+.trow{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.lvl{display:inline-flex;align-items:flex-end;gap:2px;font-size:11.5px;color:#777;white-space:nowrap}
+.lvl i{display:inline-block;width:4px;border-radius:1px;background:#ddd5c8;margin-right:1px}
+.lvl i:nth-child(1){height:6px}.lvl i:nth-child(2){height:9px}.lvl i:nth-child(3){height:12px;margin-right:5px}
+.lvl i.on{background:var(--cyan)}
+.post .meta{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--orange)}
+.post h3{font-size:22px;color:#2b2b2b}
+.post p{margin:0;font-size:14px;color:#666}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto;padding-top:8px}
+.chip{font-size:11.5px;background:#f4efe6;border:1px solid var(--creamb);border-radius:99px;padding:3px 9px;color:#6b5a44}
+.go{margin-top:10px;font-weight:700;color:var(--orange)}
+.post.empty{background:transparent;border:2px dashed rgba(224,176,122,.5);box-shadow:none;color:#d8c6ae;align-items:center;justify-content:center;text-align:center;padding:26px;min-height:340px}
+.post.empty .plus{width:56px;height:56px;border-radius:50%;border:2px dashed var(--bronze2);display:flex;align-items:center;justify-content:center;font:300 34px var(--font-display);color:var(--bronze2);margin-bottom:12px}
+.post.empty h3{color:#f3e6d4;font-size:20px}
+.post.empty p{color:#cdb79c;font-size:13.5px;max-width:260px}
+/* teachers */
+.teach{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.tile{background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px}
+.tile b{display:block;font:700 20px var(--font-display);color:#fff;margin-bottom:4px}
+.tile span{font-size:13.5px;color:#bdbdbd}
+/* next */
+.next{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:center;background:#3b2a1a;border-radius:18px;padding:28px 30px;border:1px solid rgba(224,176,122,.35)}
+.next h2{font-size:30px;color:#ffe7c4}
+.next p{color:#e5d3bb;margin:8px 0 0}
+form{display:grid;gap:10px}
+form input,form select{font:16px var(--font-ui);padding:12px 14px;border-radius:10px;border:1px solid #6b5236;background:#fffaf2;color:#2b2b2b;width:100%}
+form button{background:var(--orange);color:#fff;border:0;border-radius:10px;padding:12px;font:15px var(--font-ui);min-height:46px;cursor:pointer}
+.thanks{color:#ffe7c4;font:18px var(--font-display)}
+footer{text-align:center;color:#777;font-size:12px;padding:30px 16px 50px}
+@media (max-width:860px){.hero,.next{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.teach{grid-template-columns:1fr 1fr}.note{grid-template-columns:1fr}.nav a.l{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a class="brand" href="#top">Allgood <b>Academy</b> · Español</a>
+  <span class="sp"></span>
+  <a class="l" href="#historias">Historias</a><a class="l" href="#maestros">Para maestros</a><a class="l" href="#despues">¿A dónde vamos?</a>
+  <span class="av" aria-label="Your profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>
+</nav>
+
+<header class="band" id="top">
+  <div class="wrap hero">
+    <div>
+      <div class="kick">Allgood Academy · Español</div>
+      <h1>Viaja en <span>español.</span></h1>
+      <p>Mini interactive stories inspired by real travel. Get lost, order dinner, survive an interview, all in Spanish. In every story, the Spanish you choose changes what happens next.</p>
+      <a class="cta" href="/espanol/el-viaje/">Empezar: El Viaje →</a><a class="cta ghost" href="#maestros">For teachers</a>
+    </div>
+    <div class="map" id="map">
+      <svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Route map of the stories">
+        <rect width="1200" height="900" fill="#0f1c24"/>
+        <g stroke="rgba(255,255,255,.05)"><path d="M0 100H1200M0 200H1200M0 300H1200M0 400H1200M0 500H1200M0 600H1200M0 700H1200M0 800H1200M100 0V900M200 0V900M300 0V900M400 0V900M500 0V900M600 0V900M700 0V900M800 0V900M900 0V900M1000 0V900M1100 0V900"/></g>
+        <path d="M0 0H1200V330Q1110 380 1040 440Q960 500 880 480Q800 450 740 510Q670 590 620 640Q540 710 460 650Q400 610 380 700L360 900H0Z" fill="#1d3240"/>
+        <text x="760" y="660" font-family="Georgia" font-style="italic" font-size="24" fill="#3d5d70">Golfo de México</text>
+        <!-- routes from home -->
+        <path id="r1" d="M880 220 Q640 110 400 450" fill="none" stroke="#CF4616" stroke-width="4"/>
+        <path d="M880 220 Q1020 120 1120 90" fill="none" stroke="#CF4616" stroke-width="4"/>
+        <path d="M880 220 Q820 520 720 760" fill="none" stroke="#E0B07A" stroke-width="3" stroke-dasharray="4 10" opacity=".6"/>
+        <path d="M880 220 Q1100 420 1080 720" fill="none" stroke="#E0B07A" stroke-width="3" stroke-dasharray="4 10" opacity=".6"/>
+        <!-- plane on the live route -->
+        <g><path d="M-22 0 L20 -4 L26 0 L20 4Z M-4 -2 L-12 -22 L-4 -22 L8 -2Z M-4 2 L-12 22 L-4 22 L8 2Z M-20 -1 L-26 -10 L-21 -10 L-14 -1Z M-20 1 L-26 10 L-21 10 L-14 1Z" fill="#fff" transform="scale(1.3)"/><animateMotion dur="9s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#r1"/></animateMotion></g>
+        <!-- home -->
+        <g class="pin" tabindex="0" data-tip="<b>Atlanta</b> · home base. Every trip starts here."><circle cx="880" cy="220" r="16" fill="#357889"/><circle class="ring" cx="880" cy="220" r="24" fill="none" stroke="#357889" stroke-width="2"/><text x="908" y="214" font-family="Verdana" font-size="22" fill="#fff">ATL · Atlanta</text></g>
+        <!-- live -->
+        <g class="pin" tabindex="0" data-tip="<b>Monterrey · El Viaje</b> · live now. A lost bag, an interview, and dinner with the team."><circle cx="400" cy="450" r="18" fill="#CF4616"/><circle class="ring" cx="400" cy="450" r="28" fill="none" stroke="#EB8D69" stroke-width="2"><animate attributeName="r" values="24;34;24" dur="2.4s" repeatCount="indefinite"/></circle><text x="190" y="500" font-family="Verdana" font-size="22" fill="#fff">MTY · Monterrey</text></g>
+        <!-- empty stops for stories still being written -->
+        <g class="pin" tabindex="0" data-tip="<b>Moscú → Saransk · El Mundial</b> · live now. A night train, a stadium of Peru fans, and a story to tell right."><circle cx="1120" cy="90" r="16" fill="#D91023"/><circle class="ring" cx="1120" cy="90" r="26" fill="none" stroke="#EB8D69" stroke-width="2"/><text x="980" y="70" font-family="Verdana" font-size="22" fill="#fff">MOW · Moscú</text></g>
+        <g class="pin" tabindex="0" data-tip="<b>Next stop</b> · a new story is on its way."><circle cx="720" cy="760" r="14" fill="none" stroke="#E0B07A" stroke-width="3" stroke-dasharray="5 5"/><text x="712" y="768" font-family="Georgia" font-size="22" fill="#E0B07A">+</text></g>
+        <g class="pin" tabindex="0" data-tip="<b>Next stop</b> · a new story is on its way."><circle cx="1080" cy="720" r="14" fill="none" stroke="#E0B07A" stroke-width="3" stroke-dasharray="5 5"/><text x="1072" y="728" font-family="Georgia" font-size="22" fill="#E0B07A">+</text></g>
+      </svg>
+      <div class="maptip" id="tip"><b>Monterrey · El Viaje</b> · live now. Tap a stop on the map.</div>
+    </div>
+  </div>
+</header>
+
+<section class="band" style="padding-top:10px">
+  <div class="wrap note">
+    <div class="photo">William's photo from a trip goes here</div>
+    <div>
+      <span class="draft">Draft · William to edit</span>
+      <h2>Hola, soy William.</h2>
+      <p>I taught Spanish for six years. I also love to travel, and some of my favorite memories from trips are small moments when I had to figure out what to say, like asking for help at a counter or ordering dinner with people I'd just met.</p>
+      <p>I've used those experiences to create these mini stories. Each one is short and set in a real place, and the choices you make in Spanish change how it plays out.</p>
+      <p>¡Buen viaje!</p>
+      <div class="sig">— William Allgood, founder of Allgood Academy</div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="historias">
+  <div class="wrap">
+    <div class="sh"><div><h2>Las historias</h2><p>Each one is a single class period. Free for students, with nothing to sign up for before playing.</p></div></div>
+    <div class="cards">
+      <a class="post" href="/espanol/el-viaje/">
+        <div class="pic"><svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="d1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2140"/><stop offset=".6" stop-color="#b0603a"/><stop offset="1" stop-color="#f0b06a"/></linearGradient></defs><rect width="400" height="250" fill="url(#d1)"/><path d="M0 170 L50 150 L90 110 L125 70 L150 95 L175 120 L200 95 L230 55 L260 100 L300 130 L360 150 L400 165 L400 250 L0 250Z" fill="#5a3546"/><g fill="#2a1d29"><rect x="20" y="190" width="30" height="60"/><rect x="58" y="170" width="22" height="80"/><rect x="300" y="180" width="26" height="70"/><rect x="332" y="160" width="20" height="90"/></g><rect x="150" y="215" width="90" height="24" rx="8" fill="#f2c230"/></svg><div class="stampc">MTY<small>EN VIVO</small></div></div>
+        <div class="body"><span class="meta">Historia 1 · Monterrey, México</span><div class="trow"><h3>El Viaje</h3><span class="lvl" title="ACTFL Intermediate Mid" aria-label="Level: Intermedio (ACTFL Intermediate Mid)"><i class="on"></i><i class="on"></i><i></i>Intermedio</span></div><p>Your bag is lost, your interview is at 9:00, and the team wants to take you to dinner.</p>
+          <div class="chips"><span class="chip">Pretérito vs. imperfecto</span><span class="chip">Tú vs. usted</span><span class="chip">Condicional</span><span class="chip">Subjuntivo</span></div>
+          <span class="go">Empezar →</span></div>
+      </a>
+      <a class="post" href="/espanol/el-mundial/">
+        <div class="pic"><svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="d2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3a6a"/><stop offset="1" stop-color="#e09a6a"/></linearGradient><clipPath id="bw"><path d="M20 180 Q200 90 380 180 L380 250 L20 250Z"/></clipPath></defs><rect width="400" height="250" fill="url(#d2)"/><path d="M20 180 Q200 90 380 180 L380 250 L20 250Z" fill="#3a3a48"/><g clip-path="url(#bw)"><circle cx="30" cy="140" r="4" fill="#fff"/><circle cx="67" cy="193" r="4" fill="#D91023"/><circle cx="104" cy="246" r="4" fill="#fff"/><circle cx="141" cy="189" r="4" fill="#D91023"/><circle cx="178" cy="242" r="4" fill="#fff"/><circle cx="215" cy="185" r="4" fill="#D91023"/><circle cx="252" cy="238" r="4" fill="#fff"/><circle cx="289" cy="181" r="4" fill="#D91023"/><circle cx="326" cy="234" r="4" fill="#fff"/><circle cx="363" cy="177" r="4" fill="#D91023"/><circle cx="50" cy="230" r="4" fill="#fff"/><circle cx="87" cy="173" r="4" fill="#D91023"/><circle cx="124" cy="226" r="4" fill="#fff"/><circle cx="161" cy="169" r="4" fill="#D91023"/><circle cx="198" cy="222" r="4" fill="#fff"/><circle cx="235" cy="165" r="4" fill="#D91023"/><circle cx="272" cy="218" r="4" fill="#fff"/><circle cx="309" cy="161" r="4" fill="#D91023"/><circle cx="346" cy="214" r="4" fill="#fff"/><circle cx="33" cy="157" r="4" fill="#D91023"/><circle cx="70" cy="210" r="4" fill="#fff"/><circle cx="107" cy="153" r="4" fill="#D91023"/><circle cx="144" cy="206" r="4" fill="#fff"/><circle cx="181" cy="149" r="4" fill="#D91023"/><circle cx="218" cy="202" r="4" fill="#fff"/><circle cx="255" cy="145" r="4" fill="#D91023"/><circle cx="292" cy="198" r="4" fill="#fff"/><circle cx="329" cy="141" r="4" fill="#D91023"/><circle cx="366" cy="194" r="4" fill="#fff"/><circle cx="53" cy="247" r="4" fill="#D91023"/><circle cx="90" cy="190" r="4" fill="#fff"/><circle cx="127" cy="243" r="4" fill="#D91023"/><circle cx="164" cy="186" r="4" fill="#fff"/><circle cx="201" cy="239" r="4" fill="#D91023"/><circle cx="238" cy="182" r="4" fill="#fff"/><circle cx="275" cy="235" r="4" fill="#D91023"/><circle cx="312" cy="178" r="4" fill="#fff"/><circle cx="349" cy="231" r="4" fill="#D91023"/><circle cx="36" cy="174" r="4" fill="#fff"/><circle cx="73" cy="227" r="4" fill="#D91023"/><circle cx="110" cy="170" r="4" fill="#fff"/><circle cx="147" cy="223" r="4" fill="#D91023"/><circle cx="184" cy="166" r="4" fill="#fff"/><circle cx="221" cy="219" r="4" fill="#D91023"/><circle cx="258" cy="162" r="4" fill="#fff"/><circle cx="295" cy="215" r="4" fill="#D91023"/><circle cx="332" cy="158" r="4" fill="#fff"/><circle cx="369" cy="211" r="4" fill="#D91023"/><circle cx="56" cy="154" r="4" fill="#fff"/><circle cx="93" cy="207" r="4" fill="#D91023"/><circle cx="130" cy="150" r="4" fill="#fff"/><circle cx="167" cy="203" r="4" fill="#D91023"/><circle cx="204" cy="146" r="4" fill="#fff"/><circle cx="241" cy="199" r="4" fill="#D91023"/><circle cx="278" cy="142" r="4" fill="#fff"/><circle cx="315" cy="195" r="4" fill="#D91023"/><circle cx="352" cy="248" r="4" fill="#fff"/><circle cx="39" cy="191" r="4" fill="#D91023"/><circle cx="76" cy="244" r="4" fill="#fff"/><circle cx="113" cy="187" r="4" fill="#D91023"/><circle cx="150" cy="240" r="4" fill="#fff"/><circle cx="187" cy="183" r="4" fill="#D91023"/><circle cx="224" cy="236" r="4" fill="#fff"/><circle cx="261" cy="179" r="4" fill="#D91023"/><circle cx="298" cy="232" r="4" fill="#fff"/><circle cx="335" cy="175" r="4" fill="#D91023"/><circle cx="372" cy="228" r="4" fill="#fff"/><circle cx="59" cy="171" r="4" fill="#D91023"/><circle cx="96" cy="224" r="4" fill="#fff"/><circle cx="133" cy="167" r="4" fill="#D91023"/><circle cx="170" cy="220" r="4" fill="#fff"/><circle cx="207" cy="163" r="4" fill="#D91023"/><circle cx="244" cy="216" r="4" fill="#fff"/><circle cx="281" cy="159" r="4" fill="#D91023"/><circle cx="318" cy="212" r="4" fill="#fff"/><circle cx="355" cy="155" r="4" fill="#D91023"/><circle cx="42" cy="208" r="4" fill="#fff"/><circle cx="79" cy="151" r="4" fill="#D91023"/><circle cx="116" cy="204" r="4" fill="#fff"/><circle cx="153" cy="147" r="4" fill="#D91023"/><circle cx="190" cy="200" r="4" fill="#fff"/><circle cx="227" cy="143" r="4" fill="#D91023"/><circle cx="264" cy="196" r="4" fill="#fff"/><circle cx="301" cy="249" r="4" fill="#D91023"/><circle cx="338" cy="192" r="4" fill="#fff"/><circle cx="375" cy="245" r="4" fill="#D91023"/><circle cx="62" cy="188" r="4" fill="#fff"/><circle cx="99" cy="241" r="4" fill="#D91023"/><circle cx="136" cy="184" r="4" fill="#fff"/><circle cx="173" cy="237" r="4" fill="#D91023"/></g><path d="M40 182 Q200 100 360 182" fill="none" stroke="#e8e8f0" stroke-width="4"/></svg><div class="stampc">MOW<small>EN VIVO</small></div></div>
+        <div class="body"><span class="meta">Historia 2 · Moscú y Saransk, Rusia · 2018</span><div class="trow"><h3>El Mundial</h3><span class="lvl" title="ACTFL Intermediate Mid" aria-label="Level: Intermedio (ACTFL Intermediate Mid)"><i class="on"></i><i class="on"></i><i></i>Intermedio</span></div><p>A hostel full of Argentines, a night train to Saransk, and a stadium of Peru fans. Tell the story right.</p>
+          <div class="chips"><span class="chip">Pretérito vs. imperfecto</span><span class="chip">Verbs that change meaning</span><span class="chip">Vos</span></div>
+          <span class="go">Empezar →</span></div>
+      </a>
+      <div class="post empty"><div class="plus">+</div><h3>Historia 3</h3><p>Shown here once it's written. Every story will carry its ACTFL level.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="maestros">
+  <div class="wrap">
+    <div class="sh"><div><h2>Para maestros</h2><p>Built by a former Spanish teacher for real class periods.</p></div></div>
+    <div class="teach">
+      <div class="tile"><b>45 minutes</b><span>One story fits one class period, with a recap at the end.</span></div>
+      <div class="tile"><b>ACTFL levels</b><span>Each story shows its level (Novice, Intermediate or Advanced). Hover it for the ACTFL sublevel. El Viaje targets Intermediate Mid.</span></div>
+      <div class="tile"><b>Mission Control</b><span>Students join with your class code. You see completions and which choices they made.</span></div>
+      <div class="tile"><b>Free for students</b><span>Students play right away. Nothing to sign up for, and saving is optional.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="despues">
+  <div class="wrap next">
+    <div><h2>¿A dónde vamos después?</h2><p>Spanish teachers: tell us what your students struggle with, and where the next story should go. Your answer goes straight to William.</p></div>
+    <form id="ask">
+      <input name="topic" required placeholder="What's hard to teach? (e.g. por vs. para)" aria-label="What's hard to teach">
+      <select name="level" aria-label="Level you teach"><option value="">Level you teach…</option><option>Spanish 1</option><option>Spanish 2</option><option>Spanish 3</option><option>Spanish 4</option><option>AP Spanish</option><option>Heritage speakers</option></select>
+      <input name="place" placeholder="A place you'd love a story set in (optional)" aria-label="Place">
+      <button>Enviar</button>
+    </form>
+  </div>
+</section>
+
+<footer>Allgood Academy · Español hub · empty stops are stories still being written</footer>
+
+<script>
+{
+const tip=document.getElementById('tip');
+document.querySelectorAll('.pin').forEach(p=>{const show=()=>tip.innerHTML=p.dataset.tip;p.addEventListener('click',show);p.addEventListener('focus',show);p.addEventListener('mouseenter',show)});
+// No backend: the answer goes out as an email from the visitor's own mail app.
+document.getElementById('ask').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target),v=k=>(f.get(k)||'').trim()||'(not given)';
+const body=`What's hard to teach: ${v('topic')}\nLevel I teach: ${v('level')}\nA place I'd love a story set in: ${v('place')}\n`;
+location.href='mailto:learning@allgoodacademy.com?subject='+encodeURIComponent('Español: next story idea')+'&body='+encodeURIComponent(body);
+e.target.outerHTML='<p class="thanks">¡Gracias! Your email app should open with your answer filled in. Hit send and it goes straight to William. Nothing opened? Write to <a style="color:inherit" href="mailto:learning@allgoodacademy.com">learning@allgoodacademy.com</a>.</p>'});
+}
+</script>
+</body>
+</html>
