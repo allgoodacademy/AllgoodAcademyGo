@@ -62,7 +62,8 @@ a{color:var(--teal-deep)}
 .menu hr{border:0;border-top:1px solid var(--line);margin:6px 0}
 .who{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:12.5px;white-space:nowrap}
 .who .av{width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex:none}
-.who .nm{max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.who .nm{display:block;max-width:280px;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+@media(max-width:640px){.who .nm{max-width:200px}}
 .plan{font-size:10.5px;font-weight:700;letter-spacing:.06em;border-radius:6px;padding:2px 7px;background:var(--line);color:var(--soft)}
 .plan.pro{background:var(--orange);color:#fff}
 button.plan{border:0;font-family:inherit;cursor:default}
@@ -1308,6 +1309,7 @@ function paintHeader() {
     renderJoinQr(state.code);
     const teacher = state.me.displayName || (state.user && state.user.displayName) || 'Teacher';
     $('who-name').textContent = teacher;
+    $('who-name').title = teacher;   // the full name on hover, if a very long one is shortened
     $('who-av').textContent = initialsOf(teacher).slice(0, 1);
     const chip = $('plan-chip');
     // Free: the chip is the always-visible way in to Pro. Pro: a plain label.
