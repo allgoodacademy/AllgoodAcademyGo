@@ -18,6 +18,7 @@
      performance and then never read it; it does now. See /js/skill-routing.js. -->
 <script type="module" src="/js/skill-routing.js"></script>
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <link rel="stylesheet" href="/assets/css/fonts.css">
     <link rel="stylesheet" href="/assets/css/tablet-chassis.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,7 +41,7 @@
      here — change the dashboard, then re-copy to all three games.
      ============================================= */
   body {
-    font-family: Verdana, Geneva, sans-serif;
+    font-family: var(--font-ui);
     background-color: #0f172a;
     min-height: 100vh;
     min-height: 100dvh;
@@ -76,8 +77,8 @@
     min-height: 0;
     min-width: 0;
     background-image:
-        radial-gradient(circle at 0% 0%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
-        radial-gradient(circle at 100% 100%, rgba(211, 71, 22, 0.35) 0%, transparent 30%),
+        radial-gradient(circle at 0% 0%, rgba(207, 70, 22, 0.35) 0%, transparent 30%),
+        radial-gradient(circle at 100% 100%, rgba(207, 70, 22, 0.35) 0%, transparent 30%),
         linear-gradient(135deg, #5c5c5c 0%, #d6d6d6 25%, #8a8a8a 50%, #e0e0e0 75%, #5c5c5c 100%);
     border-radius: 12px;
     padding: 12px;
@@ -162,7 +163,7 @@
     border: none;
     padding: 10px 12px;
     border-radius: 6px;
-    font-family: Verdana, Geneva, sans-serif;
+    font-family: var(--font-ui);
     font-size: 0.82rem;
     font-weight: 700;
     color: var(--color-dark);
@@ -186,17 +187,17 @@
 
   /* ── INTRO ── */
   #intro { text-align: center; max-width: 440px; margin: auto 0; }
-  #intro h1 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2rem,6vw,2.8rem); font-weight: 700; color: var(--cream); line-height: 1.1; margin-bottom: 12px; }
+  #intro h1 { font-family: var(--font-display); font-size: clamp(2rem,6vw,2.8rem); font-weight: 700; color: var(--cream); line-height: 1.1; margin-bottom: 12px; }
   #intro h1 em { color: var(--orange); font-style: normal; }
   #intro p { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 28px; }
   .start-btn {
     background: var(--orange); color: white; border: none;
     padding: 14px 40px; border-radius: 50px;
-    font-family: Verdana, Geneva, sans-serif; font-size: 14px; font-weight: 700;
+    font-family: var(--font-ui); font-size: 14px; font-weight: 700;
     cursor: pointer; transition: opacity 0.15s, transform 0.1s;
   }
   .start-btn:hover { opacity: 0.9; transform: scale(1.02); }
-  .wordmark { font-family: Georgia, 'Times New Roman', serif; font-size: 0.8rem; color: rgba(255,255,255,0.2); margin-top: 16px; letter-spacing: 0.04em; }
+  .wordmark { font-family: var(--font-display); font-size: 0.8rem; color: rgba(255,255,255,0.2); margin-top: 16px; letter-spacing: 0.04em; }
 
   /* ── GAME ── */
   #game { display: none; width: 100%; max-width: 560px; margin: auto 0; flex-direction: column; align-items: center; }
@@ -209,7 +210,7 @@
   .node-circle.lit-true { fill: rgba(46,125,82,0.4); stroke: var(--true-color); stroke-width: 2; }
   .node-circle.lit-false { fill: rgba(192,57,43,0.4); stroke: var(--false-color); stroke-width: 2; }
   .node-circle.lit-stopped { fill: rgba(255,255,255,0.15); stroke: rgba(255,255,255,0.4); stroke-width: 2; }
-  .node-label { fill: rgba(255,255,255,0.4); font-size: 9px; font-family: Verdana,Geneva,sans-serif; text-anchor: middle; }
+  .node-label { fill: rgba(255,255,255,0.4); font-size: 9px; font-family: var(--font-ui); text-anchor: middle; }
   .node-label.you-label { fill: var(--teal); font-weight: 700; }
   .edge { stroke: rgba(255,255,255,0.08); stroke-width: 1; transition: stroke 0.4s; }
   .edge.active-true { stroke: var(--true-color); stroke-width: 1.5; opacity: 0.6; }
@@ -254,7 +255,7 @@
   @keyframes vdot { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
 
   .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; width: 100%; }
-  .action-btn { padding: 16px 8px; border: none; border-radius: 14px; font-family: Verdana, Geneva, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.1s, opacity 0.1s; display: flex; flex-direction: column; align-items: center; gap: 7px; letter-spacing: 0.02em; }
+  .action-btn { padding: 16px 8px; border: none; border-radius: 14px; font-family: var(--font-ui); font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.1s, opacity 0.1s; display: flex; flex-direction: column; align-items: center; gap: 7px; letter-spacing: 0.02em; }
   .action-btn:hover { transform: scale(1.03); }
   .action-btn svg { width: 20px; height: 20px; }
   .btn-forward { background: #fff3f0; color: var(--orange); }
@@ -267,14 +268,14 @@
   #consequence { display: none; width: 100%; max-width: 560px; margin: auto 0; flex-direction: column; align-items: center; }
   .consequence { width: 100%; animation: cardIn 0.4s ease; text-align: center; }
   .consequence-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 12px; }
-  .consequence-scene { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.75; margin-bottom: 16px; text-align: left; font-family: Georgia, 'Times New Roman', serif; }
+  .consequence-scene { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.75; margin-bottom: 16px; text-align: left; font-family: var(--font-display); }
   .consequence-mechanism { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 20px; padding: 14px 16px; background: rgba(255,255,255,0.04); border-radius: 12px; text-align: left; }
-  .next-btn { background: var(--teal); color: white; border: none; padding: 14px 36px; border-radius: 50px; font-family: Verdana, Geneva, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; transition: opacity 0.15s; }
+  .next-btn { background: var(--teal); color: white; border: none; padding: 14px 36px; border-radius: 50px; font-family: var(--font-ui); font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; transition: opacity 0.15s; }
   .next-btn:hover { opacity: 0.9; }
 
   /* ── END ── */
   #end { display: none; text-align: center; max-width: 440px; margin: auto 0; }
-  .end-score { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(3.5rem,12vw,5rem); font-weight: 700; color: var(--orange); line-height: 1; }
+  .end-score { font-family: var(--font-display); font-size: clamp(3.5rem,12vw,5rem); font-weight: 700; color: var(--orange); line-height: 1; }
   .end-label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; font-weight: 700; margin-bottom: 20px; }
   .end-breakdown { width: 100%; background: rgba(255,255,255,0.04); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
   .end-row { display: flex; justify-content: space-between; font-size: 12px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -283,13 +284,13 @@
   .end-row-val { font-weight: 700; color: var(--cream); }
   .jodi-moment { width: 100%; background: var(--teal); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
   .jodi-moment-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; margin-bottom: 6px; }
-  .jodi-moment-text { font-family: Georgia, 'Times New Roman', serif; font-size: 13px; color: white; line-height: 1.65; font-style: italic; }
+  .jodi-moment-text { font-family: var(--font-display); font-size: 13px; color: white; line-height: 1.65; font-style: italic; }
   .deeper-card { width: 100%; background: rgba(53,120,137,0.14); border: 1px solid rgba(53,120,137,0.35); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
   .deeper-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.08em; margin-bottom: 8px; }
   .deeper-msg { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.65; margin-bottom: 14px; }
-  .deeper-btn { background: var(--teal); color: white; border: none; padding: 12px; border-radius: 50px; font-family: Verdana, Geneva, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; width: 100%; }
-  .play-again-btn { background: var(--orange); color: white; border: none; padding: 14px; border-radius: 50px; font-family: Verdana, Geneva, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 8px; }
-  .hub-btn { background: transparent; color: var(--cream); border: 1px solid rgba(255,255,255,0.15); padding: 12px; border-radius: 50px; font-family: Verdana, Geneva, sans-serif; font-size: 12px; cursor: pointer; width: 100%; }
+  .deeper-btn { background: var(--teal); color: white; border: none; padding: 12px; border-radius: 50px; font-family: var(--font-ui); font-size: 12px; font-weight: 700; cursor: pointer; width: 100%; }
+  .play-again-btn { background: var(--orange); color: white; border: none; padding: 14px; border-radius: 50px; font-family: var(--font-ui); font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 8px; }
+  .hub-btn { background: transparent; color: var(--cream); border: 1px solid rgba(255,255,255,0.15); padding: 12px; border-radius: 50px; font-family: var(--font-ui); font-size: 12px; cursor: pointer; width: 100%; }
 </style>
 </head>
 <body>
@@ -329,15 +330,15 @@ body.present .nav-shell.activity{display:none}
 .nav-shell,.nav-shell *{box-sizing:border-box}
 .nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
 .nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
-.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
 .nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
 .nav-shell .nav-right{display:flex;align-items:center;gap:4px}
-.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
 .nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
 .nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
 .nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
-.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
 .nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
 .nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
 @media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
@@ -475,7 +476,7 @@ const scenarios = [
     stop:{ scene:`You stop it. Students who use that bus stop don't know. Two more incidents happen that week.`, mechanism:`Stopping accurate safety information causes real harm. Verify before you stop — this one was worth forwarding.` },
     category:"accuracy"
   },
-  { id:"sports-insider-22-your-school-s-football-coach-jus", sender:"Sports_Insider_22", avatarColor:"#D34716", avatarText:"SI",
+  { id:"sports-insider-22-your-school-s-football-coach-jus", sender:"Sports_Insider_22", avatarColor:"#CF4616", avatarText:"SI",
     sub:`Forwarded 124 times · Account you don't follow`, forwardCount:124,
     claim:`Your school's football coach just got fired for stealing from the booster fund. My cousin works there and confirmed it.`, detail:`No news source. No school statement.`, source:`Sports_Insider_22 · Account created 3 weeks ago`,
     truth:false,
@@ -511,7 +512,7 @@ const scenarios = [
     stop:{ scene:`You stop it. The panic doesn't spread to your contacts.`, mechanism:`Anonymous claims with no source and no verifiable detail are almost never worth forwarding. The standard for health information should be higher, not lower.` },
     category:"misinformation"
   },
-  { id:"local-news-alert-road-closure-alert-main-street", sender:"Local News Alert", avatarColor:"#D34716", avatarText:"LN",
+  { id:"local-news-alert-road-closure-alert-main-street", sender:"Local News Alert", avatarColor:"#CF4616", avatarText:"LN",
     sub:`Forwarded 8 times · Local news account`, forwardCount:8,
     claim:`Road closure alert: Main Street between 4th and 7th Ave will be closed Saturday 8AM–4PM for the annual 5K race.`, detail:`From the local news Twitter account.`, source:`@LocalNews · Verified media account`,
     truth:true,
@@ -556,7 +557,7 @@ const scenarios = [
     stop:{ scene:`A friend drives through a flooded underpass anyway. Her car stalls.`, mechanism:`Safety information from verified official sources should spread. Speed matters here.` },
     category:"accuracy"
   },
-  { id:"school-library-the-library-will-be-closed", sender:"School Library", avatarColor:"#D34716", avatarText:"SL",
+  { id:"school-library-the-library-will-be-closed", sender:"School Library", avatarColor:"#CF4616", avatarText:"SL",
     sub:`Forwarded 2 times · Official school account`, forwardCount:2,
     claim:`The library will be closed Thursday and Friday this week for inventory. The computer lab in Room 114 is available as an alternative.`, detail:null, source:`Official school account`,
     truth:true,
@@ -646,7 +647,7 @@ const scenarios = [
     stop:{ scene:`Two students prepare for the wrong date and are underprepared on May 7th.`, mechanism:`Academic information that's verifiable and high-stakes should spread.` },
     category:"accuracy"
   },
-  { id:"jordan-t-the-park-behind-school-is", sender:"Jordan T.", avatarColor:"#D34716", avatarText:"JT",
+  { id:"jordan-t-the-park-behind-school-is", sender:"Jordan T.", avatarColor:"#CF4616", avatarText:"JT",
     sub:`Forwarded 2 times · Friend`, forwardCount:2,
     claim:`The park behind school is closed this weekend for a private event. Gate will be locked. Don't plan to hang out there Saturday.`, detail:null, source:`Friend`,
     truth:true,
@@ -736,7 +737,7 @@ const scenarios = [
     stop:{ scene:`You stop it. Nobody wastes time on a nonexistent tax.`, mechanism:`'Unofficial' in an account name is a signal. 'Approved quietly' is almost always false. Always check original sources for government policy claims.` },
     category:"misinformation"
   },
-  { id:"anonymous-i-heard-from-someone-at", sender:"Anonymous", avatarColor:"#D34716", avatarText:"A",
+  { id:"anonymous-i-heard-from-someone-at", sender:"Anonymous", avatarColor:"#CF4616", avatarText:"A",
     sub:`Forwarded 67 times · Anonymous`, forwardCount:67,
     claim:`I heard from someone at the hospital that there's been a spike in a new flu strain in our area that's worse than COVID. Hospitals are preparing for overflow.`, detail:null, source:`Anonymous`,
     truth:false,
@@ -826,7 +827,7 @@ const scenarios = [
     stop:{ scene:`You stop it. A student-athlete's future isn't damaged by a rival fan's false claim.`, mechanism:`Rival fan accounts are not sources. Ever.` },
     category:"reputation"
   },
-  { id:"parent-network-alert-warning-the-school-cafeteria-", sender:"Parent_Network_Alert", avatarColor:"#D34716", avatarText:"PN",
+  { id:"parent-network-alert-warning-the-school-cafeteria-", sender:"Parent_Network_Alert", avatarColor:"#CF4616", avatarText:"PN",
     sub:`Forwarded 1,203 times · Unofficial parent group`, forwardCount:1203,
     claim:`WARNING: The school cafeteria has been failing health inspections for 3 months. Administration is hiding it to avoid bad press. Check what your kids are eating.`, detail:null, source:`Unofficial parent group`,
     truth:false,

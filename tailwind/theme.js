@@ -13,13 +13,17 @@
 // commit. design-tokens.css names the theme.js key beside each shared value.
 module.exports = {
     colors: {
-        // Allgood Academy brand.
-        'allgood-primary': '#D34716',
+        // Allgood Academy brand. The orange was nudged from #D34716 to #CF4616 on
+        // 2026-11-25 (AA-1) so white button labels pass WCAG AA (4.62:1, was 4.48:1).
+        'allgood-primary': '#CF4616',
         'allgood-secondary': '#357889',
         'allgood-dark': '#4C4C4C',
         'allgood-light': '#F7F7F7',
         'allgood-hover': '#EB8D69',
         'allgood-accent': '#2D6473',
+        // Secondary text that still passes AA: 4.6-5.3:1 on the canvas, white and
+        // cream. Replaces Tailwind's text-gray-400 (#9CA3AF, 2.54:1 on white).
+        'ink-soft': '#5C6E75',
         // Jodi's Schoolhouse surfaces.
         'jodi-warmth': '#FBF6EE',
         'jodi-border': '#E8DFCE',
@@ -41,8 +45,10 @@ module.exports = {
     },
     // Fallback chains match --font-display / --font-ui in
     // public/assets/css/design-tokens.css; check-tokens.js enforces that.
+    // Gelasio and Atkinson Hyperlegible Next are self-hosted (public/assets/css/fonts.css);
+    // the "Fallback" names are metric-matched faces defined there for Chromebooks.
     fontFamily: {
-        heading: ['Georgia', 'Times New Roman', 'serif'],
-        body: ['Verdana', 'Geneva', 'sans-serif'],
+        heading: ['Gelasio', 'Georgia', 'Gelasio Fallback', 'Times New Roman', 'serif'],
+        body: ['Atkinson Hyperlegible Next', 'Verdana', 'Atkinson Hyperlegible Next Fallback', 'Geneva', 'sans-serif'],
     },
 };

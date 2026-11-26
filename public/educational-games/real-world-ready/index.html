@@ -7,8 +7,6 @@
     <link rel="stylesheet" href="/assets/css/tailwind.min.css">
     <script src="/assets/js/lucide.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- Shared identity/login module — see /js/auth-core.js. Must load before the inline
          module script below (module scripts execute in document order, same as defer). -->
@@ -95,6 +93,7 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <link rel="stylesheet" href="/assets/css/fonts.css">
     <style>
         body {
             font-family: 'Inter', Verdana, sans-serif;
@@ -104,7 +103,7 @@
         }
 
         input, textarea { -webkit-user-select: text; user-select: text; }
-        h1, h2, h3, h4 { font-family: Georgia, 'Times New Roman', serif; }
+        h1, h2, h3, h4 { font-family: var(--font-display); }
 
         /* App shell replaces the old tablet-frame + screen-container pairing.
            Full-bleed, edge to edge, at every screen size. */
@@ -204,15 +203,15 @@ body.present .nav-shell.activity{display:none}
 .nav-shell,.nav-shell *{box-sizing:border-box}
 .nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
 .nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
-.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
 .nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
 .nav-shell .nav-right{display:flex;align-items:center;gap:4px}
-.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
 .nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
 .nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
 .nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
-.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
 .nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
 .nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
 @media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
@@ -306,18 +305,18 @@ body.present .nav-shell.activity{display:none}
                             <p class="text-xs font-bold text-allgood-secondary tracking-wider uppercase mt-1" id="hud-name-display">Agent Learner</p>
                         </div>
                         <div class="p-5 border-b border-gray-100">
-                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Global Score</p>
+                            <p class="text-[10px] uppercase font-bold text-ink-soft tracking-widest mb-1">Global Score</p>
                             <div class="flex items-baseline gap-2">
                                 <span class="text-4xl font-heading font-bold text-allgood-primary" id="hud-score">0</span>
-                                <span class="text-sm font-bold text-gray-400">/ 72</span>
+                                <span class="text-sm font-bold text-ink-soft">/ 72</span>
                             </div>
-                            <div id="hud-delta-container" class="mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-orange-50 text-allgood-primary border border-orange-100 flex items-center gap-1.5 w-fit transition-colors duration-300">
+                            <div id="hud-delta-container" class="mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-orange-50 text-[color:var(--color-orange-deep)] border border-orange-100 flex items-center gap-1.5 w-fit transition-colors duration-300">
                                 <i id="hud-delta-icon" data-lucide="target" class="w-3 h-3"></i>
                                 <span id="hud-delta-text">64 Points to Certification</span>
                             </div>
                         </div>
                         <div class="p-5 border-b border-gray-100">
-                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Readiness Analytics</p>
+                            <p class="text-[10px] uppercase font-bold text-ink-soft tracking-widest mb-4">Readiness Analytics</p>
                             <div class="mb-4">
                                 <div class="flex justify-between text-[10px] font-bold text-allgood-dark mb-1">
                                     <span class="flex items-center gap-1"><i data-lucide="scale" class="w-3 h-3 text-amber-600"></i> Judgment</span>
@@ -341,7 +340,7 @@ body.present .nav-shell.activity{display:none}
                             </div>
                         </div>
                         <div class="p-5 flex-1 overflow-y-auto hud-scroll bg-gray-50/50">
-                            <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-2">Active Mission</p>
+                            <p class="text-[10px] uppercase font-bold text-ink-soft tracking-widest mb-2">Active Mission</p>
                             <div id="hud-active-mission" class="text-sm font-bold text-allgood-dark border-l-4 border-allgood-secondary pl-3 py-1 mb-2">Standing By</div>
                             <div id="hud-mission-progress" class="text-xs font-bold text-gray-500 pl-4">Select a mission to begin.</div>
                         </div>
@@ -417,7 +416,7 @@ body.present .nav-shell.activity{display:none}
                                             <!-- OPTIONAL FEEDBACK — never gates the evaluation or the badge. Same
                                                  structure as the GoodBlock Case 7 rating: rate if you like. -->
                                             <div id="feedback-container" class="w-full bg-gray-50 p-4 rounded-lg shadow-inner border border-gray-200 text-left relative">
-                                                <h3 class="font-bold text-allgood-dark text-xs uppercase tracking-wide mb-3 text-center">Rate this GoodBlock <span class="text-gray-400 font-normal normal-case">(optional)</span></h3>
+                                                <h3 class="font-bold text-allgood-dark text-xs uppercase tracking-wide mb-3 text-center">Rate this GoodBlock <span class="text-ink-soft font-normal normal-case">(optional)</span></h3>
                                                 <div class="flex justify-center space-x-2 mb-4" id="star-wrapper">
                                                     <button onclick="window.setRating(1)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="1"><i id="star-1" class="fas fa-star text-2xl text-gray-300"></i></button>
                                                     <button onclick="window.setRating(2)" class="star-btn focus:outline-none transition-transform hover:scale-110" data-val="2"><i id="star-2" class="fas fa-star text-2xl text-gray-300"></i></button>
@@ -450,7 +449,7 @@ body.present .nav-shell.activity{display:none}
                                         <div class="w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-lg shadow-inner border border-gray-200 mb-8">
                                             <p class="text-sm font-semibold text-gray-500 mb-1">Total Score</p>
                                             <p id="final-score-value" class="text-5xl font-extrabold text-allgood-dark font-heading">0 / 72</p>
-                                            <p id="final-score-percent" class="text-xs text-gray-400 mt-1">(0% Effectiveness)</p>
+                                            <p id="final-score-percent" class="text-xs text-ink-soft mt-1">(0% Effectiveness)</p>
                                         </div>
                                         <h3 id="final-rank-heading" class="text-xl font-heading font-bold text-allgood-dark mb-2">Still Learning</h3>
                                         <p id="final-rank-message" class="text-sm text-gray-600 max-w-md mx-auto mb-8">Good start. Reread the feedback and try again.</p>
@@ -473,7 +472,7 @@ body.present .nav-shell.activity{display:none}
                                             <button onclick="window.location.href = '/jsh/real-world-ready-lab/';" class="w-full bg-allgood-primary hover:bg-[#EB8D69] text-white font-bold py-3 rounded shadow-md transition-transform transform hover:scale-[1.02] active:scale-95 flex items-center justify-center uppercase tracking-wide text-sm font-body">
                                                 <i data-lucide="play-circle" class="w-5 h-5 mr-2"></i> Explore the Lab Pack
                                             </button>
-                                            <button onclick="window.performHardReset()" class="w-full bg-transparent text-gray-400 font-bold py-2 mt-3 hover:text-white transition-colors text-xs uppercase tracking-wider">
+                                            <button onclick="window.performHardReset()" class="w-full bg-transparent text-ink-soft font-bold py-2 mt-3 hover:text-white transition-colors text-xs uppercase tracking-wider">
                                                 <i data-lucide="rotate-ccw" class="w-3 h-3 inline mr-1"></i> Retake Challenge
                                             </button>
                                         </div>
@@ -499,7 +498,7 @@ body.present .nav-shell.activity{display:none}
                                 <i data-lucide="chevron-left" class="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1"></i>
                                 <span class="hidden sm:inline">Back</span>
                             </button>
-                            <p class="text-gray-400 text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a> <span id="current-year"></span></p>
+                            <p class="text-ink-soft text-[10px] hidden sm:block font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a> <span id="current-year"></span></p>
                             <button id="next-button" class="bg-allgood-primary hover:bg-allgood-hover text-white px-4 sm:px-6 py-2 rounded-full text-sm font-bold shadow-md transition-transform transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed font-body">
                                 <span class="hidden sm:inline" id="next-btn-text">Next</span>
                                 <i data-lucide="chevron-right" class="h-6 w-6 sm:h-4 sm:w-4 ml-0 sm:ml-1"></i>
@@ -550,7 +549,7 @@ body.present .nav-shell.activity{display:none}
                             <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm transition-colors flex items-center justify-center">
                                 <i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Go to Dashboard
                             </button>
-                            <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">
+                            <button onclick="window.closeSystemMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-2">
                                 Cancel
                             </button>
                         </div>
@@ -1040,7 +1039,7 @@ body.present .nav-shell.activity{display:none}
 
                 if (delta > 0) {
                     if (hudDeltaText) hudDeltaText.textContent = `${delta} Points to Certification`;
-                    if (hudDeltaContainer) hudDeltaContainer.className = "mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-orange-50 text-allgood-primary border border-orange-100 flex items-center gap-1.5 w-fit transition-colors duration-300";
+                    if (hudDeltaContainer) hudDeltaContainer.className = "mt-3 text-[10px] font-bold py-1.5 px-2 rounded bg-orange-50 text-[color:var(--color-orange-deep)] border border-orange-100 flex items-center gap-1.5 w-fit transition-colors duration-300";
                     if (hudDeltaIcon) hudDeltaIcon.setAttribute('data-lucide', 'target');
                     if (mobileHudDelta) {
                         mobileHudDelta.textContent = `${delta} pts to badge`;
@@ -1318,7 +1317,7 @@ body.present .nav-shell.activity{display:none}
                 // region (the page itself), and the mockups are purely decorative context.
                 const answerCard = `
                     <div class="max-w-xl mx-auto mt-5 bg-white rounded-2xl border border-gray-200 shadow-sm p-5 sm:p-6">
-                        <p class="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-3">Select Response</p>
+                        <p class="text-[10px] uppercase tracking-widest text-ink-soft font-bold mb-3">Select Response</p>
                         <div class="space-y-2">${choicesHtml}</div>
                         ${feedbackHtml ? `<div class="mt-4">${feedbackHtml}</div>` : ''}
                     </div>`;
@@ -1343,7 +1342,7 @@ body.present .nav-shell.activity{display:none}
                     sceneHtml = `
                     <div class="mx-auto max-w-xs bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div class="px-3 py-2 flex items-center justify-between border-b border-gray-100">
-                            <div class="flex items-center space-x-2"><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[1.5px]"><div class="w-full h-full rounded-full bg-white p-[1px] flex items-center justify-center"><i data-lucide="user" class="w-3 h-3 text-gray-400"></i></div></div><div class="leading-none"><div class="text-[10px] font-bold text-gray-900">friend_123</div><div class="text-[8px] text-gray-400">Saturday</div></div></div><i data-lucide="more-horizontal" class="w-3 h-3 text-gray-400"></i>
+                            <div class="flex items-center space-x-2"><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[1.5px]"><div class="w-full h-full rounded-full bg-white p-[1px] flex items-center justify-center"><i data-lucide="user" class="w-3 h-3 text-gray-400"></i></div></div><div class="leading-none"><div class="text-[10px] font-bold text-gray-900">friend_123</div><div class="text-[8px] text-ink-soft">Saturday</div></div></div><i data-lucide="more-horizontal" class="w-3 h-3 text-gray-400"></i>
                         </div>
                         <div class="bg-gray-100 py-6 px-4 flex items-center justify-center text-center"><p class="text-xs font-serif font-medium text-gray-800 italic">"${cleanText}"</p></div>
                         <div class="px-3 py-2"><div class="flex space-x-3 mb-1"><i data-lucide="heart" class="w-4 h-4 text-gray-800"></i><i data-lucide="message-circle" class="w-4 h-4 text-gray-800"></i><i data-lucide="share-2" class="w-4 h-4 text-gray-800"></i></div><div class="text-[9px] font-bold text-gray-900">4,203 likes</div></div>
@@ -1353,7 +1352,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="max-w-lg mx-auto bg-white rounded-lg overflow-hidden border border-gray-300 shadow-sm">
                         <div class="bg-gray-100 px-3 py-2 flex items-center space-x-2 border-b border-gray-200">
                             <div class="flex space-x-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-400"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div><div class="w-2.5 h-2.5 rounded-full bg-green-400"></div></div>
-                            <div class="flex-grow bg-white rounded shadow-inner h-6 flex items-center px-2 border border-gray-200"><i data-lucide="lock" class="w-2.5 h-2.5 text-green-600 mr-1.5"></i><span class="text-[10px] text-gray-400 font-mono">https://search.web/results</span></div>
+                            <div class="flex-grow bg-white rounded shadow-inner h-6 flex items-center px-2 border border-gray-200"><i data-lucide="lock" class="w-2.5 h-2.5 text-green-600 mr-1.5"></i><span class="text-[10px] text-ink-soft font-mono">https://search.web/results</span></div>
                         </div>
                         <div class="p-5 bg-white">
                             <div class="text-[10px] text-gray-500 mb-1 flex items-center"><span class="bg-gray-200 rounded px-1 mr-1">Ad</span> www.result.com</div>
@@ -1408,7 +1407,7 @@ body.present .nav-shell.activity{display:none}
                         </div>
                         <div class="bg-gray-800 flex items-center justify-center p-4">
                             <div class="w-full bg-black/60 border border-green-500/30 rounded p-2">
-                                <div class="text-[9px] text-gray-400">[Global] <span class="text-red-400">Troll_User99:</span> ${cleanText}</div>
+                                <div class="text-[9px] text-ink-soft">[Global] <span class="text-red-400">Troll_User99:</span> ${cleanText}</div>
                             </div>
                         </div>
                     </div>`;
@@ -1439,8 +1438,8 @@ body.present .nav-shell.activity{display:none}
                 if (state === 'locked') {
                     return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" data-locked="true" class="scenario-block mb-10 max-w-xl mx-auto bg-white/60 rounded-2xl border border-dashed border-gray-300 p-8 text-center select-none">
                         <i data-lucide="lock" class="w-5 h-5 text-gray-300 mx-auto mb-2"></i>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Scenario ${scenarioIndex}</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Answer the scenario above to continue</p>
+                        <p class="text-xs font-bold text-ink-soft uppercase tracking-widest">Scenario ${scenarioIndex}</p>
+                        <p class="text-[11px] text-ink-soft mt-1">Answer the scenario above to continue</p>
                     </div>`;
                 }
 
@@ -1462,7 +1461,7 @@ body.present .nav-shell.activity{display:none}
                                 ? ' bg-amber-50 border-amber-200 text-amber-800 ring-1 ring-amber-300'
                                 : ' bg-rose-50 border-rose-200 text-rose-800 ring-1 ring-rose-300';
                         } else {
-                            btnClass += ' bg-gray-50 border-gray-100 text-gray-400 opacity-60';
+                            btnClass += ' bg-gray-50 border-gray-100 text-ink-soft opacity-60';
                         }
                     } else {
                         btnClass += ' bg-white border-gray-200 text-gray-700 md:hover:border-allgood-primary md:hover:bg-orange-50 md:hover:text-allgood-primary active:border-allgood-primary active:bg-orange-50 active:text-allgood-primary cursor-pointer active:scale-[0.98]';
@@ -1502,7 +1501,7 @@ body.present .nav-shell.activity{display:none}
                 return `<div id="scenario-block-${scenarioIndex}" data-scenario-idx="${scenarioIndex}" class="scenario-block mb-10 scroll-mt-4">
                     <section class="mb-4 border-b border-gray-200 pb-2 flex justify-between items-end max-w-xl mx-auto">
                         <h2 class="text-xl font-heading font-bold text-allgood-dark">Scenario ${scenarioIndex}</h2>
-                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">${isAnswered ? 'Reviewed' : 'Decide'}</span>
+                        <span class="text-xs font-bold text-ink-soft uppercase tracking-widest mb-1">${isAnswered ? 'Reviewed' : 'Decide'}</span>
                     </section>
                     <div class="flex justify-center">
                         ${visualHtml}

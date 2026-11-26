@@ -15,7 +15,7 @@
 // The contract is written in design-tokens.css itself. A token that mirrors a theme.js
 // value is annotated with the key it mirrors:
 //
-//     --color-orange: #D34716;      /* theme.js allgood-primary */
+//     --color-orange: #CF4616;      /* theme.js allgood-primary */
 //
 // This script reads those annotations and enforces them, so declaring a new shared
 // value is just a matter of annotating it. It also checks the reverse direction: a
@@ -201,10 +201,44 @@ for (const page of [...pages, THEME_JS]) {
   declRe.lastIndex = 0;
 }
 
+// 4c. Self-hosted fonts (AA-1, 2026-11-25). District filters block Google Fonts, so no
+// page may load a stylesheet or font from it; prose that merely names the host is fine.
+// And every page that loads design-tokens.css must load fonts.css too, or --font-display
+// and --font-ui name faces that page never defines.
+const GOOGLE_FONTS = /(?:href|src)\s*=\s*["']https?:\/\/fonts\.(?:googleapis|gstatic)\.com|@import\s+url\(\s*["']?https?:\/\/fonts\.(?:googleapis|gstatic)\.com|url\(\s*["']?https?:\/\/fonts\.gstatic\.com/;
+for (const page of pages) {
+  const text = read(page);
+  const m = text.match(GOOGLE_FONTS);
+  if (m) {
+    const line = text.slice(0, m.index).split('\n').length;
+    fail(`${page}:${line} loads from Google Fonts. Self-host the face in public/assets/fonts/ `
+      + `and declare it in public/assets/css/fonts.css instead.`);
+  }
+  if (page.endsWith('.html') && /href="\/assets\/css\/design-tokens\.css"/.test(text)
+      && !/href="\/assets\/css\/fonts\.css"/.test(text)) {
+    fail(`${page} loads design-tokens.css but not /assets/css/fonts.css, so the self-hosted `
+      + `Gelasio / Atkinson Hyperlegible Next faces are never defined there.`);
+  }
+}
+
+// 4d. The pre-AA-1 orange. #D34716 put white button labels at 4.48:1, just under WCAG AA;
+// the brand moved to #CF4616. The old value coming back anywhere (hex or rgba) is drift.
+const OLD_ORANGE = /#d34716\b|rgba?\(\s*211\s*,\s*71\s*,\s*22\b/i;
+for (const page of pages) {
+  const text = read(page);
+  const m = text.match(OLD_ORANGE);
+  if (m) {
+    const line = text.slice(0, m.index).split('\n').length;
+    fail(`${page}:${line} has the retired orange ${m[0]}. Use var(--color-orange) / `
+      + `allgood-primary (#CF4616), or rgba(207, 70, 22, …) where a literal is unavoidable.`);
+  }
+}
+
 if (problems.length) {
   console.error(`check-tokens: ${problems.length} problem(s)\n - ` + problems.join('\n - '));
   process.exit(1);
 }
 console.log(`check-tokens: OK — ${checkedPairs} shared value(s) agree between ${THEME_JS} and `
   + `${TOKENS_CSS} (${tokens.size} tokens defined), no brand literal in any <style> block `
-  + `across ${pages.length} pages, and no short font fallback chain anywhere.`);
+  + `across ${pages.length} pages, no short font fallback chain anywhere, no Google Fonts link, `
+  + `fonts.css beside every design-tokens.css, and no retired #D34716 orange.`);

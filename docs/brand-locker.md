@@ -1,6 +1,8 @@
 # Allgood Academy Brand Locker (snapshot)
 
 > Snapshot of the Brand Locker v1.7 (https://claude.ai/artifact/TxXyhJzrvKeD1N7kZRFQ7U), taken 2026-11-25. The locker page is the master copy of the rules; this file exists so Claude Code can read them. Don't edit rules here; change the locker, then refresh this snapshot.
+>
+> **Repo update 2026-11-26 (AA-1):** the orange change and the self-hosted fonts below are no longer pending. The brand orange is **#CF4616** site-wide (`allgood-primary` / `--color-orange`), and the fonts are **self-hosted Gelasio (display) + Atkinson Hyperlegible Next (body)** from `/assets/fonts/` (`public/assets/css/fonts.css`). The locker page should get the same edit at its next refresh.
 
 
 The brand locker for Allgood Academy (allgoodacademy.com): colors, type, characters, art style and the rules for using them. Every design made for Allgood Academy (a GoodBlock, a simulation, a dashboard, a TPT cover, a Facebook post) starts here. The Art Director seat on the advisory board owns it.
@@ -29,7 +31,7 @@ Allgood Academy meets **WCAG 2.1 AA** (what U.S. public schools are required to 
 
 Two colors carry the brand, and they're on everything, Jodi included:
 
-- **Burnt orange `brand-orange` #D34716** is the action color: buttons, progress, the Sun, the lightbulb. One orange action per screen.
+- **Burnt orange `brand-orange` #CF4616** is the action color: buttons, progress, the Sun, the lightbulb. One orange action per screen.
 - **Deep teal `brand-teal` #357889** is the structure color: headers, nav, links, accents. Jodi's cardigan is this exact teal.
 
 Around them:
@@ -39,18 +41,18 @@ Around them:
 
 **Lab Pack accents.** Each Lab Pack (or GoodBlock in Digital Decisions) gets one accent, and they can't repeat. Claimed: teal (Social Intelligence), indigo #6D5EC4 (Privacy & Security), blue #2B5FA8 (Digital Citizenship), plum #7C3D8E (Professional Brand), amber #C97D1A (Real World Ready), berry #9B3B5A (Room to Think). Proposed: bronze #B0773A (El Viaje). Green is never an accent: it's the "correct" state color. Check this list before picking a new one.
 
-**Contrast rules.** White on orange is 4.48:1, just under the 4.5 line, so button labels stay bold and 15px+. Amber and bronze are fills only; use their `-dark` for text. `ink-faint` is decoration only.
+**Contrast rules.** White on orange is 4.62:1 (passes AA since the 2026-11-25 nudge from #D34716); keep button labels bold. Amber and bronze are fills only; use their `-dark` for text. `ink-faint` is decoration only.
 
 ## Type
 
-Two system fonts, on purpose. **Georgia** for display (headings, big numbers, titles). **Verdana** for everything you read or tap. Nothing loads from a font CDN, so a district filter can never block the text.
+Two self-hosted, open-license (SIL OFL) fonts. **Gelasio** for display (headings, big numbers, titles), built to match Georgia's metrics. **Atkinson Hyperlegible Next** for everything you read or tap, made by the Braille Institute for low-vision readability. Both are served from allgoodacademy.com itself (`/assets/fonts/`, declared in `public/assets/css/fonts.css`), never from a font CDN, so a district filter can't block the text. Georgia and Verdana stay next in the fallback chain.
 
-**Where they actually show up:** Georgia and Verdana come with Windows, Mac, iPad and iPhone. **Chromebooks don't include them.** ChromeOS ships its own core fonts (Arimo, Tinos, Cousine), so on a Chromebook the page falls back down the chain: headings become Tinos (a Times New Roman look-alike) and body text becomes ChromeOS's default sans-serif. Text always loads and stays readable, but most students (on Chromebooks) see a plainer version than the design shows. The fix, if wanted: self-host open-license fonts from allgoodacademy.com itself (filter-safe because they come from our own domain), such as Gelasio (built to match Georgia's sizing). That's a founder decision; until then, design so the page still looks right in Tinos and a plain sans-serif.
+**Why self-hosted (done 2026-11-26, AA-1):** Georgia and Verdana come with Windows, Mac, iPad and iPhone. **Chromebooks don't include them.** ChromeOS ships its own core fonts (Arimo, Tinos, Cousine), so on a Chromebook the page falls back down the chain: headings become Tinos (a Times New Roman look-alike) and body text becomes ChromeOS's default sans-serif. Text always loads and stays readable, but most students (on Chromebooks) see a plainer version than the design shows. The fix, if wanted: self-host open-license fonts from allgoodacademy.com itself (filter-safe because they come from our own domain), such as Gelasio (built to match Georgia's sizing). The founder chose that fix (2026-11-25) and it has shipped: Chromebooks now see Gelasio and Atkinson Hyperlegible Next, with metric-matched Tinos/Arimo fallback faces so text doesn't jump while the fonts load.
 
 Don't add Google Fonts links to student-facing pages: some district filters block them.
 
-- Headings: Georgia bold, tight (-0.02em letter spacing). Hero 68px, h1 48px, h2 36px, h3 19px.
-- Body: Verdana 15px / 1.6. Small 13px. Labels 12px bold.
+- Headings: Gelasio bold, tight (-0.02em letter spacing). Hero 68px, h1 48px, h2 36px, h3 19px.
+- Body: Atkinson Hyperlegible Next 15px / 1.6. Small 13px. Labels 12px bold.
 - Exceptions already shipped and left alone: Mission Control (Space Grotesk + JetBrains Mono), Insider (system UI).
 
 ## Shape
@@ -100,7 +102,7 @@ The **lightbulb mark** (`assets/Logos/allgood-lightbulb.png`): an orange bulb wi
 - `allgood-academy-logo-A-oneline.svg` / `-night.svg`: nav and header size.
 - `allgood-academy-logo-B-lit-o.svg` / `-night.svg`: the trial mark.
 
-All type is converted to outlines, so the files look identical on every computer with no fonts installed. Every file has `role="img"` and `aria-label="Allgood Academy"`. Their orange is #CF4616, the approved accessibility nudge; the site's buttons move to the same orange when prompt F ships.
+All type is converted to outlines, so the files look identical on every computer with no fonts installed. Every file has `role="img"` and `aria-label="Allgood Academy"`. Their orange is #CF4616, the approved accessibility nudge; the site's buttons use the same orange (shipped 2026-11-26, AA-1).
 
 **Changing a logo or icon file later:** the site caches these files for up to a year, so a changed version gets a new file name (for example `-v2`). Replacing a file under the same name would leave visitors seeing the old one.
 
@@ -127,7 +129,6 @@ Flat shapes with one shade tone, rounded line caps, a warm drop shadow, no outli
 
 - Jodi's poses (see **Jodi**). Her four new expressions, talking mouths and avatar are done.
 - Scenario characters (the students and people inside Cases and sims). Jodi works solo, with no sidekick, per her character bible; these are the people in the stories she tells, not co-hosts.
-- Self-hosted fonts so Chromebooks see the intended type (founder decision).
 - Components (button, Jodi bubble, Case card, A–D vote chip) as live previews.
 - The Spanish (El Viaje) style family, once approved.
 
@@ -164,11 +165,11 @@ Accessibility comes first in this locker. Every design is checked against these 
 **Known failures in the current brand (need a fix):**
 | Pair | Ratio | Where it shows up | Fix |
 |---|---|---|---|
-| White on `brand-orange` #D34716 | **4.48:1** | Every orange button (labels are 14px bold) | Founder decision: nudge the orange to **#CF4616** (4.62:1, a change no one will see) or keep it and make button labels 19px bold |
+| ~~White on `brand-orange` #D34716~~ | ~~4.48:1~~ | Every orange button | **Fixed 2026-11-26 (AA-1):** the orange is now **#CF4616** (4.62:1) site-wide |
 | `brand-orange` text on `bg`, cream or light grey | 3.8–4.2:1 | Orange links/labels on non-white pages | Use `brand-orange-deep` for orange text |
 | `brand-teal` text on `bg` #EAEEEF | 4.28:1 | Teal links on marketing pages and the sims hub | Use `brand-teal-deep` for teal text on `bg` |
 | `night-muted` on `night-card` | 4.21:1 | Small grey text on dark cards | Use it on `night` only (5.3:1), or `night-warm-white` at reduced emphasis |
-| Tailwind `text-gray-400` (#9CA3AF) on white | 2.54:1 | 278 places, including the "© Allgood Academy" footer | Swap for `ink-soft` |
+| Tailwind `text-gray-400` (#9CA3AF) on white | 2.54:1 | Was 278 places | **Fixed 2026-11-26 (AA-1)** on text: swapped for `ink-soft` (theme.js `ink-soft`); a few decorative Lucide icons keep it |
 | `ink-faint`, `brand-orange-hover`, amber, bronze as text | 2.5–3.8:1 | Labels | Decoration and fills only |
 
 **Color is never the only signal.** Correct, risky and locked-in states also get an icon or a word. Colors that must be told apart differ in lightness, not just hue (blue/orange beats red/green).
@@ -346,7 +347,7 @@ Real photos are rare and purposeful: the orbit background (`assets/Backgrounds/o
 
 # Style Families
 
-Each product line shares the brand core (orange action, teal structure, Georgia + Verdana, pill buttons) but has its own world. The shared chassis is plumbing only: present mode, A–D votes, telemetry, accessibility, filter-safe loading. **The look, layout and metaphor are new for every simulation.**
+Each product line shares the brand core (orange action, teal structure, Gelasio + Atkinson Hyperlegible Next, pill buttons) but has its own world. The shared chassis is plumbing only: present mode, A–D votes, telemetry, accessibility, filter-safe loading. **The look, layout and metaphor are new for every simulation.**
 
 ## Jodi's Schoolhouse (GoodBlocks / Labs)
 
@@ -399,9 +400,9 @@ Every sim is its own world. Before one is built, the Art Director writes its the
 | `ink-soft` | #5C6E75 | #7A909F | Secondary text, captions (4.6:1 on bg light, 5.3:1 on bg dark). Repo: --color-ink-soft / --color-muted. |
 | `ink-faint` | #8A9AA0 | #7A909F | Decorative only: dividers' labels, placeholder glyphs. Fails 4.5:1 as text (2.9:1 on white) — never body copy. Repo: --color-ink-faint. |
 | `hairline` | #D8DFE1 | #425562 | Borders and rules. Light: --color-hairline. Dark: the sims' color-mix(muted 40%, dark-card), worked out to hex. |
-| `cta` | #D34716 | #D34716 | The one action color: Next, Start, Lock in. White labels on it are 4.48:1, just under AA's 4.5:1 for normal text — pending a founder decision (nudge to #CF4616, or 19px+ bold labels). Repo: --color-orange / allgood-primary. |
+| `cta` | #CF4616 | #CF4616 | The one action color: Next, Start, Lock in. White labels on it are 4.62:1 (passes AA; nudged from #D34716 on 2026-11-25). Repo: --color-orange / allgood-primary. |
 | `focus-ring` | {brand-teal-deep} |  | Keyboard focus outline on every control: 2px solid, 2px offset, via :focus-visible. 6.6:1 on white, 5.7:1 on bg. Never remove focus outlines without this replacement. |
-| `brand-orange` | #D34716 |  | Burnt orange. Brand primary and action color; the lightbulb's glass; the Sun in every sim. White label text on it is 4.48:1, which FAILS AA for normal text — see Accessibility for the fix. Orange text on bg/cream/light fails (3.8–4.2:1): use brand-orange-deep for orange text. Repo: --color-orange. |
+| `brand-orange` | #CF4616 |  | Burnt orange. Brand primary and action color; the lightbulb's glass; the Sun in every sim. White label text on it is 4.62:1 (passes AA; was #D34716 at 4.48:1 until 2026-11-26). Orange text on bg/cream/light fails (3.8–4.2:1): use brand-orange-deep for orange text. Repo: --color-orange. |
 | `brand-orange-deep` | #B23A0F |  | Pressed/hover depth under orange buttons; safe for small orange text on white (6:1). Repo: --color-orange-deep. |
 | `brand-orange-hover` | #EB8D69 |  | Light orange hover fill on older GoodBlocks. Never text (2.5:1). Repo: allgood-hover. |
 | `brand-orange-wash` | #FBE9E2 |  | Orange tint behind callouts and chips (Mission Control). Repo: mission-control --orange-wash. |

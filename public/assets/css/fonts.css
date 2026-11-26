@@ -1,0 +1,242 @@
+/* ============================================================================
+   ALLGOOD ACADEMY — SELF-HOSTED FONTS
+   Every face the site uses, served from allgoodacademy.com itself.
+
+   WHY
+   ---
+   Georgia and Verdana are not installed on Chromebooks (ChromeOS ships Arimo,
+   Tinos and Cousine), so most students saw fallback fonts. And some district
+   filters block fonts.googleapis.com / fonts.gstatic.com. Files from our own
+   domain load wherever the site loads. Founder decision 2026-11-25 (AA-1).
+
+   WHAT
+   ----
+   Brand (every page that loads design-tokens.css):
+     Gelasio                     display — built to match Georgia's metrics
+     Atkinson Hyperlegible Next  body — Braille Institute, low-vision legibility
+   Per-page faces that used to come from Google Fonts, self-hosted as is:
+     Inter                       Digital Decisions / Real World Ready / Room to Think hubs
+     Atkinson Hyperlegible       AllgoodOS pages
+     Bricolage Grotesque         AllgoodOS pages
+   A face downloads only when a page actually renders text in it, so listing
+   them all here costs the other pages nothing.
+
+   All are SIL OFL 1.1 (OFL.txt beside each family's files), subset to Latin +
+   Latin Extended (Spanish for El Viaje), built by scripts/build-fonts.py.
+
+   RULES
+   -----
+   - local() first, then our woff2; font-display: swap so text is never
+     invisible while a file loads.
+   - Atkinson Hyperlegible Next is one variable file per style. It is declared
+     once per weight the site uses so each local() can name the right static
+     install; every one of those faces points at the same URL, so the browser
+     downloads it once.
+   - The "Fallback" faces are metric-matched stand-ins (size-adjust /
+     ascent-override) for the fonts a Chromebook falls back to while the woff2
+     loads: Tinos (= Times New Roman metrics) and Arimo (= Arial metrics). They
+     sit in --font-display / --font-ui after Georgia / Verdana, so text does not
+     jump when the real face swaps in. Values printed by scripts/build-fonts.py.
+   - /assets/fonts/** is cached for a year (firebase.json). A changed font
+     file needs a new file name, like the logo files.
+   ============================================================================ */
+
+/* --- Gelasio (display) ------------------------------------------------- */
+
+@font-face {
+  font-family: 'Gelasio';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Gelasio Regular'), local('Gelasio-Regular'),
+       url('/assets/fonts/gelasio/Gelasio-Regular.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Gelasio';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Gelasio Bold'), local('Gelasio-Bold'),
+       url('/assets/fonts/gelasio/Gelasio-Bold.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Gelasio';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Gelasio Italic'), local('Gelasio-Italic'),
+       url('/assets/fonts/gelasio/Gelasio-Italic.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+/* --- Atkinson Hyperlegible Next (body) -------------------------------- */
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next Regular'), local('AtkinsonHyperlegibleNext-Regular'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next Medium'), local('AtkinsonHyperlegibleNext-Medium'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next SemiBold'), local('AtkinsonHyperlegibleNext-SemiBold'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next Bold'), local('AtkinsonHyperlegibleNext-Bold'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next ExtraBold'), local('AtkinsonHyperlegibleNext-ExtraBold'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next Italic'), local('AtkinsonHyperlegibleNext-Italic'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Italic-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next Medium Italic'), local('AtkinsonHyperlegibleNext-MediumItalic'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Italic-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next SemiBold Italic'), local('AtkinsonHyperlegibleNext-SemiBoldItalic'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Italic-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next Bold Italic'), local('AtkinsonHyperlegibleNext-BoldItalic'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Italic-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: italic;
+  font-weight: 800;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Next ExtraBold Italic'), local('AtkinsonHyperlegibleNext-ExtraBoldItalic'),
+       url('/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Italic-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+/* --- Metric-matched fallbacks (see RULES above) ------------------------ */
+@font-face {
+  font-family: 'Gelasio Fallback';
+  src: local('Tinos'), local('Tinos Regular'), local('Tinos-Regular'),
+       local('Liberation Serif'), local('LiberationSerif'),
+       local('Times New Roman'), local('TimesNewRomanPSMT');
+  size-adjust: 110.04%;
+  ascent-override: 84.31%;
+  descent-override: 31.06%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next Fallback';
+  src: local('Arimo'), local('Arimo Regular'), local('Arimo-Regular'),
+       local('Liberation Sans'), local('LiberationSans'),
+       local('Arial'), local('ArialMT');
+  size-adjust: 99.97%;
+  ascent-override: 98.43%;
+  descent-override: 31.61%;
+  line-gap-override: 0%;
+}
+
+/* --- Inter (three game hubs; was fonts.googleapis.com) ------------------ */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: local('Inter Variable'),
+       url('/assets/fonts/inter/Inter-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+/* --- AllgoodOS pages (were fonts.googleapis.com) ---------------------- */
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Regular'), local('AtkinsonHyperlegible-Regular'),
+       url('/assets/fonts/atkinson-hyperlegible/AtkinsonHyperlegible-Regular.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Atkinson Hyperlegible Bold'), local('AtkinsonHyperlegible-Bold'),
+       url('/assets/fonts/atkinson-hyperlegible/AtkinsonHyperlegible-Bold.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url('/assets/fonts/bricolage-grotesque/BricolageGrotesque-Variable.woff2') format('woff2');
+  unicode-range: U+0000-024F, U+0259, U+02B0-02FF, U+0300-036F, U+1E00-1EFF, U+2000-206F, U+2070-209F, U+20A0-20CF, U+2100-214F, U+2190-2199, U+2212, U+2215, U+2264-2265, U+FEFF, U+FFFD;
+}

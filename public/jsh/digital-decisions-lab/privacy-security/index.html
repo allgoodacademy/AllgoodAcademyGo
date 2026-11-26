@@ -112,9 +112,12 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/assets/css/fonts.css">
     <style>
         body {
-            font-family: Verdana, Geneva, sans-serif;
+            font-family: var(--font-ui);
             background-color: #F7F7F7;
             min-height: 100vh;
             min-height: 100dvh;
@@ -123,7 +126,7 @@
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
 
-        h1, h2, h3, h4, h5, h6 { font-family: Georgia, 'Times New Roman', serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); }
 
         .app-shell {
             width: 100%; height: 100dvh;
@@ -345,15 +348,15 @@ body.present .nav-shell.activity{display:none}
 .nav-shell,.nav-shell *{box-sizing:border-box}
 .nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
 .nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.7;text-align:left}
-.nav-shell .wordmark{display:block;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
 .nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
 .nav-shell .nav-right{display:flex;align-items:center;gap:4px}
-.nav-shell .nav-link{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
 .nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
 .nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
 .nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
-.nav-shell .nav-cta{font-family:Verdana,Geneva,sans-serif;font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
 .nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
 .nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
 @media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
@@ -424,7 +427,7 @@ body.present .nav-shell.activity{display:none}
                         <span class="text-xs font-bold text-white font-heading tracking-tight truncate max-w-[140px]">Privacy &amp; Security</span>
                     </div>
                     <div class="flex shrink-0 items-center bg-black/20 rounded-full px-3 py-1 border border-white/10 shadow-inner backdrop-blur-sm">
-                        <span class="text-[10px] uppercase tracking-wider text-white/60 mr-2 font-heading font-bold">Case</span>
+                        <span class="text-[10px] uppercase tracking-wider text-white/80 mr-2 font-heading font-bold">Case</span>
                         <span id="header-page-indicator" class="text-xs font-bold text-white font-body tabular-nums">1 / 6</span>
                     </div>
                 </div>
@@ -531,12 +534,12 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="flex items-center justify-between mb-3">
-                            <span id="sort-counter" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Item 1 of 5</span>
+                            <span id="sort-counter" class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Item 1 of 5</span>
                             <div id="sort-dots" class="flex items-center gap-1.5"></div>
                         </div>
 
                         <div id="sort-card" class="card-shimmer rounded-2xl p-4 border-2 border-gray-200 mb-3 min-h-[110px]">
-                            <p id="sort-sender" class="text-[10px] font-mono text-gray-400"></p>
+                            <p id="sort-sender" class="text-[10px] font-mono text-ink-soft"></p>
                             <p id="sort-text" class="text-sm text-gray-800 font-bold mt-1 leading-relaxed"></p>
                         </div>
 
@@ -680,7 +683,7 @@ body.present .nav-shell.activity{display:none}
                         </div>
 
                         <div class="card-shimmer rounded-2xl p-5 border mb-4">
-                            <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-2">Choose a password</label>
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-ink-soft block mb-2">Choose a password</label>
                             <input id="pw-input" type="text" autocomplete="off" spellcheck="false" placeholder="start typing..." class="w-full border-2 border-gray-200 rounded-lg px-3 py-3 text-base font-mono text-gray-800 focus:outline-none focus:border-gb-accent transition-colors">
 
                             <div class="mt-4">
@@ -693,7 +696,7 @@ body.present .nav-shell.activity{display:none}
                                          does not reliably re-render. Rewriting innerHTML does. -->
                                     <span id="pw-icon-wrap" class="shrink-0 mt-0.5"><i data-lucide="circle-alert" class="w-5 h-5 text-red-500"></i></span>
                                     <div>
-                                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Estimated time to crack</p>
+                                        <p class="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Estimated time to crack</p>
                                         <p id="pw-time" class="text-lg font-heading font-bold text-gray-900 leading-tight">&mdash;</p>
                                         <p id="pw-note" class="text-[11px] text-gray-500 mt-0.5"></p>
                                     </div>
@@ -701,7 +704,7 @@ body.present .nav-shell.activity{display:none}
                             </div>
                         </div>
 
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Or try one of Priya's</p>
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-2">Or try one of Priya's</p>
                         <div class="flex flex-wrap gap-2 mb-4">
                             <button class="pw-preset text-xs font-mono bg-white border border-gray-200 hover:border-gb-accent rounded-lg px-3 py-2 transition-colors" data-pw="priya12">priya12</button>
                             <button class="pw-preset text-xs font-mono bg-white border border-gray-200 hover:border-gb-accent rounded-lg px-3 py-2 transition-colors" data-pw="P@ssw0rd!">P@ssw0rd!</button>
@@ -747,13 +750,13 @@ body.present .nav-shell.activity{display:none}
                                 </div>
                                 <div>
                                     <p class="text-sm font-bold text-gray-900">@jaydn_hoops27</p>
-                                    <p class="text-[10px] text-gray-400">Not following you &middot; Joined 3 days ago</p>
+                                    <p class="text-[10px] text-ink-soft">Not following you &middot; Joined 3 days ago</p>
                                 </div>
                             </div>
                             <p class="text-sm text-gray-800 leading-relaxed">hey!! i think we got a mutual friend 😅 wait do u go to westfield or the other one? anyway i was gonna ask u something &mdash; u free rn? or is ur mom n them around lol. where u at rn</p>
                         </div>
 
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Check everything this message is actually fishing for</p>
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-2">Check everything this message is actually fishing for</p>
                         <div id="fish-list" class="space-y-2 mb-4">
                             <div class="fish-item card-shimmer rounded-xl p-3 border-2 border-gray-200 flex items-center gap-3" data-fish="school" data-correct="yes">
                                 <div class="fish-box w-5 h-5 rounded border-2 border-gray-300 shrink-0"></div>
@@ -852,7 +855,7 @@ body.present .nav-shell.activity{display:none}
                                 <button onclick="window.returnToLabPack()" class="w-full bg-allgood-primary hover:bg-allgood-hover text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2">
                                     <span>Check Out What's Next</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
                                 </button>
-                                <button onclick="window.launchDigitalDecisionsChallenge()" class="w-full text-gray-400 hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
+                                <button onclick="window.launchDigitalDecisionsChallenge()" class="w-full text-ink-soft hover:text-gray-600 text-[11px] font-bold uppercase tracking-wide mt-3">
                                     Or jump straight to the Digital Decisions Challenge
                                 </button>
                             </div>
@@ -871,7 +874,7 @@ body.present .nav-shell.activity{display:none}
 
         <!-- Footer -->
         <footer class="footer-content flex items-center justify-center px-6 border-t border-gray-200 bg-white z-20 relative shrink-0">
-            <p class="text-gray-400 text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
+            <p class="text-ink-soft text-[10px] font-body">&copy; <a href="https://www.allgoodacademy.com" target="_blank" class="hover:text-allgood-primary transition-colors font-bold">Allgood Academy</a></p>
         </footer>
 
         <!-- HOME MODAL -->
@@ -883,7 +886,7 @@ body.present .nav-shell.activity{display:none}
                 <div class="space-y-3">
                     <button onclick="window.restartModule()" class="w-full bg-white hover:bg-gray-50 text-allgood-dark font-bold py-3 rounded border border-jodi-border shadow-sm flex items-center justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restart Lab</button>
                     <button onclick="window.handleSystemExit()" class="w-full bg-allgood-primary/10 hover:bg-allgood-primary/20 text-allgood-primary font-bold py-3 rounded border border-allgood-primary/30 shadow-sm flex items-center justify-center"><i data-lucide="layout-grid" class="w-4 h-4 mr-2"></i> Dashboard</button>
-                    <button onclick="window.closeSystemMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
+                    <button onclick="window.closeSystemMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-2">Cancel</button>
                 </div>
             </div>
         </div>
@@ -894,7 +897,7 @@ body.present .nav-shell.activity{display:none}
                 <h2 class="text-lg font-heading font-bold text-allgood-dark mb-1">Jump to a Case</h2>
                 <p class="text-xs text-gray-500 mb-4 font-body">Only cases you've already cleared are open for review.</p>
                 <div id="case-menu-list" class="space-y-2"></div>
-                <button onclick="window.closeCaseMenu()" class="w-full text-gray-400 hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
+                <button onclick="window.closeCaseMenu()" class="w-full text-ink-soft hover:text-gray-600 font-bold py-2 text-sm mt-3">Close</button>
             </div>
         </div>
 
@@ -951,7 +954,7 @@ body.present .nav-shell.activity{display:none}
                 const btn = document.createElement('button');
                 btn.disabled = !unlocked;
                 btn.className = `w-full text-left p-3 rounded-lg border flex items-center justify-between text-xs font-bold transition-colors ${
-                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    unlocked ? 'bg-white border-jodi-border text-allgood-dark hover:border-gb-accent cursor-pointer' : 'bg-gray-100 border-gray-200 text-ink-soft cursor-not-allowed'
                 } ${isCurrent ? 'ring-2 ring-allgood-primary' : ''}`;
                 btn.innerHTML = `<span>Case ${i + 1}: ${CASE_TITLES[i]}</span>${unlocked ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : '<i data-lucide="lock" class="w-3.5 h-3.5"></i>'}`;
                 if (unlocked) btn.onclick = () => {

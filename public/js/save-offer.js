@@ -51,8 +51,8 @@ function show() {
       <style>
         #ag-save-offer{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:2147483000;
           width:min(460px,calc(100vw - 20px));background:var(--color-surface);color:var(--color-ink);border:1.5px solid var(--color-orange);border-radius:14px;
-          box-shadow:0 18px 40px -18px rgba(23,39,44,.55);padding:12px 44px 12px 14px;font:14px/1.45 Verdana,Geneva,sans-serif}
-        #ag-save-offer b{display:block;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-weight:400;margin:0 0 2px}
+          box-shadow:0 18px 40px -18px rgba(23,39,44,.55);padding:12px 44px 12px 14px;font:14px/1.45 var(--font-ui, Verdana, Geneva, sans-serif)}
+        #ag-save-offer b{display:block;font-family:var(--font-display, Georgia, 'Times New Roman', serif);font-size:17px;font-weight:400;margin:0 0 2px}
         #ag-save-offer p{margin:0 0 8px;color:var(--color-ink-soft);font-size:13px}
         #ag-save-offer .r{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
         #ag-save-offer a{display:inline-block;background:var(--color-orange);color:#fff;font-weight:700;text-decoration:none;border-radius:999px;padding:7px 14px;font-size:13px}
