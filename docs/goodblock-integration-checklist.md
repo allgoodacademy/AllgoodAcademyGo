@@ -199,6 +199,12 @@ from an older reference, and check:
 
 - [ ] Reuse Jodi's mood SVGs from `public/assets/jodi/*.svg` by URL — don't re-embed them
   inline in a new GoodBlock file.
+  The set (see [brand-locker.md](brand-locker.md) → Jodi for when to use each):
+  - Expressions: `jodi-neutral`, `jodi-happy`, `jodi-concerned`, `jodi-thinking`,
+    `jodi-surprised`, `jodi-proud`, `jodi-encouraging`, `jodi-listening`
+  - Talking mouths (swap with neutral while her bubble types): `jodi-talk-ah`,
+    `jodi-talk-ee`, `jodi-talk-oo`
+  - Round avatar (nav, dashboards, bubble icons; down to 32px): `jodi-avatar`
 - [ ] Verify every new Lucide icon name via web search ("lucide icons `[name]`") before
   using it — a wrong or renamed icon fails silently (no error, just missing icon), and this
   has happened more than once.
