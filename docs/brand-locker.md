@@ -1,6 +1,6 @@
 # Allgood Academy Brand Locker (snapshot)
 
-> Snapshot of the Brand Locker v1.4 (https://claude.ai/artifact/TxXyhJzrvKeD1N7kZRFQ7U), taken 2026-11-25. The locker page is the master copy of the rules; this file exists so Claude Code can read them. Don't edit rules here; change the locker, then refresh this snapshot.
+> Snapshot of the Brand Locker v1.5 (https://claude.ai/artifact/TxXyhJzrvKeD1N7kZRFQ7U), taken 2026-11-25. The locker page is the master copy of the rules; this file exists so Claude Code can read them. Don't edit rules here; change the locker, then refresh this snapshot.
 
 
 The brand locker for Allgood Academy (allgoodacademy.com): colors, type, characters, art style and the rules for using them. Every design made for Allgood Academy (a GoodBlock, a simulation, a dashboard, a TPT cover, a Facebook post) starts here. The Art Director seat on the advisory board owns it.
@@ -86,7 +86,14 @@ The **lightbulb mark** (`assets/Logos/allgood-lightbulb.png`): an orange bulb wi
 - B always carries `aria-label="Allgood Academy"` (or real alt text). Screen readers must never hear "Allgo d."
 - The trial runs through **January 31, 2027**. Then the Art Director reviews it: social engagement on B posts vs. A posts, plus any teacher or student reactions. The outcome is one of three: promote B, keep it as a social-only mark, or retire it.
 
-Final vector (SVG) files for A and B don't exist yet; see "Not in the locker yet."
+**Logo files (v1.0, 2026-11-25), in this locker's Logos folder; queued for the repo at `public/assets/brand/`:**
+- `allgood-lightbulb.svg`: the mark alone, as clean vector (traced from the original PNG; colors set to `brand-orange` and `brand-teal`).
+- `allgood-academy-logo-A-stacked.svg`: primary logo.
+- `allgood-academy-logo-A-stacked-reverse.svg`: white type, bulb on a cream disc, for teal or dark backgrounds.
+- `allgood-academy-logo-A-oneline.svg` / `-night.svg`: nav and header size.
+- `allgood-academy-logo-B-lit-o.svg` / `-night.svg`: the trial mark.
+
+All type is converted to outlines, so the files look identical on every computer with no fonts installed. Every file has `role="img"` and `aria-label="Allgood Academy"`.
 
 ## Art style
 
@@ -109,7 +116,6 @@ Flat shapes with one shade tone, rounded line caps, a warm drop shadow, no outli
 
 ## Not in the locker yet
 
-- Final SVG files: the lightbulb mark, wordmark A (stacked, one-line, reverse) and wordmark B (light, night), with the text converted to shapes so they look right without the fonts.
 - Jodi's poses (see **Jodi**). Her four new expressions, talking mouths and avatar are done.
 - Scenario characters (the students and people inside Cases and sims). Jodi works solo, with no sidekick, per her character bible; these are the people in the stories she tells, not co-hosts.
 - Self-hosted fonts so Chromebooks see the intended type (founder decision).
