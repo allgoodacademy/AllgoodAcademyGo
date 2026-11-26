@@ -1,6 +1,6 @@
 # Allgood Academy Brand Locker (snapshot)
 
-> Snapshot of the Brand Locker v1.5 (https://claude.ai/artifact/TxXyhJzrvKeD1N7kZRFQ7U), taken 2026-11-25. The locker page is the master copy of the rules; this file exists so Claude Code can read them. Don't edit rules here; change the locker, then refresh this snapshot.
+> Snapshot of the Brand Locker v1.7 (https://claude.ai/artifact/TxXyhJzrvKeD1N7kZRFQ7U), taken 2026-11-25. The locker page is the master copy of the rules; this file exists so Claude Code can read them. Don't edit rules here; change the locker, then refresh this snapshot.
 
 
 The brand locker for Allgood Academy (allgoodacademy.com): colors, type, characters, art style and the rules for using them. Every design made for Allgood Academy (a GoodBlock, a simulation, a dashboard, a TPT cover, a Facebook post) starts here. The Art Director seat on the advisory board owns it.
@@ -61,7 +61,14 @@ Don't add Google Fonts links to student-facing pages: some district filters bloc
 
 ## Iconography
 
-**Lucide** icons (self-hosted at `/assets/js/lucide.min.js`), 2px stroke, rounded caps, colored with `brand-teal` or the Lab Pack accent. Each Lab Pack's GoodBlocks are told apart by one Lucide icon plus the pack's accent.
+Two icon sets, with separate jobs:
+
+- **Interface icons: Lucide** (self-hosted at `/assets/js/lucide.min.js`), 2px stroke, rounded caps, colored with `brand-teal` or the Lab Pack accent. Navigation, buttons, toolbars and menus always use Lucide. Each Lab Pack's GoodBlocks are told apart by one Lucide icon plus the pack's accent.
+- **Content icons: the Allgood Academy set** (24 icons, v1.0, approved 2026-11-25; in this locker's Icons folder, queued for the repo at `public/assets/icons/`; reference canvas: https://claude.ai/artifact/TyuPqBw1CfiabmkLwEMRBu). Drawn in the flat house style on a 64-unit grid, brand colors only. Use them for content, never for UI: Lab Pack and simulation cards, Case headers, facilitator guides, badges, slides and social posts.
+  - Sizes: 96, 64 or 48px. Never below 32px; use a Lucide icon there instead.
+  - Next to their words they're decorative (`alt=""` / `aria-hidden="true"`). Standing alone they keep their label (each file has `role="img"` and an `aria-label`).
+  - Names: `aa-icon-<name>.svg`. Lessons and class: lesson, case, challenge, vote, hint, class-period, teacher-guide, badge, plan, goal, data. Topics: messages, privacy, citizenship, professional-brand, money, conflict, perspective, think, travel. Simulations: water-cycle, snowball, seasons, wildlife.
+  - New icons follow the same grid and style; the Art Director approves them before they're added.
 
 ## Logo
 
@@ -93,7 +100,9 @@ The **lightbulb mark** (`assets/Logos/allgood-lightbulb.png`): an orange bulb wi
 - `allgood-academy-logo-A-oneline.svg` / `-night.svg`: nav and header size.
 - `allgood-academy-logo-B-lit-o.svg` / `-night.svg`: the trial mark.
 
-All type is converted to outlines, so the files look identical on every computer with no fonts installed. Every file has `role="img"` and `aria-label="Allgood Academy"`.
+All type is converted to outlines, so the files look identical on every computer with no fonts installed. Every file has `role="img"` and `aria-label="Allgood Academy"`. Their orange is #CF4616, the approved accessibility nudge; the site's buttons move to the same orange when prompt F ships.
+
+**Changing a logo or icon file later:** the site caches these files for up to a year, so a changed version gets a new file name (for example `-v2`). Replacing a file under the same name would leave visitors seeing the old one.
 
 ## Art style
 
@@ -246,7 +255,7 @@ The finished art is in the repo at `public/assets/jodi/` (served as `/assets/jod
 | `jodi-talk-ah.svg`, `jodi-talk-ee.svg`, `jodi-talk-oo.svg` | Mouth shapes swapped with neutral in a loop (about 160ms each) while her bubble types out; rest on closed when the text is done. No loop when reduce-motion is on |
 | `jodi-avatar.svg` | Round head-and-shoulders crop for nav bars, dashboards, bubble icons and social profiles (works down to 32px) |
 
-The four originals are in the repo now. The eight new files (approved 2026-11-25, drawn from `jodi-neutral.svg` and `jodi-happy.svg` with only the face changed) are queued for the repo; until they land there, use the copies in this locker.
+All twelve files are live in the repo at `public/assets/jodi/` (the eight new ones, approved 2026-11-25 and drawn from `jodi-neutral.svg` and `jodi-happy.svg` with only the face changed, merged in PR #86). No GoodBlock uses the new expressions or the talking loop yet; that's a content decision per GoodBlock.
 
 **Always pull her by path. Never describe her and redraw her.**
 
