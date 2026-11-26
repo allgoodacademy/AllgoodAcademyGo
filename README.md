@@ -5,6 +5,8 @@ Each page is a standalone HTML file (Tailwind + vanilla JS + Firebase Auth/Fires
 served exactly as committed — the two generators in `scripts/` (`build:css`, `build:nav`) write
 their output into the repo, so there is no build step between a commit and the deploy.
 
+Brand rules: [docs/brand-locker.md](docs/brand-locker.md) (snapshot of the Brand Locker; the locker is the master copy).
+
 Mirrors the local `Allgood_OS_Host` Firebase Hosting folder, plus `insider/` (not part of the
 original local folder, added separately).
 
