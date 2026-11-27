@@ -7,6 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
 <script src="/js/reduced-motion.js"></script>
+<script src="/js/story-tracking.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 
@@ -876,13 +877,22 @@ const SPK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 const S={name:'',conf:{},choice:{},done:{},path:{}};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 
-/* telemetry (real Telemetry API shape; prototype logs to console + #debug). Name and free text are never logged. */
+/* telemetry: the shared Telemetry API, through /js/story-tracking.js (it loads AuthCore and
+   Telemetry and queues calls until they are ready). Stream 'espanol'. The start-screen name,
+   anything typed and the class-vote hand counts are never sent. #debug shows every call. */
 const DBG=location.hash==='#debug';let dbgEl=null;
 function dlog(k,o){try{console.log('[mundial]',k,o)}catch(_){}if(!DBG)return;if(!dbgEl){dbgEl=document.createElement('div');dbgEl.id='dbg';dbgEl.innerHTML='<b>Telemetry · stream espanol</b><br>';document.body.appendChild(dbgEl)}dbgEl.insertAdjacentHTML('beforeend',`<div><b>${k}</b> ${JSON.stringify(o)}</div>`);dbgEl.scrollTop=1e6}
-const TM=window.Telemetry||{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{})};
+const ST=window.StoryTrack||null;
+if(ST&&DBG)ST.setDebug(dlog);
+const TM=ST?ST.TM:{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{})};
 TM.init({module:'el-mundial',gameName:'El Mundial',stream:'espanol',stepsTotal:10});
-const T=(e,d)=>TM.track(e,Object.assign({v:'1.6'},d||{}));
-function saveProgress(){const d={v:'1.6',done:S.done,choice:S.choice,conf:S.conf,path:S.path};if(window.AuthCore&&window.AuthCore.saveModuleProgress){try{window.AuthCore.saveModuleProgress('el-mundial',d)}catch(_){}}else dlog('saveModuleProgress',{slug:'el-mundial',gates:Object.keys(S.done).length,path:S.path})}
+const T=(e,d)=>TM.track(e,Object.assign({v:'1.9'},d||{}));
+/* first-try 0|1 per Puerta (every Puerta locks after one answer), the fork path, solo|class */
+function gatesNow(){const g={};[1,2,3,4,5].forEach(n=>{if(S.done[n])g[n]=S.conf[n]||0});return g}
+function pushSummary(){TM.summary({gates:gatesNow(),path:{f1:S.path.f1||null},mode:S.mode||'solo'})}
+/* module_progress/el-mundial: `state` is ONE string so each save replaces it whole (a merge would
+   keep an earlier playthrough's gates); `finished` stops a finished story from resuming. */
+function saveProgress(fin){const d={v:'1.9',finished:!!fin,state:JSON.stringify({done:S.done,choice:S.choice,conf:S.conf,path:{f1:S.path.f1||null}})};if(ST)ST.saveProgress('el-mundial',d);else dlog('saveModuleProgress',{slug:'el-mundial',gates:Object.keys(S.done).length,path:S.path})}
 
 /* people */
 const P={facu:{skin:'#e0b48c',hair:'#6b4a2a',top:'#75aadb',style:'short'},lucia:{skin:'#d9a07a',hair:'#2a1a14',top:'#f4f4f4',style:'long'},rosa:{skin:'#a8714a',hair:'#1a120d',top:'#D91023',style:'long'},mateo:{skin:'#a8714a',hair:'#1a120d',top:'#f4f4f4',style:'short'},olga:{skin:'#f0c8a8',hair:'#c9a060',top:'#1f3a5a',style:'short',cap:true}};
@@ -941,7 +951,9 @@ function jodi(n,m,txt){document.getElementById('g'+n+'jt').innerHTML=`<div class
 function finish(n){if(S.done[n])return;S.done[n]=1;setTimeout(()=>CV.reveal(n),0);const st=document.querySelector('#g'+n+' .gst');st.textContent='Abordado';st.classList.add('done');
   const sp=$('#stamp');sp.innerHTML=`P${n}<small>ABORDADO</small>`;sp.classList.remove('go2');void sp.offsetWidth;sp.classList.add('go2');
   setTimeout(()=>$$('#dots i')[n-1].classList.add('on'),1200);document.getElementById('g'+n+'nx').hidden=false;
-  TM.choice({scenarioIndex:n,choiceIndex:0,score:S.conf[n]||0,category:'gate'});saveProgress()}
+  TM.choice({scenarioIndex:n,choiceIndex:choiceIndexOf(n),score:S.conf[n]||0,category:'gate'});pushSummary();saveProgress()}
+/* Puertas 1-2: the option picked (A=0, B=1, C=2). Puertas 3-5 (verb chips): how many slots were right. */
+function choiceIndexOf(n){const c=S.choice[n];if(typeof c==='string')return Math.max(0,['A','B','C'].indexOf(c));if(n===3)return [1,2,3].filter(i=>c&&c[i]===KEY3[i]).length;if(n===4)return c?(c.a==='conocía')+(c.b==='conocí'):0;if(n===5)return c?Object.keys(KEY5).filter(s=>okSlot(s,c[s])).length:0;return 0}
 $$('[data-unlock]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.unlock;let first=null;$$('[data-after="'+k+'"]').forEach(s=>{s.classList.remove('locked');if(!first)first=s;watch(s)});
   if(k==='g5')buildEnd();b.closest('.next').hidden=true;onScroll();if(first)setTimeout(()=>first.scrollIntoView({behavior:'smooth'}),60)}));
 function choose(wrap,go){$$(wrap+' .opt').forEach(o=>o.addEventListener('click',()=>{if(o.disabled)return;$$(wrap+' .opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');if(go)$(go).disabled=false}))}
@@ -982,7 +994,7 @@ $$('#f1p .path').forEach(b=>b.addEventListener('click',()=>{if(S.path.f1)return;
     const got=[];$$('#shelf .shirt').forEach(s=>s.addEventListener('click',()=>{if(got.length>=2||s.classList.contains('sel'))return;s.classList.add('sel');got.push(s.dataset.es);$('#f1cnt').textContent=got.length+'/2';s.querySelector('.tag').textContent+=' = '+s.dataset.es;say(s.dataset.es);if(got.length===2){S.path.f1items=got.slice();const t=`Lucía: “¡Bien! ${got[0]} y ${got[1]}. Con eso sobrevivimos al tren.”`;$('#f1step').innerHTML=`<div class="reply"><div class="bub">${t}</div></div>`;say(t.replace('Lucía: ','').replace(/[“”]/g,''));doneF1()}}));doneF1()}
   T('fork_open',{fork:1,path:k})}));
 function addHints(list){list.forEach(el=>{if(!el||el.querySelector('.hint'))return;let bb;try{bb=el.getBBox()}catch(e){return}const cx=bb.x+bb.width/2,cy=bb.y+bb.height/2;el.insertAdjacentHTML('beforeend',`<g class="hint" style="pointer-events:none"><circle class="r1" cx="${cx}" cy="${cy}" r="16"/><circle class="r0" cx="${cx}" cy="${cy}" r="11"/></g>`)})}
-function doneF1(){setTimeout(()=>{$('#f1nx').hidden=false;saveProgress()},700)}
+function doneF1(){setTimeout(()=>{$('#f1nx').hidden=false;pushSummary();saveProgress()},700)}
 
 /* Comida para el tren: each item is drawn as itself, with its Cyrillic label printed on the packaging (AA-7 art pass). */
 const FOOD=[
@@ -1025,17 +1037,19 @@ $('#g4go').addEventListener('click',()=>{if(S.choice[4])return;const a=val(41),b
     setTimeout(()=>{jodi(4,ok?'happy':'thinking',`<b>Conocía</b> (imperfect) = <i>knew</i>, an ongoing state: you didn't know anyone there. <b>Conocí</b> (preterite) = <i>met</i>, a one-time event: today you met lots of Peruvians. Same verb, two different English words.`);finish(4)},1400)},900)});
 
 /* PUERTA 5 · la postal (synthesis) */
-const KEY5={51:'conocí',52:'tenía',53:'fui',54:'llegamos',55:'llovía'};
+const KEY5={51:'conocí',52:'tenía',53:['fui','era'],54:'llegamos',55:'llovía'};
+/* Slot 53 takes either verb (founder, 2026-11-27): ¡yo fui / era el intérprete! */
+const okSlot=(s,v)=>[].concat(KEY5[s]).includes(v);
 $('#g5go').addEventListener('click',()=>{if(S.choice[5])return;const v={};Object.keys(KEY5).forEach(s=>v[s]=val(s));S.choice[5]=v;lockChips('#g5');$('#g5go').disabled=true;
-  const wrong=Object.keys(KEY5).filter(s=>v[s]!==KEY5[s]);T('ev_gate_lock',{gate:5,right:5-wrong.length});S.conf[5]=wrong.length<=1?1:0;
+  const wrong=Object.keys(KEY5).filter(s=>!okSlot(s,v[s]));T('ev_gate_lock',{gate:5,right:5-wrong.length});S.conf[5]=wrong.length<=1?1:0;
   const notes={51:'“¿Conocías a los argentinos de antes? ¡No sabíamos!”',52:'“¿La señora tuvo los boletos? ¿Se los dieron en el tren?”',53:'“¿Eras el intérprete? ¿Como trabajo, todo el viaje?”',54:'“¿Llegaban al estadio cuando…? ¿Y qué pasó después?”',55:'“¿Llovió un poquito y paró? ¿O estaba lloviendo cuando llegaron?”'};
   setTimeout(()=>{if(!wrong.length){reply($('#g5rep'),'Tu familia · WhatsApp','“¡Qué viaje increíble! Te entendimos todo. ¡Queremos ver las fotos!”')}
     else{reply($('#g5rep'),'Tu familia · WhatsApp','“¡Qué viaje! Pero tenemos preguntas…”');wrong.forEach((s,i)=>setTimeout(()=>reply($('#g5rep'),'Tu familia',notes[s]),700*(i+1)))}
-    setTimeout(()=>{jodi(5,wrong.length?'thinking':'happy',`A good postcard mixes both tracks. <i>Conocí</i> and <i>fui</i> are events. <i>Tenía</i> and <i>llovía</i> are background. <i>Llegamos</i> is the moment everything else hangs on.${wrong.length?` Your family got confused by ${wrong.length} verb${wrong.length>1?'s':''}: those were their questions.`:''}`);finish(5)},900+700*wrong.length)},700)});
+    setTimeout(()=>{jodi(5,wrong.length?'thinking':'happy',`A good postcard mixes both tracks. <i>Conocí</i> and <i>fui</i> are events. <i>Tenía</i> and <i>llovía</i> are background. <i>Llegamos</i> is the moment everything else hangs on. “¡Yo fui / era el intérprete!” works both ways: <i>fui</i> = that one trip, <i>era</i> = the role over time.${wrong.length?` Your family got confused by ${wrong.length} verb${wrong.length>1?'s':''}: those were their questions.`:''}`);finish(5)},900+700*wrong.length)},700)});
 
 /* END */
-function buildEnd(){const c=Object.values(S.conf).reduce((a,b)=>a+b,0);TM.complete({finalScore:c,percentage:c*20,summary:{gates:S.conf,path:S.path.f1,mode:S.mode||'solo'}});TM.summary({score:c,path:S.path.f1});
-  if(window.logModuleCompletion){try{window.logModuleCompletion({score:c})}catch(_){}}else dlog('game_scores (logModuleCompletion)',{gameName:'El Mundial',completed:true,score:c});
+function buildEnd(){const c=Object.values(S.conf).reduce((a,b)=>a+b,0);TM.complete({finalScore:c,percentage:c*20,summary:{gates:gatesNow(),path:{f1:S.path.f1||null},mode:S.mode||'solo',score:c}});
+  if(ST)ST.logCompletion('El Mundial',{score:c,finalScore:c,maxScore:5});else dlog('game_scores',{gameName:'El Mundial',completed:true,score:c});saveProgress(true);
   $('#endline').textContent=c>=4?'Facu, Lucía, Rosa y Mateo te mandan saludos. Todos entendieron tu historia perfectamente.':c>=2?'Tus amigos entendieron casi todo, y lo que no, te lo preguntaron.':'Fue un viaje con muchas preguntas… y así se aprende.';
   setTimeout(()=>{$$('#meter i').forEach((i,k)=>setTimeout(()=>i.classList.toggle('on',k<c),k*250));$('#mlab').textContent=`Pasado bien contado: ${c}/5`;$$('.st').forEach((s,k)=>setTimeout(()=>s.classList.add('on'),400+k*300))},500);
   const ch=S.choice;const g3=ch[3]||{};const g4=ch[4]||{};
@@ -1075,7 +1089,7 @@ const CV_CFG={
   2:[{opts:[['A','A · tenía'],['B','B · tuvo']],ok:['A']}],
   3:[{label:'1',opts:[['cantaban','cantaban'],['cantaron','cantaron']],ok:['cantaban']},{label:'2',opts:[['falló','falló'],['fallaba','fallaba']],ok:['falló']},{label:'3',opts:[['cantaban','cantaban'],['cantaron','cantaron']],ok:['cantaban']}],
   4:[{label:'1',opts:[['conocía','conocía'],['conocí','conocí']],ok:['conocía']},{label:'2',opts:[['conocí','conocí'],['conocía','conocía']],ok:['conocí']}],
-  5:[{label:'1',opts:[['conocí','conocí'],['conocía','conocía']],ok:['conocí']},{label:'2',opts:[['tenía','tenía'],['tuvo','tuvo']],ok:['tenía']},{label:'3',opts:[['fui','fui'],['era','era']],ok:['fui']},{label:'4',opts:[['llegamos','llegamos'],['llegábamos','llegábamos']],ok:['llegamos']},{label:'5',opts:[['llovía','llovía'],['llovió','llovió']],ok:['llovía']}]
+  5:[{label:'1',opts:[['conocí','conocí'],['conocía','conocía']],ok:['conocí']},{label:'2',opts:[['tenía','tenía'],['tuvo','tuvo']],ok:['tenía']},{label:'3',opts:[['fui','fui'],['era','era']],ok:['fui','era']},{label:'4',opts:[['llegamos','llegamos'],['llegábamos','llegábamos']],ok:['llegamos']},{label:'5',opts:[['llovía','llovía'],['llovió','llovió']],ok:['llovía']}]
 };
 /* ---------- Class vote: "¿Juegan en clase? Cuenten las manos" ----------
    Optional, per Puerta. A teacher projecting the story counts hands and taps them in.
@@ -1112,10 +1126,50 @@ const CV=(()=>{
     b.querySelector('.cv-note').hidden=true;const res=b.querySelector('.cv-res');res.innerHTML='<div class="cv-h">Así votó la clase · how the class voted</div>'+html;res.hidden=false;
     b.querySelector('.cv-panel').hidden=false;b.querySelector('.cv-link').setAttribute('aria-expanded','true');
     b.querySelectorAll('.cv-b').forEach(x=>x.disabled=true);
-    T('class_vote',{gate:n,counts:counts[n],total:Math.max(...tot)});
+    T('class_vote',{gate:n});
   }
   document.querySelectorAll('.cv').forEach(b=>{const n=+b.dataset.g;build(n);b.querySelector('.cv-link').addEventListener('click',e=>toggle(n,e.currentTarget))});
   return {reveal,isOn:()=>on};
+})();
+
+/* ---------- Resume (2026-11-27) ----------
+   A student who left mid-story comes back to the next section, not the start. Finished
+   Puertas show their stamp and the locked pick; their replies and Jodi notes are not
+   replayed. Reaching la carta is the completion, so it is never unlocked for them. */
+(function(){
+  if(!ST)return;
+  const ORDER=['g1','f1','g2','g3','g4','g5'];
+  ST.loadProgress('el-mundial').then(d=>{
+    if(!d||d.finished||typeof d.state!=='string')return;
+    let st;try{st=JSON.parse(d.state)}catch(_){return}
+    if(Object.keys(S.done).length||S.path.f1)return; // already playing on this load
+    const isDone=k=>k[0]==='g'?!!(st.done||{})[k.slice(1)]:!!(st.path||{})[k];
+    const reached=[];for(const k of ORDER){if(!isDone(k))break;reached.push(k)}
+    if(!reached.length)return;
+    Object.assign(S.done,st.done||{});Object.assign(S.choice,st.choice||{});Object.assign(S.conf,st.conf||{});
+    if(st.path&&st.path.f1)S.path.f1=st.path.f1;
+    reached.forEach(k=>{
+      restoreSection(k);
+      if(k==='g5'){$('#g5nx').hidden=false;return}
+      const b=document.querySelector(`[data-unlock="${k}"]`);if(b)b.click();
+    });
+    const last=reached[reached.length-1];
+    const target=last==='g5'?$('#g5'):document.querySelector(`[data-after="${last}"]`);
+    T('resume',{at:last});pushSummary();
+    setTimeout(()=>{onScroll();if(target)target.scrollIntoView({behavior:'auto'})},250);
+  });
+  function restoreSection(k){
+    if(k==='f1'){$$('#f1p .path').forEach(x=>{x.disabled=true;x.classList.toggle('sel',x.dataset.k===S.path.f1)});return}
+    const n=+k.slice(1),sec=$('#'+k);if(!sec)return;
+    const st=sec.querySelector('.gst');if(st){st.textContent='Abordado';st.classList.add('done')}
+    const dot=$$('#dots i')[n-1];if(dot)dot.classList.add('on');
+    sec.querySelectorAll('.opt,.chip').forEach(x=>x.disabled=true);
+    const go=$('#g'+n+'go');if(go)go.disabled=true;
+    const c=S.choice[n];
+    if(typeof c==='string')sec.querySelectorAll('.opt').forEach(o=>o.classList.toggle('sel',o.dataset.k===c));
+    else if(c&&typeof c==='object'){const m=n===4?{41:c.a,42:c.b}:c;Object.keys(m).forEach(sl=>{const ch=sec.querySelector(`.chip[data-slot="${sl}"]`);if(ch&&m[sl])ch.textContent=m[sl]})}
+    const rep=$('#g'+n+'rep');if(rep)rep.insertAdjacentHTML('beforeend','<p class="small">Ya pasaste esta puerta. <span lang="en">You answered this one last time.</span></p>');
+  }
 })();
 }
 </script>

@@ -428,7 +428,7 @@ body.present .nav-shell.activity{display:none}
           <a class="tab" href="#packs" data-view="packs"><i data-lucide="book-open"></i>Lab Packs<span class="n" id="n-packs"></span></a>
           <a class="tab" href="#games" data-view="games"><i data-lucide="gamepad-2"></i>Games<span class="n" id="n-games"></span></a>
           <a class="tab" href="#sims" data-view="sims"><i data-lucide="globe"></i>Simulations<span class="n" id="n-sims"></span></a>
-          <!-- Español (2026-11-27): a view like Games and Simulations, its story cards from /data/espanol.json. Student-reachable: no tracking (no launch log). check-modules.js keeps it here. -->
+          <!-- Español (2026-11-27): a view like Games and Simulations, its story cards from /data/espanol.json. Tracked like them (launch log, progress pill). check-modules.js keeps it here. -->
           <a class="tab" href="#espanol" data-view="espanol"><i data-lucide="languages" aria-hidden="true"></i><span lang="es">Español</span><span class="n" id="n-espanol"></span></a>
           <a class="tab" href="#profile" data-view="profile"><i data-lucide="user-round"></i>Profile</a>
         </div>
@@ -609,10 +609,14 @@ const [registryData, simsData, espanolData] = await Promise.all([
 // Lab) is deliberately on no surface of the site, this one included.
 // Simulations are in the registry too (type 'sim', so Mission Control can assign them), but
 // this page renders them from simulations.json, so they are left out of MODULES here.
-const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden && m.type !== 'sim');
+// Español stories (type 'story') are in the registry too, for tracking and assigning; their
+// cards come from espanol.json (STORIES below), so they are left out of MODULES as well.
+const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden && m.type !== 'sim' && m.type !== 'story');
 const SIMS = (simsData.simulations || []).filter((s) => s.url).map((s) => ({ ...s, type: 'simulation' }));
-// Español stories: not tracked yet, so no progress pill and no launch log (see the launch log).
-const STORIES = (espanolData.stories || []).filter((s) => s.url).map((s) => ({ ...s, type: 'story' }));
+// Español stories: the card text from espanol.json, joined to the registry entry (same id) for
+// gameNames, so a finished story (game_scores) reads Done like everything else.
+const STORY_REG = new Map((registryData.modules || []).filter((m) => m.type === 'story').map((m) => [m.id, m]));
+const STORIES = (espanolData.stories || []).filter((s) => s.url).map((s) => ({ ...s, type: 'story', gameNames: (STORY_REG.get(s.id) || {}).gameNames || [s.name] }));
 // Comms (/js/message-hq.js) builds its topic chips from this.
 window.MODULE_REGISTRY = MODULES.filter((m) => m.type !== 'game').map((m) => ({ ...m, category: m.type }));
 
@@ -645,7 +649,7 @@ function card(m, { where, pill } = {}) {
         </div>`;
     }
     const story = type === 'story';
-    return `<a class="card t-${esc(type)}" href="${esc(m.url)}" data-name="${esc(m.name)}"${story ? ' data-nolog' : ''}>
+    return `<a class="card t-${esc(type)}" href="${esc(m.url)}" data-name="${esc(m.name)}">
         <span class="ic"><i data-lucide="${esc(hub.icon || FALLBACK_ICON[type])}"></i></span>
         <span class="grow"><b${story ? ' lang="es"' : ''}>${esc(m.name)}</b><span class="meta">${esc(meta)}</span></span>${pill != null ? pill : pillFor(m)}
     </a>`;
@@ -835,8 +839,9 @@ async function loadStatus(uid) {
         getDocs(collection(db, 'artifacts', appId, 'users', uid, 'module_progress')).catch(() => ({ docs: [] })),
         getDocs(collection(db, 'artifacts', appId, 'users', uid, 'game_scores')).catch(() => ({ docs: [] })),
     ]);
+    const TRACKED = [...MODULES, ...STORIES];
     for (const d of progress.docs) {
-        const m = MODULES.find((x) => x.id === d.id);
+        const m = TRACKED.find((x) => x.id === d.id);
         if (!m) continue;
         const data = d.data();
         // A finished game writes { completed: true } here (/js/game-finish.js).
@@ -845,7 +850,7 @@ async function loadStatus(uid) {
     }
     for (const d of scores.docs) {
         const data = d.data();
-        for (const m of MODULES) {
+        for (const m of TRACKED) {
             if (!(m.gameNames || []).includes(data.gameName)) continue;
             const prev = status.get(m.id) || { state: 'go' };
             const best = (m.type === 'challenge' || m.type === 'game') && typeof data.finalScore === 'number' && data.completed === true
@@ -941,6 +946,7 @@ async function renderClass(uid, profile) {
                 // An assigned simulation is drawn with its simulations.json card (same URL).
                 const m = MODULES.find((x) => x.id === it.id)
                     || (it.type === 'sim' ? SIMS.find((x) => x.url === it.url) : null)
+                    || (it.type === 'story' ? STORIES.find((x) => x.id === it.id) : null)
                     || { ...it, type: it.type };
                 return card({ ...m, url: it.url, name: it.name }, { where: it.extra ? 'just for you' : '' });
             }).join('');
@@ -1290,8 +1296,7 @@ $('save-sheet').addEventListener('keydown', (e) => {
 document.addEventListener('click', (e) => {
     const a = e.target.closest('a[data-name]');
     const user = auth.currentUser;
-    // Español stories are not tracked yet (AA-8): no launch log, no GA event.
-    if (!a || !user || a.hasAttribute('data-nolog')) return;
+    if (!a || !user) return;
     if (typeof window.gtag === 'function') window.gtag('event', 'launch_module', { module_name: a.dataset.name });
     addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'launches'), {
         courseName: a.dataset.name, targetUrl: a.getAttribute('href'), timestamp: serverTimestamp(),

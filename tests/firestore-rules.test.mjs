@@ -1050,6 +1050,77 @@ console.log('\nONE DASHBOARD (2026-11-27) — a student on /dashboard/ cannot re
   });
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// ESPAÑOL STORIES (2026-11-27). No rule changed: the stories write the shapes every other
+// activity writes. These pin acceptance criteria 1b and 2: a student in the class plays a
+// story (session + summary on the 'espanol' stream, choice events, a game_scores record,
+// module_progress for resume) using only their own session, and the class's teacher can read
+// all of it, one student at a time; another teacher and a classmate cannot.
+// ════════════════════════════════════════════════════════════════════════════════
+console.log('\nESPAÑOL — a class member plays El Mundial / El Viaje; their teacher reads it');
+{
+  const kid = env.authenticatedContext('member_1', { provider_id: 'anonymous' }).firestore();
+  const t2 = env.authenticatedContext('teacher_2', { email: 'o@school.org' }).firestore();
+  const classmate = env.authenticatedContext('multi_1').firestore();
+  const SESS = (db, id) => doc(db, 'artifacts', APP, 'sessions', id);
+  const SCORE = (db, uid, id) => doc(db, 'artifacts', APP, 'users', uid, 'game_scores', id);
+  const evt = (module, gameName, sessionId, event, meta, step) => ({
+    uid: 'member_1', role: 'student', isGuest: true, module, gameName, stream: 'espanol', sessionId,
+    event, step, meta, device: 'desktop', entry: 'dashboard', ts: Timestamp.now(), clientTs: Date.now(),
+  });
+  for (const [module, gameName, steps, sid, gates, path] of [
+    ['el-mundial', 'El Mundial', 10, 'es_mundial_1', { 1: 1, 2: 0, 3: 1, 4: 1, 5: 1 }, { f1: 'metro' }],
+    ['el-viaje', 'El Viaje', 12, 'es_viaje_1', { 1: 1, 2: 0, 3: 1, 4: 1, 5: 1 }, { f1: 'tienda', f2: 'dia', f3: 'tacos+agua' }],
+  ]) {
+    await it(`${gameName}: the student writes its session on the 'espanol' stream, with the summary`, async () => {
+      await assertSucceeds(setDoc(SESS(kid, sid), {
+        uid: 'member_1', role: 'student', isGuest: true, module, gameName, stream: 'espanol', sessionId: sid,
+        stepsTotal: steps, startedAt: Timestamp.now(), lastSeenAt: Timestamp.now(), activeMs: 0, maxStep: 2,
+        completed: false, device: 'desktop', entry: 'dashboard', source: { src: 'test' }, path: `/espanol/${module}/`,
+      }));
+      await assertSucceeds(setDoc(SESS(kid, sid), { maxStep: steps, completed: true, activeMs: 1800000, summary: { gates, path, mode: 'solo', score: 4 } }, { merge: true }));
+    });
+    await it(`${gameName}: the student writes Puerta, fork and completion events`, async () => {
+      await assertSucceeds(setDoc(doc(kid, 'artifacts', APP, 'events', `${sid}_g2`), evt(module, gameName, sid, 'choice', { scenarioIndex: 2, choiceIndex: 1, score: gates[2], category: 'gate' }, 5)));
+      await assertSucceeds(setDoc(doc(kid, 'artifacts', APP, 'events', `${sid}_f1`), evt(module, gameName, sid, 'choice', { scenarioIndex: 'f1', choiceIndex: 1, category: 'fork' }, 3)));
+      await assertSucceeds(setDoc(doc(kid, 'artifacts', APP, 'events', `${sid}_done`), evt(module, gameName, sid, 'module_complete', { finalScore: 4, percentage: 80, activeMs: 1800000 }, steps)));
+    });
+    await it(`${gameName}: the student writes game_scores and module_progress (resume) under their own uid`, async () => {
+      await assertSucceeds(setDoc(SCORE(kid, 'member_1', sid), { gameName, completed: true, score: 4, finalScore: 4, maxScore: 5, lastUpdated: Timestamp.now() }, { merge: true }));
+      await assertSucceeds(setDoc(PROGRESS(kid, 'member_1', module), { v: '1.9', finished: true, state: JSON.stringify({ done: { 1: 1, 2: 1 } }), lastUpdated: Timestamp.now() }, { merge: true }));
+    });
+    await it(`${gameName}: the class's teacher CAN read the completion, the summary (Puerta 2 = ${gates[2]}, the path) and the events`, async () => {
+      const ss = await assertSucceeds(getDocs(query(collection(teacher, 'artifacts', APP, 'sessions'), where('uid', '==', 'member_1'))));
+      const mine = ss.docs.map((d) => d.data()).find((d) => d.sessionId === sid);
+      if (!mine || mine.completed !== true || mine.summary.gates[2] !== gates[2] || mine.summary.path.f1 !== path.f1) throw new Error(`summary not readable as written: ${JSON.stringify(mine && mine.summary)}`);
+      const ev = await assertSucceeds(getDocs(query(EVENTS(teacher), where('uid', '==', 'member_1'))));
+      const g2 = ev.docs.map((d) => d.data()).find((e) => e.sessionId === sid && e.event === 'choice' && e.meta.scenarioIndex === 2);
+      if (!g2 || g2.stream !== 'espanol' || g2.meta.score !== gates[2]) throw new Error('Puerta 2 choice event not readable');
+      const sc = await assertSucceeds(getDocs(collection(teacher, 'artifacts', APP, 'users', 'member_1', 'game_scores')));
+      if (!sc.docs.some((d) => d.data().gameName === gameName && d.data().completed === true)) throw new Error('game_scores completion not readable');
+      await assertSucceeds(getDoc(PROGRESS(teacher, 'member_1', module)));
+    });
+    await it(`${gameName}: another teacher CANNOT read any of it`, async () => {
+      await assertFails(getDocs(query(collection(t2, 'artifacts', APP, 'sessions'), where('uid', '==', 'member_1'))));
+      await assertFails(getDocs(query(EVENTS(t2), where('uid', '==', 'member_1'))));
+      await assertFails(getDoc(SCORE(t2, 'member_1', sid)));
+    });
+    await it(`${gameName}: a classmate CANNOT read any of it`, async () => {
+      await assertFails(getDoc(SESS(classmate, sid)));
+      await assertFails(getDocs(query(EVENTS(classmate), where('uid', '==', 'member_1'))));
+      await assertFails(getDoc(SCORE(classmate, 'member_1', sid)));
+      await assertFails(getDoc(PROGRESS(classmate, 'member_1', module)));
+    });
+  }
+  await it('a story event CANNOT carry a field outside the events allowlist (e.g. a name)', async () => {
+    await assertFails(setDoc(doc(kid, 'artifacts', APP, 'events', 'es_bad'), { ...evt('el-mundial', 'El Mundial', 'es_mundial_1', 'ev_start', {}, 1), name: 'Sofía' }));
+  });
+  await it('the teacher CAN assign a story beside the simulations (assignedSims, per-student sims)', async () => {
+    await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { assignedSims: ['el-mundial', 'el-viaje'] }, { merge: true }));
+    await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { assignedSims: [] }, { merge: true }));
+  });
+}
+
 await env.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

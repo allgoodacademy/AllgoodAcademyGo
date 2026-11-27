@@ -72,6 +72,17 @@ const LEARNER_SURFACES = [
   'public/join/index.html',
   // Take the Bait. No analytics of any kind on this route.
   'public/educational-games/takethebait/index.html',
+  // The simulations (2026-11-27): student pages, played on Chromebooks and projected in class.
+  'public/simulations/index.html',
+  'public/simulations/watercycle/index.html',
+  'public/simulations/seasons/index.html',
+  'public/simulations/wolves-and-deer/index.html',
+  'public/simulations/snowball/index.html',
+  // The Español hub and stories (2026-11-27). Tracked on their own first-party stream
+  // ('espanol'); no Google Analytics, no cookies, no third-party script.
+  'public/espanol/index.html',
+  'public/espanol/el-viaje/index.html',
+  'public/espanol/el-mundial/index.html',
 ];
 
 // Extracts the body of `window.NAME = ... };` so we can ask what a function actually calls.
@@ -182,6 +193,35 @@ if (exists('public/mission-control/index.html')) {
       break;
     }
     idx = mc.indexOf(GTAG_LIB, idx + 1);
+  }
+}
+
+// --- 2b. The Español stories: no third-party script or stylesheet at all (2026-11-27) ---
+// Students reach these pages (COPPA). The only scripts are this site's own (/js/...), and the
+// only network beyond this site is Firebase (gstatic.com modules, imported by /js/auth-core.js
+// and /js/telemetry.js, and the Firebase APIs they call). No external <script src>, no
+// external stylesheet, no analytics or cookie code in the tracking script they load.
+{
+  const STORY_PAGES = ['public/espanol/el-viaje/index.html', 'public/espanol/el-mundial/index.html'];
+  for (const file of STORY_PAGES) {
+    if (!exists(file)) continue;
+    const src = read(file);
+    for (const m of src.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)) {
+      if (!m[1].startsWith('/')) fail('espanol', `${file}: loads a script from ${m[1]} — only the site's own /js/ scripts may load on a story page.`);
+    }
+    for (const m of src.matchAll(/<link\b[^>]*\bhref=["'](https?:)?\/\/[^"']+["'][^>]*>/gi)) {
+      if (/rel=["']?(stylesheet|preload|preconnect|dns-prefetch)/i.test(m[0])) fail('espanol', `${file}: ${m[0]} reaches a third-party host.`);
+    }
+    if (/gtag\(|googletagmanager|google-analytics|document\.cookie/.test(src)) fail('espanol', `${file}: contains analytics or cookie code.`);
+    if (!src.includes('<script src="/js/story-tracking.js"></script>')) fail('espanol', `${file}: does not load /js/story-tracking.js.`);
+  }
+  const ST = 'public/js/story-tracking.js';
+  if (exists(ST)) {
+    const st = read(ST).replace(/\/\/.*$/gm, '');
+    if (/gtag|googletagmanager|google-analytics|document\.cookie|localStorage|sessionStorage/.test(st)) fail('espanol', `${ST}: must not touch analytics, cookies or browser storage.`);
+    const hosts = [...st.matchAll(/https?:\/\/([^/'"]+)/g)].map((x) => x[1]).filter((h) => h !== 'www.gstatic.com');
+    if (hosts.length) fail('espanol', `${ST}: reaches ${[...new Set(hosts)].join(', ')} — only www.gstatic.com (Firebase) is allowed.`);
+    if (/displayName|\.name\b|S\.name/.test(st)) fail('espanol', `${ST}: mentions a name field; the story's start-screen name must never leave the device.`);
   }
 }
 
