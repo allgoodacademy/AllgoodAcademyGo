@@ -6,5 +6,5 @@
 module.exports = require('./shared')(['public/jsh/real-world-ready-lab/**/*.html'], {
     DEFAULT: '#C97D1A',
     light: '#FEF3DC',
-    dark: '#A8620E',
+    dark: '#A15E0D',
 });

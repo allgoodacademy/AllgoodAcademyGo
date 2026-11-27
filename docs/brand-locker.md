@@ -432,7 +432,7 @@ Every sim is its own world. Before one is built, the Art Director writes its the
 | `accent-professional-brand-dark` | #5E2C6E |  | Pressed/hover for Professional Brand. |
 | `accent-professional-brand-light` | #F3E8F9 |  | Tint for Professional Brand. |
 | `accent-real-world-ready` | #C97D1A |  | Real World Ready Lab Pack amber, shared by all its GoodBlocks. Fill only: 3.3:1 as text — use the -dark for text. |
-| `accent-real-world-ready-dark` | #A8620E |  | Real World Ready text/pressed (4.75:1). |
+| `accent-real-world-ready-dark` | #A15E0D |  | Real World Ready text/pressed (5.09:1 on white, 4.63:1 on the -light tint). Was #A8620E until 2026-11-27 (AA-6): 4.32:1 on the tint. |
 | `accent-real-world-ready-light` | #FEF3DC |  | Real World Ready tint. |
 | `accent-room-to-think` | #9B3B5A |  | Room to Think Lab Pack berry, shared by all its GoodBlocks (6.6:1). |
 | `accent-room-to-think-dark` | #7A2B45 |  | Room to Think pressed. |

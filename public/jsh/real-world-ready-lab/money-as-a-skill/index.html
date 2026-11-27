@@ -247,7 +247,7 @@
 
         /* Shared: one instruction bar per Case. Updates as the Case moves through its steps. */
         .step-bar { border-left: 4px solid #C97D1A; background: #FEF3DC; border-radius: 0 12px 12px 0; padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px; }
-        .step-bar .step-num { width: 22px; height: 22px; border-radius: 999px; background: #C97D1A; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+        .step-bar .step-num { width: 22px; height: 22px; border-radius: 999px; background: #A15E0D; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
         .step-bar .step-text { font-size: 13px; color: #4a2f08; line-height: 1.45; }
         .step-bar.done { border-left-color: #059669; background: #ECFDF5; }
         .step-bar.done .step-num { background: #059669; }
@@ -277,15 +277,17 @@
         .chat-line { animation: fadeIn .3s ease-out; }
         .chat-them { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; border-bottom-left-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1f2937; max-width: 85%; }
         .chat-me { background: #FEF3DC; border: 1px solid #F3D9A8; border-radius: 14px; border-bottom-right-radius: 4px; padding: 8px 12px; font-size: 12px; color: #4a2f08; max-width: 85%; margin-left: auto; }
-        .chat-sys { font-size: 10px; text-align: center; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 0; }
+        .chat-sys { font-size: 10px; text-align: center; color: var(--color-ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 0; }
 
         /* ---- Money as a Skill: commit buttons (all five Cases) ---- */
         .commit-btn { background: #fff; border: 2px solid #E5E7EB; border-radius: 12px; transition: border-color .2s ease, background-color .2s ease, opacity .3s ease, transform .1s ease; padding: 12px 14px; text-align: left; font-size: 13px; line-height: 1.4; cursor: pointer; width: 100%; color: #1f2937; }
         .commit-btn:hover:not(:disabled):not(.locked-out) { border-color: #C97D1A; background: #FEF3DC; }
         .commit-btn:active:not(.locked-out) { transform: scale(.985); }
         .commit-btn.chosen { border-color: #C97D1A; background: #FEF3DC; font-weight: 600; }
-        .commit-btn.locked-out { opacity: .4; pointer-events: none; cursor: default; }
-        .commit-btn .opt-tag { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #9ca3af; margin-bottom: 4px; }
+        /* Options not picked: faded by colour, not opacity, so they stay readable at 4.5:1+ (AA-6). */
+        .commit-btn.locked-out { pointer-events: none; cursor: default; background: #F9FAFB; border-color: #e5e7eb; }
+        .commit-btn.locked-out, .commit-btn.locked-out * { color: var(--color-ink-soft) !important; }
+        .commit-btn .opt-tag { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--color-ink-soft); margin-bottom: 4px; }
 
         /* ---- Case 4: The Group Fund toggles ---- */
         .toggle-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid #E5E7EB; background: #fff; transition: border-color .2s ease, background-color .2s ease; }
@@ -299,9 +301,9 @@
 
         /* ---- Case 5: The Upgrade Trap look-closer ---- */
         .look-btn { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; border: 1px solid #E5E7EB; background: #fff; border-radius: 999px; padding: 8px 12px; cursor: pointer; transition: all .15s ease; color: #4b5563; }
-        .look-btn:hover:not(:disabled) { border-color: #C97D1A; color: #A8620E; }
+        .look-btn:hover:not(:disabled) { border-color: #C97D1A; color: #A15E0D; }
         .look-btn:disabled { opacity: .4; cursor: default; }
-        .look-btn.used { border-color: #C97D1A; background: #FEF3DC; color: #A8620E; }
+        .look-btn.used { border-color: #C97D1A; background: #FEF3DC; color: #A15E0D; }
         .price-card { transition: border-color .3s ease, background-color .3s ease; }
         .price-card.is-bought { border-color: #C97D1A; background: #FEF3DC; }
         #look-detail { animation: fadeIn .3s ease-out; }
@@ -466,7 +468,7 @@ body.present .nav-shell.activity{display:none}
                         <strong id="whiteboard-title" class="text-amber-300 block text-sm font-heading"></strong>
                         <p id="whiteboard-desc" class="text-slate-300 leading-relaxed"></p>
                     </div>
-                    <button id="jodi-recall" onclick="window.recallJodi()" class="hidden w-full text-[10px] font-bold uppercase tracking-widest text-gb-accent hover:text-gb-accent-dark py-1 mb-2 items-center justify-center gap-1">
+                    <button id="jodi-recall" onclick="window.recallJodi()" class="hidden w-full text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark hover:text-gb-accent-dark py-1 mb-2 items-center justify-center gap-1">
                         <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span id="jodi-recall-label">Re-read what Jodi said</span>
                     </button>
                 </div>
@@ -480,7 +482,7 @@ body.present .nav-shell.activity{display:none}
                 <div class="page" id="page-1">
                     <div class="page-inner">
                     <div class="max-w-2xl mx-auto pt-8 px-4 sm:px-8 flex flex-col justify-center py-4">
-                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 1</span>
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 1</span>
                         <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1 mb-4">Money as a Skill</h2>
                         <p class="text-sm text-gray-600 mb-4 leading-relaxed">Five situations. Each one is a decision you could make this week &mdash; a split, an impulse, a favour, an upgrade, a price tag. There's no single right answer. There's just what happens depending on the move you make, and whether you noticed you were making one.</p>
                         <div class="mb-6 card-shimmer rounded-xl p-4 border flex items-center gap-3">
@@ -533,7 +535,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 2</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 2</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Split Decision</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">You and your friend want to buy a Bluetooth speaker together. It costs <strong>$30</strong>. Your friend will keep it at their house and use it almost every day. You'll use it maybe once or twice a month when you're over.</p>
                         </div>
@@ -577,7 +579,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 3</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 3</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Impulse Window</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">You've been saving for headphones &mdash; <strong>$60</strong>. You've got <strong>$58</strong>. You're almost there. Then you spot something else: a phone case for <strong>$12</strong>. You can afford it right now. It sets your savings back to $46.</p>
                         </div>
@@ -631,7 +633,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 4</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Group Fund</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Your friend group &mdash; six of you &mdash; wants to pool <strong>$60</strong> for something, $10 each. Someone says: <em>"You should hold the money and track who's paid."</em> They mean it as a compliment. You're responsible. People trust you.</p>
                         </div>
@@ -689,7 +691,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 5</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 5</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Upgrade Trap</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">You need a new backpack for school. Two options at the store. You can afford either one.</p>
                         </div>
@@ -753,7 +755,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 6</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 6</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Ask</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">You're at a local shop. You find a phone case you actually want &mdash; it's <strong>$20</strong>. When you pick it up you notice the packaging is dented and one corner has a small scuff. Not broken. Just not pristine. The tag still says $20.</p>
                         </div>
@@ -806,7 +808,7 @@ body.present .nav-shell.activity{display:none}
                 <div class="page" id="page-7">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-10 px-4 sm:px-8 flex flex-col justify-center py-4 items-center text-center">
-                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent mb-3">Case 7</span>
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark mb-3">Case 7</span>
 
                         <div id="case7-rating" class="mb-6 w-full max-w-md">
                             <h2 class="text-2xl font-heading font-bold text-gray-900 mb-1">Before You Go</h2>
@@ -839,7 +841,7 @@ body.present .nav-shell.activity{display:none}
                                 <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-gb-accent-light to-amber-100 border-4 border-gb-accent/40 shadow-inner flex items-center justify-center">
                                     <i data-lucide="coins" class="w-10 h-10 text-gb-accent-dark drop-shadow-sm"></i>
                                 </div>
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-gb-accent block mb-1">MINTED IN DOSSIER</span>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark block mb-1">MINTED IN DOSSIER</span>
                                 <h3 class="text-xl font-heading font-bold text-gray-900 mb-1">Money as a Skill Foundation</h3>
                                 <!-- 8 = 'money' scenarios in the Real World Ready Challenge SCENARIO_DATA.
                                      Counted against the coverage map, not estimated. This counts Challenge
@@ -875,7 +877,7 @@ body.present .nav-shell.activity{display:none}
         <!-- HOME MODAL -->
         <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
             <div class="bg-jodi-warmth rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gb-accent">
-                <div class="mb-4"><i data-lucide="home" class="w-10 h-10 mx-auto text-gb-accent"></i></div>
+                <div class="mb-4"><i data-lucide="home" class="w-10 h-10 mx-auto text-gb-accent-dark"></i></div>
                 <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Where to, Agent?</h2>
                 <p class="text-sm text-gray-500 mb-6 font-body">You can pick this back up anytime.</p>
                 <div class="space-y-3">

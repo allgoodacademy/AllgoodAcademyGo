@@ -312,8 +312,8 @@
         .flag:hover { background-color: #fde68a; }
         .flag.fixed { border-bottom-color: #059669; background-color: #ecfdf5; }
         .flag.fixed:hover { background-color: #d1fae5; }
-        .flag.cut { border-bottom: none; background: transparent; color: #9ca3af; font-style: italic; padding: 0 3px; cursor: pointer; }
-        .flag.cut:hover { color: #6b7280; }
+        .flag.cut { border-bottom: none; background: transparent; color: var(--color-ink-soft); font-style: italic; padding: 0 3px; cursor: pointer; }
+        .flag.cut:hover { color: var(--color-ink-soft); }
         #draft-review { animation: fadeIn .3s ease-out; }
 
         /* ---- Case 2: before/after cards (the actual editing surface) ---- */
@@ -323,7 +323,7 @@
         .fa-badge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; }
         .fa-badge.todo { background: #fef3c7; color: #92400e; }
         .fa-badge.done { background: #d1fae5; color: #065f46; }
-        .fa-before { color: #9ca3af; text-decoration: line-through; font-size: 13px; margin-top: 2px; }
+        .fa-before { color: var(--color-ink-soft); text-decoration: line-through; font-size: 13px; margin-top: 2px; }
         .fa-after { color: #065f46; font-size: 13px; margin-top: 4px; font-weight: 600; }
         #draft-box.is-review .flag { border-bottom: none; background: transparent; cursor: default; }
         .repl-btn { transition: background-color .15s ease, border-color .15s ease, transform .1s ease; }
@@ -1461,7 +1461,7 @@ body.present .nav-shell.activity{display:none}
                 const active = !feedSettled && i === feedIndex;
                 return `<button onclick="window.gotoPost(${i})" class="rounded-lg border-2 px-1 py-1.5 text-center transition-colors ${stateClass(st)} ${active ? 'ring-2 ring-offset-1 ring-gb-accent' : ''}">
                     <span class="block text-[9px] font-bold leading-tight truncate">${p.short}</span>
-                    <span class="block text-[9px] opacity-80 leading-tight">${stateWord(st)}</span>
+                    <span class="block text-[9px] leading-tight">${stateWord(st)}</span>
                 </button>`;
             }).join('');
             document.getElementById('feed-counter').textContent = `${Object.keys(feedState).length} of ${FEED_POSTS.length} decided`;

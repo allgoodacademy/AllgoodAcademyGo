@@ -372,7 +372,7 @@ body.present .nav-shell.activity{display:none}
                                             <i data-lucide="glasses" class="w-12 h-12 text-allgood-secondary"></i>
                                         </div>
                                         <button class="accordion-toggle w-full bg-white border border-gray-200 p-4 rounded-lg shadow-md flex justify-between items-center hover:bg-gray-50 hover:border-allgood-primary transition-all group">
-                                            <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary transition-colors font-heading">How to use this GoodBlock</span>
+                                            <span class="font-bold text-allgood-dark text-base group-hover:text-allgood-primary-deep transition-colors font-heading">How to use this GoodBlock</span>
                                             <i data-lucide="chevron-down" class="accordion-icon w-5 h-5 text-gray-400 transform transition-transform duration-300 group-hover:text-allgood-primary"></i>
                                         </button>
                                         <div class="accordion-content hidden bg-gray-50 border-x border-b border-gray-200 rounded-b-lg p-5 text-gray-600 shadow-inner text-xs font-body">
@@ -485,9 +485,9 @@ body.present .nav-shell.activity{display:none}
                         <!-- Mobile Progress Pill (Gesture Nav) -->
                         <div id="mobile-progress-pill" class="md:hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[100] bg-white/95 backdrop-blur-xl border border-gray-200 shadow-xl rounded-full px-5 py-2 flex flex-col items-center justify-center transition-transform duration-200 pointer-events-none w-max">
                             <span id="pill-text" class="text-[10px] font-bold text-allgood-dark uppercase tracking-widest">Swipe to begin</span>
-                            <div class="flex items-center gap-3 mt-1 opacity-60" id="pill-hints">
+                            <div class="flex items-center gap-3 mt-1" id="pill-hints">
                                 <i data-lucide="chevrons-left" class="w-3 h-3 text-allgood-secondary"></i>
-                                <span class="text-[8px] text-gray-500 font-bold tracking-widest">NAVIGATE</span>
+                                <span class="text-[8px] text-ink-soft font-bold tracking-widest">NAVIGATE</span>
                                 <i data-lucide="chevrons-right" class="w-3 h-3 text-allgood-secondary"></i>
                             </div>
                         </div>
@@ -1104,7 +1104,7 @@ body.present .nav-shell.activity{display:none}
                     const isComplete = answered === total;
                     const statusHtml = isComplete
                         ? `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded"><i data-lucide="check" class="w-3 h-3 inline"></i> CLEARED</span>`
-                        : `<span class="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-1 rounded">${answered} / ${total} DONE</span>`;
+                        : `<span class="bg-gray-100 text-ink-soft text-[10px] font-bold px-2 py-1 rounded">${answered} / ${total} DONE</span>`;
 
                     const btn = document.createElement('button');
                     btn.className = `w-full bg-white border-2 border-gray-200 hover:border-allgood-primary p-5 rounded-xl shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-3 group relative overflow-hidden ${isComplete ? 'opacity-80' : ''}`;
@@ -1224,7 +1224,7 @@ body.present .nav-shell.activity{display:none}
                 const pillHints = document.getElementById('pill-hints');
                 if (pillText) {
                     pillText.textContent = isAnswered ? `Scenario ${currentQueueIndex + 1} of ${categoryQueue.length}` : "Answer above to continue";
-                    if (pillHints) pillHints.style.opacity = isAnswered ? "0.8" : "0.2";
+                    if (pillHints) pillHints.style.opacity = isAnswered ? "1" : "0"; // hidden until usable: the pill text already says "Answer above to continue" (AA-6: 0.2 opacity was 1.3:1)
                 }
                 lucide.createIcons();
             }
@@ -1280,7 +1280,7 @@ body.present .nav-shell.activity{display:none}
                     if (index === 0) pillText.textContent = "Swipe left to begin";
                     else if (index === 1) pillText.textContent = "Select a mission";
                     else if (index === 3) pillText.textContent = "Mission Complete";
-                    else if (index === 2 && pillHints) pillHints.style.opacity = "0.2";
+                    else if (index === 2 && pillHints) pillHints.style.opacity = "0";
                 }
 
                 lucide.createIcons();
@@ -1464,7 +1464,7 @@ body.present .nav-shell.activity{display:none}
                             btnClass += ' bg-gray-50 border-gray-100 text-ink-soft opacity-60';
                         }
                     } else {
-                        btnClass += ' bg-white border-gray-200 text-gray-700 md:hover:border-allgood-primary md:hover:bg-orange-50 md:hover:text-allgood-primary active:border-allgood-primary active:bg-orange-50 active:text-allgood-primary cursor-pointer active:scale-[0.98]';
+                        btnClass += ' bg-white border-gray-200 text-gray-700 md:hover:border-allgood-primary md:hover:bg-orange-50 md:hover:text-allgood-primary-deep active:border-allgood-primary active:bg-orange-50 active:text-allgood-primary-deep cursor-pointer active:scale-[0.98]';
                     }
 
                     const disabledAttr = isAnswered ? 'disabled' : '';
