@@ -3,7 +3,8 @@
 // Load as a CLASSIC script, AFTER the story's own script:
 //   <script src="/js/story-presentar.js"></script>
 // It does nothing at all unless the page was opened with ?mode=presentar (the teacher's
-// "Presentar en clase" button on the dashboard adds &class=<their class code>).
+// "Presentar en clase" button on the dashboard adds &class=<their class code>) AND the
+// signed-in user is a teacher. A student who adds the parameter gets the normal story.
 //
 // WHAT IT IS. The teacher runs the story on the projector and the class votes at each Puerta
 // by show of hands. No student devices, no class code on screen, no names, nothing per
@@ -32,6 +33,25 @@
     try { q = new URLSearchParams(location.search); } catch (e) { return; }
     if (q.get('mode') !== 'presentar') return;
 
+    // TEACHERS ONLY. The parameter alone turns nothing on: /js/story-tracking.js decides
+    // (StoryTrack.presentar) whether the signed-in user is a teacher. For anyone else the
+    // parameter is ignored and the story runs normally, tracked like any solo play. While
+    // that is being checked a plain cover hides the page, so a projector never shows the
+    // start screen's name box.
+    var ST0 = window.StoryTrack;
+    if (!ST0 || !ST0.presentar) return;
+    var cover = document.createElement('div');
+    cover.className = 'pm-cover';
+    cover.setAttribute('role', 'status');
+    cover.style.cssText = 'position:fixed;inset:0;z-index:200;background:#141414;color:#EDEDED;display:grid;place-items:center;font-size:18px';
+    cover.textContent = 'Abriendo Presentar en clase…';
+    document.body.appendChild(cover);
+    ST0.presentar.then(function (isTeacher) {
+        if (isTeacher) activate();
+        cover.remove();
+    }).catch(function () { cover.remove(); });
+
+  function activate() {
     var CODE = String(q.get('class') || '').toUpperCase();
     if (!/^[A-Z0-9]{4,12}$/.test(CODE)) CODE = '';
     var SLUG = location.pathname.split('/').filter(Boolean).pop();
@@ -486,4 +506,5 @@
     window.StoryPresentar = { active: true, classCode: CODE, goTo: show, refresh: paintBar, votes: votes };
     // Start on the title; the story's own start button runs when the teacher presses Empezar.
     setTimeout(function () { window.scrollTo(0, 0); paintBar(); paintTeacherLine(); $('[data-pm="next"]', bar).focus(); }, 0);
+  }
 })();

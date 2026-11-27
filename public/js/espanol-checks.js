@@ -5,7 +5,8 @@
 //   <script src="/js/espanol-checks.js"></script>
 //
 // BEHIND A FLAG. It does nothing at all unless window.AG_CONFIG.ESPANOL_CHECKS_ON is true
-// (/js/site-config.js: on for staging, off for production). The items are drafts awaiting
+// (/js/site-config.js: on for staging, off for production), or an admin account asked for a
+// preview with ?checks=preview (see the top of the function). The items are drafts awaiting
 // native-speaker review; they live in the story's checks.json, so reviewed wording is a data
 // change only. ONE component for every story: it finds the story by its folder name.
 //
@@ -30,11 +31,25 @@
 // in each phase. Nothing else. Vos is in the story and is not measured here.
 (function () {
     var CFG = window.AG_CONFIG || {};
-    if (!CFG.ESPANOL_CHECKS_ON) return;
-
-    var SLUG = location.pathname.split('/').filter(Boolean).pop();
     var ST = window.StoryTrack || null;
-    var PRESENTAR = !!(window.StoryPresentar && window.StoryPresentar.active);
+    if (CFG.ESPANOL_CHECKS_ON) { start(); return; }
+
+    // FLAG OFF (production, until the native-speaker review). Nothing below runs for a
+    // student or a teacher. The one exception is an ADMIN PREVIEW: an account on the admin
+    // list (/js/site-config.js, the same two addresses firestore.rules trusts) that opened the
+    // page with ?checks=preview. The parameter alone does nothing: without it this file stops
+    // here, and with it we wait to see who is signed in and stop for everyone else.
+    if (!CFG.checksPreviewAsked || typeof CFG.espanolChecksFor !== 'function' || !ST) return;
+    ST.ready.then(function (core) {
+        var u = core && core.auth && core.auth.currentUser;
+        if (CFG.espanolChecksFor(u)) start();
+    }).catch(function () { /* not an admin, or sign-in unavailable: no checks */ });
+    return;
+
+  function start() {
+    var SLUG = location.pathname.split('/').filter(Boolean).pop();
+    // Set below, once /js/story-tracking.js has decided whether this is a teacher presenting.
+    var PRESENTAR = false;
     var $ = function (s, r) { return (r || document).querySelector(s); };
     var g1 = $('#g1'), carta = $('#carta');
     if (!g1 || !carta) return;
@@ -207,13 +222,16 @@
 
     /* ── start: the items, then who this is and what they have already done ─── */
     var bank = fetch('checks.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('checks.json ' + r.status); return r.json(); });
-    var who = PRESENTAR || !ST ? Promise.resolve(null) : ST.ready.then(function (core) {
-        var u = core && core.auth && core.auth.currentUser;
-        return u ? u.uid : null;
-    }).catch(function () { return null; });
-    var saved = PRESENTAR || !ST ? Promise.resolve(null) : ST.loadProgress(SLUG);
-
-    Promise.all([bank, who, saved]).then(function (res) {
+    var mode = ST && ST.presentar ? ST.presentar.catch(function () { return false; }) : Promise.resolve(false);
+    mode.then(function (presenting) {
+        PRESENTAR = !!presenting;
+        var who = PRESENTAR || !ST ? Promise.resolve(null) : ST.ready.then(function (core) {
+            var u = core && core.auth && core.auth.currentUser;
+            return u ? u.uid : null;
+        }).catch(function () { return null; });
+        var saved = PRESENTAR || !ST ? Promise.resolve(null) : ST.loadProgress(SLUG);
+        return Promise.all([bank, who, saved]);
+    }).then(function (res) {
         BANK = res[0];
         if (!BANK || !Array.isArray(BANK.A) || BANK.A.length !== 5 || !Array.isArray(BANK.B) || BANK.B.length !== 5) throw new Error('checks.json is not a 5 + 5 item bank');
         var uid = res[1], prog = res[2] || {};
@@ -247,4 +265,5 @@
             return { v: 1, form: R.form, emb: presented.emb.slice(), adu: presented.adu.slice() };
         },
     };
+  }
 })();

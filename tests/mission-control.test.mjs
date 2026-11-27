@@ -1329,6 +1329,116 @@ test('ESPANOL_CHECKS_ON: on for staging, previews and local; OFF on production a
         assert.equal(flag(h), true, `the checks should be on at "${h}"`);
     }
     // Nothing in a story or in Mission Control shows the checks without reading the flag.
-    assert.match(readFileSync(new URL('../public/js/espanol-checks.js', import.meta.url), 'utf8'), /if \(!CFG\.ESPANOL_CHECKS_ON\) return;/);
+    const checksSrc = readFileSync(new URL('../public/js/espanol-checks.js', import.meta.url), 'utf8');
+    assert.match(checksSrc, /if \(CFG\.ESPANOL_CHECKS_ON\) \{ start\(\); return; \}/);
+    // With the flag off, the file stops unless the preview was asked for, and then only starts for an admin.
+    assert.match(checksSrc, /if \(!CFG\.checksPreviewAsked \|\| typeof CFG\.espanolChecksFor !== 'function' \|\| !ST\) return;/);
+    assert.match(checksSrc, /if \(CFG\.espanolChecksFor\(u\)\) start\(\);/);
     assert.match(src, /var PRODUCTION_ESPANOL_CHECKS = false;/, 'the production switch stays off until the founder flips it');
+});
+
+/* ── Review of #97 (2026-11-27): the admin-only preview, and teacher-only Presentar ───────── */
+const vmod = await import('node:vm');
+const SITE_CONFIG_SRC = readFileSync(new URL('../public/js/site-config.js', import.meta.url), 'utf8');
+const configAt = (hostname, search = '') => { const window = { location: { hostname, search } }; vmod.runInNewContext(SITE_CONFIG_SRC, { window }); return window.AG_CONFIG; };
+const ADMIN = { email: 'balgood93@gmail.com', emailVerified: true, isAnonymous: false };
+
+test('checks preview on production: only an admin account WITH ?checks=preview sees them', () => {
+    const plain = configAt('allgoodacademy.com');
+    const asked = configAt('allgoodacademy.com', '?checks=preview');
+    assert.equal(plain.ESPANOL_CHECKS_ON, false);
+    assert.equal(asked.ESPANOL_CHECKS_ON, false, 'the parameter never turns the flag itself on');
+    assert.equal(asked.checksPreviewAsked, true);
+    assert.equal(asked.espanolChecksFor(ADMIN), true);
+    assert.equal(asked.espanolChecksFor({ ...ADMIN, email: 'Learning@AllgoodAcademy.com' }), true);
+    // An admin who did not ask sees the site as everyone does.
+    assert.equal(plain.espanolChecksFor(ADMIN), false);
+    // Nobody else, whatever the URL says.
+    const others = [
+        null, undefined, {},
+        { email: 'teacher@school.org', emailVerified: true, isAnonymous: false },              // another teacher
+        { email: null, isAnonymous: true },                                                    // a student
+        { email: 'kid123@save.allgoodacademy.com', emailVerified: false, isAnonymous: false }, // a student with a save code
+        { ...ADMIN, emailVerified: false },                                                    // an unverified claim to an admin address
+        { ...ADMIN, isAnonymous: true },
+        { ...ADMIN, email: 'balgood93@gmail.com.evil.com' },
+    ];
+    for (const u of others) assert.equal(asked.espanolChecksFor(u), false, `must not preview for ${JSON.stringify(u)}`);
+    for (const search of ['?checks=1', '?checks=previews', '?xchecks=preview', '?src=test']) assert.equal(configAt('allgoodacademy.com', search).espanolChecksFor(ADMIN), false, search);
+    assert.equal(configAt('allgoodacademy.com', '?src=test&checks=preview').espanolChecksFor(ADMIN), true);
+    // Where the flag is on (staging), everyone sees the checks, as before.
+    assert.equal(configAt('allgood-academy--staging-ba3i7t07.web.app').espanolChecksFor(null), true);
+});
+
+test('checks preview: the admin list is the one firestore.rules and Insider use', () => {
+    const list = (src, re) => (src.match(re) || ['', ''])[1].match(/'[^']+'/g).map((x) => x.slice(1, -1)).sort();
+    const fromConfig = list(SITE_CONFIG_SRC, /var ADMIN_EMAILS = \[([^\]]+)\]/);
+    const fromRules = list(readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8'), /request\.auth\.token\.email in \[([^\]]+)\]/);
+    const fromInsider = list(readFileSync(new URL('../public/insider/index.html', import.meta.url), 'utf8'), /const ALLOWED_EMAILS = \[([^\]]+)\]/);
+    assert.equal(fromConfig.length, 2);
+    assert.deepEqual(fromConfig, fromRules);
+    assert.deepEqual(fromConfig, fromInsider);
+    // Mission Control decides per signed-in user, never from the flag alone.
+    const teacherSrc = readFileSync(new URL('../public/mission-control/teacher.js', import.meta.url), 'utf8');
+    assert.match(teacherSrc, /CHECKS_ON = !!\(window\.AG_CONFIG && typeof window\.AG_CONFIG\.espanolChecksFor === 'function' && window\.AG_CONFIG\.espanolChecksFor\(user\)\);/);
+});
+
+/* /js/story-tracking.js in a tiny fake page: who is signed in, what their profile says, and
+   whether the URL asks for Presentar. Returns what was written. */
+async function storyTrackingAs({ search, user, role, accountFails = false }) {
+    const src = readFileSync(new URL('../public/js/story-tracking.js', import.meta.url), 'utf8');
+    const writes = { saved: [], loaded: [] };
+    const AuthCore = {
+        auth: { currentUser: user }, db: {}, appId: 'allgood-academy',
+        startSession: async () => user,
+        getAccount: async () => { if (accountFails) throw new Error('permission-denied'); return { role }; },
+        saveModuleProgress: async (slug, data) => { writes.saved.push([slug, data]); },
+        loadModuleProgress: async (slug) => { writes.loaded.push(slug); return { state: '{}' }; },
+    };
+    const Telemetry = Object.fromEntries(['init', 'plan', 'step', 'choice', 'complete', 'summary', 'track', 'restart'].map((k) => [k, () => {}]));
+    const window = { AuthCore, Telemetry };
+    const document = { createElement: () => ({}), head: { appendChild: () => {} } };
+    vmod.runInNewContext(src, { window, document, location: { search }, setTimeout, Promise, console });
+    const ST = window.StoryTrack;
+    const presenting = await ST.presentar;
+    await ST.saveProgress('el-mundial', { finished: false, state: '{}' });
+    const resumed = await ST.loadProgress('el-mundial');
+    return { presenting, saved: writes.saved.length, loaded: writes.loaded.length, resumed, asked: ST.presentarAsked };
+}
+const TEACHER_USER = { uid: 't1', isAnonymous: false, email: 't@school.org' };
+const ANON_STUDENT = { uid: 's1', isAnonymous: true };
+const SAVED_STUDENT = { uid: 's2', isAnonymous: false, email: 'abc@save.allgoodacademy.com' };
+
+test('Presentar: a signed-in teacher who asks for it presents, and their own progress is not written', async () => {
+    const r = await storyTrackingAs({ search: '?mode=presentar&class=KM7QPD', user: TEACHER_USER, role: 'teacher' });
+    assert.deepEqual([r.presenting, r.saved, r.loaded, r.resumed], [true, 0, 0, null]);
+});
+
+test('Presentar: a student who adds ?mode=presentar gets the normal story, tracked', async () => {
+    for (const [user, role] of [[ANON_STUDENT, 'student'], [SAVED_STUDENT, 'student'], [null, 'student']]) {
+        const r = await storyTrackingAs({ search: '?mode=presentar', user, role });
+        assert.equal(r.asked, true);
+        assert.equal(r.presenting, false, `must not present for ${JSON.stringify(user)}`);
+        if (user) assert.deepEqual([r.saved, r.loaded], [1, 1], 'progress is saved and resumed as in solo play');
+    }
+    // An anonymous session can't claim it either, even if a profile said "teacher".
+    assert.equal((await storyTrackingAs({ search: '?mode=presentar', user: ANON_STUDENT, role: 'teacher' })).presenting, false);
+});
+
+test('Presentar: when the profile cannot be read the parameter is ignored (tracked), and a teacher without it plays solo', async () => {
+    const unreadable = await storyTrackingAs({ search: '?mode=presentar', user: TEACHER_USER, role: 'teacher', accountFails: true });
+    assert.deepEqual([unreadable.presenting, unreadable.saved], [false, 1]);
+    const solo = await storyTrackingAs({ search: '?src=test', user: TEACHER_USER, role: 'teacher' });
+    assert.deepEqual([solo.asked, solo.presenting, solo.saved, solo.loaded], [false, false, 1, 1]);
+});
+
+test('Presentar: the player and the checks both wait for that answer, never the URL alone', () => {
+    const player = readFileSync(new URL('../public/js/story-presentar.js', import.meta.url), 'utf8');
+    assert.match(player, /ST0\.presentar\.then\(function \(isTeacher\) \{\s*if \(isTeacher\) activate\(\);/);
+    // Nothing of the player is built before activate(): the class, the bar and the stylesheet are all inside it.
+    const before = player.slice(0, player.indexOf('function activate()'));
+    assert.equal(/classList\.add\('presentar'\)|pm-bar|story-presentar\.css/.test(before.replace(/^\s*\/\/.*$/gm, '')), false);
+    const checks = readFileSync(new URL('../public/js/espanol-checks.js', import.meta.url), 'utf8');
+    assert.match(checks, /var mode = ST && ST\.presentar \?/);
+    assert.equal(/window\.StoryPresentar\.active/.test(checks), false);
 });

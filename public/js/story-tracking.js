@@ -68,52 +68,72 @@
         setTimeout(poll, 50);
     })();
 
-    // PRESENTAR (?mode=presentar, /js/story-presentar.js): the teacher is running the story
-    // for the class on a projector. Their own progress and completion are not written (a
-    // class session must never read as solo play, or resume next time), and nothing is read
-    // back. What a presented session saves is one class-level document, written there.
-    var PRESENTAR = /[?&]mode=presentar(&|$)/.test(location.search);
+    // PRESENTAR (?mode=presentar, /js/story-presentar.js): a TEACHER is running the story for
+    // the class on a projector. Their own progress and completion are not written (a class
+    // session must never read as solo play, or resume next time), and nothing is read back.
+    // What a presented session saves is one class-level document, written there.
+    //
+    // TEACHERS ONLY (2026-11-27, review of #97). The URL parameter alone turns nothing on:
+    // a student who adds ?mode=presentar must not be able to skip their own tracking. The
+    // mode is on only when the signed-in user is a teacher: a real (not anonymous) sign-in
+    // whose own profile says role 'teacher', which firestore.rules lets nobody set without a
+    // teacher sign-in and a class they own. For anyone else, and when sign-in or the profile
+    // can't be read, the parameter is ignored and the story runs normally, tracked.
+    // `presentar` is a promise for that answer; everything below waits for it.
+    var ASKED = /[?&]mode=presentar(&|$)/.test(location.search);
+    var presentar = !ASKED ? Promise.resolve(false) : ready.then(function (core) {
+        var user = core && core.auth && core.auth.currentUser;
+        if (!user || user.isAnonymous || !core.getAccount) return false;
+        return core.getAccount(user.uid).then(function (acct) { return !!acct && acct.role === 'teacher'; });
+    }).catch(function () { return false; });
 
     function clean(data) {
         try { return JSON.parse(JSON.stringify(data || {})); } catch (e) { return {}; }
     }
 
     function saveProgress(slug, data) {
-        if (PRESENTAR) return Promise.resolve();
         var d = clean(data);
-        return ready.then(function (core) {
-            if (core && core.saveModuleProgress) return core.saveModuleProgress(slug, d);
-            return undefined;
+        return presentar.then(function (on) {
+            if (on) return undefined;
+            return ready.then(function (core) {
+                if (core && core.saveModuleProgress) return core.saveModuleProgress(slug, d);
+                return undefined;
+            });
         }).catch(function () { /* never block the story */ });
     }
 
     function loadProgress(slug) {
-        if (PRESENTAR) return Promise.resolve(null);
-        return ready.then(function (core) {
-            return core && core.loadModuleProgress ? core.loadModuleProgress(slug) : null;
+        return presentar.then(function (on) {
+            if (on) return null;
+            return ready.then(function (core) {
+                return core && core.loadModuleProgress ? core.loadModuleProgress(slug) : null;
+            });
         }).catch(function () { return null; });
     }
 
     function logCompletion(gameName, fields) {
-        if (PRESENTAR) return Promise.resolve();
         var f = clean(fields);
-        return ready.then(function (core) {
-            var user = core && core.auth && core.auth.currentUser;
-            if (!user) return undefined;
-            return import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js').then(function (fs) {
-                var sid = (real && real.sessionId) || ('story-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
-                var ref = fs.doc(core.db, 'artifacts', core.appId, 'users', user.uid, 'game_scores', sid);
-                var rec = { gameName: gameName, completed: true, lastUpdated: fs.serverTimestamp() };
-                Object.keys(f).forEach(function (k) { rec[k] = f[k]; });
-                rec.gameName = gameName; rec.completed = true;
-                return fs.setDoc(ref, rec, { merge: true });
+        return presentar.then(function (on) {
+            if (on) return undefined;
+            return ready.then(function (core) {
+                var user = core && core.auth && core.auth.currentUser;
+                if (!user) return undefined;
+                return import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js').then(function (fs) {
+                    var sid = (real && real.sessionId) || ('story-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+                    var ref = fs.doc(core.db, 'artifacts', core.appId, 'users', user.uid, 'game_scores', sid);
+                    var rec = { gameName: gameName, completed: true, lastUpdated: fs.serverTimestamp() };
+                    Object.keys(f).forEach(function (k) { rec[k] = f[k]; });
+                    rec.gameName = gameName; rec.completed = true;
+                    return fs.setDoc(ref, rec, { merge: true });
+                });
             });
         }).catch(function (e) { try { console.warn('[StoryTrack] completion write failed', e); } catch (_) { /* ignore */ } });
     }
 
     window.StoryTrack = {
         TM: TM,
-        presentar: PRESENTAR,
+        presentarAsked: ASKED,
+        presentar: presentar,   // Promise<boolean>: true only for a signed-in teacher who asked for it
         ready: ready,
         setDebug: function (fn) { debug = typeof fn === 'function' ? fn : null; },
         saveProgress: saveProgress,

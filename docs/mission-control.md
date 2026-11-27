@@ -415,6 +415,19 @@ no rubric.
   own teacher reads and writes; students cannot read them). Only the taps are stored. There
   is no text box for the postcard anywhere.
 
+**Presentar is teachers only.** `?mode=presentar` on its own turns nothing on.
+`/js/story-tracking.js` checks that the signed-in user is not anonymous and that their own
+profile says `role: 'teacher'` (`StoryTrack.presentar`, a promise). For anyone else, or when
+the profile can't be read, the parameter is ignored and the story runs normally and is
+tracked. So a student can't add it to skip progress or completion records.
+
+**Admin preview of the checks in production.** While `ESPANOL_CHECKS_ON` is off, an account
+on the admin list (the two addresses `firestore.rules` and Insider use, verified email) can
+add `?checks=preview` to a story or to `/dashboard/` to see Embarque / Aduana, the growth
+view and the rubric. Both are needed: the parameter does nothing for anyone else, and an
+admin without it sees what everyone sees. Unit tests cover who gets it and keep the three
+admin lists the same.
+
 **Verifying locally.** Staging cannot create anonymous sessions (the API key's referrer
 list), so student saves are verified in the emulators: `firebase emulators:start --only
 auth,firestore,storage --project allgood-academy`, then `node scripts/uat/seed-emulator.mjs`

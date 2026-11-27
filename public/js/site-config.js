@@ -25,8 +25,30 @@
     var staging = /^allgood-academy--[a-z0-9-]+\.web\.app$/.test(host);
     var local = host === 'localhost' || host === '127.0.0.1';
 
+    var CHECKS_ON = PRODUCTION_ESPANOL_CHECKS || staging || local;
+
+    // ADMIN PREVIEW (2026-11-27). While the flag is off in production, the two admin accounts
+    // can still look at Embarque / Aduana, the growth view and the rubric there, by adding
+    // ?checks=preview to the page. BOTH are needed: the parameter does nothing for anyone
+    // else, and an admin without it sees the site exactly as everyone does. The list is the
+    // one firestore.rules trusts (isAllowlistedAdmin) and Insider uses; a unit test fails if
+    // the three ever differ. The address must be verified, as the rules require. This only
+    // decides what is SHOWN: what anyone can read or write is decided by firestore.rules.
+    var ADMIN_EMAILS = ['balgood93@gmail.com', 'learning@allgoodacademy.com'];
+    var previewAsked = false;
+    try { previewAsked = /[?&]checks=preview(&|$)/.test(String(window.location.search || '')); } catch (e) { previewAsked = false; }
+    function isAdmin(user) {
+        return !!user && user.isAnonymous !== true && user.emailVerified === true
+            && typeof user.email === 'string' && ADMIN_EMAILS.indexOf(user.email.toLowerCase()) >= 0;
+    }
+
     window.AG_CONFIG = Object.freeze({
         staging: staging || local,
-        ESPANOL_CHECKS_ON: PRODUCTION_ESPANOL_CHECKS || staging || local,
+        ESPANOL_CHECKS_ON: CHECKS_ON,
+        // True only when ?checks=preview is on the URL. On its own it turns nothing on.
+        checksPreviewAsked: previewAsked,
+        // Should THIS signed-in user see the checks? Everyone where the flag is on; where it
+        // is off, only an admin account that asked for the preview.
+        espanolChecksFor: function (user) { return CHECKS_ON || (previewAsked && isAdmin(user)); },
     });
 })();

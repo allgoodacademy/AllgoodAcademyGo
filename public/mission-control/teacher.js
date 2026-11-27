@@ -51,7 +51,11 @@ import { storyReport, studentStory, playedStoryIds, growthReport, presentedGrowt
 // Embarque → Aduana (the growth view and the postcard rubric) is behind a flag: on for
 // staging, off for production until the item bank has had its native-speaker review. See
 // /js/site-config.js, which the dashboard loads before this module.
-const CHECKS_ON = !!(window.AG_CONFIG && window.AG_CONFIG.ESPANOL_CHECKS_ON);
+// The one exception while it is off: an admin account that opened the dashboard with
+// ?checks=preview (AG_CONFIG.espanolChecksFor). Decided in load(), once the user is known;
+// nothing reads it before then.
+let CHECKS_ON = !!(window.AG_CONFIG && window.AG_CONFIG.ESPANOL_CHECKS_ON);
+const CHECKS_PREVIEW = () => CHECKS_ON && !(window.AG_CONFIG && window.AG_CONFIG.ESPANOL_CHECKS_ON);
 
 const { db, appId, auth, waitForAuthReady } = window.AuthCore;
 
@@ -407,6 +411,7 @@ const isFreeClass = (code) => !state.marker || state.marker.firstClassCode === c
 async function load() {
     const user = await waitForAuthReady();
     state.user = user;
+    CHECKS_ON = !!(window.AG_CONFIG && typeof window.AG_CONFIG.espanolChecksFor === 'function' && window.AG_CONFIG.espanolChecksFor(user));
     const meSnap = user ? await getDoc(doc(db, 'artifacts', appId, 'users', user.uid)) : null;
     const me = meSnap && meSnap.exists() ? meSnap.data() : {};
     state.me = me;
@@ -2038,13 +2043,14 @@ function registryIdFor(m) {
     return r ? r.id : null;
 }
 function cardActions(m) {
-    const tryIt = `<a class="btn ghost sm" href="${esc(m.url)}" data-name="${esc(m.name)}">Try it</a>`;
+    // An admin previewing the checks (?checks=preview) keeps the preview when they open a story.
+    const tryIt = `<a class="btn ghost sm" href="${esc(m.url)}${m.type === 'story' && CHECKS_PREVIEW() ? '?checks=preview' : ''}" data-name="${esc(m.name)}">Try it</a>`;
     const present = m.type === 'simulation' && m.present
         ? `<a class="btn ghost sm" href="${esc(m.url)}#present" data-name="${esc(m.name)}">Present</a>` : '';
     // Español stories: the class plays it together on the projector (story-presentar.js).
     // Teacher-only like everything here; the class code rides along so the recap can save.
     const presentar = m.type === 'story' && state.code
-        ? `<a class="btn ghost sm" href="${esc(m.url)}?mode=presentar&amp;class=${encodeURIComponent(state.code)}" data-name="${esc(m.name)}" lang="es">Presentar en clase</a>` : '';
+        ? `<a class="btn ghost sm" href="${esc(m.url)}?mode=presentar&amp;class=${encodeURIComponent(state.code)}${CHECKS_PREVIEW() ? '&amp;checks=preview' : ''}" data-name="${esc(m.name)}" lang="es">Presentar en clase</a>` : '';
     const id = state.code ? registryIdFor(m) : null;
     if (!id || !state.registryById.has(id)) return tryIt + present + presentar;
     const kind = kindOf(m.type === 'simulation' ? 'sim' : m.type);

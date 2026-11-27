@@ -264,6 +264,13 @@ async function main() {
   }
   for (let i = 0; i < 3; i++) { const uid = `uat_es3_${i}`; await student('UATES2', uid, NAMES[i + 24], i); await mundial(uid, i, { finished: i < 2, reached: i < 2 ? 5 : 2 }); }
 
+  // ── UAT-Admin: an account on the admin list (emulator only), with a small class, for the
+  //    admin-only preview of the checks while ESPANOL_CHECKS_ON is off (?checks=preview) ──
+  await teacher('uat_t_admin', 'learning@allgoodacademy.com', 'UAT Admin', { classroomCode: 'UATAD1' });
+  await classroom('UATAD1', 'uat_t_admin', 'UAT Admin', 'UAT Admin class', { assignedModules: [], assignedGames: [], assignedSims: ['el-mundial'] });
+  await A('teacher_free_class', 'uat_t_admin').set({ firstClassCode: 'UATAD1', createdAt: ts(NOW - 30 * DAY) });
+  for (let i = 0; i < 6; i++) { const uid = `uat_ad_${i}`; await student('UATAD1', uid, NAMES[i + 12], i); await mundial(uid, i, { finished: i < 5, reached: i < 5 ? 5 : 3 }); }
+
   // ── A brand-new free teacher with no class yet (for the setup screen) ──
   await auth.createUser({ uid: 'uat_t_new', email: 'uat-new@example.com', password: 'uat-password-1', displayName: 'UAT New', emailVerified: true }).catch(() => {});
 
