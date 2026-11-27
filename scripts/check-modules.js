@@ -423,7 +423,8 @@ const HIDDEN_SURFACES = [
   ['public/for-teachers/index.html', 'the For Teachers page'],
   ['public/about/index.html', 'the About page'],
   ['public/dashboard/index.html', 'the dashboard'],
-  ['public/mission-control/index.html', 'Mission Control'],
+  ['public/mission-control/index.html', 'Mission Control sign-in'],
+  ['public/mission-control/teacher.js', 'Mission Control in the dashboard'],
   ['public/insider/index.html', "Insider's COURSES"],
   ...Object.values(PACKS).map(cfg => [cfg.hub, 'a Lab Pack hub']),
 ];

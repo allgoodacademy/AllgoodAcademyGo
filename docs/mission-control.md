@@ -11,6 +11,35 @@ and switching writes the new code to that same field. `firestore.rules` (`teache
 accepts a class whose `teacherUid` is the teacher, so every existing teacher grant follows the
 active class without any rule learning about more than one.
 
+## One dashboard (2026-11-27, storyboard v2.0)
+
+Mission Control now lives **inside `/dashboard/`**, as the teacher section of its left rail.
+"My dashboard" is the one home for everyone; a student's dashboard is unchanged.
+
+| Where | What |
+| --- | --- |
+| `public/mission-control/teacher.js` | Mission Control's page script, **moved, not rewritten**. `/dashboard/` imports it only after reading `users/{uid}` and finding `role === 'teacher'` with a class (`startTeacher()`); it inserts the class card, the rail headings, the views below, the overlays (student panel, Pro panel, class dialogs, Show on screen, poster) and Try it / Assign on the cards. |
+| `public/mission-control/teacher.css` | the additions in the dashboard's own style, then Mission Control's old rules scoped under `.mcx` so they never reach a dashboard element with the same class name. |
+| `public/mission-control/classes.js` | `createClass()`, shared by first-class setup and "+ New class". |
+| `public/mission-control/index.html` | teacher **sign-in, sign-up, consent and the first class**, unchanged. A teacher with a class is sent to `/dashboard/#class`, keeping the query string (Stripe's `?pro=welcome`). |
+
+The rail for a teacher: the **class card** (switcher, code, Copy, Show on screen, plan), then
+**Learn** (Home, Lab Packs, Games, Simulations, Español) and **Mission Control** (Class
+overview `#class`, Students `#students`, Reports `#reports`, Teacher guides `#guides`), then
+Profile. The old tabs map onto those views: Overview → Class overview; Students → Students;
+the drill-downs → Reports; Teacher guides → Teacher guides. **Assign is no longer a tab**: every
+Lab Pack, game and simulation card has **Assign** (toggles to "Assigned ✓", writing the same
+class fields), and Class overview has **Assign several** — the old Assign tab's catalog with
+one Save bar. Assigning to one student or a group from Students opens that same catalog,
+scoped, exactly as before. Home leads with the class (the four numbers, Assigned work, Could
+use a check-in), then "Your own practice".
+
+Analytics: `teacher.js` loads no GA; its `track()` events go to the dashboard's own
+`ag_account`-gated property. `/mission-control/` (sign-in) keeps the marketing property.
+`check-invariants.js` enforces both, and that the dashboard imports `teacher.js` only behind
+the teacher check. The section below describes the tabs as they were before the move; the
+behavior inside each is unchanged.
+
 ## Redesign (2026-11-25)
 
 The page sits under the shared pill nav (`nav/nav.js`, `npm run build:nav`) on the site's cream

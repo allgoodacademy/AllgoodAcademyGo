@@ -1,0 +1,352 @@
+/* Mission Control inside the dashboard (2026-11-27, storyboard v2.0). Loaded by
+   /mission-control/teacher.js, so only a signed-in teacher's page ever has it.
+
+   Two parts:
+     1. The dashboard additions (class card, rail headings, card actions, Home), written for
+        the dashboard's own shell and tokens, so a teacher's page is the same tablet a student
+        sees with one quiet teacher marker: the class card.
+     2. Mission Control's own rules, MOVED from /mission-control/index.html and scoped under
+        .mcx so they cannot reach a dashboard element that happens to share a class name
+        (.card, .grid, .stat, .empty ...). Every teacher pane and overlay sits in a .mcx. */
+
+.mcx,.tclass,body.is-teacher{
+  --line:var(--color-cream-border); --soft:var(--color-ink-soft); --faint:var(--color-ink-faint);
+  --canvas:var(--color-cream); --gold:#8F5E0E; --gold-wash:#F7ECD6;
+}
+
+/* ===== 1. the dashboard additions ===== */
+
+/* Rail: the class card, on every teacher page. */
+.tclass{position:relative;background:var(--teal-wash);border-radius:14px;padding:10px 12px 12px;margin:0 0 10px;display:flex;flex-direction:column;gap:6px}
+.tclass .clsel{position:relative;min-width:0}
+.tclass .clsbtn{display:flex;align-items:center;gap:6px;width:100%;min-height:32px;background:none;border:0;padding:2px 0;text-align:left;font:inherit;color:var(--ink);cursor:pointer;border-radius:8px}
+.tclass .clsname{flex:1;min-width:0;font-weight:700;font-size:13.5px;line-height:1.3;overflow-wrap:anywhere}
+.tclass .clsbtn svg{width:16px;height:16px;flex:none;color:var(--teal-deep)}
+.tclass .clsbtn:hover .clsname{text-decoration:underline}
+.tclass .tcode{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tclass .tcode .lbl{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.tclass .tcode b{font-family:'Courier New',Courier,monospace;font-size:19px;letter-spacing:.12em;color:var(--teal-deep)}
+.tclass .tacts{display:flex;gap:6px;flex-wrap:wrap}
+.tclass .mini{min-height:32px;padding:5px 11px;border-radius:999px;border:1.5px solid var(--teal-deep);background:var(--surface);color:var(--teal-deep);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.tclass .mini:hover{background:var(--teal-deep);color:var(--surface)}
+.tclass .plan{align-self:flex-start;font:inherit;font-size:10.5px;font-weight:700;letter-spacing:.06em;border:0;border-radius:6px;padding:4px 8px;min-height:24px;background:var(--surface);color:var(--ink-soft)}
+.tclass .plan.pro{background:var(--orange-deep);color:#fff}
+.tclass .plan.up{cursor:pointer;color:var(--orange-deep)}
+.tclass .plan.up:hover{background:var(--orange-deep);color:#fff}
+.tclass .menu{position:absolute;top:calc(100% + 6px);left:-4px;z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:min(300px,calc(100vw - 32px));padding:6px}
+.tclass .menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:36px;text-align:left;background:none;border:0;padding:8px 10px;border-radius:8px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
+.tclass .menu button:hover,.tclass .menu button:focus-visible{background:var(--teal-wash)}
+.tclass .menu button[aria-current="true"]{font-weight:700}
+.tclass .menu .sm{font-size:12px;color:var(--ink-soft);font-weight:400}
+.tclass .menu .plan.pro{background:var(--orange-deep);color:#fff;font-size:10px;font-weight:700;border-radius:6px;padding:2px 6px}
+.tclass .menu hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+
+/* Rail headings: Learn, Mission Control. */
+.rail-h{margin:12px 12px 4px;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.tabs .rail-h:first-child{margin-top:2px}
+.rail-sp{display:block;height:10px}
+
+/* Home: the class first, then the teacher's own practice, smaller. */
+body.is-teacher #hello-sub,body.is-teacher #stats,body.is-teacher #new{display:none !important}
+#t-home{margin:4px 0 8px}
+#t-home .t-lead{margin:4px 0 18px;color:var(--ink-soft);font-size:14px}
+.t-own{font-size:20px;margin:26px 0 10px;padding-top:18px;border-top:1px solid var(--hairline)}
+body.is-teacher #continue{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.is-teacher #continue .bigc{padding:12px;box-shadow:none}
+body.is-teacher #continue .bigc .ic{width:42px;height:42px}
+body.is-teacher #continue .bigc b{font-size:16px}
+body.is-teacher #badges{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+body.is-teacher .badge{padding:12px 8px 10px}
+body.is-teacher .badge .medal{width:44px;height:44px}
+body.is-teacher #badges-title{font-size:18px}
+
+/* Content cards, teacher view: Try it, Present, Assign. */
+.card.tcard:hover{transform:none}
+/* The teacher's own progress sits under the title, so the name keeps the card's width. */
+.card.tcard .grow .pill{margin-top:6px}
+.cacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.cacts .btn.sm{min-height:32px;padding:6px 12px;font-size:12.5px}
+.cacts .btn.assign.on{background:var(--sage);border-color:var(--sage);color:#fff}
+.cacts .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+/* Mission Control's views in the dashboard. */
+.t-acts{margin:0 0 18px}
+.t-acts .btn{min-height:40px}
+.tcode-inline{font-family:'Courier New',Courier,monospace;letter-spacing:.1em;color:var(--teal-deep)}
+.mcx .t-mode{font-size:22px;margin:0 0 2px}
+#class-banner:empty{display:none}
+#class-banner{margin:0 0 14px}
+
+@media (max-width:820px){
+  .rail-h,.rail-sp{display:none}
+  .tclass{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 8px;padding:10px 12px}
+  .tclass .clsel{flex:1 1 100%}
+  .tclass .plan{order:4}
+  body.is-teacher #continue{grid-template-columns:1fr}
+}
+
+/* The poster: when a teacher prints, only the poster prints. */
+@media print{
+  body.is-teacher > *:not(#mc-overlays){display:none !important}
+  body.is-teacher #mc-overlays > *:not(.print-sheet){display:none !important}
+}
+
+/* ===== 2. Mission Control's rules, moved (scoped to .mcx) ===== */
+.mcx .btn.sm{padding:7px 12px;font-size:12.5px}
+.mcx .btn.danger{background:#A8321F;border-color:#A8321F;color:#fff}
+.mcx .btn.danger:hover{background:#8A2818;border-color:#8A2818}
+.mcx .btn[disabled],.mcx .btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+.mcx .muted{color:var(--soft)}
+.mcx .eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--teal-deep);text-transform:uppercase}
+.mcx .cbanner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;border-radius:12px;padding:10px 14px;margin:0;font-size:13px;background:var(--gold-wash);color:var(--ink)}
+.mcx .cbanner .btn{margin-left:auto}
+.mcx .cbanner[data-tone="ok"]{background:var(--sage-wash)}
+.mcx .cbanner[data-tone="wait"]{background:var(--teal-wash)}
+.mcx .cbanner + .cbanner{margin-top:8px}
+.mcx h2,.mcx h3{font-family:var(--font-display);font-weight:400;letter-spacing:-.02em;margin:0;color:var(--ink)}
+/* Dashboard rules a pane must not inherit. */
+.mcx .empty{border:0;border-radius:0;padding:10px 0}
+.mcx .sub{margin:2px 0 12px}
+.mcx .grid{margin:0}
+.mcx .bar{margin-top:5px}
+.mcx .stat .k{margin:0;text-transform:none;letter-spacing:0;font-weight:400}
+.mcx .nm .av{font-family:var(--font-ui)}
+
+/* ---------- overview ---------- */
+.mcx .banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;background:var(--orange-wash);border-radius:12px;padding:10px 14px;margin-bottom:16px;font-size:13px}
+.mcx .banner .btn{margin-left:auto}
+.mcx .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.mcx .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.mcx .stat .k{font-size:12px;color:var(--soft)}
+.mcx .stat .n{font-family:var(--font-display);font-size:30px;line-height:1.1;margin:4px 0 2px}
+.mcx .stat .n small{font-size:15px;color:var(--soft)}
+.mcx .stat .s{font-size:12px;color:var(--soft)}
+.mcx .meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.mcx .meter i{display:block;height:100%;background:var(--teal)}
+.mcx .cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+.mcx .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px}
+.mcx .box+.box{margin-top:16px}
+.mcx .cols>.box{margin-top:0}
+.mcx .box h2,.mcx .box h3{font-size:19px}
+.mcx .sub{font-size:12.5px;color:var(--soft);margin:2px 0 12px}
+.mcx .boxhead{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.mcx .boxhead>div{flex:1 1 200px}
+.mcx .wi{display:grid;grid-template-columns:auto minmax(0,1fr) 150px 18px;gap:12px;align-items:center;padding:11px 8px;margin:0 -8px;border:0;border-top:1px solid var(--line);background:none;width:calc(100% + 16px);text-align:left;border-radius:10px}
+.mcx .wi:first-child{border-top:0}
+.mcx .wi:hover{background:var(--teal-wash)}
+.mcx .wi b{display:block;font-size:14px}
+.mcx .wi .chev{color:var(--soft);font-size:18px}
+.mcx .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.mcx .ic svg{width:19px;height:19px}
+/* Español card (2026-11-27). Self-contained; replaced in the Mission Control redesign. */
+.mcx .es-card{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;color:var(--ink);text-decoration:none;min-height:44px}
+.mcx .es-card:hover{border-color:var(--teal)}
+.mcx .es-card .ic{background:var(--teal-wash);color:var(--teal-deep)}
+.mcx .es-card b{display:block;font-size:14px;color:var(--teal-deep)}
+.mcx .es-card .meta{flex:1}
+.mcx .es-card .chev{color:var(--soft);font-size:18px}
+.mcx .t-lab{background:var(--teal-wash);color:var(--teal)}.mcx .t-challenge{background:var(--orange-wash);color:var(--orange)}.mcx .t-game{background:var(--plum-wash);color:var(--plum)}.mcx .t-sim{background:var(--sage-wash);color:var(--sage)}
+.mcx .meta{font-size:12px;color:var(--soft)}
+.mcx .prog{font-size:12px;color:var(--soft);text-align:right}
+.mcx .bar{height:7px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:5px}
+.mcx .bar i{display:block;height:100%;background:var(--teal);border-radius:4px}
+.mcx .check{display:flex;flex-direction:column;gap:8px}
+.mcx .ck{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.mcx .ck .dot{width:10px;height:10px;border-radius:50%;background:var(--gold)}
+.mcx .ck .dot.grey{background:var(--faint)}
+.mcx .ck b{font-size:13.5px}
+.mcx .ck .why{font-size:12px;color:var(--soft)}
+.mcx .note{font-size:12px;color:var(--soft);margin-top:12px;line-height:1.5}
+.mcx .empty{font-size:13px;color:var(--soft);padding:10px 0}
+.mcx .steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.mcx .stp{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px}
+.mcx .stp .num{width:30px;height:30px;border-radius:50%;background:var(--teal-wash);color:var(--teal-deep);display:flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:10px}
+.mcx .stp .num.done{background:var(--sage);color:#fff}
+.mcx .stp h3{font-size:18px;margin-bottom:4px}
+.mcx .stp p{margin:0 0 12px;color:var(--soft);font-size:13px}
+
+/* ---------- drill-down ---------- */
+.mcx .back{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:0;color:var(--teal-deep);font-weight:700;font-size:13px;margin-bottom:12px}
+.mcx .dhead{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.mcx .dhead h2{font-size:26px}
+.mcx .dhead .btn{margin-left:auto}
+.mcx .fun{display:flex;flex-direction:column;gap:7px}
+.mcx .fr{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr) 70px;gap:12px;align-items:center;font-size:13px}
+.mcx .fr .lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcx .fr .lab span{color:var(--soft);margin-right:6px}
+.mcx .fr .track{height:22px;background:var(--teal-wash);border-radius:6px;overflow:hidden}
+.mcx .fr .track i{display:block;height:100%;background:var(--teal);border-radius:6px}
+.mcx .fr.f-ch .track i{background:var(--orange)}.mcx .fr.f-gm .track i{background:var(--plum)}.mcx .fr.f-sm .track i{background:var(--sage)}
+.mcx .fr .num{text-align:right;font-weight:700}
+.mcx .fr .num small{font-weight:400;color:var(--soft)}
+.mcx .stuck{font-size:12px;color:var(--gold);margin:-2px 0 4px 242px}
+.mcx .rate{display:grid;grid-template-columns:minmax(0,1fr) 120px 44px;gap:10px;align-items:center;font-size:12.5px;padding:4px 0}
+.mcx .rate .split{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.mcx .rate .split i{display:block;height:100%;background:var(--sage)}
+.mcx .rate .p{text-align:right;font-weight:700}
+.mcx .scn{border-top:1px solid var(--line);padding:14px 0}
+.mcx .scn:first-of-type{border-top:0;padding-top:4px}
+.mcx .scn .q{font-size:13.5px;margin:4px 0 10px;max-width:760px}
+.mcx .ch{display:grid;grid-template-columns:minmax(0,1fr) 120px 44px;gap:10px;align-items:center;font-size:12.5px;padding:4px 0}
+.mcx .ch .t{color:var(--soft)}
+.mcx .ch .t.best{color:var(--ink);font-weight:700}
+.mcx .mk{display:inline-block;font-size:10px;font-weight:700;border-radius:5px;padding:0 5px;margin-right:6px;vertical-align:1px;letter-spacing:.04em}
+.mcx .mk.b{background:var(--sage-wash);color:var(--sage)}.mcx .mk.o{background:var(--gold-wash);color:var(--gold)}.mcx .mk.w{background:var(--orange-wash);color:var(--orange)}
+.mcx .ch .split{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.mcx .ch .split i{display:block;height:100%}
+.mcx .ch .p{text-align:right;font-weight:700}
+.mcx .talk{background:var(--gold-wash);border-radius:12px;padding:12px 14px;font-size:13px;margin-top:12px}
+.mcx .talk b{color:var(--gold)}
+.mcx .names .link{font-weight:700}
+
+/* ---------- students ---------- */
+.mcx .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.mcx .search{flex:1 1 180px;max-width:300px;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface)}
+.mcx .chips{display:flex;gap:6px;flex-wrap:wrap}
+.mcx .chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:12.5px;color:var(--soft)}
+.mcx .chip[aria-pressed="true"]{background:var(--ink);color:var(--canvas);border-color:var(--ink);font-weight:700}
+.mcx .toolbar .exports{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.mcx .tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.mcx table{width:100%;border-collapse:collapse}
+.mcx th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700}
+.mcx td{padding:10px 14px;border-top:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+.mcx tr:first-child td{border-top:0}
+.mcx tr.r{cursor:pointer}.mcx tr.r:hover td{background:var(--teal-wash)}
+.mcx tr.sel td{background:var(--sage-wash)}
+.mcx td.cb,.mcx th.cb{width:44px;padding-right:0}
+.mcx td.cb input,.mcx th.cb input{width:18px;height:18px;accent-color:var(--sage);cursor:pointer;margin:0}
+.mcx .nm{display:flex;align-items:center;gap:10px;font-weight:700;background:none;border:0;padding:0;text-align:left}
+.mcx .nm .av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex:none}
+.mcx .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.mcx .tag.ok{background:var(--sage-wash);color:var(--sage)}.mcx .tag.chk{background:var(--gold-wash);color:var(--gold)}.mcx .tag.new{background:var(--teal-wash);color:var(--teal-deep)}.mcx .tag.extra{background:var(--plum-wash);color:var(--plum)}.mcx .tag.grey{background:var(--line);color:var(--soft)}
+.mcx .mini{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mcx .mini .bar{width:80px;margin:0}
+.mcx .over td{background:repeating-linear-gradient(135deg,var(--canvas),var(--canvas) 8px,var(--surface) 8px,var(--surface) 16px);color:var(--soft);font-size:13px}
+.mcx .bulk,.mcx .save{position:sticky;bottom:12px;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;background:var(--ink);color:var(--canvas);border-radius:14px;padding:12px 16px;margin-top:12px}
+.mcx .bulk .btn.ghost,.mcx .save .btn.ghost{background:transparent;color:var(--canvas);border-color:rgba(255,255,255,.4)}
+.mcx .bulk .go,.mcx .save .go{margin-left:auto}
+
+/* ---------- student panel ---------- */
+.mcx .scrim{position:fixed;inset:0;z-index:55;background:rgba(15,20,23,.32)}
+/* Closed, the panel is display:none: parked off-screen with a transform it still widened the
+   page's scroll area. Open, it slides in. */
+.mcx .drawer{position:fixed;top:0;right:0;bottom:0;z-index:60;width:min(480px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:-20px 0 50px -30px rgba(0,0,0,.5);padding:22px;overflow:auto;display:none}
+.mcx .drawer.on{display:block;animation:slidein .22s ease}
+@keyframes slidein{from{transform:translateX(100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){.mcx .drawer.on{animation:none}}
+.mcx .x{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;border:0;background:var(--teal-wash);color:var(--teal-deep);font-size:19px;line-height:1}
+.mcx .drawer h2{font-size:24px;padding-right:40px;overflow-wrap:anywhere}
+.mcx .drawer .sec{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--soft);text-transform:uppercase;margin:20px 0 6px}
+.mcx details.as{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--surface)}
+.mcx details.as summary{list-style:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;cursor:pointer}
+.mcx details.as summary::-webkit-details-marker{display:none}
+.mcx details.as[open] summary{border-bottom:1px solid var(--line)}
+.mcx details.as .body{padding:10px 12px 12px;font-size:12.5px}
+.mcx .stepl{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:start;padding:5px 0}
+.mcx .stepl .s{width:20px;height:20px;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700;background:var(--line);color:var(--soft)}
+.mcx .stepl .s.d{background:var(--sage);color:#fff}
+.mcx .stepl .s.h{background:var(--gold);color:#fff}
+.mcx .pick{font-size:12px;color:var(--soft);margin-top:2px}
+.mcx .sess{display:grid;grid-template-columns:70px minmax(0,1fr) auto;gap:8px;font-size:12.5px;padding:6px 0;border-top:1px solid var(--line)}
+
+/* ---------- assign ---------- */
+.mcx .scope{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;background:var(--sage-wash);border:1px solid var(--sage);border-radius:12px;padding:10px 14px;margin-bottom:16px;font-size:13px}
+.mcx .scope .btn{margin-left:auto}
+.mcx .cat{margin-bottom:22px}
+.mcx .cat h2{font-size:20px}
+.mcx .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.mcx .ac{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:13px;text-align:left;width:100%;transition:border-color .15s}
+.mcx .ac:hover{border-color:var(--teal)}
+.mcx .ac[aria-pressed="true"]{border-color:var(--sage);background:var(--sage-wash)}
+.mcx .ac.cls{opacity:.62;border-style:dashed;cursor:default}
+.mcx .ac[disabled]{cursor:not-allowed}
+.mcx .ac .grow{flex:1;min-width:0}
+.mcx .ac b{display:block;font-size:14px;line-height:1.3}
+.mcx .ac .tick{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;color:#fff;font-size:13px}
+.mcx .ac[aria-pressed="true"] .tick{background:var(--sage);border-color:var(--sage)}
+.mcx .wc{font-size:10px;font-weight:700;letter-spacing:.06em;background:var(--line);color:var(--soft);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:2px}
+
+/* ---------- guides ---------- */
+.mcx .gl{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.mcx .gc{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.mcx .gc h3{font-size:17px}
+.mcx .gc .row{display:flex;gap:8px 10px;flex-wrap:wrap;align-items:center;margin-top:auto;padding-top:6px}
+.mcx .gc .soon{font-size:12px;color:var(--soft)}
+.mcx .gc .row .text-btn{align-self:center}
+.mcx .gc .incl{font-size:12px;font-weight:700;color:var(--orange-deep);background:var(--orange-wash);border-radius:6px;padding:3px 8px}
+.mcx .gbanner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--orange-wash);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:12px;font-size:13.5px}
+.mcx .gbundle{margin:14px 2px 0;font-size:13px;color:var(--soft)}
+.mcx .gbundle a{color:var(--teal-deep);font-weight:700}
+
+/* ---------- overlays: Pro panel, class code on screen, new class ---------- */
+.mcx .modal{position:fixed;inset:0;z-index:70;background:rgba(15,20,23,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+.mcx .modal .mcard{background:var(--surface);border-radius:18px;max-width:640px;width:100%;padding:26px;position:relative;max-height:92vh;overflow:auto}
+.mcx .modal h2{font-size:26px;padding-right:40px}
+.mcx .modal .eyebrow{padding-right:44px}
+.mcx .cmp{display:grid;grid-template-columns:minmax(0,1.4fr) 1fr 1fr;margin:16px 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px}
+.mcx .cmp div{padding:9px 12px;border-top:1px solid var(--line)}
+.mcx .cmp .h{font-weight:700;background:var(--canvas);border-top:0}
+.mcx .cmp .pro{background:var(--orange-wash)}
+.mcx .cmp .h.pro{color:var(--orange)}
+.mcx .price{font-family:var(--font-display);font-size:28px;font-weight:700}
+.mcx .field{display:flex;flex-direction:column;gap:6px;margin:14px 0}
+.mcx .field input{padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface)}
+.mcx .wall{position:fixed;inset:0;z-index:80;background:var(--teal-deep);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px}
+.mcx .wall .big{font-family:'Courier New',Courier,monospace;font-weight:700;font-size:clamp(54px,12vw,140px);letter-spacing:.14em;margin:14px 0;line-height:1.1}
+.mcx .wall p{font-size:clamp(18px,2.4vw,26px);margin:0;opacity:.92}
+.mcx .wall .btn{margin-top:28px;background:#fff;border-color:#fff;color:var(--teal-deep)}
+
+/* ---------- dialogs and the loading note ---------- */
+.mcx .screen-error{font-size:13px;color:#B4232C}
+.mcx .emailpref,.pcard .emailpref{margin:12px 0 0;font-size:12.5px;color:var(--ink-soft)}
+.pcard .emailpref label{display:inline-flex;gap:8px;align-items:center;cursor:pointer}
+.pcard .emailpref input{width:18px;height:18px;accent-color:var(--sage)}
+.mcx .spinner{display:inline-block;width:20px;height:20px;border-radius:50%;border:3px solid var(--teal-wash);border-top-color:var(--teal);animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mcx .spinner{animation:none}}
+.mcx .t-loading{position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:58;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:10px 18px;box-shadow:var(--shadow);font-size:13.5px;color:var(--ink)}
+
+/* ---------- toast ---------- */
+.mcx .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:90;padding:10px 16px;border-radius:10px;font-size:13px;background:var(--ink);color:var(--canvas);box-shadow:var(--shadow);max-width:min(460px,90vw);line-height:1.45}
+.mcx .toast.err{background:#7A1E25}
+
+/* ---------- phone and Chromebook ---------- */
+@media (max-width:1100px){.mcx .stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:860px){
+  .mcx .cols{grid-template-columns:1fr}.mcx .steps{grid-template-columns:1fr}
+  .mcx .wi{grid-template-columns:auto minmax(0,1fr) 18px}.mcx .wi .prog{grid-column:2/3;text-align:left}
+  .mcx .hm{display:none}
+  .mcx .fr{grid-template-columns:minmax(0,1fr) 60px}.mcx .fr .track{grid-column:1/-1;grid-row:2}.mcx .stuck{margin-left:0}
+  .mcx .ch,.mcx .rate{grid-template-columns:minmax(0,1fr) 44px}.mcx .ch .split,.mcx .rate .split{grid-column:1/-1;grid-row:2}
+  .mcx .cmp{font-size:12px}
+  .mcx .toolbar .exports{margin-left:0}
+  .mcx td,.mcx th{padding:10px 10px}
+}
+@media (max-width:480px){.mcx .stats{grid-template-columns:1fr 1fr}.mcx .stat .n{font-size:26px}.mcx .stat{padding:12px}}
+
+
+/* ---------- the wall poster ---------- */
+.mcx .print-sheet{display:none}
+@media print{
+  html,body{background:#fff !important;color:#000 !important}
+  .mcx .print-sheet{display:block !important;text-align:center;padding:8% 6%;font-family:var(--font-ui);color:#000}
+  .mcx .print-sheet .p-kicker{font-size:13pt;letter-spacing:.22em;text-transform:uppercase;color:#333;margin-bottom:10mm}
+  .mcx .print-sheet .p-class{font-family:var(--font-display);font-size:22pt;font-weight:700;margin-bottom:4mm}
+  /* Legible from the back of a classroom, and monospaced so an O and a 0 cannot be confused. */
+  .mcx .print-sheet .p-code{font-family:'Courier New',Courier,monospace;font-size:96pt;font-weight:700;letter-spacing:.1em;line-height:1.05;margin:6mm 0 10mm;border-top:2px solid #000;border-bottom:2px solid #000;padding:8mm 0}
+  .mcx .print-sheet .p-how{font-size:18pt;line-height:1.5;max-width:170mm;margin:0 auto}
+  .mcx .print-sheet .p-how strong{font-weight:700}
+  .mcx .print-sheet .p-qr{margin:8mm auto 0;width:42mm}
+  .mcx .print-sheet .p-qr svg{display:block;width:42mm;height:42mm}
+  .mcx .print-sheet .p-qr-note{font-size:10pt;color:#333;margin-top:2mm}
+  .mcx .print-sheet .p-foot{margin-top:8mm;font-size:10pt;color:#555}
+  @page{margin:12mm}
+}
+
+/* ===== 3. after the moved rules, so these win ===== */
+/* AA fixes over Mission Control's old values (axe, 2026-11-27): the small choice tags and
+   the not-yet-reached step numbers were 4.0–4.3:1. */
+.mcx .mk.b{color:#23633F}
+.mcx .mk.w{color:var(--orange-deep)}
+.mcx .stepl .s,.mcx .tag.grey{color:var(--ink)}
+.mcx .tag.ok{color:#23633F}
+/* 24px+ targets for the standalone links (Open, See all …). */
+.mcx .ck .link,.mcx .note > .link,.mcx .empty > .link{display:inline-flex;align-items:center;min-height:24px}

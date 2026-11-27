@@ -1002,6 +1002,54 @@ await it('a session source CANNOT be changed after the session is created', asyn
   await assertSucceeds(setDoc(SESS(me, 'src_s1'), { activeMs: 5000 }, { merge: true }));
 });
 
+console.log('\nONE DASHBOARD (2026-11-27) — a student on /dashboard/ cannot read what the teacher views read');
+// Mission Control now runs inside /dashboard/, the page every student loads. The teacher
+// module is only imported for a teacher, but hiding it is not the protection: these are the
+// reads /mission-control/teacher.js makes, tried by a student IN THE SAME CLASS (member_1,
+// an anonymous session, as every student is). Every one must be denied by the rules.
+{
+  const kid = env.authenticatedContext('member_1', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  await it('a student CANNOT read a classmate\'s profile or the teacher\'s', async () => {
+    await assertFails(getDoc(U(kid, 'student_1')));
+    await assertFails(getDoc(U(kid, 'teacher_1')));
+  });
+  await it('a student CANNOT list the roster (either query the class view loads with)', async () => {
+    await assertFails(getDocs(query(collection(kid, 'artifacts', APP, 'users'),
+      where('classroomCode', '==', 'KM7QPD'), where('role', '==', 'student'))));
+    await assertFails(getDocs(query(collection(kid, 'artifacts', APP, 'classroom_members'),
+      where('classroomCode', '==', 'KM7QPD'))));
+  });
+  await it('a student CANNOT read a classmate\'s progress, scores or attempts', async () => {
+    await assertFails(getDocs(collection(kid, 'artifacts', APP, 'users', 'student_1', 'module_progress')));
+    await assertFails(getDocs(collection(kid, 'artifacts', APP, 'users', 'student_1', 'game_scores')));
+    await assertFails(getDocs(collection(kid, 'artifacts', APP, 'users', 'student_1', 'game_scores', 'g1', 'scenario_attempts')));
+  });
+  await it('a student CANNOT read a classmate\'s sessions or events (Reports, Students)', async () => {
+    await assertFails(getDocs(query(collection(kid, 'artifacts', APP, 'sessions'), where('uid', '==', 'student_1'))));
+    await assertFails(getDocs(query(collection(kid, 'artifacts', APP, 'events'), where('uid', '==', 'student_1'))));
+  });
+  await it('a student CANNOT list the class\'s per-student extras', async () => {
+    await assertFails(getDocs(query(collection(kid, 'artifacts', APP, 'classroom_assignments'),
+      where('classroomCode', '==', 'KM7QPD'))));
+  });
+  await it('a student CANNOT read the teacher\'s plan, free-class marker or class list', async () => {
+    await assertFails(getDoc(PLAN(kid, 'teacher_1')));
+    await assertFails(getDoc(MARKER(kid, 'teacher_1')));
+    await assertFails(getDocs(query(collection(kid, 'artifacts', APP, 'classrooms'), where('teacherUid', '==', 'teacher_1'))));
+  });
+  await it('a student CANNOT assign from a card (write the class\'s assigned fields)', async () => {
+    await assertFails(setDoc(CLASS(kid, 'KM7QPD'), { assignedModules: ['social-intelligence'] }, { merge: true }));
+    await assertFails(setDoc(CLASS(kid, 'KM7QPD'), { assignedSims: ['watercycle'] }, { merge: true }));
+  });
+  await it('...while the class\'s teacher CAN (the card Assign / Assigned ✓ write)', async () => {
+    await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { assignedModules: ['social-intelligence'], assignedSims: ['watercycle'] }, { merge: true }));
+    await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { assignedModules: [], assignedSims: [] }, { merge: true }));
+  });
+  await it('a student CAN still read their own class (what "Assigned by your teacher" needs)', async () => {
+    await assertSucceeds(getDoc(CLASS(kid, 'KM7QPD')));
+  });
+}
+
 await env.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
