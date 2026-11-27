@@ -255,6 +255,24 @@ for (const s of sims) {
 for (const e of fs.readdirSync(path.join(root, 'public/simulations'), { withFileTypes: true })) {
   if (e.isDirectory() && !sims.some((s) => s.url === `/simulations/${e.name}/`)) fail(`public/simulations/${e.name}/ is not in ${SIMS_FILE}, so no student can find it from the dashboard`);
 }
+// Español (2026-11-27): a rail item right after Simulations, linking out to /espanol/ with the
+// Lucide "languages" icon (decorative) and a visible "Español" label. Español is not in the
+// site-wide nav, so this rail item is how a student finds it; do not let it quietly go.
+{
+  const rail = (dash.replace(/<!--[\s\S]*?-->/g, '').match(/<div class="tabs">([\s\S]*?)<\/div>/) || [])[1] || '';
+  const tabs = [...rail.matchAll(/<a class="tab"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
+  const si = tabs.findIndex((t) => /data-view="sims"/.test(t));
+  const es = tabs.findIndex((t) => /href="\/espanol\/"/.test(t));
+  if (es < 0) fail('dashboard: the Español rail item (href="/espanol/") is gone — students reach Español only from here');
+  else {
+    if (es !== si + 1) fail('dashboard: the Español rail item must come right after Simulations');
+    const t = tabs[es];
+    if (!/data-lucide="languages"/.test(t)) fail('dashboard: the Español rail item must use the Lucide "languages" icon (not the globe; Simulations has that)');
+    if (!/aria-hidden="true"/.test(t)) fail('dashboard: the Español rail icon must be aria-hidden (the text label names the link)');
+    if (!/>Español<\/a>/.test(t)) fail('dashboard: the Español rail item must show the visible label "Español"');
+    if (/data-view=/.test(t)) fail('dashboard: the Español rail item is a link to /espanol/, not a dashboard view');
+  }
+}
 // Every lab the pack will hold, shipped or not — the hub shows a Coming Soon placeholder
 // for any planned lab not yet live (checked under "hubs" below). These lists used to live
 // as constants on the old dashboard; they are a build-time fact, so they live here now.

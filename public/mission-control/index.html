@@ -112,6 +112,13 @@ button.plan.up:hover{background:var(--orange);color:#fff}
 .wi .chev{color:var(--soft);font-size:18px}
 .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
 .ic svg{width:19px;height:19px}
+/* Español card (2026-11-27). Self-contained; replaced in the Mission Control redesign. */
+.es-card{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;color:var(--ink);text-decoration:none;min-height:44px}
+.es-card:hover{background:var(--teal-wash)}
+.es-card .ic{background:var(--teal-wash);color:var(--teal-deep)}
+.es-card b{display:block;font-size:14px;color:var(--teal-deep)}
+.es-card .meta{flex:1}
+.es-card .chev{color:var(--soft);font-size:18px}
 .t-lab{background:var(--teal-wash);color:var(--teal)}.t-challenge{background:var(--orange-wash);color:var(--orange)}.t-game{background:var(--plum-wash);color:var(--plum)}.t-sim{background:var(--sage-wash);color:var(--sage)}
 .meta{font-size:12px;color:var(--soft)}
 .prog{font-size:12px;color:var(--soft);text-align:right}
@@ -1660,12 +1667,19 @@ function classItems() {
     const c = state.classroom || {};
     return [...(c.assignedModules || []), ...(c.assignedGames || []), ...(c.assignedSims || [])];
 }
+/* Español (2026-11-27): a destination only. A plain link to /espanol/: no assigning, no
+   progress, no track() event. Icon: Lucide "languages", copied from the bundled
+   /assets/js/lucide.min.js. Self-contained; the Mission Control redesign replaces it. */
+const ESPANOL_CARD = `<a class="es-card" href="/espanol/">
+      <span class="ic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg></span>
+      <span class="meta"><b lang="es">Español</b>Spanish stories for your students, free.</span>
+      <span class="chev" aria-hidden="true">›</span></a>`;
 function renderOverview() {
     const pane = $('pane-overview');
     if (state.drillId) { pane.innerHTML = renderDrill(state.drillId); return; }
     const items = classItems();
     const students = state.students;
-    if (!students.length) { pane.innerHTML = capBanner() + setupSteps(items.length > 0); return; }
+    if (!students.length) { pane.innerHTML = capBanner() + setupSteps(items.length > 0) + ESPANOL_CARD; return; }
 
     const n = students.length;
     const active = students.filter((s) => s.lastSeen && (Date.now() - s.lastSeen) < ACTIVE_WINDOW_DAYS * DAY).length;
@@ -1712,7 +1726,7 @@ function renderOverview() {
           ${work}
           <p class="note">Counts include only students who joined this class. If a student plays a game at home on a device that never joined, it won't show here.</p></div>
         <div class="box"><h2>Could use a check-in</h2><p class="sub">Most useful first. Not grades — just where to look.</p>${check}</div>
-      </div>`;
+      </div>` + ESPANOL_CARD;
 }
 function setupSteps(hasWork) {
     return `<div class="box"><h2>Set up your class in three steps</h2><p class="sub">Most teachers are ready in about five minutes.</p>
