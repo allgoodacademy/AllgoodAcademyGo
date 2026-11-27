@@ -1505,6 +1505,7 @@
                     <span class="text-[10px] text-slate-400 shrink-0" title="${fmtDateTime(m.ms)}">${fmtAgo(m.ms)}</span>
                 </div>
                 ${m.senderEmail ? `<p class="text-[10px] text-slate-400 mb-1">${esc(m.senderEmail)}</p>` : ''}
+                ${m.replyTo ? `<p class="text-[10px] text-slate-400 mb-1">Reply to: <a class="font-bold hover:underline" href="mailto:${encodeURIComponent(m.replyTo)}">${esc(m.replyTo)}</a> <span class="text-slate-400">(typed by the sender, not verified)</span></p>` : ''}
                 <p class="text-sm text-slate-700 whitespace-pre-wrap">${esc(m.message || '')}</p>
             </div>`;
         }
@@ -1616,7 +1617,7 @@
                 case 'attempts': rows = D.attempts.map(a => ({ uid: a.uid, sessionId: a.sessionId, gameName: a.course ? a.course.name : '', scenarioIndex: a.scenarioIndex, question: a.question, choiceIndex: a.choiceIndex, score: a.score, effectiveness: a.effectiveness, cashImpact: a.cashImpact, timestamp: iso(a.ms) })); cols = ['uid', 'sessionId', 'gameName', 'scenarioIndex', 'question', 'choiceIndex', 'score', 'effectiveness', 'cashImpact', 'timestamp']; break;
                 case 'launches': rows = D.launches.map(l => ({ uid: l.uid, courseName: l.courseName, targetUrl: l.targetUrl, timestamp: iso(l.ms) })); cols = ['uid', 'courseName', 'targetUrl', 'timestamp']; break;
                 case 'feedback': rows = D.feedback.map(f => ({ uid: f.uid, name: f.name, gameName: f.gameName, rating: f.rating, feedback: f.feedback, timestamp: iso(f.ms) })); cols = ['uid', 'name', 'gameName', 'rating', 'feedback', 'timestamp']; break;
-                case 'messages': rows = D.messages.map(m => ({ senderUid: m.senderUid, senderName: m.senderName, senderEmail: m.senderEmail, source: m.source, message: m.message, isGuest: m.isGuest, timestamp: iso(m.ms) })); cols = ['senderUid', 'senderName', 'senderEmail', 'source', 'message', 'isGuest', 'timestamp']; break;
+                case 'messages': rows = D.messages.map(m => ({ senderUid: m.senderUid, senderName: m.senderName, senderEmail: m.senderEmail, replyTo: m.replyTo || '', source: m.source, message: m.message, isGuest: m.isGuest, timestamp: iso(m.ms) })); cols = ['senderUid', 'senderName', 'senderEmail', 'source', 'message', 'isGuest', 'timestamp']; break;
                 default: return;
             }
             download(`insider-${kind}-${stamp}.csv`, toCSV(rows, cols));

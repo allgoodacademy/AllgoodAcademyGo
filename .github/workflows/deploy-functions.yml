@@ -1,5 +1,6 @@
-# Deploys the Cloud Functions (functions/, today the Stripe webhook that turns on Mission
-# Control Pro) from GitHub, so the founder never needs a terminal.
+# Deploys the Cloud Functions (functions/: the Stripe webhook that turns on Mission Control
+# Pro, and espanolIdeaEmail, which emails Español hub ideas to learning@) from GitHub, so the
+# founder never needs a terminal.
 #
 #   - Runs on any push to main that touches functions/ (or this file), after the function
 #     tests pass.
@@ -58,9 +59,29 @@ jobs:
         run: node_modules/.bin/firebase functions:delete stripeWebhook --region us-central1 --project allgood-academy --force --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+      # espanolIdeaEmail needs GMAIL_APP_PASSWORD in Secret Manager. The founder pastes the
+      # Gmail app password (learning@allgoodacademy.com) into the GitHub secret of the same name;
+      # this copies it into Secret Manager on every run (each run adds a secret version).
+      # Until the GitHub secret exists, only stripeWebhook is deployed, so Stripe never waits
+      # on email setup.
+      - name: Store the Gmail app password in Secret Manager
+        id: gmail
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          if [ -z "$GMAIL_APP_PASSWORD" ]; then
+            echo "GMAIL_APP_PASSWORD GitHub secret not set: deploying stripeWebhook only (no Español idea email)."
+            echo "targets=functions:stripeWebhook" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$GMAIL_APP_PASSWORD" | tr -d '[:space:]' > "${{ runner.temp }}/gmail-app-password"
+          node_modules/.bin/firebase functions:secrets:set GMAIL_APP_PASSWORD --data-file "${{ runner.temp }}/gmail-app-password" --project allgood-academy --non-interactive --force
+          rm -f "${{ runner.temp }}/gmail-app-password"
+          echo "targets=functions" >> "$GITHUB_OUTPUT"
       - name: Deploy functions
         # --force accepts the default Artifact Registry cleanup policy, which the CLI would
         # otherwise stop to ask about in a non-interactive run.
-        run: node_modules/.bin/firebase deploy --only functions --project allgood-academy --non-interactive --force ${{ inputs.debug && '--debug' || '' }}
+        run: node_modules/.bin/firebase deploy --only ${{ steps.gmail.outputs.targets }} --project allgood-academy --non-interactive --force ${{ inputs.debug && '--debug' || '' }}
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json

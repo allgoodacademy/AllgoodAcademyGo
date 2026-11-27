@@ -15,4 +15,4 @@ if [ ! -d functions/node_modules ]; then
 fi
 
 node_modules/.bin/firebase emulators:exec --only firestore,auth --project allgood-functions-test \
-  "node --test functions/test/stripe-webhook.test.js"
+  "node --test functions/test/stripe-webhook.test.js functions/test/espanol-idea-email.test.js"
