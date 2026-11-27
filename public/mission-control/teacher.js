@@ -46,7 +46,7 @@ import {
 // The registry loader the games already share: one cached fetch of /data/modules-registry.json.
 import { loadRegistry } from '/js/skill-routing.js';
 import { createClass as createClassShared } from './classes.js';
-import { storyReport, studentStory, playedStoryIds, growthReport, presentedGrowth } from './espanol-report.js';
+import { storyReport, studentStory, playedStoryIds, growthReport, presentedGrowth, presentedVote } from './espanol-report.js';
 
 // Embarque → Aduana (the growth view and the postcard rubric) is behind a flag: on for
 // staging, off for production until the item bank has had its native-speaker review. See
@@ -1326,9 +1326,12 @@ function storyChecks(it) {
     });
     return false;
 }
-const growthBar = (label, count, n, pct, showPercent, cls, approx = false) => `<div class="gr ${cls}"><span class="gl">${label}</span>
+const growthBar = (label, count, n, pct, showPercent, cls) => `<div class="gr ${cls}"><span class="gl">${label}</span>
     <span class="split" aria-hidden="true"><i style="width:${pct}%"></i></span>
-    <span class="p">${showPercent ? `${approx ? 'about ' : ''}${pct}%` : `${count} <small>of ${n}</small>`}</span></div>`;
+    <span class="p">${showPercent ? `${pct}%` : `${count} <small>of ${n}</small>`}</span></div>`;
+// A presented session's class vote on a check, in words (a quick vote has no numbers).
+const CHECK_WORDS = { right: 'the class picked the right answer', other: 'the class picked another answer', split: 'the class was split' };
+const checkLine = (label, v) => (v ? `<p class="note" style="margin:2px 0">${label}: ${CHECK_WORDS[v]}</p>` : '');
 function growthHtml(it, who) {
     const checks = storyChecks(it);
     if (!checks) return '';
@@ -1381,8 +1384,9 @@ async function saveRubric(btn) {
 }
 
 /* Presented sessions (Presentar en clase), kept apart from solo play: these are the class's
-   votes by show of hands, saved by the teacher from the projector. A quick vote ("nearly
-   everyone", "split") is an approximate share, and says so. */
+   votes by show of hands, saved by the teacher from the projector. Exact hand counts show
+   bars and the counts. A quick vote ("nearly everyone", "split") shows words only, never a
+   percentage: nobody counted (AA-17). Older sessions are read through presentedVote. */
 function presentedHtml(it, cfg) {
     const list = presentedFor(it.id);
     if (!list.length) return '';
@@ -1392,24 +1396,33 @@ function presentedHtml(it, cfg) {
             if (!saved || !Array.isArray(saved.rows)) return '';
             const rows = pc.blanks.map((b, bi) => {
                 const r = saved.rows[bi];
-                if (!r) return '';
-                const quick = r.mode === 'quick';
-                const total = quick ? 0 : Object.values(r.counts || {}).reduce((a, c) => a + (Number(c) || 0), 0);
-                const opts = b.options.map((o) => {
-                    const pct = Number((r.shares || {})[o.k]) || 0;
-                    const right = b.right.includes(o.k);
-                    return `<div class="eo${right ? ' ok' : ''}"><div class="t" lang="es">${esc(o.text || o.k)}${right ? ' <span class="mk b" lang="en">✓ Right answer</span>' : ''}${r.pick === o.k ? ' <span class="mk o" lang="en">Class pick</span>' : ''}</div>
-                      <div class="split" aria-hidden="true"><i style="width:${pct}%"></i></div>
-                      <div class="p">${quick ? `about ${pct}%` : `${Number((r.counts || {})[o.k]) || 0} <small>of ${total}</small>`}</div></div>`;
-                }).join('');
-                return `<div class="eblank">${b.sentence ? `<p class="q" lang="es">${esc(b.sentence)}</p>` : ''}${opts}${quick ? '<p class="note" style="margin-top:4px">Quick vote: approximate, not a count.</p>' : ''}</div>`;
+                const vote = presentedVote(r);
+                if (!vote) return '';
+                const mark = (o, pick) => `${b.right.includes(o.k) ? ' <span class="mk b" lang="en">✓ Right answer</span>' : ''}${pick === o.k ? ' <span class="mk o" lang="en">Class pick</span>' : ''}`;
+                let opts;
+                if (vote.mode === 'quick') {
+                    const split = vote.quick === 'split';
+                    const pick = split ? null : vote.quick;
+                    opts = `<p class="note" style="margin:2px 0">Quick vote: ${split ? 'the class was split' : 'nearly everyone picked one answer'}. Not a count.</p>`
+                        + b.options.filter((o) => o.k === pick || b.right.includes(o.k))
+                            .map((o) => `<div class="eo q${b.right.includes(o.k) ? ' ok' : ''}"><div class="t" lang="es">${esc(o.text || o.k)}${mark(o, pick)}</div></div>`).join('');
+                } else {
+                    opts = b.options.map((o) => {
+                        const c = vote.counts[o.k] || 0;
+                        const pct = vote.total ? Math.round((c / vote.total) * 100) : 0;
+                        return `<div class="eo${b.right.includes(o.k) ? ' ok' : ''}"><div class="t" lang="es">${esc(o.text || o.k)}${mark(o, r.pick)}</div>
+                          <div class="split" aria-hidden="true"><i style="width:${pct}%"></i></div>
+                          <div class="p">${c} <small>of ${vote.total}</small></div></div>`;
+                    }).join('');
+                }
+                return `<div class="eblank">${b.sentence ? `<p class="q" lang="es">${esc(b.sentence)}</p>` : ''}${opts}</div>`;
             }).join('');
             return `<div class="epres"><div class="eyebrow">Puerta ${pc.n} · ${esc(pc.label)}</div>${rows}</div>`;
         }).join('');
         const forks = (cfg.forks || []).map((f) => { const o = f.options.find((x) => x.k === (p.forks || {})[f.key]); return o ? `<span lang="es">${esc(f.label)}: ${esc(o.text)}</span>` : ''; }).filter(Boolean).join(' · ');
         const pg = CHECKS_ON && p.checks ? presentedGrowth(storyChecks(it) || null, p.checks) : null;
         const growth = pg && pg.length ? `<div class="epres"><div class="eyebrow">Embarque → Aduana · class votes</div>${pg.map((sl) => `<div class="eblank"><p class="q">${esc(sl.skill)}</p>
-            ${sl.emb == null ? '' : growthBar('Embarque (before)', 0, 0, sl.emb, true, 'before', true)}${sl.adu == null ? '' : growthBar('Aduana (after)', 0, 0, sl.adu, true, 'after', true)}</div>`).join('')}<p class="note" style="margin-top:4px">Quick votes: approximate, not a count.</p></div>` : '';
+            ${checkLine('Embarque (before)', sl.emb)}${checkLine('Aduana (after)', sl.adu)}</div>`).join('')}<p class="note" style="margin-top:4px">Quick votes by show of hands, not a count.</p></div>` : '';
         return `<details class="as"${list.length === 1 ? ' open' : ''}><summary><span><b style="font-size:13.5px">Presented ${esc(fmtDate(toMillis(p.createdAt)))}</b><div class="meta">The class voted by show of hands${forks ? ` · path: ${forks}` : ''}</div></span></summary>
             <div class="body">${puertas || '<p class="empty">No votes were saved in this session.</p>'}${growth}</div></details>`;
     }).join('');

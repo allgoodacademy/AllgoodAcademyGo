@@ -1300,7 +1300,36 @@ test('growth view: five or more students shows percentages; nothing to flag when
     assert.equal(g.slots[0].aduPct, 100);
     assert.equal(g.worth, null);
     assert.equal(presentedGrowth(CHECKS_CFG, null), null);
-    assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ right: 10 }], adu: [{ right: 90 }] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 10, adu: 90 });
+    // New shape: right true / false, null for a split. Old shape: an invented share (90 = right).
+    assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ pick: 2, right: false }], adu: [{ pick: 0, right: true }] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 'other', adu: 'right' });
+    assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ pick: 'split', right: null }], adu: [] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 'split', adu: null });
+    assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ pick: 1, right: 5 }], adu: [{ pick: 0, right: 90 }] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 'other', adu: 'right' });
+    assert.equal(presentedGrowth(CHECKS_CFG, { emb: [{ pick: 'split', right: 50 }] })[0].emb, 'split');
+});
+
+/* ── Presented sessions: no invented percentages (2026-11-27, AA-17) ──────────── */
+const { presentedVote } = await import('../public/mission-control/espanol-report.js');
+
+test('presented votes: a quick vote reads as a label, never numbers, in either saved shape', () => {
+    assert.deepEqual(presentedVote({ mode: 'quick', quick: 'B', pick: 'B' }), { mode: 'quick', quick: 'B' });
+    assert.deepEqual(presentedVote({ mode: 'quick', quick: 'split', pick: 'A' }), { mode: 'quick', quick: 'split' });
+    // Saved before AA-17: invented shares. The label comes back; the numbers do not.
+    assert.deepEqual(presentedVote({ mode: 'quick', counts: null, shares: { A: 5, B: 90, C: 5 }, pick: 'B' }), { mode: 'quick', quick: 'B' });
+    assert.deepEqual(presentedVote({ mode: 'quick', counts: null, shares: { A: 50, B: 50 }, pick: 'A' }), { mode: 'quick', quick: 'split' });
+    assert.equal(presentedVote(null), null);
+});
+
+test('presented votes: exact counts come back as the counts entered, old shape or new', () => {
+    assert.deepEqual(presentedVote({ mode: 'exact', counts: { A: 18, B: 6 }, pick: 'A' }), { mode: 'exact', counts: { A: 18, B: 6 }, total: 24 });
+    assert.deepEqual(presentedVote({ mode: 'exact', counts: { A: 3, B: 1 }, shares: { A: 75, B: 25 } }), { mode: 'exact', counts: { A: 3, B: 1 }, total: 4 });
+});
+
+test('presented votes: the Reports tab no longer prints "about N%" for a quick vote', () => {
+    const src = readFileSync(new URL('../public/mission-control/teacher.js', import.meta.url), 'utf8');
+    const fn = src.slice(src.indexOf('function presentedHtml('), src.indexOf('function drillStoryHtml('));
+    assert.doesNotMatch(fn, /about \$\{/);
+    assert.doesNotMatch(fn, /shares/);
+    assert.doesNotMatch(src, /approx/);
 });
 
 test('item banks: five slots, five items per form, the right option first, a rule for each', () => {
