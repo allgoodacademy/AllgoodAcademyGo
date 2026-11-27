@@ -54,12 +54,14 @@ const SIGNIN = { label: 'Teacher sign in', href: '/mission-control/' };
 
 // --- The session script, emitted inline directly under the bar. -------------
 //
-// Two words change, nothing else:
+// Two things change, nothing else:
 //   - a browser with a session (ag_signed_in — every student who has played
 //     anything) reads "My dashboard" in place of "Start learning": same link,
 //     but it tells a returning student their work is there;
-//   - a signed-in teacher (ag_account) sees "Mission Control" in place of
-//     "Teacher sign in", since that is where the link already goes.
+//   - a signed-in teacher (ag_account) reads "My dashboard" too, and loses the
+//     "Teacher sign in" link (2026-11-27, one dashboard): their class is
+//     Mission Control inside the dashboard, so the button is the one way in.
+//     Signed out, everyone still sees "Teacher sign in".
 //
 // Deliberately synchronous and deliberately HERE, immediately after the markup:
 // it runs during parse, before first paint, so a slow Chromebook never shows a
@@ -74,8 +76,8 @@ const SESSION_SCRIPT = `<script>
   var s=false,a=false;
   try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
-  if(s&&cta)cta.textContent='My dashboard';
-  if(a&&signin)signin.textContent='Mission Control';
+  if((s||a)&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.remove();
   // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
   // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
   // writes it onto the session doc. See docs/insider-analytics.md.
@@ -266,8 +268,8 @@ const PAGES = [
     { file: 'public/educational-games/index.html', slug: 'games',        skin: 'light' },
     { file: 'public/simulations/index.html',       slug: 'simulations',  skin: 'light' },
     { file: 'public/dashboard/index.html',         slug: 'dashboard',    skin: 'light' },
-    // The teacher's page. Its "Teacher sign in" link is the one marked as here (and reads
-    // "Mission Control" for a signed-in teacher — see the session script).
+    // Teacher sign-in. Its "Teacher sign in" link is the one marked as here (and the link
+    // is gone for a signed-in teacher, whose class is on /dashboard/ — see the session script).
     { file: 'public/mission-control/index.html',   slug: 'mission-control', skin: 'light' },
     { file: 'public/jsh/digital-decisions-lab/index.html', slug: 'lab-hub', skin: 'light', activity: true },
     { file: 'public/jsh/real-world-ready-lab/index.html',  slug: 'lab-hub', skin: 'light', activity: true },

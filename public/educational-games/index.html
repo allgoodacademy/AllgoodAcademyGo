@@ -436,8 +436,8 @@ body.present .nav-shell.activity{display:none}
   var s=false,a=false;
   try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
   var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
-  if(s&&cta)cta.textContent='My dashboard';
-  if(a&&signin)signin.textContent='Mission Control';
+  if((s||a)&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.remove();
   // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
   // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
   // writes it onto the session doc. See docs/insider-analytics.md.

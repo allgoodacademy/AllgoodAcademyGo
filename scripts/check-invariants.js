@@ -148,6 +148,27 @@ if (exists('public/dashboard/index.html')) {
   }
 }
 
+// Mission Control inside the dashboard (2026-11-27). /dashboard/ is every student's page, so
+// the teacher module it imports must never bring analytics of its own (its events go to the
+// dashboard's gated property), and the page may import it only behind the teacher check.
+{
+  const TEACHER_JS = 'public/mission-control/teacher.js';
+  if (exists(TEACHER_JS) && /googletagmanager|google-analytics|gtag\/js/.test(read(TEACHER_JS))) {
+    fail('ga4', `${TEACHER_JS}: loads an analytics library. It runs inside /dashboard/, every ` +
+      `student's page; its events go to the dashboard's own ag_account-gated GA4 through window.gtag.`);
+  }
+  if (exists('public/dashboard/index.html')) {
+    const dash = read('public/dashboard/index.html');
+    const at = dash.indexOf("import('/mission-control/teacher.js')");
+    const caller = dash.indexOf("if (profile.role === 'teacher') startTeacher();");
+    if (at !== -1 && caller === -1) {
+      fail('ga4', `public/dashboard/index.html: imports /mission-control/teacher.js without the ` +
+        `"if (profile.role === 'teacher') startTeacher();" gate. Teacher code must load for a ` +
+        `teacher only.`);
+    }
+  }
+}
+
 if (exists('public/mission-control/index.html')) {
   const mc = read('public/mission-control/index.html');
   let idx = mc.indexOf(GTAG_LIB);
@@ -516,7 +537,9 @@ function isScheduled(file) {
         `characters, hint "Nickname or first name. No last names.").`);
     }
   }
-  const MC = 'public/mission-control/index.html';
+  // The poster moved with Mission Control into the dashboard (2026-11-27): its markup is in
+  // the teacher module now.
+  const MC = 'public/mission-control/teacher.js';
   if (exists(MC)) {
     const mc = read(MC);
     const sheet = (mc.match(/<div class="print-sheet"[\s\S]*?<\/div>\s*\n\s*<!--/) || [''])[0];
