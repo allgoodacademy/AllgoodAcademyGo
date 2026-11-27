@@ -1173,6 +1173,38 @@ console.log('\nPresented sessions (Presentar en clase):');
   });
 }
 
+// ── Postcard rubric taps (Embarque → Aduana, rule #6e, 2026-11-27) ────────────────────────
+console.log('\nPostcard rubric taps:');
+{
+  const RUB = (db, code, id) => doc(db, 'artifacts', APP, 'classrooms', code, 'rubric_scores', id);
+  const taps = (over = {}) => ({ uid: 'student_1', story: 'el-mundial', classroomCode: 'KM7QPD', teacherUid: 'teacher_1', levels: { 0: 2, 1: 1 }, updatedAt: serverTimestamp(), ...over });
+  const other = env.authenticatedContext('teacher_other', { email: 'o@school.org' }).firestore();
+  const member = env.authenticatedContext('member_1').firestore();
+  await it('the class\'s teacher CAN save, change and read rubric taps for a student', async () => {
+    await assertSucceeds(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps()));
+    await assertSucceeds(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps({ levels: { 0: 2, 1: 2, 2: 0 } })));
+    await assertSucceeds(getDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial')));
+    await assertSucceeds(getDocs(collection(teacher, 'artifacts', APP, 'classrooms', 'KM7QPD', 'rubric_scores')));
+  });
+  await it('a student CANNOT read their own rubric taps, a classmate\'s, or the list', async () => {
+    await assertFails(getDoc(RUB(student, 'KM7QPD', 'student_1_el-mundial')));
+    await assertFails(getDoc(RUB(member, 'KM7QPD', 'student_1_el-mundial')));
+    await assertFails(getDocs(collection(student, 'artifacts', APP, 'classrooms', 'KM7QPD', 'rubric_scores')));
+  });
+  await it('a student CANNOT write rubric taps', async () => {
+    await assertFails(setDoc(RUB(student, 'KM7QPD', 'student_1_el-mundial'), taps({ levels: { 0: 2, 1: 2, 2: 2, 3: 2 } })));
+  });
+  await it('another teacher CANNOT read or write this class\'s rubric taps', async () => {
+    await assertFails(getDoc(RUB(other, 'KM7QPD', 'student_1_el-mundial')));
+    await assertFails(setDoc(RUB(other, 'KM7QPD', 'student_1_el-mundial'), taps({ teacherUid: 'teacher_other' })));
+  });
+  await it('rubric taps CANNOT carry anything else (e.g. the postcard text), or sit at the wrong id', async () => {
+    await assertFails(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps({ text: 'Querida familia…' })));
+    await assertFails(setDoc(RUB(teacher, 'KM7QPD', 'someone_else'), taps()));
+    await assertFails(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps({ classroomCode: 'OTHER9' })));
+  });
+}
+
 await env.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -46,7 +46,12 @@ import {
 // The registry loader the games already share: one cached fetch of /data/modules-registry.json.
 import { loadRegistry } from '/js/skill-routing.js';
 import { createClass as createClassShared } from './classes.js';
-import { storyReport, studentStory, playedStoryIds } from './espanol-report.js';
+import { storyReport, studentStory, playedStoryIds, growthReport, presentedGrowth } from './espanol-report.js';
+
+// Embarque → Aduana (the growth view and the postcard rubric) is behind a flag: on for
+// staging, off for production until the item bank has had its native-speaker review. See
+// /js/site-config.js, which the dashboard loads before this module.
+const CHECKS_ON = !!(window.AG_CONFIG && window.AG_CONFIG.ESPANOL_CHECKS_ON);
 
 const { db, appId, auth, waitForAuthReady } = window.AuthCore;
 
@@ -296,7 +301,9 @@ const state = {
     drillId: null,           // an assignment open on Overview
     reportTab: null,         // Reports: lessons | challenges | games | sims | espanol
     presented: [],           // this class's presented sessions (Presentar en clase), newest first
-    storyCfg: {},            // story id → its report.json (false while loading, null if it failed)
+    storyCfg: {},
+    storyChecks: {},         // story id → its checks.json (flag on only; false loading, null failed)
+    rubrics: {},             // `${uid}_${story}` → the teacher's postcard rubric taps (flag on only)            // story id → its report.json (false while loading, null if it failed)
     filter: 'all',           // Students tab: all | check | done
     search: '',
     selected: new Set(),     // Students tab ticks
@@ -482,6 +489,18 @@ async function load() {
         state.presented = pSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
     } catch (e) {
         console.warn('[Mission Control] presented sessions unavailable', e && e.code);
+    }
+
+    // Postcard rubric taps (Embarque → Aduana, flag on only): the teacher's own notes on a
+    // postcard written on paper or in Google Classroom. Only the taps are stored.
+    state.rubrics = {};
+    if (CHECKS_ON) {
+        try {
+            const rSnap = await getDocs(collection(db, 'artifacts', appId, 'classrooms', state.code, 'rubric_scores'));
+            rSnap.docs.forEach((d) => { state.rubrics[d.id] = d.data(); });
+        } catch (e) {
+            console.warn('[Mission Control] rubric taps unavailable', e && e.code);
+        }
     }
 
     const rows = (await Promise.all(memberUids.map(async (uid) => {
@@ -1286,6 +1305,73 @@ function blankHtml(b, showPercent) {
           <div class="p">${countOrShare(o.count, b.n, showPercent)}</div></div>`).join('');
     return `<div class="eblank">${b.sentence ? `<p class="q" lang="es">${esc(b.sentence)}</p>` : ''}${rows}</div>`;
 }
+/* EMBARQUE → ADUANA (flag on only): the class's growth by skill, and the postcard rubric. */
+function storyChecks(it) {
+    if (!CHECKS_ON) return null;
+    const hit = state.storyChecks[it.id];
+    if (hit !== undefined) return hit;
+    state.storyChecks[it.id] = false;
+    fetch(`${it.url}checks.json`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((cfg) => {
+        state.storyChecks[it.id] = cfg && Array.isArray(cfg.slots) ? cfg : null;
+        if (state.tab === 'reports' && state.drillId === it.id) renderReports();
+        if (state.panelUid) renderPanel(state.panelUid);
+    });
+    return false;
+}
+const growthBar = (label, count, n, pct, showPercent, cls, approx = false) => `<div class="gr ${cls}"><span class="gl">${label}</span>
+    <span class="split" aria-hidden="true"><i style="width:${pct}%"></i></span>
+    <span class="p">${showPercent ? `${approx ? 'about ' : ''}${pct}%` : `${count} <small>of ${n}</small>`}</span></div>`;
+function growthHtml(it, who) {
+    const checks = storyChecks(it);
+    if (!checks) return '';
+    const g = growthReport(checks, it.id, who);
+    if (!g.boarded) return '';
+    const body = g.n
+        ? g.slots.map((sl) => `<div class="eblank"><p class="q">${esc(sl.skill)} <span class="muted" style="font-weight:400">· ${esc(sl.puerta)}</span></p>
+            ${growthBar('Embarque (before)', sl.emb, g.n, sl.embPct, g.showPercent, 'before')}${growthBar('Aduana (after)', sl.adu, g.n, sl.aduPct, g.showPercent, 'after')}</div>`).join('')
+        : '<p class="empty">Nobody has reached the Aduana yet. This fills in as students finish the story.</p>';
+    return `<div class="box epu"><h3>Embarque → Aduana: before and after</h3>
+        <p class="sub">${g.n} of ${who.length} students did both checks. Each skill shows how many got it on the first try before the story and after it.</p>
+        ${g.worth ? `<div class="talk"><b>Worth five minutes tomorrow:</b> ${esc(g.worth)}</div>` : ''}
+        ${body}
+        <p class="note">5 questions is a practice check, not a test of any one student.</p></div>`;
+}
+/* The postcard rubric, in a student's panel: four rows, three levels. The postcard itself is
+   on paper or in Google Classroom; only these taps are saved, by the teacher, to their class. */
+const RUBRIC_LEVELS = ['Todavía no', 'Casi', '¡Listo!'];
+function rubricHtml(it, s) {
+    const checks = storyChecks(it);
+    if (!checks || !Array.isArray(checks.rubric)) return '';
+    const saved = state.rubrics[`${s.uid}_${it.id}`];
+    const levels = (saved && saved.levels) || {};
+    const rows = checks.rubric.map((r, ri) => `<div class="rub" role="group" aria-label="${esc(r.title)}">
+        <div><b>${esc(r.title)}</b><div class="meta">${esc(r.detail)}</div></div>
+        <div class="rubl">${RUBRIC_LEVELS.map((l, li) => `<button class="rubb" type="button" data-rubric="${esc(it.id)}" data-uid="${esc(s.uid)}" data-row="${ri}" data-level="${li}" aria-pressed="${levels[ri] === li}"${state.readOnly ? ' disabled' : ''} lang="es">${l}</button>`).join('')}</div></div>`).join('');
+    return `<div class="sec" style="margin-top:12px">Postcard rubric</div>
+        <p class="pick">The postcard is written on paper or in Google Classroom. Tap what you saw; only your taps are saved.</p>${rows}`;
+}
+async function saveRubric(btn) {
+    if (state.readOnly) return;
+    const { rubric: story, uid } = btn.dataset;
+    const row = Number(btn.dataset.row), level = Number(btn.dataset.level);
+    const id = `${uid}_${story}`;
+    const prev = state.rubrics[id];
+    const levels = { ...((prev && prev.levels) || {}) };
+    if (levels[row] === level) delete levels[row]; else levels[row] = level;   // tap again to clear
+    state.rubrics[id] = { uid, story, classroomCode: state.code, teacherUid: state.user.uid, levels };
+    renderPanel(uid);
+    const again = document.querySelector(`#drawer [data-rubric="${CSS.escape(story)}"][data-row="${row}"][data-level="${level}"]`);
+    if (again) again.focus();
+    try {
+        await setDoc(doc(db, 'artifacts', appId, 'classrooms', state.code, 'rubric_scores', id), { ...state.rubrics[id], updatedAt: serverTimestamp() });
+    } catch (e) {
+        console.warn('[Mission Control] rubric tap did not save', e && e.code);
+        if (prev) state.rubrics[id] = prev; else delete state.rubrics[id];
+        renderPanel(uid);
+        toast('That did not save. Please try again.', true);
+    }
+}
+
 /* Presented sessions (Presentar en clase), kept apart from solo play: these are the class's
    votes by show of hands, saved by the teacher from the projector. A quick vote ("nearly
    everyone", "split") is an approximate share, and says so. */
@@ -1313,8 +1399,11 @@ function presentedHtml(it, cfg) {
             return `<div class="epres"><div class="eyebrow">Puerta ${pc.n} · ${esc(pc.label)}</div>${rows}</div>`;
         }).join('');
         const forks = (cfg.forks || []).map((f) => { const o = f.options.find((x) => x.k === (p.forks || {})[f.key]); return o ? `<span lang="es">${esc(f.label)}: ${esc(o.text)}</span>` : ''; }).filter(Boolean).join(' · ');
+        const pg = CHECKS_ON && p.checks ? presentedGrowth(storyChecks(it) || null, p.checks) : null;
+        const growth = pg && pg.length ? `<div class="epres"><div class="eyebrow">Embarque → Aduana · class votes</div>${pg.map((sl) => `<div class="eblank"><p class="q">${esc(sl.skill)}</p>
+            ${sl.emb == null ? '' : growthBar('Embarque (before)', 0, 0, sl.emb, true, 'before', true)}${sl.adu == null ? '' : growthBar('Aduana (after)', 0, 0, sl.adu, true, 'after', true)}</div>`).join('')}<p class="note" style="margin-top:4px">Quick votes: approximate, not a count.</p></div>` : '';
         return `<details class="as"${list.length === 1 ? ' open' : ''}><summary><span><b style="font-size:13.5px">Presented ${esc(fmtDate(toMillis(p.createdAt)))}</b><div class="meta">The class voted by show of hands${forks ? ` · path: ${forks}` : ''}</div></span></summary>
-            <div class="body">${puertas || '<p class="empty">No votes were saved in this session.</p>'}</div></details>`;
+            <div class="body">${puertas || '<p class="empty">No votes were saved in this session.</p>'}${growth}</div></details>`;
     }).join('');
     return `<div class="box epu"><h3>${plural(list.length, 'presented session')}</h3>
         <p class="sub">Played together on the projector with Presentar en clase. These are class votes, kept apart from what students did on their own. No student is named or counted.</p>${sessions}</div>`;
@@ -1329,7 +1418,7 @@ function drillStoryHtml(it, who) {
         ${d.worth ? `<div class="talk"><b>Worth five minutes tomorrow:</b> <span lang="es">${esc(d.worth.text)}</span></div>` : ''}
         ${d.forks.map((f) => `<p class="efork"><b>Paths picked <span class="muted">(<span lang="es">${esc(f.label)}</span>, no right answer here)</span>:</b> <span lang="es">${f.options.map((o) => `${esc(o.text)} ${o.count}`).join(' · ')}</span></p>`).join('')}
         ${eventsNote()}</div>`;
-    const shown = presentedHtml(it, cfg);
+    const shown = growthHtml(it, who) + presentedHtml(it, cfg);
     if (!d.played) return `${head}<div class="box"><p class="empty">Nobody in this class has opened it on their own yet from a device that joined.</p></div>${shown}`;
     const cards = d.puertas.map((p) => `<div class="box epu"><div class="eyebrow">Puerta ${p.n} · ${esc(p.label)}</div>
         <p class="eprompt" lang="es">${esc(p.prompt)}</p>${p.ask ? `<p class="sub" lang="es">${esc(p.ask)}</p>` : ''}
@@ -1483,7 +1572,7 @@ function panelItemBody(s, id) {
             <div>Puerta ${p.n} <span class="meta">· ${esc(p.label)}</span></div>
             <span class="meta">${p.answered ? (p.right ? '✓ Right on the first try' : 'Not yet') : 'Not reached'}</span></div>`).join('');
         const path = d.forks.filter((f) => f.text).map((f) => `<span lang="es">${esc(f.label)}: ${esc(f.text)}</span>`).join(' · ');
-        return `${top}${rows}${path ? `<div class="pick">Path: ${path}</div>` : ''}`;
+        return `${top}${rows}${path ? `<div class="pick">Path: ${path}</div>` : ''}${rubricHtml(it, s)}`;
     }
     if (it.type === 'sim') {
         const p = simProgress(s, it);
@@ -1551,6 +1640,8 @@ function renderPanel(uid) {
 }
 $('drawer').addEventListener('click', (e) => {
     if (e.target.closest('[data-close-panel]')) { closePanel(); return; }
+    const rb = e.target.closest('[data-rubric]');
+    if (rb && !rb.disabled) { saveRubric(rb); return; }
     const a = e.target.closest('[data-assign-for]');
     if (a) { const uid = a.dataset.assignFor; closePanel(); openAssignFor([uid]); }
 });

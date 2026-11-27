@@ -374,3 +374,48 @@ handful of students.
 - **Product updates (opt-in).** `users/{uid}.productUpdates = { optedIn, source: 'setup'|'settings', updatedAt }`, written by the teacher only (`AuthCore.setProductUpdates`). Offered unchecked on the setup screen and as a toggle at the bottom of Mission Control. No field means "not asked yet", which is **not** opted in. Privacy policy section 5 describes it.
 - **Counting teachers.** `scripts/report-teacher-accounts.js` (or Actions → "Teacher accounts report") is read-only and prints counts only; per-account detail goes to the gitignored `reports/` folder.
 - **Refunds.** A full Stripe refund takes back only the paid year: `proUntil` goes back one year, never earlier than now. A Founding Teacher who paid and was refunded keeps their free months.
+
+## Reports by kind of work, and Español (2026-11-27)
+
+**Reports** has one tab per kind of work: Lessons, Challenges, Games, Simulations, Español.
+Each lists that kind's assigned items (Español also lists a story the class played without
+it being assigned, or presented) and opens the same drill-down as before. The last tab is
+remembered per teacher in `localStorage` (`mc_reports_tab_<uid>`).
+
+**The Español report** (`espanol-report.js`, pure, unit-tested) shows first tries per Puerta:
+- Prompts, options, right answers and grammar labels come from
+  `public/espanol/<story>/report.json`. A new story adds that file; `check:modules` fails if a
+  scored Puerta has no entry.
+- A student's first try is their earliest `choice` event per Puerta (`category: 'gate'`).
+  Puertas with several blanks send each blank's pick in `meta.picks`, so a replay never
+  overwrites it. Where events can't be read it falls back to the session summary and
+  `module_progress`.
+- Under five students who answered, counts are shown, not percentages.
+- Wording rule: "picked" and "right answer". Never score, grade, wrong or at risk. A unit
+  test reads the template and fails on those words.
+
+**Presentar en clase** (`/js/story-presentar.js`, `?mode=presentar&class=<code>`) is the same
+story page driven as slides with a class vote. Saving the recap writes one document to
+`classrooms/{code}/presented_sessions/{id}` (rule 6d: the class's own teacher creates and
+reads; no updates): `story`, `createdAt`, `puertas` (per row: `mode` quick or exact,
+`counts`, `shares`, the `pick` played), `forks`, and `checks` when the flag is on. No student
+is in it. Quick votes are approximate shares and are labelled that way.
+
+**Embarque → Aduana** (`/js/espanol-checks.js`) is behind `ESPANOL_CHECKS_ON` in
+`/js/site-config.js`: on for the staging and preview channels and localhost, off in
+production until the item bank (`public/espanol/<story>/checks.json`, a draft) has had its
+native-speaker review. To turn it on in production, set `PRODUCTION_ESPANOL_CHECKS = true`
+there. With the flag off nothing is loaded or shown: no Embarque, no Aduana, no growth view,
+no rubric.
+- Stored on the student's own `module_progress/{story}.checks`: `form` (the Embarque form;
+  Aduana is the other), `emb` and `adu` (0 or 1 per skill slot), `embDone`, `aduDone`.
+- Form order: even or odd from the student's anonymous uid, so it is stable on reload.
+- The growth view counts only students who did both checks.
+- Postcard rubric taps: `classrooms/{code}/rubric_scores/{uid}_{story}` (rule 6e: the class's
+  own teacher reads and writes; students cannot read them). Only the taps are stored. There
+  is no text box for the postcard anywhere.
+
+**Verifying locally.** Staging cannot create anonymous sessions (the API key's referrer
+list), so student saves are verified in the emulators: `firebase emulators:start --only
+auth,firestore,storage --project allgood-academy`, then `node scripts/uat/seed-emulator.mjs`
+(the `uat-es@example.com` teacher has a 22-student El Mundial class and a 3-student one).

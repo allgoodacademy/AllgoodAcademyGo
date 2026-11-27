@@ -404,6 +404,30 @@ service cloud.firestore {
         && request.resource.data.forks is map;
     }
 
+    // 6e. NEW (2026-11-27) — POSTCARD RUBRIC TAPS (Embarque → Aduana, Mission Control's student
+    //     panel). classrooms/{code}/rubric_scores/{uid}_{story}: the teacher's own taps on the
+    //     story's four rubric rows (0 Todavía no, 1 Casi, 2 ¡Listo!) for a postcard the student
+    //     wrote on paper or in Google Classroom. ONLY THE TAPS: the postcard is never here, and
+    //     nothing a student typed is. Written and read by the class's own teacher, for a
+    //     student, at the id the uid + story pair requires. A student cannot read their own or
+    //     a classmate's; nobody else can read or write any of it.
+    match /artifacts/{appId}/classrooms/{code}/rubric_scores/{scoreId} {
+      allow read, delete: if request.auth != null && classroomOwnedBy(appId, code, request.auth.uid);
+      allow create, update: if request.auth != null
+        && classroomOwnedBy(appId, code, request.auth.uid)
+        && classWritable(appId, code, request.auth.uid)
+        && request.resource.data.keys().hasOnly(['uid', 'story', 'classroomCode', 'teacherUid', 'levels', 'updatedAt'])
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.classroomCode == code
+        && request.resource.data.uid is string
+        && request.resource.data.story is string
+        && request.resource.data.story.matches('^[a-z0-9-]{1,40}$')
+        && scoreId == request.resource.data.uid + '_' + request.resource.data.story
+        && request.resource.data.levels is map
+        && request.resource.data.levels.size() <= 8
+        && request.resource.data.updatedAt == request.time;
+    }
+
     // 6. NEW — Teachers can READ (not write) a classroom member's subcollections too
     //    (game_scores, launches) — needed so the roster can show real completion/scores,
     //    not just names. Still fully scoped to the teacher's own classroom, still read-only.

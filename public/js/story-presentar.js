@@ -59,8 +59,11 @@
         $$('section').forEach(function (sec) {
             if (sec.classList.contains('locked') || sec.id === 'intro') return;
             if (sec.classList.contains('chap')) $$('.step', sec).forEach(function (s) { out.push(s); });
-            else if (sec.classList.contains('carta')) { out.push($('.gin', sec) || sec); }
-            else if (sec.classList.contains('gate') || sec.classList.contains('fork')) out.push(sec);
+            else if (sec.classList.contains('carta')) {
+                out.push($('.gin', sec) || sec);
+                var adu = $('.ea-aduana', sec);          // Aduana (espanol-checks.js), when the checks are on
+                if (adu) out.push(adu);
+            } else if (sec.classList.contains('gate') || sec.classList.contains('fork') || sec.classList.contains('ea-sec')) out.push(sec);
         });
         return out.filter(Boolean);
     }
@@ -77,7 +80,7 @@
             var r = card.getBoundingClientRect();
             y = r.top + window.scrollY + r.height / 2 - window.innerHeight / 2;
             y = Math.max(y, absTop(el) - window.innerHeight * 0.55);
-        } else y = absTop(el) - (el.classList.contains('gin') ? 80 : 0);
+        } else y = absTop(el) - (el.classList.contains('gin') || el.classList.contains('ea-aduana') ? 80 : 0);
         window.scrollTo(0, Math.max(0, y));
         window.dispatchEvent(new Event('scroll'));
         var sec = sectionOf(el);
@@ -93,6 +96,8 @@
             setTimeout(function () { show(1); }, 80);
             return;
         }
+        // Embarque / Aduana: the class answers all five before the story goes on.
+        if (list[cur].dataset && list[cur].dataset.pmWait === '1') { say('Primero las cinco preguntas: el voto de la clase.'); return; }
         if (cur < list.length - 1) { show(cur + 1); return; }
         // The last unlocked step: press the story's own "continue" button, if it is offered.
         var btn = sec && $('.next:not([hidden]) [data-unlock]', sec);

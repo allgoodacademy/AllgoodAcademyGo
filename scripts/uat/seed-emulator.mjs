@@ -101,7 +101,11 @@ async function mundial(uid, i, { finished, reached }) {
   const score = Object.values(conf).reduce((a, b) => a + b, 0);
   await session(uid, 'el-mundial', 'espanol', { maxStep: finished ? 10 : Math.min(9, 2 + reached * 2), stepsTotal: 10, completed: finished, activeMs: (8 + reached * 4) * 60000, at: t + 120000, gameName: 'El Mundial',
     summary: { gates, path: { f1: fork }, mode: 'solo', ...(finished ? { score } : {}) } });
-  await A('users', uid, 'module_progress', 'el-mundial').set({ v: '1.9', finished, state: JSON.stringify({ done, choice, conf, path: { f1: fork } }), lastUpdated: ts(t) });
+  // Embarque → Aduana (flag on only): everyone who opened it boarded; those who finished did
+  // the Aduana too. The class grows most on conocía / conocí and least on the last skill.
+  const EMB = [0.45, 0.5, 0.35, 0.2, 0.3], ADU = [0.8, 0.85, 0.75, 0.8, 0.5];
+  const checks = { v: 1, form: i % 2 ? 'B' : 'A', emb: EMB.map((p) => (flip(p) ? 1 : 0)), adu: finished ? ADU.map((p) => (flip(p) ? 1 : 0)) : [], embDone: true, aduDone: finished };
+  await A('users', uid, 'module_progress', 'el-mundial').set({ v: '1.9', finished, state: JSON.stringify({ done, choice, conf, path: { f1: fork } }), checks, lastUpdated: ts(t) });
   if (finished) await A('users', uid, 'game_scores', sid).set({ gameName: 'El Mundial', completed: true, score, finalScore: score, maxScore: 5, lastUpdated: ts(t) });
 }
 /* El Viaje, played without being assigned: all five Puertas, both turns of Puerta 4. */

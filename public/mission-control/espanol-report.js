@@ -149,3 +149,43 @@ export function playedStoryIds(stories, students = []) {
             || !!(raw.progress && raw.progress[st.id]);
     })).map((st) => st.id);
 }
+
+/* EMBARQUE → ADUANA: the class's growth, skill by skill (only where ESPANOL_CHECKS_ON is
+   true). Reads each student's own module_progress/{story}.checks: { form, emb: [0|1 x5],
+   adu: [0|1 x5], embDone, aduDone }, slot i being the story's i-th skill whichever form the
+   student got. Only students who did BOTH count, so the two columns are the same people.
+   Five questions is a practice check, not a test of any one student: this is a class view. */
+export function growthReport(checksCfg, storyId, students = []) {
+    const slots = (checksCfg && checksCfg.slots) || [];
+    const rows = students.map((s) => {
+        const p = s && s.raw && s.raw.progress && s.raw.progress[storyId];
+        const c = p && p.checks;
+        if (!c || !Array.isArray(c.emb) || !Array.isArray(c.adu)) return { emb: null, adu: null };
+        return { emb: c.emb.length >= 5 ? c.emb : null, adu: c.adu.length >= 5 && c.aduDone !== false ? c.adu : null };
+    });
+    const boarded = rows.filter((r) => r.emb).length;
+    const both = rows.filter((r) => r.emb && r.adu);
+    const n = both.length;
+    const out = slots.map((sl, i) => {
+        const emb = both.filter((r) => Number(r.emb[i]) > 0).length;
+        const adu = both.filter((r) => Number(r.adu[i]) > 0).length;
+        return { k: sl.k, skill: sl.skill, puerta: sl.puerta, emb, adu, embPct: share(emb, n), aduPct: share(adu, n) };
+    });
+    const lowest = n ? out.slice().sort((a, b) => a.adu - b.adu)[0] : null;
+    const worth = lowest && lowest.adu < n
+        ? `${lowest.skill}: ${lowest.adu} of ${n} got it at the Aduana (${lowest.emb} of ${n} at Embarque).`
+        : null;
+    return { n, boarded, showPercent: n >= MIN_FOR_PERCENT, slots: out, worth };
+}
+
+/* The same view for one presented session: the class's quick votes before and after. Each
+   saved item is { pick, right } where `right` is the approximate share who had it right. */
+export function presentedGrowth(checksCfg, saved) {
+    if (!saved || !Array.isArray(saved.emb) || !saved.emb.length) return null;
+    const slots = (checksCfg && checksCfg.slots) || [];
+    return slots.map((sl, i) => ({
+        skill: sl.skill,
+        emb: saved.emb[i] ? Number(saved.emb[i].right) || 0 : null,
+        adu: saved.adu && saved.adu[i] ? Number(saved.adu[i].right) || 0 : null,
+    }));
+}

@@ -1270,3 +1270,65 @@ test('Español report: every word a teacher reads avoids score, grade, wrong and
     const shown = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\$\{[^}]*\}/g, '');
     for (const word of [/\bscore/i, /\bgrade/i, /\bwrong\b/i, /at risk/i]) assert.equal(word.test(shown), false, `the Español report says ${word}`);
 });
+
+/* ── Embarque → Aduana: the growth view and the flag (2026-11-27) ───────────── */
+const { growthReport, presentedGrowth } = await import('../public/mission-control/espanol-report.js');
+const CHECKS_CFG = JSON.parse(readFileSync(new URL('../public/espanol/el-mundial/checks.json', import.meta.url), 'utf8'));
+const withChecks = (uid, checks) => ({ uid, name: uid, events: [], raw: { sessions: [], scores: [], progress: { 'el-mundial': { checks } } } });
+
+test('growth view: only students who did both checks count, skill by skill', () => {
+    const students = [
+        withChecks('a', { form: 'A', emb: [1, 0, 0, 0, 0], adu: [1, 1, 1, 1, 0], embDone: true, aduDone: true }),
+        withChecks('b', { form: 'B', emb: [0, 0, 0, 0, 0], adu: [1, 1, 0, 1, 0], embDone: true, aduDone: true }),
+        withChecks('c', { form: 'A', emb: [1, 1, 1, 1, 1], adu: [], embDone: true, aduDone: false }),   // boarded, never reached the Aduana
+        withChecks('d', { form: 'B', emb: [1, 0], adu: [], embDone: false, aduDone: false }),           // left mid-Embarque
+        { uid: 'e', name: 'e', events: [], raw: { sessions: [], scores: [], progress: {} } },
+    ];
+    const g = growthReport(CHECKS_CFG, 'el-mundial', students);
+    assert.equal(g.n, 2);
+    assert.equal(g.boarded, 3);
+    assert.equal(g.showPercent, false, 'under five students: counts, not percentages');
+    assert.deepEqual(g.slots.map((s) => [s.emb, s.adu]), [[1, 2], [0, 2], [0, 1], [0, 2], [0, 0]]);
+    assert.equal(g.slots.length, 5);
+    assert.match(g.worth, /^Tell a short past story with both tenses: 0 of 2 got it at the Aduana/);
+});
+
+test('growth view: five or more students shows percentages; nothing to flag when all got it', () => {
+    const five = [0, 1, 2, 3, 4].map((i) => withChecks(`s${i}`, { form: 'A', emb: [0, 0, 0, 0, 0], adu: [1, 1, 1, 1, 1], embDone: true, aduDone: true }));
+    const g = growthReport(CHECKS_CFG, 'el-mundial', five);
+    assert.equal(g.showPercent, true);
+    assert.equal(g.slots[0].aduPct, 100);
+    assert.equal(g.worth, null);
+    assert.equal(presentedGrowth(CHECKS_CFG, null), null);
+    assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ right: 10 }], adu: [{ right: 90 }] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 10, adu: 90 });
+});
+
+test('item banks: five slots, five items per form, the right option first, a rule for each', () => {
+    for (const story of ['el-mundial', 'el-viaje']) {
+        const bank = JSON.parse(readFileSync(new URL(`../public/espanol/${story}/checks.json`, import.meta.url), 'utf8'));
+        assert.equal(bank.story, story);
+        assert.equal(bank.slots.length, 5);
+        assert.equal(bank.rubric.length, 4);
+        assert.ok(bank.postcard.length > 20);
+        for (const form of ['A', 'B']) {
+            assert.equal(bank[form].length, 5);
+            for (const it of bank[form]) { assert.equal(it.a, 0); assert.ok(it.o.length >= 2 && it.q && it.why); }
+        }
+        assert.equal(/\bvos\b/i.test(JSON.stringify([bank.A, bank.B])), false, 'vos is in the story, not measured by the checks');
+    }
+});
+
+test('ESPANOL_CHECKS_ON: on for staging, previews and local; OFF on production and anywhere unexpected', async () => {
+    const vm = await import('node:vm');
+    const src = readFileSync(new URL('../public/js/site-config.js', import.meta.url), 'utf8');
+    const flag = (hostname) => { const window = { location: { hostname } }; vm.runInNewContext(src, { window }); return window.AG_CONFIG.ESPANOL_CHECKS_ON; };
+    for (const h of ['allgoodacademy.com', 'www.allgoodacademy.com', 'allgood-academy.web.app', 'allgood-academy.firebaseapp.com', 'example.com', '', 'allgood-academy--staging.evil.com']) {
+        assert.equal(flag(h), false, `the checks must be off on "${h}"`);
+    }
+    for (const h of ['allgood-academy--staging-ba3i7t07.web.app', 'allgood-academy--pr97-claude-x-abc123.web.app', 'localhost', '127.0.0.1']) {
+        assert.equal(flag(h), true, `the checks should be on at "${h}"`);
+    }
+    // Nothing in a story or in Mission Control shows the checks without reading the flag.
+    assert.match(readFileSync(new URL('../public/js/espanol-checks.js', import.meta.url), 'utf8'), /if \(!CFG\.ESPANOL_CHECKS_ON\) return;/);
+    assert.match(src, /var PRODUCTION_ESPANOL_CHECKS = false;/, 'the production switch stays off until the founder flips it');
+});
