@@ -18,6 +18,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+
+// Node's built-in fetch ignores HTTPS_PROXY unless NODE_USE_ENV_PROXY=1 (Node >= 22.21 / 24.5).
+// In the cloud environment the proxy is what adds the ElevenLabs key, so a request that skips it
+// gets a 401. When a proxy is configured, re-run this script once with proxy support switched on.
+if ((process.env.HTTPS_PROXY || process.env.https_proxy) && process.env.NODE_USE_ENV_PROXY !== '1') {
+  const [maj, min] = process.versions.node.split('.').map(Number);
+  if (maj < 22 || (maj === 22 && min < 21) || (maj === 24 && min < 5) || maj === 23) {
+    console.error(`Node ${process.versions.node} can't route fetch through HTTPS_PROXY; use Node >= 22.21.`);
+    process.exit(1);
+  }
+  const r = spawnSync(process.execPath, process.argv.slice(1), { stdio: 'inherit', env: { ...process.env, NODE_USE_ENV_PROXY: '1' } });
+  process.exit(r.status ?? 1);
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BUDGET = 15000; // characters per run; the key is capped at 20,000 credits
