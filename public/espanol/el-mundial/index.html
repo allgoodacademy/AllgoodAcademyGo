@@ -6,6 +6,7 @@
 <title>El Mundial · Allgood Academy</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 
@@ -746,7 +747,7 @@ function setStage(st,n){if(stageState[st.id]===n)return;stageState[st.id]=n;
 const rt=$('#rt'),plane=$('#plane');const RL=rt.getTotalLength();rt.style.strokeDasharray=RL;rt.style.strokeDashoffset=RL;
 function onScroll(){const vh=innerHeight,doc=document.documentElement;$('#bar').style.width=(scrollY/(doc.scrollHeight-vh)*100)+'%';
   $$('.chap:not(.locked)').forEach(ch=>{const st=ch.querySelector('.stage');let cur=1;ch.querySelectorAll('.step').forEach(s=>{if(s.getBoundingClientRect().top<vh*.6)cur=+s.dataset.s});setStage(st,cur)});
-  const s1=$('#c0');const r=s1.getBoundingClientRect();const p=Math.min(1,Math.max(0,-r.top/(vh*1.6)));rt.style.strokeDashoffset=RL*(1-p);const a=rt.getPointAtLength(RL*p),b=rt.getPointAtLength(Math.min(RL,RL*p+2));plane.setAttribute('transform',`translate(${a.x},${a.y}) rotate(${Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI})`)}
+  const s1=$('#c0');const r=s1.getBoundingClientRect();const p=window.AG_REDUCED_MOTION?1:Math.min(1,Math.max(0,-r.top/(vh*1.6)));rt.style.strokeDashoffset=RL*(1-p);const a=rt.getPointAtLength(RL*p),b=rt.getPointAtLength(Math.min(RL,RL*p+2));plane.setAttribute('transform',`translate(${a.x},${a.y}) rotate(${Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI})`)}
 let tick=false;addEventListener('scroll',()=>{if(!tick){tick=true;requestAnimationFrame(()=>{onScroll();tick=false})}},{passive:true});addEventListener('resize',onScroll);
 $$('.stage').forEach(st=>{stageState[st.id]=-1;setStage(st,1)});onScroll();
 

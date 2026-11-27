@@ -6,6 +6,7 @@
 <title>El Viaje · Allgood Academy</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 /*
@@ -853,9 +854,9 @@ function onScroll(){
     ch.querySelectorAll('.step').forEach(s=>{const r=s.getBoundingClientRect();if(r.top<vh*.6)cur=+s.dataset.s});
     setStage(st.id,cur);
     const r=ch.getBoundingClientRect(),p=Math.min(1,Math.max(0,-r.top/(r.height-vh)));
-    st.querySelectorAll('[data-par]').forEach(g=>g.setAttribute('transform',`translate(${p*+g.dataset.par},0)`));
+    if(!window.AG_REDUCED_MOTION) st.querySelectorAll('[data-par]').forEach(g=>g.setAttribute('transform',`translate(${p*+g.dataset.par},0)`));
   });
-  const s5=$('#c0 .step[data-s="5"]');if(s5){const r=s5.getBoundingClientRect();const p=Math.min(1,Math.max(0,(vh*.6-r.top)/(r.height*.75)));route.style.strokeDashoffset=RL*(1-p);const pt=route.getPointAtLength(RL*p),pt2=route.getPointAtLength(Math.min(RL,RL*p+2));plane.setAttribute('transform',`translate(${pt.x},${pt.y}) rotate(${Math.atan2(pt2.y-pt.y,pt2.x-pt.x)*180/Math.PI})`)}
+  const s5=$('#c0 .step[data-s="5"]');if(s5){const r=s5.getBoundingClientRect();const p=window.AG_REDUCED_MOTION?1:Math.min(1,Math.max(0,(vh*.6-r.top)/(r.height*.75)));route.style.strokeDashoffset=RL*(1-p);const pt=route.getPointAtLength(RL*p),pt2=route.getPointAtLength(Math.min(RL,RL*p+2));plane.setAttribute('transform',`translate(${pt.x},${pt.y}) rotate(${Math.atan2(pt2.y-pt.y,pt2.x-pt.x)*180/Math.PI})`)}
 }
 let tick=false;addEventListener('scroll',()=>{if(!tick){tick=true;requestAnimationFrame(()=>{onScroll();tick=false})}},{passive:true});addEventListener('resize',onScroll);onScroll();
 
@@ -1025,6 +1026,8 @@ $('#g1go').addEventListener('click',()=>{
   const lines=v==='facturaba'
     ?['BÚSQUEDA DE EQUIPAJE','interpreta: <b>en proceso · interrumpido</b>','→ la maleta nunca recibió etiqueta','→ buscando en ATL · MOSTRADOR 14…','<span class="ok">✓ ENCONTRADA · sin etiqueta, en la báscula</span>']
     :['BÚSQUEDA DE EQUIPAJE','interpreta: <b>terminado · maleta etiquetada</b>','→ buscando en el sistema de conexiones…','→ MTY · banda 3 · ATL transferencias…','<span class="no">✗ NO ENCONTRADA en conexiones</span>'];
+  // Reduced motion (AA-6): the whole search result at once instead of a line every 520ms.
+  if(window.AG_REDUCED_MOTION){scr.innerHTML=lines.join('<br>')+'<br>';after1(v);return}
   let i=0;scr.innerHTML='';const iv=setInterval(()=>{scr.innerHTML+=lines[i]+'<br>';i++;if(i>=lines.length){clearInterval(iv);after1(v)}},520);
 });
 function after1(v){

@@ -6,6 +6,7 @@
 <title>Take the Bait — Allgood Academy</title>
 <link rel="preload" as="image" href="/assets/jodi/jodi-neutral.svg">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <!-- First-party learning telemetry, same pipe as every module (see docs/insider-analytics.md).
      Firebase (gstatic + Firestore) is the only thing these talk to. Tagged
@@ -332,7 +333,7 @@ function startLevel(l){
   showBanner("Level "+(l+1)+": "+LEVEL_DEFS[l].name,"Smash Scam HQ");levelStartMs=Date.now();
   const tm=T_();if(tm){if(TM.levels>0)tm.restart();tm.track("level_start",{level:l+1,speedSetting:speedName()});}TM.levels++;
 }
-function goHome(){state="home";b=null;$("hud").classList.add("hide");$("hint").classList.add("hide");$("banner").classList.add("hide");renderMap();renderSeg($("segHome"));show("home");demo=new Battle({L:0,speed:"relaxed",aspect:W/H||0.56});demo.firing=true;}
+function goHome(){state="home";b=null;$("hud").classList.add("hide");$("hint").classList.add("hide");$("banner").classList.add("hide");renderMap();renderSeg($("segHome"));show("home");demo=new Battle({L:0,speed:"relaxed",aspect:W/H||0.56});demo.firing=!RM;}
 let demo=null;
 function pause(){if(state!=="play")return;state="paused";renderSeg($("segPause"));show("pause");if(b)b.firing=false;}
 function resume(){if(state!=="paused")return;state="play";show(null);}
@@ -360,7 +361,8 @@ document.addEventListener("visibilitychange",()=>{if(document.hidden&&state==="p
 
 /* ---------- effects ---------- */
 const px=x=>x*W,py=y=>y*H;
-function burst(x,y,col,n,spd){for(let k=0;k<n&&parts.length<500;k++){const a=rand(0,6.283),s=rand(40,spd||180);parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-40,life:rand(0.3,0.6),col,r:rand(2,4)});}}
+function burst(x,y,col,n,spd){if(RM)return; // reduced motion: no particle sprays (AA-6)
+for(let k=0;k<n&&parts.length<500;k++){const a=rand(0,6.283),s=rand(40,spd||180);parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-40,life:rand(0.3,0.6),col,r:rand(2,4)});}}
 function floatText(txt,x,y,col,size){if(floats.length<30)floats.push({txt,x,y,t:0,col,size:size||16});}
 function events(game){for(const ev of game.events){if(game===demo)continue;
   if(ev.type==="fire"){sfx.pew();recoil=1;}
@@ -387,7 +389,7 @@ function draw(game){
   // track
   X.fillStyle=K.cream;X.fillRect(0,0,W,H);
   const lane=W*0.06;X.fillStyle=K.tealWash;X.fillRect(0,0,lane,H);X.fillRect(W-lane,0,lane,H);
-  X.fillStyle="rgba(232,223,206,.55)";for(let y=((T*30)%40)-40;y<H;y+=40)X.fillRect(W/2-2,y,4,20);
+  X.fillStyle="rgba(232,223,206,.55)";for(let y=(RM?0:(T*30)%40)-40;y<H;y+=40)X.fillRect(W/2-2,y,4,20);
   // Scam HQ
   const bw=W*0.6,bh=H*0.1,bx=(W-bw)/2,by=py(BASE_Y)-bh+6;
   X.fillStyle=flash>0?"#3a5566":K.darkCard;rr(bx,by,bw,bh,10);X.fill();
@@ -494,7 +496,8 @@ function update(dt){
   shake=Math.max(0,shake-dt*2.5);flash=Math.max(0,flash-dt);recoil=Math.max(0,recoil-dt*8);
   if(state==="play"&&b){const k=(keys.r?1:0)-(keys.l?1:0);if(k)b.cx=clamp(b.cx+k*0.9*dt,0.05,0.95);b.step(dt);events(b);updHud();}
   else if(state==="end"&&b){b.step(0);endT-=dt;if(endT<=0)startQuiz();}
-  else if(state==="home"&&demo){demo.cx=0.5+Math.sin(T*0.7)*0.3;demo.step(dt);demo.events.length=0;if(demo.over||demo.t>50){demo=new Battle({L:0,speed:"relaxed",aspect:W/H||0.56});demo.firing=true;}}
+  else if(state==="home"&&demo&&!RM){ // reduced motion: the home-screen demo battle is a still picture (AA-6)
+   demo.cx=0.5+Math.sin(T*0.7)*0.3;demo.step(dt);demo.events.length=0;if(demo.over||demo.t>50){demo=new Battle({L:0,speed:"relaxed",aspect:W/H||0.56});demo.firing=true;}}
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=300*dt;if(p.life<=0)parts.splice(i,1);}
   for(let i=floats.length-1;i>=0;i--){const f=floats[i];f.t+=dt;f.y-=40*dt;if(f.t>0.9)floats.splice(i,1);}
   for(let i=conf.length-1;i>=0;i--){const c=conf[i];c.x+=c.vx*dt;c.y+=c.vy*dt;c.r+=c.vr*dt;if(c.y>H+20)conf.splice(i,1);}

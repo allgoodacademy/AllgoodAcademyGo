@@ -84,6 +84,8 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
+    <script src="/js/time-limits.js"></script>
     <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -605,6 +607,7 @@ body.present .nav-shell.activity{display:none}
                             </div>
                             <div class="sm:col-span-2 flex flex-col gap-3">
                                 <button id="c2-start-btn" onclick="window.startCase2Feed()" class="small-btn primary w-full py-3">Start the morning</button>
+                                <div id="c2-time"></div>
                                 <button id="c2-believe-btn" onclick="window.pressBelieve()" class="believe-btn" disabled>I'd believe it now</button>
                                 <div id="c2-readout" class="card-shimmer rounded-2xl border p-4 text-gray-500 italic text-xs">Your number will show up here.</div>
                             </div>
@@ -1199,7 +1202,7 @@ body.present .nav-shell.activity{display:none}
         // reset) can cancel it. Case 2's feed ticks go through it too.
         let pendingTimers = [];
         function scheduleUI(fn, ms) { const id = setTimeout(fn, ms); pendingTimers.push(id); return id; }
-        function clearPendingUI() { pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+        function clearPendingUI() { pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; if (c2Clock) { c2Clock.stop(); c2Clock = null; } }
         window._clearPendingUI = clearPendingUI;
 
         // THE feedback call for every Case. On desktop the bubble tucks behind the whiteboard
@@ -1298,7 +1301,12 @@ body.present .nav-shell.activity{display:none}
         let c2Frozen = false;
         let c2Timers = [];
 
-        function c2ClearTimers() { c2Timers.forEach(id => clearTimeout(id)); c2Timers = []; }
+        // The feed runs on an AGTime clock (/js/time-limits.js, AA-6): a post every 1.8s as
+        // before, and the window still closes the moment post nine lands unless the student
+        // adds time ("+ more time" keeps the button live after post nine) or turns the timer
+        // off (then "Stop the feed" ends it when they're ready). #present: Pause / +30s / Off.
+        var c2Clock = null;
+        function c2ClearTimers() { c2Timers.forEach(id => clearTimeout(id)); c2Timers = []; if (c2Clock) { c2Clock.stop(); c2Clock = null; } }
         // Case 2's own timers are registered with the shared scheduler as well, so
         // advanceFromPage()/the Case menu cancel them too. Belt and braces on purpose: a feed
         // tick that outlives the Case would append a post to a panel the student has left.
@@ -1329,18 +1337,30 @@ body.present .nav-shell.activity{display:none}
             document.getElementById('c2-status').textContent = 'Posts arriving';
             window.setStep(2, 1, 'Watch them land. <strong>Press the moment you\'d believe it</strong> — not when you\'re certain.');
 
-            for (let i = 0; i < YARA_POSTS.length; i++) {
-                c2Schedule(() => {
-                    if (c2Frozen) return;
-                    c2PostsShown = i + 1;
-                    c2RenderPost(i);
-                    // Armed only once something is actually on screen: pressing "I'd believe
-                    // it now" against an empty feed would log a number that counted nothing.
-                    document.getElementById('c2-believe-btn').disabled = false;
-                    document.getElementById('c2-status').textContent = `${c2PostsShown} of 9 posts`;
-                    if (c2PostsShown === YARA_POSTS.length) c2FeedRanOut();
-                }, C2_TICK_MS * (i + 1));
-            }
+            const showPost = (i) => {
+                if (c2Frozen) return;
+                c2PostsShown = i + 1;
+                c2RenderPost(i);
+                // Armed only once something is actually on screen: pressing "I'd believe
+                // it now" against an empty feed would log a number that counted nothing.
+                document.getElementById('c2-believe-btn').disabled = false;
+                document.getElementById('c2-status').textContent = `${c2PostsShown} of 9 posts`;
+            };
+            c2Clock = AGTime.countdown({
+                seconds: C2_TICK_MS * YARA_POSTS.length / 1000,
+                tickMs: 200,
+                mount: document.getElementById('c2-time'),
+                endLabel: 'Stop the feed',
+                onTick: (t) => {
+                    const due = Math.min(YARA_POSTS.length, Math.floor((t.elapsed * 1000 + 1) / C2_TICK_MS));
+                    while (!c2Frozen && c2PostsShown < due) showPost(c2PostsShown);
+                },
+                onExpire: () => {
+                    c2Clock = null;
+                    while (!c2Frozen && c2PostsShown < YARA_POSTS.length) showPost(c2PostsShown);
+                    c2FeedRanOut();
+                }
+            });
         };
 
         // Route A: the student pressed. N is whatever was on screen.
@@ -1631,11 +1651,14 @@ body.present .nav-shell.activity{display:none}
         let c3RepostTimer = null;
         function startRepostTicker() {
             if (c3RepostTimer) return;
-            c3RepostTimer = setInterval(() => {
+            const bump = () => {
                 c3Reposts += Math.floor(Math.random() * 3) + 1;
                 const el = document.getElementById('c3-reposts');
                 if (el) el.textContent = c3Reposts;
-            }, 2600);
+            };
+            // Reduced motion (AA-6): instead of ticking on its own, it climbs one step each time the student taps or clicks anywhere — the same pressure, tied to their own pace, nothing running by itself.
+            if (window.AG_REDUCED_MOTION) { c3RepostTimer = 'tap'; document.addEventListener('click', bump); return; }
+            c3RepostTimer = setInterval(bump, 2600);
         }
 
         const case3Board = makeMergeBoard({

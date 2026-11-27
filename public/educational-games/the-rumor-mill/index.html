@@ -18,6 +18,8 @@
      performance and then never read it; it does now. See /js/skill-routing.js. -->
 <script type="module" src="/js/skill-routing.js"></script>
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
+    <script src="/js/time-limits.js"></script>
     <link rel="stylesheet" href="/assets/css/fonts.css">
     <link rel="stylesheet" href="/assets/css/tablet-chassis.css">
 <style>
@@ -427,6 +429,7 @@ body.present .nav-shell.activity{display:none}
     <div class="hud-progress" id="progressDots"></div>
   </div>
   <div class="countdown-bar"><div class="countdown-fill" id="timerFill" style="width:100%"></div></div>
+  <div id="timerControls"></div>
   <div class="msg-card" id="msgCard"></div>
   <div class="verify-panel" id="verifyPanel"></div>
   <div class="actions">
@@ -1142,6 +1145,29 @@ function renderScenario() {
   startTimer();
 }
 
+// The clock runs through AGTime (/js/time-limits.js, AA-6): a student can add time or
+// turn it off, and a teacher projecting with #present gets Pause / +30s / Off. Untouched,
+// it still auto-forwards at 0, as it always has.
+function runTimer(seconds) {
+  if (timer) timer.stop();
+  const fill = document.getElementById('timerFill');
+  const bar = fill.parentNode;
+  const startLeft = timeLeft;
+  bar.style.visibility = '';
+  timer = AGTime.countdown({
+    seconds,
+    mount: document.getElementById('timerControls'),
+    theme: 'dark',
+    onTick: (t) => {
+      timeLeft = startLeft - t.elapsed;
+      if (t.off) { bar.style.visibility = 'hidden'; return; }
+      fill.style.width = (Math.min(1, t.left / 30) * 100) + '%';
+      fill.className = t.left <= 10 ? 'countdown-fill urgent' : 'countdown-fill';
+    },
+    onExpire: () => choose('forward') // auto-forward on timeout — impulsive!
+  });
+}
+
 // Initials on a coloured avatar: white or ink, whichever reads better on that colour (AA-6).
 function avatarInk(hex) {
   const c = hex.replace('#', ''), v = [0, 2, 4].map(i => parseInt(c.substr(i, 2), 16) / 255).map(x => x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
@@ -1150,17 +1176,11 @@ function avatarInk(hex) {
 }
 
 function startTimer() {
-  clearInterval(timer);
   timeLeft = 30;
   const fill = document.getElementById('timerFill');
   fill.style.width = '100%';
   fill.className = 'countdown-fill';
-  timer = setInterval(() => {
-    timeLeft--;
-    fill.style.width = (timeLeft / 30 * 100) + '%';
-    if (timeLeft <= 10) fill.className = 'countdown-fill urgent';
-    if (timeLeft <= 0) { clearInterval(timer); choose('forward'); } // auto-forward on timeout — impulsive!
-  }, 1000);
+  runTimer(30);
 }
 
 function doVerify() {
@@ -1178,7 +1198,8 @@ function doVerify() {
   // Pause the timer during verify — resumes below with 12 seconds left. 1.5s rather
   // than a longer wait: the timer is paused either way, but this still needs to read
   // as "checking something real," just not slow enough to feel like a load stall.
-  clearInterval(timer);
+  const timeUsedBeforeVerify = 30 - timeLeft;
+  if (timer) timer.stop();
 
   setTimeout(() => {
     verified = true; verifying = false;
@@ -1190,19 +1211,16 @@ function doVerify() {
     const fill = document.getElementById('timerFill');
     fill.style.width = (12 / 30 * 100) + '%';
     fill.className = 'countdown-fill urgent';
-    timer = setInterval(() => {
-      timeLeft--;
-      fill.style.width = (timeLeft / 30 * 100) + '%';
-      if (timeLeft <= 0) { clearInterval(timer); choose('forward'); }
-    }, 1000);
+    if (AGTime.isOff()) timeLeft = 30 - timeUsedBeforeVerify; // untimed: keep counting time used
+    runTimer(12);
   }, 1500);
 }
 
 function choose(action) {
-  clearInterval(timer);
+  if (timer) timer.stop();
   const s = session[currentIdx];
   const data = action === 'forward' ? s.forward : s.stop;
-  const timeUsed = 30 - timeLeft;
+  const timeUsed = Math.round(30 - timeLeft);
 
   // Scoring: +10 for correct call, +3 for incorrect call after verifying
   // (you had the information and still got it wrong).

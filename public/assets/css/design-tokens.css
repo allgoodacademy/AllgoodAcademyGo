@@ -77,3 +77,25 @@
   --font-display: 'Gelasio', Georgia, 'Gelasio Fallback', 'Times New Roman', serif;
   --font-ui: 'Atkinson Hyperlegible Next', Verdana, 'Atkinson Hyperlegible Next Fallback', Geneva, sans-serif;
 }
+
+/* ============================================================================
+   REDUCED MOTION — every page (AA-6, WCAG 2.3.3 / 2.2.2)
+   When the OS asks for reduced motion, every CSS animation and transition runs
+   for 0.01ms, once, and stops on its LAST frame. That is deliberately not
+   `animation: none`: an element that animates in from opacity 0 (a chart line,
+   a card) would then stay invisible. Looping decoration (pulses, blinks, radar
+   rings, shimmer) stops after one instant pass. Smooth scrolling becomes a jump.
+   /js/reduced-motion.js covers what CSS cannot: JS smooth scrolls and SVG
+   <animate>. Canvas and timed JS motion is handled per page through
+   window.AG_REDUCED_MOTION.
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

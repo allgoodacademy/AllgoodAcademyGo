@@ -18,6 +18,7 @@
      unchanged; only the destination lookup moved out of this file. -->
 <script type="module" src="/js/skill-routing.js"></script>
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
     <link rel="stylesheet" href="/assets/css/fonts.css">
     <link rel="stylesheet" href="/assets/css/tablet-chassis.css">
 <style>
@@ -788,7 +789,7 @@ body.present .nav-shell.activity{display:none}
     <span class="feedback-icon" id="feedbackIcon"></span>
     <div class="feedback-result" id="feedbackResult"></div>
     <div class="feedback-signal" id="feedbackSignal"></div>
-    <button class="next-btn" onclick="nextScenario()">Next signal →</button>
+    <button class="next-btn" id="feedbackNext" onclick="nextScenario()">Next signal →</button>
   </div>
 </div>
 
@@ -1827,13 +1828,10 @@ function choose(pick) {
 
   showFeedback(correct, s.feedback);
 
-  if (lives <= 0) {
-    setTimeout(() => {
-      document.getElementById('feedbackOverlay').classList.remove('show');
-      showEnd('lives-lost');
-    }, 2000);
-    return;
-  }
+  // Out of lives: the explanation stays up until the student moves on (its button
+  // goes to the end screen, see nextScenario). It used to close itself after 2s, which
+  // took the last explanation away before it could be read (WCAG 2.2.1, AA-6).
+  if (lives <= 0) return;
 }
 
 function showFeedback(correct, feedbackText) {
@@ -1842,11 +1840,13 @@ function showFeedback(correct, feedbackText) {
   result.textContent = correct ? 'Good read.' : 'Missed the signal.';
   result.className = 'feedback-result ' + (correct ? 'correct' : 'wrong');
   document.getElementById('feedbackSignal').textContent = feedbackText;
+  document.getElementById('feedbackNext').textContent = lives <= 0 ? 'See your results →' : 'Next signal →';
   document.getElementById('feedbackOverlay').classList.add('show');
 }
 
 function nextScenario() {
   document.getElementById('feedbackOverlay').classList.remove('show');
+  if (lives <= 0) { showEnd('lives-lost'); return; }
   currentIndex++;
   if (currentIndex >= ROUND_SIZE) {
     showEnd('completed');

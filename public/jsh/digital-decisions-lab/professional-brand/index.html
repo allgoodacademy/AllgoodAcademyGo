@@ -112,6 +112,8 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
+    <script src="/js/time-limits.js"></script>
     <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -831,6 +833,7 @@ body.present .nav-shell.activity{display:none}
                         <div class="mb-3">
                             <div class="h-2 rounded-full bg-gray-200 overflow-hidden"><div id="thread-clock-fill"></div></div>
                             <div class="flex justify-between text-[9px] font-bold uppercase tracking-widest text-ink-soft mt-1"><span>0s</span><span id="thread-clock-label">0s</span><span>45s</span></div>
+                            <div id="thread-time" class="flex justify-center"></div>
                         </div>
 
                         <div id="thread-state" class="text-center text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-3">Not started</div>
@@ -2017,11 +2020,16 @@ body.present .nav-shell.activity{display:none}
 
         function setThreadState(t) { document.getElementById('thread-state').textContent = t; }
 
+        // The 45-second window runs through AGTime (/js/time-limits.js, AA-6): "+ more time"
+        // keeps the window open longer, "Turn off timer" means it never closes by itself
+        // (Skip to the end still ends it), and #present gives a teacher Pause / +30s / Off.
+        // The events still land at the same seconds; scoring by second is unchanged.
+        let threadClock = null;
         function threadTick() {
             threadT += 1;
             THREAD_EVENTS.filter(e => e.at === threadT).forEach(threadAppend);
             const fill = document.getElementById('thread-clock-fill');
-            fill.style.width = `${(threadT / THREAD_END) * 100}%`;
+            fill.style.width = `${Math.min(100, (threadT / THREAD_END) * 100)}%`;
             fill.classList.toggle('late', threadT >= 18 && threadT < 38);
             fill.classList.toggle('gone', threadT >= 38);
             document.getElementById('thread-clock-label').textContent = `${threadT}s`;
@@ -2029,7 +2037,7 @@ body.present .nav-shell.activity{display:none}
             if (threadT === 28) setThreadState("It's in another chat now");
             if (threadT === 38) setThreadState('A staff account is watching');
             if (threadT === 10) { const s = document.getElementById('thread-skip'); s.classList.remove('hidden'); s.classList.add('flex'); }
-            if (threadT >= THREAD_END) threadTimeout();
+            if (threadT >= THREAD_END && !threadClock) threadTimeout();
         }
 
         window.startThread = () => {
@@ -2043,14 +2051,19 @@ body.present .nav-shell.activity{display:none}
             document.getElementById('thread-status').textContent = 'Live';
             window.setStep(5, 2, "You're on the call. <strong>Press Message him</strong> whenever you think Adan should say something — or never, and watch what happens.");
             window.teach(5, "Clock's running", "Nothing about this is Adan's problem. Say something whenever you want. Clock's running either way.", 'concerned');
-            threadTick();
-            threadTimer = setInterval(threadTick, 1000);
+            threadClock = AGTime.countdown({
+                seconds: THREAD_END,
+                mount: document.getElementById('thread-time'),
+                onTick: (c) => { while (threadT < Math.floor(c.elapsed)) threadTick(); },
+                onExpire: () => { threadClock = null; threadTimeout(); }
+            });
             if (window.sfx) window.sfx.click();
         };
 
         function stopThread() {
             if (threadTimer) clearInterval(threadTimer);
-            threadTimer = null; threadRunning = false;
+            if (threadClock) threadClock.stop();
+            threadTimer = null; threadClock = null; threadRunning = false;
         }
 
         function showOutcome(title, text, escalate) {

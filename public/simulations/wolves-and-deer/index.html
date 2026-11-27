@@ -7,6 +7,7 @@
 <meta name="description" content="A winter survey simulation for grades 6–8. Fly over a snowy valley, count the deer and wolves, and figure out why their numbers rise and fall together.">
 <meta name="standards" content="NGSS MS-LS2-2; MS-LS2-1; MS-LS2-4">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 /* VOICE: a field biologist's winter. Quiet, cold air, a warm notebook.
@@ -960,7 +961,7 @@ function enterStep(n){
   if(S.step>=1 && S.step!==n){ activeClock(); track("wd_step_end",{step:S.step, activeMs:Math.round(stepClock.ms)}); }
   S.step=n; S.votes={}; S.voteSent=false; S.pred=null; S.locked=false; S.running=false; S.revealed=false; S.hints=0; S.waitStart=null; S.testing=null; S.picked=null;
   resetClock(); stepHook=null; logv.danger=false; logv.ghost=null; logv.marks=null; logv.mode="valley"; logv.isoLate=false; map.mode="valley"; $("#play").disabled=false; fast=false; $("#speed").setAttribute("aria-pressed","false");
-  if(n===0){ model.set({P:70,D:400,W:14}); model.ff(10); setPlaying(true); }
+  if(n===0){ model.set({P:70,D:400,W:14}); model.ff(10); setPlaying(!REDUCED); } // reduced motion: the intro valley waits for Fly (AA-6)
   else if(n===1){ model.set({P:70,D:400,W:14}); model.ff(24); S.introD=model.D; S.introW=model.W; setPlaying(false); $("#play").disabled=true; }
   else if(n===2){ model.set({P:50,D:600,W:0}); setPlaying(false); $("#play").disabled=true; }
   else if(n===3){ model.set({P:60,D:700,W:2+S.release,winters:[8,19]}); setPlaying(false); logv.danger=true; $("#play").disabled=true; }
@@ -979,6 +980,9 @@ function startRun(n){
   if(n===1){ model.W=0; model.log(); S.waitStart=model.t; logv.ghost={t0:model.t, len:20, v0:model.D, top:Math.max(800, model.D*3.6), f:GHOST[S.pred]}; }
   else { model.W=10; model.log(); S.waitStart=model.t; }
   track("wd_control",{step:n, control:n===1?"remove_wolves":"release_wolves"});
+  // Reduced motion (AA-6): the winters run instantly and the result is drawn as one
+  // still frame: the same counts, graph and reveal, with nothing moving.
+  if(REDUCED){ model.ff(STEPS[n].need+DT); tick(); render(); renderHud(); map.draw(model,clock,0); logv.draw(model); return; }
   setPlaying(true); $("#play").disabled=false; render(); focusEl("#act");
 }
 function reveal(){
@@ -1003,6 +1007,7 @@ function startTest(){
   var r=S.release; model.set({P:60,D:700,W:2+r,winters:[8,19]}); S.testing={release:r, fail:null};
   stepHook=function(mm){ var T=S.testing; if(!T||T.fail) return; if(mm.P<DANGER.P) T.fail={k:"P",t:mm.t}; else if(mm.D<DANGER.D) T.fail={k:"D",t:mm.t}; else if(mm.W<DANGER.W) T.fail={k:"W",t:mm.t}; };
   if(model.W<DANGER.W) S.testing.fail={k:"W",t:0};
+  if(REDUCED){ model.ff(30+DT, stepHook); tick(); renderHud(); map.draw(model,clock,0); logv.draw(model); return; } // reduced motion: instant, same result (AA-6)
   setPlaying(true); render(); announce("Flying 30 winters.");
 }
 function finishTest(){

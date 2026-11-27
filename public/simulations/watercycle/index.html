@@ -7,6 +7,7 @@
 <meta name="description" content="A guided water cycle simulation for grades 6–8. Predict, test, and explain why one side of a mountain gets rain and the other stays dry.">
 <meta name="standards" content="NGSS MS-ESS2-4">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 /* Page roles. Every value is a brand token, or a token mixed with another token. */
@@ -740,6 +741,21 @@ else window.addEventListener("resize", function(){ clearTimeout(roT); roT=setTim
 new MutationObserver(function(){ loadColors(); view.draw(); drawIsland(); }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 if(window.matchMedia){ var mq=matchMedia("(prefers-color-scheme: dark)"); var onScheme=function(){ loadColors(); view.draw(); drawIsland(); }; if(mq.addEventListener) mq.addEventListener("change",onScheme); else if(mq.addListener) mq.addListener(onScheme); }
 $("#pause").addEventListener("click", function(){ paused=!paused; this.setAttribute("aria-pressed",String(paused)); this.textContent=paused?"Play":"Pause"; schedule(); });
+// Reduced motion (AA-6): the weather does not play by itself. It starts paused (Play
+// still runs it), and whenever a step is waiting on the weather (a locked guess, the
+// 8-second test) the model runs ahead instantly and the result is drawn as one still
+// frame: the same rain counts, reveal and test outcome, with nothing moving.
+function settleReduced(){
+  if(!REDUCED || !paused) return;
+  var waiting=function(){ return S.testing || ((S.step===1||S.step===2) && S.locked && !S.revealed); };
+  if(!waiting()) return;
+  for(var i=0;i<60*20 && waiting();i++){ model.step(1/60); tick(); }
+  view.draw();
+}
+if(REDUCED){
+  paused=true; $("#pause").setAttribute("aria-pressed","true"); $("#pause").textContent="Play";
+  ["click","input","change"].forEach(function(ev){ document.addEventListener(ev, function(){ setTimeout(settleReduced,0); }); });
+}
 
 // gauges
 var gaugeEls={};
@@ -1153,7 +1169,7 @@ function startTest(){
   lockControls({T:"Locked during the test", W:"Locked during the test", M:"Locked during the test"});
   model.reset(); model.fastForward(5);
   S.testing={start:model.time, oceanF:oceanF, wind:wind, mountainFt:mountainFt};
-  if(paused){ $("#pause").click(); }
+  if(paused && !REDUCED){ $("#pause").click(); }
   render(); toStage(); announce("Test running for 8 seconds.");
 }
 function finishTest(){

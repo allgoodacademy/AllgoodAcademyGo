@@ -18,6 +18,8 @@
      categories to route by. See /js/skill-routing.js. -->
 <script type="module" src="/js/skill-routing.js"></script>
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
+    <script src="/js/time-limits.js"></script>
     <link rel="stylesheet" href="/assets/css/fonts.css">
     <link rel="stylesheet" href="/assets/css/tablet-chassis.css">
 <style>
@@ -400,6 +402,7 @@ body.present .nav-shell.activity{display:none}
     <div class="hud-progress" id="progressDots"></div>
   </div>
   <div class="countdown-bar"><div class="countdown-fill" id="countdownFill" style="width:100%"></div></div>
+  <div id="timerControls"></div>
   <div class="msg-card" id="msgCard"></div>
   <div class="actions">
     <button class="action-btn btn-send" onclick="choose('send')">
@@ -964,6 +967,8 @@ function avatarInk(hex) {
 }
 
 function typewriter(text, el) {
+  // Reduced motion: the whole message at once, so the 30s is all reading time.
+  if (window.AG_REDUCED_MOTION) { el.textContent = text; return; }
   el.textContent = '';
   let i = 0;
   const interval = setInterval(() => {
@@ -994,32 +999,38 @@ function reread() {
   }
 }
 
+// The 30-second clock runs through AGTime (/js/time-limits.js, AA-6): a student can add
+// time or turn the timer off, and a teacher projecting with #present gets Pause / +30s /
+// Off. Untouched, it still auto-sends at 0, as it always has.
 function startTimer() {
-  clearInterval(timer);
+  if (timer) timer.stop();
   timeLeft = 30;
   const fill = document.getElementById('countdownFill');
+  const bar = fill.parentNode;
   fill.style.width = '100%';
   fill.className = 'countdown-fill';
-
-  timer = setInterval(() => {
-    timeLeft--;
-    const pct = (timeLeft / 30) * 100;
-    fill.style.width = pct + '%';
-    if (timeLeft <= 10) fill.className = 'countdown-fill urgent';
-    if (timeLeft <= 0) {
-      clearInterval(timer);
-      choose('send'); // auto-send on timeout — impulsive!
-    }
-  }, 1000);
+  bar.style.visibility = '';
+  timer = AGTime.countdown({
+    seconds: 30,
+    mount: document.getElementById('timerControls'),
+    theme: 'dark',
+    onTick: (t) => {
+      timeLeft = 30 - t.elapsed;
+      if (t.off) { bar.style.visibility = 'hidden'; return; }
+      fill.style.width = (Math.min(1, t.left / 30) * 100) + '%';
+      fill.className = t.left <= 10 ? 'countdown-fill urgent' : 'countdown-fill';
+    },
+    onExpire: () => choose('send') // auto-send on timeout — impulsive!
+  });
 }
 
 function choose(action) {
-  clearInterval(timer);
+  if (timer) timer.stop();
   const s = session[currentIdx];
   const dataKey = action === 'delete' ? 'del' : action;
   const data = s[dataKey];
   const correct = action === s.best;
-  const timeUsed = 30 - timeLeft;
+  const timeUsed = Math.round(30 - timeLeft);
 
   score += correct ? 10 : 5;
   choiceTally[action] = (choiceTally[action] || 0) + 1;

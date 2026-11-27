@@ -68,6 +68,7 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
     <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -1622,6 +1623,8 @@ body.present .nav-shell.activity{display:none}
                 if (c) c.textContent = `${c5ChannelIndex} since Thursday`;
             };
             push();
+            // Reduced motion (AA-6): instead of ticking on its own, it adds one line each time the student taps or clicks anywhere — the same pressure, tied to their own pace, nothing running by itself.
+            if (window.AG_REDUCED_MOTION) { c5ChannelTimer = 'tap'; document.addEventListener('click', push); return; }
             c5ChannelTimer = setInterval(push, 3200);
         }
 
