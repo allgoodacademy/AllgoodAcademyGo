@@ -256,6 +256,12 @@ const PAGES = [
     // absence from every surface). Listing a page here only generates the bar INTO it —
     // it adds nothing to LINKS, so no other page gains a Pattern Lab link.
     { file: 'public/pattern-lab/index.html',       slug: 'pattern-lab',  skin: 'light' },
+    // Español (AA-7): the hub and its two stories carry the bar, ONE-WAY like Pattern Lab.
+    // They are still unlinked and noindex until the founder launches them, so nothing is
+    // added to LINKS. The stories keep their own bar (.hud) directly under this one.
+    { file: 'public/espanol/index.html',            slug: 'espanol',       skin: 'light' },
+    { file: 'public/espanol/el-viaje/index.html',   slug: 'espanol-story', skin: 'light' },
+    { file: 'public/espanol/el-mundial/index.html', slug: 'espanol-story', skin: 'light' },
     // Hubs.
     { file: 'public/educational-games/index.html', slug: 'games',        skin: 'light' },
     { file: 'public/simulations/index.html',       slug: 'simulations',  skin: 'light' },

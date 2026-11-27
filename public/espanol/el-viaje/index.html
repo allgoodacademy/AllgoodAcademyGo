@@ -31,7 +31,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 [hidden]{display:none!important}
 
 /* HUD */
-.hud{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;padding:10px 18px;background:rgba(14,14,14,.82);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.07)}
+.hud{position:fixed;top:var(--site-h);left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;padding:10px 18px;background:rgba(14,14,14,.82);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.07)}
 .hud .brand{font-family:var(--font-display);font-weight:700;font-size:18px;white-space:nowrap}
 #dots{white-space:nowrap}
 .hud .brand b{color:var(--color-orange-light)} /* on the dark HUD; brand orange is 4.1:1 there (AA-6) */
@@ -44,7 +44,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 .pass{display:flex;align-items:center;gap:8px;background:#22343d;border:1px solid #47656f;border-radius:8px;padding:5px 10px;font-size:10px;letter-spacing:.12em;color:#cfe3ea}
 .pass i{width:11px;height:11px;border-radius:50%;border:1.5px solid #8fb4c1;display:inline-block;transition:.4s}
 .pass i.on{background:var(--bronze);border-color:var(--bronze2);transform:scale(1.15)}
-.bar{position:fixed;top:0;left:0;height:3px;background:var(--orange);z-index:60;width:0}
+.bar{position:fixed;top:var(--site-h);left:0;height:3px;background:var(--orange);z-index:60;width:0}
 
 .hbtn{display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid rgba(255,255,255,.22);color:#eee;border-radius:99px;padding:4px 14px 4px 5px;font-size:13px;min-height:40px}
 .hbtn svg{width:18px;height:18px;margin-left:8px}
@@ -90,7 +90,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 .pstat{margin:2px 0 0!important;font-size:12.5px!important;color:var(--color-ink-soft);display:flex;align-items:center;gap:6px}
 .pstat .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block}
 .plink{display:block;text-align:right;font-size:13px;color:var(--cyan2);margin-top:6px}
-.savepop{position:fixed;top:62px;right:14px;width:min(360px,94vw);background:var(--cream);color:var(--dark);border-radius:14px;padding:16px;z-index:96;box-shadow:0 20px 50px rgba(0,0,0,.45);border:1px solid var(--creamb);animation:pop .3s}
+.savepop{position:fixed;top:calc(var(--site-h) + 62px);right:14px;width:min(360px,94vw);background:var(--cream);color:var(--dark);border-radius:14px;padding:16px;z-index:96;box-shadow:0 20px 50px rgba(0,0,0,.45);border:1px solid var(--creamb);animation:pop .3s}
 .savepop h3{font-size:19px;color:var(--cyan2)}
 .savepop p{font-size:14px;margin:6px 0 10px}
 .sopt{display:block;text-decoration:none;background:#fff;border:2px solid var(--creamb);border-radius:10px;padding:10px 12px;margin:8px 0;color:#2b2b2b}
@@ -99,7 +99,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 .sopt span{font-size:12.5px;color:#666}
 @media (max-width:760px){.hbtn span{display:none}.hbtn{padding:4px 6px}.hbtn svg{margin:0 4px}}
 /* intro */
-.intro{min-height:100vh;display:grid;place-items:center;text-align:center;padding:100px 20px 60px;position:relative;overflow:hidden}
+.intro{min-height:calc(100vh - var(--site-h));display:grid;place-items:center;text-align:center;padding:100px 20px 60px;position:relative;overflow:hidden}
 .intro .sky{position:absolute;inset:0;z-index:0;width:100%;height:100%}
 .intro .in{position:relative;z-index:1;max-width:640px}
 .kick{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange2)}
@@ -114,9 +114,9 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 
 /* scrolly chapters */
 .chap{position:relative}
-.stage{position:sticky;top:0;height:100vh;overflow:hidden}
+.stage{position:sticky;top:var(--site-h);height:calc(100vh - var(--site-h));overflow:hidden}
 .stage svg.scene{position:absolute;inset:0;width:100%;height:100%}
-.steps{position:relative;margin-top:-100vh;z-index:3;pointer-events:none}
+.steps{position:relative;margin-top:calc(var(--site-h) - 100vh);z-index:3;pointer-events:none}
 .step{min-height:95vh;display:flex;align-items:center;padding:0 6vw}
 .step.r{justify-content:flex-end}
 .step.top{align-items:flex-start;padding-top:24vh}
@@ -303,9 +303,145 @@ body.showtext .ptxt.blur{filter:none}
   .hud .brand{font-size:15px}.hud .tog.hide-sm{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+/* Class vote: "¿Juegan en clase? Cuenten manos" */
+[hidden]{display:none!important}
+.cv{margin:2px 0 12px}
+.cv-link{background:none;border:0;padding:4px 0;font:13px var(--font-ui);color:var(--color-teal-deep);text-decoration:underline;text-decoration-style:dashed;text-underline-offset:3px;cursor:pointer;min-height:32px}
+.cv-link:focus-visible,.cv-b:focus-visible{outline:3px solid var(--bronze);outline-offset:2px}
+.cv-panel{margin-top:6px;background:#fff;border:1px dashed var(--bronze);border-radius:12px;padding:10px 12px}
+.cv-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0}
+.cv-l{font:700 12px var(--font-ui);color:#7A4F20;min-width:58px}
+.cv-o{display:inline-flex;align-items:center;gap:6px;background:var(--color-cream);border:1px solid var(--color-cream-border);border-radius:999px;padding:3px 5px 3px 12px}
+.cv-w{font:15px var(--font-display);color:#2b2b2b}
+.cv-b{width:36px;height:36px;border-radius:50%;border:1px solid var(--color-cream-border);background:#fff;font:700 16px var(--font-ui);color:#2b2b2b;cursor:pointer}
+.cv-b:disabled{opacity:.4;cursor:default}
+.cv-n{min-width:22px;text-align:center;font:700 16px var(--font-display);color:#2b2b2b}
+.cv-note{font-size:12.5px;color:var(--color-ink-soft);margin:8px 0 0;line-height:1.5}
+.cv-res{margin-top:10px;border-top:1px solid var(--color-cream-border);padding-top:8px}
+.cv-h{font:11px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:#7A4F20;margin-bottom:6px}
+.cv-r{font-size:14px;color:#2b2b2b;margin-bottom:10px}
+.cv-bar{display:grid;grid-template-columns:100px 1fr 42px;gap:8px;align-items:center;font-size:13px;margin-top:4px}
+.cv-bar i{display:block;height:10px;border-radius:5px;background:#C9D3D8}
+.cv-bar.ok i{background:#2F7D4F}
+.cv-bar.ok span{font-weight:700;color:#2F7D4F}
+.cv-bar em{font-style:normal;color:var(--color-ink-soft);text-align:right}
+#start{border-radius:999px}
+/* The site nav (AA-7) sits above the story's own bar: .hud, .bar, .stage and the save pop-up
+   start below it. --site-h is the closed nav's height; the script after the nav keeps it exact.
+   A solid strip behind the nav, and it stacks over .hud so the phone menu opens over the story. */
+:root{--site-h:74px;--nav-fade:var(--ink);--nav-fade-end:var(--ink)}
+html{scroll-padding-top:var(--site-h)}
+body .nav-shell{z-index:61}
 </style>
 </head>
 <body>
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
+<div class="nav-shell">
+  <div class="wrap">
+    <nav class="nav site-nav">
+      <a class="wordmark" href="/">Allgood<em>Academy</em></a>
+      <div class="nav-right">
+        <div class="nav-links" id="site-nav-links">
+          <a class="nav-link" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
+        <button class="nav-menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-nav-links"><svg class="bars" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="x" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+    </nav>
+  </div>
+</div>
+<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>
+<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-menu{display:none}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+  .nav-shell{padding-top:10px}
+  .nav-shell .wrap{padding-left:12px;padding-right:12px}
+  .site-nav.has-menu.nav{flex-wrap:wrap;gap:6px;row-gap:0;border-radius:26px;padding:6px 6px 6px 18px}
+  .site-nav.has-menu .wordmark{font-size:20px;margin-right:auto;min-width:0;overflow:hidden;text-overflow:clip}
+  .site-nav.has-menu .nav-cta{order:1;margin-left:0;padding:8px 16px}
+  .site-nav.has-menu .nav-menu{order:2;display:inline-flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;padding:0;margin:0;border:0;border-radius:999px;background:var(--color-teal-wash);color:var(--color-teal-deep);cursor:pointer}
+  .site-nav.has-menu .nav-menu svg{display:block;width:20px;height:20px}
+  .site-nav.has-menu .nav-menu .x,.site-nav.has-menu.open .nav-menu .bars{display:none}
+  .site-nav.has-menu.open .nav-menu .x{display:block}
+  .site-nav.has-menu .nav-links{order:3;display:none;margin:8px 0 4px;padding:6px 12px 0 0;border-top:1px solid var(--color-teal-wash)}
+  .site-nav.has-menu.open .nav-links{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+  .site-nav.has-menu.open .nav-links .nav-link{display:block;font-size:15px;line-height:1.4;padding:12px 14px;border-radius:14px;white-space:normal;max-width:none;text-align:left}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+  .site-nav.has-menu.nav{padding-left:14px;padding-right:6px;gap:4px}
+  .site-nav.has-menu .wordmark{font-size:17px}
+  .site-nav.has-menu .nav-cta{padding:8px 11px;font-size:12px}
+  .site-nav.has-menu .nav-menu{width:38px;height:38px}
+}
+</style>
+<script>
+(function(){
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if(s&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.textContent='Mission Control';
+  // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
+  // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
+  // writes it onto the session doc. See docs/insider-analytics.md.
+  try{if(!sessionStorage.getItem('ag_src')){var q=new URLSearchParams(location.search),c=function(v){v=String(v||'').toLowerCase();return /^[a-z0-9._-]{1,40}$/.test(v)?v:(v?'other':'');},r='';try{var h=document.referrer?new URL(document.referrer).host:'';r=h&&h!==location.host?c(h):'';}catch(e){}var o={src:c(q.get('src')),utmSource:c(q.get('utm_source')),utmMedium:c(q.get('utm_medium')),utmCampaign:c(q.get('utm_campaign')),refHost:r};sessionStorage.setItem('ag_src',JSON.stringify(o));}}catch(e){/* storage blocked - no source recorded */}
+  var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
+  if(!btn)return;
+  nav.classList.add('has-menu');
+  function set(o){nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false');btn.setAttribute('aria-label',o?'Close menu':'Menu');}
+  btn.addEventListener('click',function(){set(!nav.classList.contains('open'));});
+  nav.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('.nav-links a'))set(false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&nav.classList.contains('open')){set(false);btn.focus();}});
+  document.addEventListener('click',function(e){if(!nav.contains(e.target))set(false);});
+})();
+</script>
+<!-- END GENERATED NAV -->
+<script>
+// Keeps --site-h equal to the site nav's closed height, so the story's bar sits right under it.
+(function(){var s=document.querySelector('.nav-shell');if(!s)return;var r=document.documentElement;
+function set(){if(s.querySelector('.site-nav.open'))return;r.style.setProperty('--site-h',s.offsetHeight+'px')}
+set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListener('resize',set);})();
+</script>
 <div class="bar" id="bar"></div>
 <header class="hud">
   <a class="brand" href="/espanol/" aria-label="Back to the Español hub" title="Back to the Español hub"><span class="back" aria-hidden="true">←</span>El <b>Viaje</b></a>
@@ -418,6 +554,7 @@ body.showtext .ptxt.blur{filter:none}
         <div class="turnlabel">Tu reporte · toca el verbo para cambiarlo</div>
         <p class="sent">“Yo <button class="chip" id="g1chip" aria-label="Cambiar verbo">facturé</button> la maleta cuando anunciaron el cambio de puerta.”</p>
         <p class="hint">Think about what actually happened at the Atlanta counter.</p>
+        <div class="cv" data-g="1"><button class="cv-link" aria-expanded="false">¿Juegan en clase? Cuenten manos</button><div class="cv-panel" hidden></div></div>
         <button class="go" id="g1go">Enviar reporte</button>
         <div class="screen" id="g1scr" hidden></div>
         <div id="g1rep"></div>
@@ -502,6 +639,7 @@ body.showtext .ptxt.blur{filter:none}
           <button class="opt" data-k="B"><b>B</b>“¡Hola, Valeria! Súper bien, ¿y tú?”</button>
           <button class="opt" data-k="C"><b>C</b>“Es un gran honor conocerla, distinguida directora.”</button>
         </div>
+        <div class="cv" data-g="2"><button class="cv-link" aria-expanded="false">¿Juegan en clase? Cuenten manos</button><div class="cv-panel" hidden></div></div>
         <button class="go" id="g2go" disabled>Decirlo</button>
         <div id="g2rep"></div>
       </div>
@@ -534,6 +672,7 @@ body.showtext .ptxt.blur{filter:none}
           <button class="opt" data-k="B"><b>B</b>“Escuché sus comentarios e hice cambios.”</button>
           <button class="opt" data-k="C"><b>C</b>“Escucho sus comentarios y hago cambios.”</button>
         </div>
+        <div class="cv" data-g="3"><button class="cv-link" aria-expanded="false">¿Juegan en clase? Cuenten manos</button><div class="cv-panel" hidden></div></div>
         <button class="go" id="g3go" disabled>Decirlo</button>
         <div id="g3rep"></div>
         <div id="g3fix"></div>
@@ -610,6 +749,7 @@ body.showtext .ptxt.blur{filter:none}
       <div class="panel" id="g4a">
         <div class="turnlabel">Turno 1</div>
         <div class="prompt"><button class="say" data-say="¿Ya había estado en México antes?">Escuchar</button><span class="ptxt blur">“¿Ya había estado en México antes?”</span></div>
+        <div class="cv" data-g="4"><button class="cv-link" aria-expanded="false">¿Juegan en clase? Cuenten manos</button><div class="cv-panel" hidden></div></div>
         <div class="opts" id="g4o1">
           <button class="opt" data-k="u"><b>A</b>“No, es mi primera vez. ¿Usted es de aquí?”</button>
           <button class="opt" data-k="t"><b>B</b>“No, es mi primera vez. ¿Tú eres de aquí?”</button>
@@ -650,6 +790,7 @@ body.showtext .ptxt.blur{filter:none}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px">
           <button class="acc">á</button><button class="acc">é</button><button class="acc">í</button><button class="acc">ó</button><button class="acc">ú</button><button class="acc">ñ</button>
         </div>
+        <div class="cv" data-g="5"><button class="cv-link" aria-expanded="false">¿Juegan en clase? Cuenten manos</button><div class="cv-panel" hidden></div></div>
         <button class="go" id="g5go">Decirlo</button>
         <p class="small" id="g5hint" style="margin:10px 0 0"></p>
         <div id="g5rep"></div>
@@ -736,8 +877,8 @@ const DBG=location.hash==='#debug';let dbgEl=null;
 function dlog(kind,obj){try{console.log('[elviaje]',kind,obj)}catch(_){}if(!DBG)return;if(!dbgEl){dbgEl=document.createElement('div');dbgEl.id='dbg';dbgEl.innerHTML='<b>Telemetry · stream espanol</b><br>';document.body.appendChild(dbgEl)}dbgEl.insertAdjacentHTML('beforeend',`<div><b>${kind}</b> ${JSON.stringify(obj)}</div>`);dbgEl.scrollTop=1e6}
 const TM=window.Telemetry||{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{}),restart:()=>dlog('restart',{})};
 TM.init({module:'el-viaje',gameName:'El Viaje',stream:'espanol',stepsTotal:12});
-const T=(e,d)=>TM.track(e,Object.assign({v:'1.9'},d||{}));
-function saveProgress(){const data={v:'1.9',done:S.done,choice:Object.assign({},S.choice,{5:S.choice[5]||undefined}),conf:S.conf,path:S.path};if(window.AuthCore&&window.AuthCore.saveModuleProgress){try{window.AuthCore.saveModuleProgress('el-viaje',data)}catch(_){}}else dlog('saveModuleProgress',{slug:'el-viaje',gates:Object.keys(S.done).length,path:S.path})}
+const T=(e,d)=>TM.track(e,Object.assign({v:'1.11'},d||{}));
+function saveProgress(){const data={v:'1.11',done:S.done,choice:Object.assign({},S.choice,{5:S.choice[5]||undefined}),conf:S.conf,path:S.path};if(window.AuthCore&&window.AuthCore.saveModuleProgress){try{window.AuthCore.saveModuleProgress('el-viaje',data)}catch(_){}}else dlog('saveModuleProgress',{slug:'el-viaje',gates:Object.keys(S.done).length,path:S.path})}
 if(window.AuthCore&&window.AuthCore.startSession){try{window.AuthCore.startSession()}catch(_){}}
 
 /* ---------- people ---------- */
@@ -996,7 +1137,7 @@ let AC=null;function ding(){try{AC=AC||new (window.AudioContext||window.webkitAu
 function reply(el,by,txt,cls){el.insertAdjacentHTML('beforeend',`<div class="reply ${cls||''}"><div class="bub"><span class="by">${by}</span>${txt}</div></div>`)}
 function jodi(n,m,txt){document.getElementById('g'+n+'jt').innerHTML=`<div class="jt"><img src="${JODI[m]}" alt="Jodi"><div><h3>Jodi's take</h3><p>${txt}</p></div></div>`}
 function finish(n){
-  if(S.done[n])return;S.done[n]=1;
+  if(S.done[n])return;S.done[n]=1;setTimeout(()=>CV.reveal(n),0);
   const sec=document.getElementById('g'+n);const st=sec.querySelector('.gst');st.textContent='Abordado';st.classList.add('done');
   const sp=$('#stamp');sp.innerHTML=`P${n}<small>ABORDADO</small>`;sp.classList.remove('go2');void sp.offsetWidth;sp.classList.add('go2');
   setTimeout(()=>$$('#dots i')[n-1].classList.add('on'),1200);
@@ -1111,7 +1252,7 @@ function buildCarta(){
   const c=Object.values(S.conf).reduce((a,b)=>a+b,0);
   const gates={};[1,2,3,4,5].forEach(n=>gates['p'+n]=S.conf[n]||0);
   const path={f1:S.path.f1,f2:S.path.f2,f3:(S.path.f3||[]).join('+')};
-  TM.complete({finalScore:c,percentage:Math.round(c/5*100),summary:{confianza:c,gates,path}});
+  TM.complete({finalScore:c,percentage:Math.round(c/5*100),summary:{confianza:c,gates,path,mode:S.mode||'solo'}});
   TM.summary({confianza:c,gates,path});
   if(window.logModuleCompletion){try{window.logModuleCompletion({confianza:c})}catch(_){}}else dlog('game_scores (logModuleCompletion)',{gameName:'El Viaje',completed:true,confianza:c});
   saveProgress();
@@ -1132,6 +1273,53 @@ function buildCarta(){
   $$('#tiles .tile button').forEach(b=>b.addEventListener('click',()=>b.parentElement.classList.toggle('open')));
 }
 $('#again').addEventListener('click',()=>location.reload());
+const CV_CFG={
+  1:[{opts:[['facturé','facturé'],['facturaba','facturaba']],ok:['facturaba']}],
+  2:[{opts:[['A','A'],['B','B'],['C','C']],ok:['A','C']}],
+  3:[{opts:[['A','A'],['B','B'],['C','C']],ok:['A']}],
+  4:[{label:'Turno 1',opts:[['u','A · usted'],['t','B · tú']],ok:['u']},{label:'Turno 2',opts:[['u','A · usted'],['t','B · tú']],ok:['t']}],
+  5:[{opts:[['esté','esté'],['está','está'],['otra','otra']],ok:['esté']}]
+};
+/* ---------- Class vote: "¿Juegan en clase? Cuenten manos" ----------
+   Optional, per Puerta. A teacher projecting the story counts hands and taps them in.
+   Using it once marks the playthrough as a class session (S.mode='class').
+   Only class counts are logged. Nothing about any student. */
+const CV=(()=>{
+  const counts={};let on=false;
+  const box=n=>document.querySelector('#g'+n+' .cv');
+  function build(n){
+    const cfg=CV_CFG[n],b=box(n);if(!cfg||!b)return;
+    const p=b.querySelector('.cv-panel');
+    p.innerHTML=cfg.map((r,ri)=>`<div class="cv-row" data-r="${ri}">${r.label?`<span class="cv-l">${r.label}</span>`:''}${r.opts.map(o=>`<span class="cv-o" data-o="${o[0]}"><span class="cv-w">${o[1]}</span><button class="cv-b" data-d="-1" aria-label="Una mano menos: ${o[1]}">−</button><span class="cv-n" aria-live="polite">0</span><button class="cv-b" data-d="1" aria-label="Una mano más: ${o[1]}">+</button></span>`).join('')}</div>`).join('')
+      +`<p class="cv-note">Cuenten las manos y toquen +. Luego elijan la respuesta de la clase, como siempre. <span class="ent">Count hands and tap +, then choose the class's answer as usual. Nothing about any student is saved.</span></p><div class="cv-res" hidden></div>`;
+    counts[n]=cfg.map(r=>Object.fromEntries(r.opts.map(o=>[o[0],0])));
+    p.querySelectorAll('.cv-b').forEach(btn=>btn.addEventListener('click',()=>{
+      if(S.done[n])return;
+      const o=btn.closest('.cv-o'),ri=+btn.closest('.cv-row').dataset.r,k=o.dataset.o;
+      counts[n][ri][k]=Math.max(0,counts[n][ri][k]+(+btn.dataset.d));
+      o.querySelector('.cv-n').textContent=counts[n][ri][k];
+    }));
+  }
+  function toggle(n,link){
+    const p=box(n).querySelector('.cv-panel'),show=p.hidden;p.hidden=!show;link.setAttribute('aria-expanded',String(show));
+    if(show&&!on){on=true;S.mode='class';T('class_mode',{gate:n})}
+  }
+  function reveal(n){
+    const b=box(n);if(!b||!counts[n])return;
+    const tot=counts[n].map(r=>Object.values(r).reduce((a,c)=>a+c,0));if(!tot.some(t=>t>0))return;
+    let html='';
+    CV_CFG[n].forEach((r,ri)=>{const t=tot[ri];if(!t)return;
+      const okO=r.opts.filter(o=>r.ok.includes(o[0]));const okN=okO.reduce((a,o)=>a+counts[n][ri][o[0]],0);
+      html+=`<div class="cv-r">${r.label?`<b>${r.label}:</b> `:''}${okN} de ${t} eligieron <b>${okO.map(o=>o[1]).join(' o ')}</b>`
+        +r.opts.map(o=>{const c=counts[n][ri][o[0]],pc=Math.round(c/t*100);return `<span class="cv-bar${r.ok.includes(o[0])?' ok':''}"><span>${o[1]}</span><i style="width:${pc}%"></i><em>${pc}%</em></span>`}).join('')+`</div>`});
+    b.querySelector('.cv-note').hidden=true;const res=b.querySelector('.cv-res');res.innerHTML='<div class="cv-h">Así votó la clase · how the class voted</div>'+html;res.hidden=false;
+    b.querySelector('.cv-panel').hidden=false;b.querySelector('.cv-link').setAttribute('aria-expanded','true');
+    b.querySelectorAll('.cv-b').forEach(x=>x.disabled=true);
+    T('class_vote',{gate:n,counts:counts[n],total:Math.max(...tot)});
+  }
+  document.querySelectorAll('.cv').forEach(b=>{const n=+b.dataset.g;build(n);b.querySelector('.cv-link').addEventListener('click',e=>toggle(n,e.currentTarget))});
+  return {reveal,isOn:()=>on};
+})();
 }
 </script>
 </body>
