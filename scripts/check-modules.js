@@ -787,6 +787,31 @@ try {
       const dataSteps = new Set([...page.matchAll(/data-step="(\d+)"/g)].map((x) => x[1])).size;
       if (dataSteps !== Number(m.stepsTotal)) fail(`public${m.url}index.html: has ${dataSteps} distinct data-step sections, registry stepsTotal is ${m.stepsTotal}`);
       if (!/<script src="\/js\/story-tracking\.js"><\/script>/.test(page)) fail(`public${m.url}index.html: does not load /js/story-tracking.js, so nothing it does is recorded`);
+      // The Español report (Reports > Español) reads each Puerta's prompt, options and right
+      // answers from the story's report.json. Every scored Puerta in the page (a section with
+      // id="g<n>") needs an entry, with options and at least one right answer per blank.
+      const reportPath = path.join('public', m.url, 'report.json');
+      const gateNums = [...new Set([...page.matchAll(/<section class="gate[^"]*" id="g(\d+)"/g)].map((x) => Number(x[1])))];
+      let report = null;
+      try { report = JSON.parse(read(reportPath)); } catch (e) { fail(`${reportPath}: missing or not valid JSON, so Reports > Español has nothing to show for "${m.name}"`); }
+      if (report) {
+        if (report.story !== m.id) fail(`${reportPath}: story "${report.story}" != registry story id "${m.id}"`);
+        for (const n of gateNums) {
+          const pu = (report.puertas || []).find((x) => x.n === n);
+          if (!pu) { fail(`${reportPath}: no entry for Puerta ${n}, which the story scores`); continue; }
+          if (!pu.label || !pu.prompt) fail(`${reportPath}: Puerta ${n} needs a grammar \`label\` and the Spanish \`prompt\``);
+          if (!Array.isArray(pu.blanks) || !pu.blanks.length) { fail(`${reportPath}: Puerta ${n} has no blanks`); continue; }
+          pu.blanks.forEach((b, i) => {
+            const keys = (b.options || []).map((o) => o.k);
+            if (keys.length < 2) fail(`${reportPath}: Puerta ${n} blank ${i + 1} needs at least two options`);
+            if (!Array.isArray(b.right) || !b.right.length || b.right.some((k) => !keys.includes(k))) fail(`${reportPath}: Puerta ${n} blank ${i + 1} \`right\` must name one or more of its options`);
+            if (pu.blanks.length > 1 && (b.key == null || !b.sentence)) fail(`${reportPath}: Puerta ${n} has several blanks, so each needs a \`key\` and its \`sentence\``);
+          });
+        }
+        for (const pu of report.puertas || []) if (!gateNums.includes(pu.n)) fail(`${reportPath}: has Puerta ${pu.n}, which the story page does not`);
+        // The story must send each blank's pick, or a replay would overwrite the first try.
+        if ((report.puertas || []).some((x) => x.blanks && x.blanks.length > 1) && !/picks:/.test(page)) fail(`public${m.url}index.html: a Puerta has several blanks but its choice event carries no \`picks\``);
+      }
     }
   }
   for (const row of esList) {

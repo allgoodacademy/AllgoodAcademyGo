@@ -1177,3 +1177,268 @@ test('assignmentSummary names Español stories separately from simulations', () 
     assert.equal(s.storyCount, 2);
     assert.match(s.label, /1 simulation \+ 2 Español stories assigned/);
 });
+
+/* ── The Español report (Reports > Español, 2026-11-27) ─────────────────────── */
+const { storyReport, studentStory, worthFiveStory, playedStoryIds, MIN_FOR_PERCENT } = await import('../public/mission-control/espanol-report.js');
+const MUNDIAL = { id: 'el-mundial', name: 'El Mundial', gameNames: ['El Mundial'], stepsTotal: 10 };
+const MUNDIAL_CFG = JSON.parse(readFileSync(new URL('../public/espanol/el-mundial/report.json', import.meta.url), 'utf8'));
+const VIAJE_CFG = JSON.parse(readFileSync(new URL('../public/espanol/el-viaje/report.json', import.meta.url), 'utf8'));
+const gateEv = (n, score, extra, at = 1000 + n) => ({ module: 'el-mundial', event: 'choice', clientTs: at, meta: { scenarioIndex: n, score, category: 'gate', ...extra } });
+const esStudent = (uid, events, { completed = false, state = null } = {}) => ({
+    uid, name: uid, events,
+    raw: {
+        sessions: [{ module: 'el-mundial', startedAt: 500, lastSeenAt: 5000, completed }],
+        scores: completed ? [{ gameName: 'El Mundial', completed: true }] : [],
+        progress: state ? { 'el-mundial': { state: JSON.stringify(state) } } : {},
+    },
+});
+
+test('Español report: first tries per Puerta, per blank, lowest first-try rate first', () => {
+    const students = [];
+    for (let i = 0; i < 6; i++) {
+        const knewIt = i < 2;   // 2 of 6 put conocía / conocí the right way round
+        students.push(esStudent(`s${i}`, [
+            gateEv(1, 1, { choiceIndex: 0 }),
+            gateEv(2, i < 5 ? 1 : 0, { choiceIndex: i < 5 ? 0 : 1 }),
+            gateEv(4, knewIt ? 1 : 0, { choiceIndex: knewIt ? 2 : 1, picks: knewIt ? { a: 'conocía', b: 'conocí' } : { a: 'conocía', b: 'conocía' } }),
+            { module: 'el-mundial', event: 'choice', clientTs: 900, meta: { scenarioIndex: 'f1', choiceIndex: i % 3, category: 'fork' } },
+        ], { completed: i < 4 }));
+    }
+    students.push({ uid: 'never', name: 'never', events: [], raw: { sessions: [], scores: [], progress: {} } });
+    const d = storyReport(MUNDIAL, MUNDIAL_CFG, students);
+    assert.equal(d.n, 7);
+    assert.equal(d.played, 6);
+    assert.equal(d.finished, 4);
+    assert.equal(d.puertas[0].n, 4, 'the Puerta with the lowest first-try rate comes first');
+    assert.equal(d.puertas[0].rate, 33);
+    assert.equal(d.puertas[0].showPercent, true);
+    const blankB = d.puertas[0].blanks.find((b) => b.key === 'b');
+    assert.deepEqual(blankB.options.map((o) => [o.k, o.count, o.right]), [['conocí', 2, true], ['conocía', 4, false]]);
+    assert.equal(d.worth.text, 'conocía vs. conocí: 4 of 6 picked conocía.');
+    assert.deepEqual(d.forks[0].options.map((o) => o.count), [2, 2, 2]);
+    // Puertas nobody reached go last, whatever their number.
+    assert.deepEqual(d.puertas.slice(-2).map((p) => p.answered), [0, 0]);
+    // The one-pick Puerta reads its option from choiceIndex.
+    const p2 = d.puertas.find((p) => p.n === 2);
+    assert.deepEqual(p2.blanks[0].options.map((o) => o.count), [5, 1]);
+});
+
+test('Español report: a replay never overwrites the first try', () => {
+    const s = esStudent('replayer', [
+        gateEv(4, 0, { picks: { a: 'conocí', b: 'conocía' } }, 1000),
+        gateEv(4, 1, { picks: { a: 'conocía', b: 'conocí' } }, 9000),
+    ], { state: { done: { 4: 1 }, choice: { 4: { a: 'conocía', b: 'conocí' } }, conf: { 4: 1 } } });
+    const mine = studentStory(MUNDIAL, MUNDIAL_CFG, s).puertas.find((p) => p.n === 4);
+    assert.equal(mine.right, false);
+    assert.deepEqual(mine.picks, { a: 'conocí', b: 'conocía' });
+});
+
+test('Español report: fewer than five students shows counts, not percentages', () => {
+    const three = [0, 1, 2].map((i) => esStudent(`t${i}`, [gateEv(1, i ? 1 : 0, { choiceIndex: i ? 0 : 1 })]));
+    const d = storyReport(MUNDIAL, MUNDIAL_CFG, three);
+    assert.equal(MIN_FOR_PERCENT, 5);
+    assert.equal(d.puertas.find((p) => p.n === 1).showPercent, false);
+});
+
+test('Español report: without readable events it falls back to the session summary and saved picks', () => {
+    const s = {
+        uid: 'x', name: 'x', events: null,
+        raw: {
+            sessions: [{ module: 'el-viaje', startedAt: 1, completed: true, summary: { gates: { 1: 1, 4: 0 }, path: { f1: 'recepcion', f2: 'ciudad' } } }],
+            scores: [],
+            progress: { 'el-viaje': { state: JSON.stringify({ done: { 1: 1, 4: 1 }, choice: { 1: 'facturaba', '4a': 'u', 4: 'u' }, conf: { 1: 1, 4: 0 } }) } },
+        },
+    };
+    const mine = studentStory({ id: 'el-viaje', gameNames: ['El Viaje'] }, VIAJE_CFG, s);
+    assert.equal(mine.finished, true);
+    assert.equal(mine.puertas[0].right, true);
+    assert.deepEqual(mine.puertas[3].picks, { a: 'u', b: 'u' });
+    assert.equal(mine.puertas[3].right, false);
+    assert.equal(mine.puertas[1].answered, false);
+    assert.deepEqual(mine.forks.map((f) => f.text), ['Recepción', 'Qué conocer en Monterrey']);
+});
+
+test('Español report: nothing to say when every first try was right, and played stories are found', () => {
+    assert.equal(worthFiveStory([{ n: 1, label: 'x', answered: 4, right: 4, blanks: [] }]), null);
+    const s = esStudent('p', []);
+    assert.deepEqual(playedStoryIds([MUNDIAL, { id: 'el-viaje', gameNames: ['El Viaje'] }], [s]), ['el-mundial']);
+});
+
+test('Español report: every word a teacher reads avoids score, grade, wrong and at risk', () => {
+    const src = readFileSync(new URL('../public/mission-control/teacher.js', import.meta.url), 'utf8');
+    const block = src.slice(src.indexOf('/* ESPAÑOL STORIES (2026-11-27)'), src.indexOf("/* One tap from a game's drill-down"));
+    const shown = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\$\{[^}]*\}/g, '');
+    for (const word of [/\bscore/i, /\bgrade/i, /\bwrong\b/i, /at risk/i]) assert.equal(word.test(shown), false, `the Español report says ${word}`);
+});
+
+/* ── Embarque → Aduana: the growth view and the flag (2026-11-27) ───────────── */
+const { growthReport, presentedGrowth } = await import('../public/mission-control/espanol-report.js');
+const CHECKS_CFG = JSON.parse(readFileSync(new URL('../public/espanol/el-mundial/checks.json', import.meta.url), 'utf8'));
+const withChecks = (uid, checks) => ({ uid, name: uid, events: [], raw: { sessions: [], scores: [], progress: { 'el-mundial': { checks } } } });
+
+test('growth view: only students who did both checks count, skill by skill', () => {
+    const students = [
+        withChecks('a', { form: 'A', emb: [1, 0, 0, 0, 0], adu: [1, 1, 1, 1, 0], embDone: true, aduDone: true }),
+        withChecks('b', { form: 'B', emb: [0, 0, 0, 0, 0], adu: [1, 1, 0, 1, 0], embDone: true, aduDone: true }),
+        withChecks('c', { form: 'A', emb: [1, 1, 1, 1, 1], adu: [], embDone: true, aduDone: false }),   // boarded, never reached the Aduana
+        withChecks('d', { form: 'B', emb: [1, 0], adu: [], embDone: false, aduDone: false }),           // left mid-Embarque
+        { uid: 'e', name: 'e', events: [], raw: { sessions: [], scores: [], progress: {} } },
+    ];
+    const g = growthReport(CHECKS_CFG, 'el-mundial', students);
+    assert.equal(g.n, 2);
+    assert.equal(g.boarded, 3);
+    assert.equal(g.showPercent, false, 'under five students: counts, not percentages');
+    assert.deepEqual(g.slots.map((s) => [s.emb, s.adu]), [[1, 2], [0, 2], [0, 1], [0, 2], [0, 0]]);
+    assert.equal(g.slots.length, 5);
+    assert.match(g.worth, /^Tell a short past story with both tenses: 0 of 2 got it at the Aduana/);
+});
+
+test('growth view: five or more students shows percentages; nothing to flag when all got it', () => {
+    const five = [0, 1, 2, 3, 4].map((i) => withChecks(`s${i}`, { form: 'A', emb: [0, 0, 0, 0, 0], adu: [1, 1, 1, 1, 1], embDone: true, aduDone: true }));
+    const g = growthReport(CHECKS_CFG, 'el-mundial', five);
+    assert.equal(g.showPercent, true);
+    assert.equal(g.slots[0].aduPct, 100);
+    assert.equal(g.worth, null);
+    assert.equal(presentedGrowth(CHECKS_CFG, null), null);
+    assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ right: 10 }], adu: [{ right: 90 }] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 10, adu: 90 });
+});
+
+test('item banks: five slots, five items per form, the right option first, a rule for each', () => {
+    for (const story of ['el-mundial', 'el-viaje']) {
+        const bank = JSON.parse(readFileSync(new URL(`../public/espanol/${story}/checks.json`, import.meta.url), 'utf8'));
+        assert.equal(bank.story, story);
+        assert.equal(bank.slots.length, 5);
+        assert.equal(bank.rubric.length, 4);
+        assert.ok(bank.postcard.length > 20);
+        for (const form of ['A', 'B']) {
+            assert.equal(bank[form].length, 5);
+            for (const it of bank[form]) { assert.equal(it.a, 0); assert.ok(it.o.length >= 2 && it.q && it.why); }
+        }
+        assert.equal(/\bvos\b/i.test(JSON.stringify([bank.A, bank.B])), false, 'vos is in the story, not measured by the checks');
+    }
+});
+
+test('ESPANOL_CHECKS_ON: on for staging, previews and local; OFF on production and anywhere unexpected', async () => {
+    const vm = await import('node:vm');
+    const src = readFileSync(new URL('../public/js/site-config.js', import.meta.url), 'utf8');
+    const flag = (hostname) => { const window = { location: { hostname } }; vm.runInNewContext(src, { window }); return window.AG_CONFIG.ESPANOL_CHECKS_ON; };
+    for (const h of ['allgoodacademy.com', 'www.allgoodacademy.com', 'allgood-academy.web.app', 'allgood-academy.firebaseapp.com', 'example.com', '', 'allgood-academy--staging.evil.com']) {
+        assert.equal(flag(h), false, `the checks must be off on "${h}"`);
+    }
+    for (const h of ['allgood-academy--staging-ba3i7t07.web.app', 'allgood-academy--pr97-claude-x-abc123.web.app', 'localhost', '127.0.0.1']) {
+        assert.equal(flag(h), true, `the checks should be on at "${h}"`);
+    }
+    // Nothing in a story or in Mission Control shows the checks without reading the flag.
+    const checksSrc = readFileSync(new URL('../public/js/espanol-checks.js', import.meta.url), 'utf8');
+    assert.match(checksSrc, /if \(CFG\.ESPANOL_CHECKS_ON\) \{ start\(\); return; \}/);
+    // With the flag off, the file stops unless the preview was asked for, and then only starts for an admin.
+    assert.match(checksSrc, /if \(!CFG\.checksPreviewAsked \|\| typeof CFG\.espanolChecksFor !== 'function' \|\| !ST\) return;/);
+    assert.match(checksSrc, /if \(CFG\.espanolChecksFor\(u\)\) start\(\);/);
+    assert.match(src, /var PRODUCTION_ESPANOL_CHECKS = false;/, 'the production switch stays off until the founder flips it');
+});
+
+/* ── Review of #97 (2026-11-27): the admin-only preview, and teacher-only Presentar ───────── */
+const vmod = await import('node:vm');
+const SITE_CONFIG_SRC = readFileSync(new URL('../public/js/site-config.js', import.meta.url), 'utf8');
+const configAt = (hostname, search = '') => { const window = { location: { hostname, search } }; vmod.runInNewContext(SITE_CONFIG_SRC, { window }); return window.AG_CONFIG; };
+const ADMIN = { email: 'balgood93@gmail.com', emailVerified: true, isAnonymous: false };
+
+test('checks preview on production: only an admin account WITH ?checks=preview sees them', () => {
+    const plain = configAt('allgoodacademy.com');
+    const asked = configAt('allgoodacademy.com', '?checks=preview');
+    assert.equal(plain.ESPANOL_CHECKS_ON, false);
+    assert.equal(asked.ESPANOL_CHECKS_ON, false, 'the parameter never turns the flag itself on');
+    assert.equal(asked.checksPreviewAsked, true);
+    assert.equal(asked.espanolChecksFor(ADMIN), true);
+    assert.equal(asked.espanolChecksFor({ ...ADMIN, email: 'Learning@AllgoodAcademy.com' }), true);
+    // An admin who did not ask sees the site as everyone does.
+    assert.equal(plain.espanolChecksFor(ADMIN), false);
+    // Nobody else, whatever the URL says.
+    const others = [
+        null, undefined, {},
+        { email: 'teacher@school.org', emailVerified: true, isAnonymous: false },              // another teacher
+        { email: null, isAnonymous: true },                                                    // a student
+        { email: 'kid123@save.allgoodacademy.com', emailVerified: false, isAnonymous: false }, // a student with a save code
+        { ...ADMIN, emailVerified: false },                                                    // an unverified claim to an admin address
+        { ...ADMIN, isAnonymous: true },
+        { ...ADMIN, email: 'balgood93@gmail.com.evil.com' },
+    ];
+    for (const u of others) assert.equal(asked.espanolChecksFor(u), false, `must not preview for ${JSON.stringify(u)}`);
+    for (const search of ['?checks=1', '?checks=previews', '?xchecks=preview', '?src=test']) assert.equal(configAt('allgoodacademy.com', search).espanolChecksFor(ADMIN), false, search);
+    assert.equal(configAt('allgoodacademy.com', '?src=test&checks=preview').espanolChecksFor(ADMIN), true);
+    // Where the flag is on (staging), everyone sees the checks, as before.
+    assert.equal(configAt('allgood-academy--staging-ba3i7t07.web.app').espanolChecksFor(null), true);
+});
+
+test('checks preview: the admin list is the one firestore.rules and Insider use', () => {
+    const list = (src, re) => (src.match(re) || ['', ''])[1].match(/'[^']+'/g).map((x) => x.slice(1, -1)).sort();
+    const fromConfig = list(SITE_CONFIG_SRC, /var ADMIN_EMAILS = \[([^\]]+)\]/);
+    const fromRules = list(readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8'), /request\.auth\.token\.email in \[([^\]]+)\]/);
+    const fromInsider = list(readFileSync(new URL('../public/insider/index.html', import.meta.url), 'utf8'), /const ALLOWED_EMAILS = \[([^\]]+)\]/);
+    assert.equal(fromConfig.length, 2);
+    assert.deepEqual(fromConfig, fromRules);
+    assert.deepEqual(fromConfig, fromInsider);
+    // Mission Control decides per signed-in user, never from the flag alone.
+    const teacherSrc = readFileSync(new URL('../public/mission-control/teacher.js', import.meta.url), 'utf8');
+    assert.match(teacherSrc, /CHECKS_ON = !!\(window\.AG_CONFIG && typeof window\.AG_CONFIG\.espanolChecksFor === 'function' && window\.AG_CONFIG\.espanolChecksFor\(user\)\);/);
+});
+
+/* /js/story-tracking.js in a tiny fake page: who is signed in, what their profile says, and
+   whether the URL asks for Presentar. Returns what was written. */
+async function storyTrackingAs({ search, user, role, accountFails = false }) {
+    const src = readFileSync(new URL('../public/js/story-tracking.js', import.meta.url), 'utf8');
+    const writes = { saved: [], loaded: [] };
+    const AuthCore = {
+        auth: { currentUser: user }, db: {}, appId: 'allgood-academy',
+        startSession: async () => user,
+        getAccount: async () => { if (accountFails) throw new Error('permission-denied'); return { role }; },
+        saveModuleProgress: async (slug, data) => { writes.saved.push([slug, data]); },
+        loadModuleProgress: async (slug) => { writes.loaded.push(slug); return { state: '{}' }; },
+    };
+    const Telemetry = Object.fromEntries(['init', 'plan', 'step', 'choice', 'complete', 'summary', 'track', 'restart'].map((k) => [k, () => {}]));
+    const window = { AuthCore, Telemetry };
+    const document = { createElement: () => ({}), head: { appendChild: () => {} } };
+    vmod.runInNewContext(src, { window, document, location: { search }, setTimeout, Promise, console });
+    const ST = window.StoryTrack;
+    const presenting = await ST.presentar;
+    await ST.saveProgress('el-mundial', { finished: false, state: '{}' });
+    const resumed = await ST.loadProgress('el-mundial');
+    return { presenting, saved: writes.saved.length, loaded: writes.loaded.length, resumed, asked: ST.presentarAsked };
+}
+const TEACHER_USER = { uid: 't1', isAnonymous: false, email: 't@school.org' };
+const ANON_STUDENT = { uid: 's1', isAnonymous: true };
+const SAVED_STUDENT = { uid: 's2', isAnonymous: false, email: 'abc@save.allgoodacademy.com' };
+
+test('Presentar: a signed-in teacher who asks for it presents, and their own progress is not written', async () => {
+    const r = await storyTrackingAs({ search: '?mode=presentar&class=KM7QPD', user: TEACHER_USER, role: 'teacher' });
+    assert.deepEqual([r.presenting, r.saved, r.loaded, r.resumed], [true, 0, 0, null]);
+});
+
+test('Presentar: a student who adds ?mode=presentar gets the normal story, tracked', async () => {
+    for (const [user, role] of [[ANON_STUDENT, 'student'], [SAVED_STUDENT, 'student'], [null, 'student']]) {
+        const r = await storyTrackingAs({ search: '?mode=presentar', user, role });
+        assert.equal(r.asked, true);
+        assert.equal(r.presenting, false, `must not present for ${JSON.stringify(user)}`);
+        if (user) assert.deepEqual([r.saved, r.loaded], [1, 1], 'progress is saved and resumed as in solo play');
+    }
+    // An anonymous session can't claim it either, even if a profile said "teacher".
+    assert.equal((await storyTrackingAs({ search: '?mode=presentar', user: ANON_STUDENT, role: 'teacher' })).presenting, false);
+});
+
+test('Presentar: when the profile cannot be read the parameter is ignored (tracked), and a teacher without it plays solo', async () => {
+    const unreadable = await storyTrackingAs({ search: '?mode=presentar', user: TEACHER_USER, role: 'teacher', accountFails: true });
+    assert.deepEqual([unreadable.presenting, unreadable.saved], [false, 1]);
+    const solo = await storyTrackingAs({ search: '?src=test', user: TEACHER_USER, role: 'teacher' });
+    assert.deepEqual([solo.asked, solo.presenting, solo.saved, solo.loaded], [false, false, 1, 1]);
+});
+
+test('Presentar: the player and the checks both wait for that answer, never the URL alone', () => {
+    const player = readFileSync(new URL('../public/js/story-presentar.js', import.meta.url), 'utf8');
+    assert.match(player, /ST0\.presentar\.then\(function \(isTeacher\) \{\s*if \(isTeacher\) activate\(\);/);
+    // Nothing of the player is built before activate(): the class, the bar and the stylesheet are all inside it.
+    const before = player.slice(0, player.indexOf('function activate()'));
+    assert.equal(/classList\.add\('presentar'\)|pm-bar|story-presentar\.css/.test(before.replace(/^\s*\/\/.*$/gm, '')), false);
+    const checks = readFileSync(new URL('../public/js/espanol-checks.js', import.meta.url), 'utf8');
+    assert.match(checks, /var mode = ST && ST\.presentar \?/);
+    assert.equal(/window\.StoryPresentar\.active/.test(checks), false);
+});

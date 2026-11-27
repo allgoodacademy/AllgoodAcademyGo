@@ -1,0 +1,87 @@
+/* PRESENTAR MODE for the Español stories (2026-11-27, storyboard presentar-v1.0).
+   Loaded only by /js/story-presentar.js, and only when the page was opened with
+   ?mode=presentar, so a student's story never downloads it. Same story, same art and text:
+   larger type for a projector (body text 28px at 1080p), English hidden until the teacher
+   presses E, no names anywhere, and a control bar instead of scrolling. */
+html.presentar{scrollbar-width:none;scroll-behavior:auto!important}
+html.presentar::-webkit-scrollbar{display:none}
+body.presentar{--pm:max(20px,2.6vh);--pm-s:max(16px,2vh);padding-bottom:72px}
+/* No site chrome, no profile, no name box: nothing personal on a projector. */
+body.presentar .nav-shell,body.presentar #openSave,body.presentar #savepop,body.presentar #nm,body.presentar .cv-link,body.presentar .cv-panel,body.presentar .enb,body.presentar .endcta,body.presentar .intro .note{display:none!important}
+body.presentar .ent{display:none!important}
+body.presentar.pm-en .ent{display:block!important}
+/* Projector type. */
+body.presentar .nc{max-width:min(980px,62vw);padding:calc(var(--pm)*.9) calc(var(--pm)*1.1)}
+body.presentar .nc p,body.presentar .lead,body.presentar .opt,body.presentar .ptxt,body.presentar .sent,body.presentar .slot,body.presentar .reply .bub,body.presentar .jt p,body.presentar .postcard p,body.presentar .path .pt,body.presentar .intro p{font-size:var(--pm);line-height:1.45}
+body.presentar .ent,body.presentar .path .pe,body.presentar .turnlabel,body.presentar .hint,body.presentar .reply .by,body.presentar .jt h3,body.presentar .small{font-size:var(--pm-s)!important}
+body.presentar .chip{font-size:var(--pm)}
+body.presentar .postcard .chip{font-size:calc(var(--pm)*.9)}
+body.presentar .lead{max-width:min(1200px,88vw)}
+body.presentar .gin{max-width:min(1500px,94vw)}
+body.presentar .jt{max-width:min(1200px,88vw)}
+body.presentar .jt img{width:calc(var(--pm)*3);height:calc(var(--pm)*3)}
+body.presentar .opt{padding:calc(var(--pm)*.45) calc(var(--pm)*.7)}
+body.presentar .gate .go{display:none}           /* in a Puerta, Revelar plays the class's pick; a fork keeps its own button */
+body.presentar .gate,body.presentar .fork{padding-top:86px}
+body.presentar .next{display:none}               /* Siguiente does this */
+body.presentar .say{font-size:var(--pm-s)}
+
+/* The control bar. */
+.pm-bar{position:fixed;left:0;right:0;bottom:0;z-index:90;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;background:rgba(14,14,14,.94);border-top:1px solid rgba(255,255,255,.14);color:#fff;font:15px var(--font-ui)}
+.pm-bar .sp{flex:1}
+.pm-b{min-height:48px;padding:8px 16px;border-radius:10px;border:2px solid rgba(255,255,255,.4);background:#1d1d1d;color:#fff;font:700 16px var(--font-ui);cursor:pointer}
+.pm-b:hover{border-color:#fff}
+.pm-b[disabled]{opacity:.45;cursor:default}
+.pm-b.pri{background:var(--color-orange);border-color:var(--color-orange)}
+.pm-b[aria-pressed="true"]{background:#fff;color:#141414}
+.pm-b kbd{font:400 12px var(--font-ui);opacity:.8;margin-left:6px;border:1px solid currentColor;border-radius:4px;padding:0 4px}
+.pm-pos{font-size:14px;color:#dcdcdc;min-width:64px;text-align:center}
+.pm-msg{font-size:15px;color:#FFCF6B}
+.pm-bar :focus-visible,.pm-vote :focus-visible,.pm-recap :focus-visible{outline:3px solid #FFCF6B;outline-offset:2px}
+.pm-teacher{margin:14px auto 0;max-width:640px;font-size:var(--pm-s);color:#f3e6d4;background:rgba(11,16,36,.7);border-radius:12px;padding:10px 14px}
+
+/* The class vote, in the Puerta where "Cuenten las manos" lives. Bronze panel; green only
+   for the right answer, and never colour alone. */
+.pm-vote{margin:14px 0 4px;background:#fff;border:2px dashed #B0773A;border-radius:14px;padding:14px 16px;color:#2b2b2b;font-family:var(--font-ui)}
+.pm-vh{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font:700 var(--pm-s) var(--font-ui);color:#7A4F20;letter-spacing:.04em;margin-bottom:8px}
+.pm-vh .sp{flex:1}
+.pm-row{border-top:1px solid var(--color-cream-border);padding:10px 0}
+.pm-row:first-of-type{border-top:0}
+.pm-rl{display:block;font:700 var(--pm-s) var(--font-ui);color:#7A4F20;margin-bottom:6px}
+.pm-quick,.pm-exact,.pm-tie{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.pm-v{min-height:52px;padding:8px 16px;border-radius:12px;border:2px solid #B0773A;background:var(--color-cream);color:#2b2b2b;font:700 var(--pm-s) var(--font-ui);cursor:pointer}
+.pm-v[aria-pressed="true"]{background:#7A4F20;border-color:#7A4F20;color:#fff}
+.pm-v.sm{min-height:44px;padding:4px 12px;font-weight:400}
+.pm-cnt{display:inline-flex;align-items:center;gap:8px;background:var(--color-cream);border:1px solid var(--color-cream-border);border-radius:999px;padding:4px 6px 4px 14px;font-size:var(--pm-s)}
+.pm-cnt b{font-family:var(--font-display)}
+.pm-cnt button{width:48px;height:48px;border-radius:50%;border:1px solid #B0773A;background:#fff;font:700 22px var(--font-ui);color:#2b2b2b;cursor:pointer}
+.pm-cnt .n{min-width:34px;text-align:center;font:700 var(--pm) var(--font-display)}
+.pm-tie{margin-top:8px;font-size:var(--pm-s);color:#2b2b2b}
+.pm-go{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.pm-reveal{min-height:56px;padding:10px 26px;border-radius:12px;border:0;background:var(--color-orange);color:#fff;font:700 var(--pm) var(--font-ui);cursor:pointer}
+.pm-reveal[disabled]{background:#8a8a8a;cursor:default}
+.pm-note{font-size:var(--pm-s);color:#4a4a4a}
+.pm-res h4{margin:4px 0 8px;font:700 var(--pm-s) var(--font-ui);color:#7A4F20;letter-spacing:.06em;text-transform:uppercase}
+.pm-bars{display:grid;grid-template-columns:minmax(120px,auto) minmax(120px,1fr) auto;gap:8px 14px;align-items:center;margin:6px 0 12px;font-size:var(--pm-s)}
+.pm-bars .w{font:700 var(--pm) var(--font-display);color:#2b2b2b}
+.pm-bars .tr{height:calc(var(--pm)*.9);background:#eee6d8;border-radius:8px;overflow:hidden}
+.pm-bars .tr i{display:block;height:100%;background:#6b6b6b;border-radius:8px}
+.pm-bars .ok .tr i,.pm-bars .tr.ok i{background:#2E7D52}
+.pm-bars .val{font-weight:700;white-space:nowrap}
+.pm-ok{display:inline-block;margin-left:8px;font:700 var(--pm-s) var(--font-ui);color:#1f6b43;background:#E7F0E9;border-radius:8px;padding:1px 8px;vertical-align:middle}
+.pm-pick{display:inline-block;margin-left:8px;font:700 var(--pm-s) var(--font-ui);color:#7A4F20;background:#F7ECD6;border-radius:8px;padding:1px 8px;vertical-align:middle}
+
+/* Class recap. */
+.pm-recap{position:fixed;inset:0;z-index:120;background:#f1ece2;color:#2b2b2b;overflow:auto;padding:4vh 5vw 100px;font:var(--pm-s) var(--font-ui)}
+.pm-recap h2{font:700 calc(var(--pm)*1.5) var(--font-display);margin:0 0 6px}
+.pm-recap h3{font:700 var(--pm) var(--font-display);margin:18px 0 4px}
+.pm-recap .worth{background:#F7ECD6;border-radius:12px;padding:12px 16px;margin:12px 0;font-size:var(--pm)}
+.pm-recap .worth b{color:#7A4F20}
+.pm-recap .card{background:#fff;border:1px solid var(--color-cream-border);border-radius:14px;padding:12px 16px;margin-top:12px}
+.pm-recap .acts{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;align-items:center}
+.pm-recap .pm-b{background:#fff;color:#141414;border-color:#2b2b2b}
+.pm-recap .pm-b.pri{background:var(--color-orange);border-color:var(--color-orange);color:#fff}
+.pm-recap a.pm-b{text-decoration:none;display:inline-flex;align-items:center}
+.pm-recap .said{font-weight:700}
+@media (max-width:700px){ .pm-bars{grid-template-columns:1fr auto} .pm-bars .tr{display:none} .pm-b kbd{display:none} }
+@media (prefers-reduced-motion:reduce){ body.presentar *{scroll-behavior:auto!important} }

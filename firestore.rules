@@ -378,6 +378,56 @@ service cloud.firestore {
         || (request.auth != null && resource.data.teacherUid == request.auth.uid);
     }
 
+    // 6d. NEW (2026-11-27) — PRESENTED SESSIONS (Presentar en clase, /js/story-presentar.js).
+    //     classrooms/{code}/presented_sessions/{id}: one document per time a teacher ran an
+    //     Español story for the class on the projector: the story, the date, the class's
+    //     show-of-hands vote at each Puerta (counts, or an approximate share for a quick
+    //     vote), the fork picked and, when the checks are on, the class's Embarque / Aduana
+    //     votes. CLASS-LEVEL ONLY: no student uid, no name, nothing typed.
+    //     - CREATE: the class's own teacher, naming themselves and this class, with the
+    //       server's time, and only the fields below.
+    //     - READ (get + list): the class's own teacher. A student in the class cannot read
+    //       it; nobody else can.
+    //     - UPDATE: never. DELETE: the class's own teacher (deleting a class's records).
+    match /artifacts/{appId}/classrooms/{code}/presented_sessions/{sessionId} {
+      allow read, delete: if request.auth != null && classroomOwnedBy(appId, code, request.auth.uid);
+      allow create: if request.auth != null
+        && classroomOwnedBy(appId, code, request.auth.uid)
+        && classWritable(appId, code, request.auth.uid)
+        && request.resource.data.keys().hasOnly(['v', 'story', 'classroomCode', 'teacherUid', 'createdAt', 'puertas', 'forks', 'checks'])
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.classroomCode == code
+        && request.resource.data.story is string
+        && request.resource.data.story.matches('^[a-z0-9-]{1,40}$')
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.puertas is map
+        && request.resource.data.forks is map;
+    }
+
+    // 6e. NEW (2026-11-27) — POSTCARD RUBRIC TAPS (Embarque → Aduana, Mission Control's student
+    //     panel). classrooms/{code}/rubric_scores/{uid}_{story}: the teacher's own taps on the
+    //     story's four rubric rows (0 Todavía no, 1 Casi, 2 ¡Listo!) for a postcard the student
+    //     wrote on paper or in Google Classroom. ONLY THE TAPS: the postcard is never here, and
+    //     nothing a student typed is. Written and read by the class's own teacher, for a
+    //     student, at the id the uid + story pair requires. A student cannot read their own or
+    //     a classmate's; nobody else can read or write any of it.
+    match /artifacts/{appId}/classrooms/{code}/rubric_scores/{scoreId} {
+      allow read, delete: if request.auth != null && classroomOwnedBy(appId, code, request.auth.uid);
+      allow create, update: if request.auth != null
+        && classroomOwnedBy(appId, code, request.auth.uid)
+        && classWritable(appId, code, request.auth.uid)
+        && request.resource.data.keys().hasOnly(['uid', 'story', 'classroomCode', 'teacherUid', 'levels', 'updatedAt'])
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.classroomCode == code
+        && request.resource.data.uid is string
+        && request.resource.data.story is string
+        && request.resource.data.story.matches('^[a-z0-9-]{1,40}$')
+        && scoreId == request.resource.data.uid + '_' + request.resource.data.story
+        && request.resource.data.levels is map
+        && request.resource.data.levels.size() <= 8
+        && request.resource.data.updatedAt == request.time;
+    }
+
     // 6. NEW — Teachers can READ (not write) a classroom member's subcollections too
     //    (game_scores, launches) — needed so the roster can show real completion/scores,
     //    not just names. Still fully scoped to the teacher's own classroom, still read-only.

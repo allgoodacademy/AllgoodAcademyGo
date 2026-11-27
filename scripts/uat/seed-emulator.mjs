@@ -62,6 +62,74 @@ async function session(uid, module, stream, { maxStep, stepsTotal, completed = f
     ...(summary ? { summary } : {}) });
 }
 
+/* One student's El Mundial: `reached` Puertas answered (0 = joined, never opened). The class
+   finds conocía / conocí (Puerta 4) hard. Shapes match what the story page writes: one
+   `choice` event per Puerta (with `picks` for the ones with several blanks) and per fork, the
+   session summary, module_progress and, when finished, a game_scores record. */
+async function mundial(uid, i, { finished, reached }) {
+  if (!reached) return;
+  const at = NOW - (1 + (i % 5)) * DAY - i * 600000;
+  const sid = `s_${uid}_el-mundial`;
+  const fork = ['plaza', 'metro', 'super'][i < 11 ? 0 : (i < 17 ? 1 : 2)];
+  const choice = {}, conf = {}, done = {}, gates = {};
+  let t = at - 25 * 60000;
+  const flip = (p) => rnd() < p;
+  const gate = async (n, score, choiceIndex, picks) => {
+    done[n] = 1; conf[n] = score; gates[n] = score; t += 4 * 60000;
+    await event(uid, 'el-mundial', 'espanol', 'choice', { scenarioIndex: n, choiceIndex, score, category: 'gate', ...(picks ? { picks } : {}) }, t, sid);
+  };
+  if (reached >= 1) { const k = flip(0.85) ? 'A' : (flip(0.6) ? 'B' : 'C'); choice[1] = k; await gate(1, k === 'A' ? 1 : 0, 'ABC'.indexOf(k)); }
+  t += 60000;
+  await event(uid, 'el-mundial', 'espanol', 'choice', { scenarioIndex: 'f1', choiceIndex: ['plaza', 'metro', 'super'].indexOf(fork), category: 'fork' }, t, sid);
+  if (reached >= 2) { const k = flip(0.7) ? 'A' : 'B'; choice[2] = k; await gate(2, k === 'A' ? 1 : 0, 'AB'.indexOf(k)); }
+  if (reached >= 3) {
+    const v = { 1: flip(0.85) ? 'cantaban' : 'cantaron', 2: flip(0.92) ? 'falló' : 'fallaba', 3: flip(0.88) ? 'cantaban' : 'cantaron' };
+    const right = (v[1] === 'cantaban') + (v[2] === 'falló') + (v[3] === 'cantaban');
+    choice[3] = v; await gate(3, right === 3 ? 1 : 0, right, v);
+  }
+  if (reached >= 4) {
+    // 13 of the 21 who get here say "hoy conocía": the count the report leads with.
+    const v = { a: flip(0.75) ? 'conocía' : 'conocí', b: i % 21 < 13 ? 'conocía' : 'conocí' };
+    const ok = v.a === 'conocía' && v.b === 'conocí';
+    choice[4] = v; await gate(4, ok ? 1 : 0, (v.a === 'conocía') + (v.b === 'conocí'), v);
+  }
+  if (reached >= 5) {
+    const v = { 51: flip(0.6) ? 'conocí' : 'conocía', 52: flip(0.7) ? 'tenía' : 'tuvo', 53: flip(0.5) ? 'fui' : 'era', 54: flip(0.8) ? 'llegamos' : 'llegábamos', 55: flip(0.65) ? 'llovía' : 'llovió' };
+    const right = (v[51] === 'conocí') + (v[52] === 'tenía') + 1 + (v[54] === 'llegamos') + (v[55] === 'llovía');
+    choice[5] = v; await gate(5, right >= 4 ? 1 : 0, right, v);
+  }
+  const score = Object.values(conf).reduce((a, b) => a + b, 0);
+  await session(uid, 'el-mundial', 'espanol', { maxStep: finished ? 10 : Math.min(9, 2 + reached * 2), stepsTotal: 10, completed: finished, activeMs: (8 + reached * 4) * 60000, at: t + 120000, gameName: 'El Mundial',
+    summary: { gates, path: { f1: fork }, mode: 'solo', ...(finished ? { score } : {}) } });
+  // Embarque → Aduana (flag on only): everyone who opened it boarded; those who finished did
+  // the Aduana too. The class grows most on conocía / conocí and least on the last skill.
+  const EMB = [0.45, 0.5, 0.35, 0.2, 0.3], ADU = [0.8, 0.85, 0.75, 0.8, 0.5];
+  const checks = { v: 1, form: i % 2 ? 'B' : 'A', emb: EMB.map((p) => (flip(p) ? 1 : 0)), adu: finished ? ADU.map((p) => (flip(p) ? 1 : 0)) : [], embDone: true, aduDone: finished };
+  await A('users', uid, 'module_progress', 'el-mundial').set({ v: '1.9', finished, state: JSON.stringify({ done, choice, conf, path: { f1: fork } }), checks, lastUpdated: ts(t) });
+  if (finished) await A('users', uid, 'game_scores', sid).set({ gameName: 'El Mundial', completed: true, score, finalScore: score, maxScore: 5, lastUpdated: ts(t) });
+}
+/* El Viaje, played without being assigned: all five Puertas, both turns of Puerta 4. */
+async function viaje(uid, i) {
+  const at = NOW - 2 * DAY - i * 300000;
+  const sid = `s_${uid}_el-viaje`;
+  let t = at - 30 * 60000;
+  const gates = {};
+  const gate = async (n, score, choiceIndex, picks) => { gates[n] = score; t += 4 * 60000; await event(uid, 'el-viaje', 'espanol', 'choice', { scenarioIndex: n, choiceIndex, score, category: 'gate', ...(picks ? { picks } : {}) }, t, sid); };
+  const f1 = i % 3, f2 = (i + 1) % 3;
+  await gate(1, i % 2, i % 2);
+  await event(uid, 'el-viaje', 'espanol', 'choice', { scenarioIndex: 'f1', choiceIndex: f1, category: 'fork' }, t + 1000, sid);
+  await gate(2, i % 4 === 1 ? 0 : 1, i % 4 === 1 ? 1 : 0);
+  await gate(3, i % 3 === 0 ? 1 : 0, i % 3);
+  await event(uid, 'el-viaje', 'espanol', 'choice', { scenarioIndex: 'f2', choiceIndex: f2, category: 'fork' }, t + 1000, sid);
+  const b = i % 2 ? 't' : 'u';
+  await gate(4, b === 't' ? 1 : 0, b === 't' ? 1 : 0, { a: 'u', b });
+  await gate(5, i % 5 === 0 ? 0 : 1, i % 5 === 0 ? 0 : 1);
+  const score = Object.values(gates).reduce((x, y) => x + y, 0);
+  await session(uid, 'el-viaje', 'espanol', { maxStep: 12, stepsTotal: 12, completed: true, activeMs: 31 * 60000, at: t + 60000, gameName: 'El Viaje',
+    summary: { gates, path: { f1: ['tienda', 'recepcion', 'valeria'][f1], f2: ['dia', 'proyecto', 'ciudad'][f2], f3: 'cabrito' }, mode: 'solo', score } });
+  await A('users', uid, 'game_scores', sid).set({ gameName: 'El Viaje', completed: true, score, finalScore: score, maxScore: 5, lastUpdated: ts(t) });
+}
+
 async function student(code, uid, name, i, { legacyOnly = false } = {}) {
   await A('users', uid).set({ role: 'student', isGuest: true, displayName: name, classroomCode: code });
   if (!legacyOnly) await A('classroom_members', `${code}_${uid}`).set({ classroomCode: code, uid, joinedAt: ts(NOW - 20 * DAY + i * 3600000) });
@@ -180,6 +248,28 @@ async function main() {
   await teacher('uat_t_legacy', 'uat-legacy@example.com', 'UAT Mrs Legacy', { classroomCode: 'UATLG1' });
   await A('classrooms', 'UATLG1').set({ teacherUid: 'uat_t_legacy', teacherName: 'UAT Mrs Legacy', createdAt: ts(NOW - 90 * DAY), assignedModules: ['privacy-security'] });
   for (let i = 0; i < 3; i++) { await student('UATLG1', `uat_l_${i}`, NAMES[i + 5], i, { legacyOnly: true }); await activity(`uat_l_${i}`, i, 0.5); }
+
+  // ── UAT-Español (2026-11-27): 22 students on El Mundial (assigned), some on El Viaje (played,
+  //    not assigned), and a 3-student class, which shows counts instead of percentages ──
+  await teacher('uat_t_es', 'uat-es@example.com', 'UAT Sra Ruiz', { classroomCode: 'UATES1' });
+  await A('teacher_plans', 'uat_t_es').set({ plan: 'pro', proUntil: ts(NOW + 300 * DAY), grantedBy: 'uat-seed', note: 'UAT', updatedAt: ts(NOW) });
+  await classroom('UATES1', 'uat_t_es', 'UAT Sra Ruiz', 'UAT Español 3', { assignedModules: ['privacy-security'], assignedGames: [], assignedSims: ['el-mundial'] });
+  await classroom('UATES2', 'uat_t_es', 'UAT Sra Ruiz', 'UAT Español club', { assignedModules: [], assignedGames: [], assignedSims: ['el-mundial'] });
+  await A('teacher_free_class', 'uat_t_es').set({ firstClassCode: 'UATES1', createdAt: ts(NOW - 30 * DAY) });
+  for (let i = 0; i < 22; i++) {
+    const uid = `uat_es_${i}`;
+    await student('UATES1', uid, NAMES[i], i);
+    await mundial(uid, i, { finished: i < 18, reached: i < 18 ? 5 : (i < 21 ? 4 : 0) });
+    if (i % 3 === 0) await viaje(uid, i);
+  }
+  for (let i = 0; i < 3; i++) { const uid = `uat_es3_${i}`; await student('UATES2', uid, NAMES[i + 24], i); await mundial(uid, i, { finished: i < 2, reached: i < 2 ? 5 : 2 }); }
+
+  // ── UAT-Admin: an account on the admin list (emulator only), with a small class, for the
+  //    admin-only preview of the checks while ESPANOL_CHECKS_ON is off (?checks=preview) ──
+  await teacher('uat_t_admin', 'learning@allgoodacademy.com', 'UAT Admin', { classroomCode: 'UATAD1' });
+  await classroom('UATAD1', 'uat_t_admin', 'UAT Admin', 'UAT Admin class', { assignedModules: [], assignedGames: [], assignedSims: ['el-mundial'] });
+  await A('teacher_free_class', 'uat_t_admin').set({ firstClassCode: 'UATAD1', createdAt: ts(NOW - 30 * DAY) });
+  for (let i = 0; i < 6; i++) { const uid = `uat_ad_${i}`; await student('UATAD1', uid, NAMES[i + 12], i); await mundial(uid, i, { finished: i < 5, reached: i < 5 ? 5 : 3 }); }
 
   // ── A brand-new free teacher with no class yet (for the setup screen) ──
   await auth.createUser({ uid: 'uat_t_new', email: 'uat-new@example.com', password: 'uat-password-1', displayName: 'UAT New', emailVerified: true }).catch(() => {});

@@ -11,7 +11,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, getDoc, setDoc, deleteDoc, collection, collectionGroup, getDocs, query, where, orderBy, limit,
-  writeBatch, Timestamp,
+  writeBatch, Timestamp, serverTimestamp, addDoc,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -1118,6 +1118,90 @@ console.log('\nESPAÑOL — a class member plays El Mundial / El Viaje; their te
   await it('the teacher CAN assign a story beside the simulations (assignedSims, per-student sims)', async () => {
     await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { assignedSims: ['el-mundial', 'el-viaje'] }, { merge: true }));
     await assertSucceeds(setDoc(CLASS(teacher, 'KM7QPD'), { assignedSims: [] }, { merge: true }));
+  });
+}
+
+// ── Presented sessions (Presentar en clase, rule #6d, 2026-11-27) ─────────────────────────
+// One class-level document per time a teacher ran a story on the projector. Written and read
+// by the class's own teacher only.
+console.log('\nPresented sessions (Presentar en clase):');
+{
+  const PRES = (db, code) => collection(db, 'artifacts', APP, 'classrooms', code, 'presented_sessions');
+  const session = (over = {}) => ({
+    v: 1, story: 'el-mundial', classroomCode: 'KM7QPD', teacherUid: 'teacher_1', createdAt: serverTimestamp(),
+    puertas: { 1: { rows: [{ key: null, mode: 'quick', counts: null, shares: { A: 90, B: 5, C: 5 }, pick: 'A', right: true }] } },
+    forks: { f1: 'plaza' }, checks: null, ...over,
+  });
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(CLASS(db, 'OTHER9'), { teacherUid: 'teacher_other', createdAt: 1 });
+    await setDoc(U(db, 'teacher_other'), { role: 'teacher', classroomCode: 'OTHER9', displayName: 'Mr Other' });
+    await setDoc(doc(PRES(db, 'KM7QPD'), 'seeded'), { ...session(), createdAt: Timestamp.now() });
+  });
+  const other = env.authenticatedContext('teacher_other', { email: 'o@school.org' }).firestore();
+  await it('the class\'s teacher CAN save a presented session to their own class', async () => {
+    await assertSucceeds(addDoc(PRES(teacher, 'KM7QPD'), session()));
+  });
+  await it('the class\'s teacher CAN read and list their presented sessions', async () => {
+    await assertSucceeds(getDoc(doc(PRES(teacher, 'KM7QPD'), 'seeded')));
+    await assertSucceeds(getDocs(PRES(teacher, 'KM7QPD')));
+  });
+  await it('a student in the class CANNOT read or list presented sessions', async () => {
+    await assertFails(getDoc(doc(PRES(student, 'KM7QPD'), 'seeded')));
+    await assertFails(getDocs(PRES(student, 'KM7QPD')));
+  });
+  await it('a student CANNOT write a presented session', async () => {
+    await assertFails(addDoc(PRES(student, 'KM7QPD'), session({ teacherUid: 'student_1' })));
+    await assertFails(addDoc(PRES(student, 'KM7QPD'), session()));
+  });
+  await it('another teacher CANNOT read, list or write this class\'s presented sessions', async () => {
+    await assertFails(getDoc(doc(PRES(other, 'KM7QPD'), 'seeded')));
+    await assertFails(getDocs(PRES(other, 'KM7QPD')));
+    await assertFails(addDoc(PRES(other, 'KM7QPD'), session({ teacherUid: 'teacher_other' })));
+  });
+  await it('a presented session CANNOT name another class, another teacher, or carry extra fields (e.g. names)', async () => {
+    await assertFails(addDoc(PRES(teacher, 'KM7QPD'), session({ classroomCode: 'OTHER9' })));
+    await assertFails(addDoc(PRES(teacher, 'KM7QPD'), session({ teacherUid: 'teacher_other' })));
+    await assertFails(addDoc(PRES(teacher, 'KM7QPD'), session({ students: ['Sofía'] })));
+    await assertFails(addDoc(PRES(teacher, 'KM7QPD'), session({ createdAt: Timestamp.fromMillis(1) })));
+  });
+  await it('a presented session CANNOT be edited after it is saved', async () => {
+    await assertFails(setDoc(doc(PRES(teacher, 'KM7QPD'), 'seeded'), { story: 'el-viaje' }, { merge: true }));
+  });
+  await it('a guest CANNOT read presented sessions', async () => {
+    await assertFails(getDocs(PRES(guest, 'KM7QPD')));
+  });
+}
+
+// ── Postcard rubric taps (Embarque → Aduana, rule #6e, 2026-11-27) ────────────────────────
+console.log('\nPostcard rubric taps:');
+{
+  const RUB = (db, code, id) => doc(db, 'artifacts', APP, 'classrooms', code, 'rubric_scores', id);
+  const taps = (over = {}) => ({ uid: 'student_1', story: 'el-mundial', classroomCode: 'KM7QPD', teacherUid: 'teacher_1', levels: { 0: 2, 1: 1 }, updatedAt: serverTimestamp(), ...over });
+  const other = env.authenticatedContext('teacher_other', { email: 'o@school.org' }).firestore();
+  const member = env.authenticatedContext('member_1').firestore();
+  await it('the class\'s teacher CAN save, change and read rubric taps for a student', async () => {
+    await assertSucceeds(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps()));
+    await assertSucceeds(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps({ levels: { 0: 2, 1: 2, 2: 0 } })));
+    await assertSucceeds(getDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial')));
+    await assertSucceeds(getDocs(collection(teacher, 'artifacts', APP, 'classrooms', 'KM7QPD', 'rubric_scores')));
+  });
+  await it('a student CANNOT read their own rubric taps, a classmate\'s, or the list', async () => {
+    await assertFails(getDoc(RUB(student, 'KM7QPD', 'student_1_el-mundial')));
+    await assertFails(getDoc(RUB(member, 'KM7QPD', 'student_1_el-mundial')));
+    await assertFails(getDocs(collection(student, 'artifacts', APP, 'classrooms', 'KM7QPD', 'rubric_scores')));
+  });
+  await it('a student CANNOT write rubric taps', async () => {
+    await assertFails(setDoc(RUB(student, 'KM7QPD', 'student_1_el-mundial'), taps({ levels: { 0: 2, 1: 2, 2: 2, 3: 2 } })));
+  });
+  await it('another teacher CANNOT read or write this class\'s rubric taps', async () => {
+    await assertFails(getDoc(RUB(other, 'KM7QPD', 'student_1_el-mundial')));
+    await assertFails(setDoc(RUB(other, 'KM7QPD', 'student_1_el-mundial'), taps({ teacherUid: 'teacher_other' })));
+  });
+  await it('rubric taps CANNOT carry anything else (e.g. the postcard text), or sit at the wrong id', async () => {
+    await assertFails(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps({ text: 'Querida familia…' })));
+    await assertFails(setDoc(RUB(teacher, 'KM7QPD', 'someone_else'), taps()));
+    await assertFails(setDoc(RUB(teacher, 'KM7QPD', 'student_1_el-mundial'), taps({ classroomCode: 'OTHER9' })));
   });
 }
 
