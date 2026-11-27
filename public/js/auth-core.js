@@ -312,9 +312,14 @@ async function setProductUpdates(uid, optedIn, source) {
 }
 
 // --- MESSAGE HQ: flat top-level collection, tagged by portal ---
-async function sendMessage({ text, source }) {
+// replyTo (optional): an address the sender typed so the founder can answer, e.g. a teacher
+// on the Español hub's "¿A dónde vamos después?" box. Unverified, so it is kept apart from
+// senderEmail (the signed-in account's own address). Messages from the Español hub are also
+// emailed to learning@ by the espanolIdeaEmail Cloud Function (functions/espanol-idea-email.js).
+async function sendMessage({ text, source, replyTo }) {
     const user = auth.currentUser;
     if (!user || !text) return;
+    const reply = typeof replyTo === 'string' ? replyTo.trim() : '';
     await addDoc(collection(db, 'artifacts', appId, 'messages'), {
         senderUid: user.uid,
         senderName: user.displayName || 'Guest',
@@ -323,6 +328,7 @@ async function sendMessage({ text, source }) {
         source: source || 'Unknown portal',
         timestamp: serverTimestamp(),
         isGuest: !!user.isAnonymous,
+        ...(reply ? { replyTo: reply.slice(0, 254) } : {}),
     });
 }
 

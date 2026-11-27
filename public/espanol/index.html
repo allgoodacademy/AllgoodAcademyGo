@@ -26,6 +26,7 @@ a{color:inherit}
 .nav .sp{flex:1}.nav a.l{font-size:13px;color:#cfcfcf;text-decoration:none}.nav a.l:hover{color:#fff}
 .av{width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.85)}
 .av svg{width:19px;height:19px;color:#fff}
+.ferr{color:#ffd0bd;font-size:14px;margin:0}.ferr a{color:inherit}
 .band{padding:clamp(28px,5vw,70px) max(5vw,16px)}
 .wrap{max-width:1180px;margin:0 auto}
 /* hero */
@@ -99,8 +100,8 @@ footer{text-align:center;color:#777;font-size:12px;padding:30px 16px 50px}
 <nav class="nav">
   <a class="brand" href="#top">Allgood <b>Academy</b> · Español</a>
   <span class="sp"></span>
-  <a class="l" href="#historias">Historias</a><a class="l" href="#maestros">Para maestros</a><a class="l" href="#despues">¿A dónde vamos?</a>
-  <span class="av" aria-label="Your profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>
+  <a class="l" href="#historias">Historias</a><a class="l" href="#maestros">Para maestros</a><a class="l" href="#despues">¿A dónde vamos?</a><a class="l" href="/dashboard/">My dashboard</a>
+  <a class="av" href="/dashboard/" aria-label="My dashboard" title="My dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></a>
 </nav>
 
 <header class="band" id="top">
@@ -192,7 +193,9 @@ footer{text-align:center;color:#777;font-size:12px;padding:30px 16px 50px}
       <input name="topic" required placeholder="What's hard to teach? (e.g. por vs. para)" aria-label="What's hard to teach">
       <select name="level" aria-label="Level you teach"><option value="">Level you teach…</option><option>Spanish 1</option><option>Spanish 2</option><option>Spanish 3</option><option>Spanish 4</option><option>AP Spanish</option><option>Heritage speakers</option></select>
       <input name="place" placeholder="A place you'd love a story set in (optional)" aria-label="Place">
+      <input name="email" type="email" maxlength="120" autocomplete="email" placeholder="Your email, so William can reply (optional)" aria-label="Your email (optional)">
       <button>Enviar</button>
+      <p class="ferr" id="askErr" role="alert" hidden></p>
     </form>
   </div>
 </section>
@@ -203,11 +206,24 @@ footer{text-align:center;color:#777;font-size:12px;padding:30px 16px 50px}
 {
 const tip=document.getElementById('tip');
 document.querySelectorAll('.pin').forEach(p=>{const show=()=>tip.innerHTML=p.dataset.tip;p.addEventListener('click',show);p.addEventListener('focus',show);p.addEventListener('mouseenter',show)});
-// No backend: the answer goes out as an email from the visitor's own mail app.
-document.getElementById('ask').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target),v=k=>(f.get(k)||'').trim()||'(not given)';
-const body=`What's hard to teach: ${v('topic')}\nLevel I teach: ${v('level')}\nA place I'd love a story set in: ${v('place')}\n`;
-location.href='mailto:learning@allgoodacademy.com?subject='+encodeURIComponent('Español: next story idea')+'&body='+encodeURIComponent(body);
-e.target.outerHTML='<p class="thanks">¡Gracias! Your email app should open with your answer filled in. Hit send and it goes straight to William. Nothing opened? Write to <a style="color:inherit" href="mailto:learning@allgoodacademy.com">learning@allgoodacademy.com</a>.</p>'});
+// The answer goes to Insider's Inbox (messages, source "Español hub") and the
+// espanolIdeaEmail Cloud Function emails it to learning@. Firebase loads only on submit, so
+// a visit that never sends anything makes no request beyond this site.
+const ask=document.getElementById('ask'),err=document.getElementById('askErr');
+ask.addEventListener('submit',async e=>{e.preventDefault();
+  const f=new FormData(ask),v=k=>String(f.get(k)||'').trim(),btn=ask.querySelector('button');
+  const text=`What's hard to teach: ${v('topic')}\nLevel I teach: ${v('level')||'(not given)'}\nA place I'd love a story set in: ${v('place')||'(not given)'}`;
+  btn.disabled=true;btn.textContent='Enviando…';err.hidden=true;
+  try{
+    if(!window.AuthCore)await import('/js/auth-core.js');
+    const A=window.AuthCore;await A.anonymousSessionOnly();
+    await A.sendMessage({text,source:'Español hub',replyTo:v('email')});
+    ask.outerHTML='<p class="thanks">¡Gracias! It\'s on its way to William. He reads every one of these.</p>';
+  }catch(_){
+    btn.disabled=false;btn.textContent='Enviar';err.hidden=false;
+    err.innerHTML='That didn\'t send. Check your connection and try again, or write to <a href="mailto:learning@allgoodacademy.com">learning@allgoodacademy.com</a>.';
+  }
+});
 }
 </script>
 </body>
