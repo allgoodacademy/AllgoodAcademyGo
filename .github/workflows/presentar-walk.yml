@@ -1,0 +1,29 @@
+# Presentar en clase walk (AA-16): runs El Viaje and El Mundial start to finish in Presentar
+# mode in headless Chromium at projector sizes, pressing only Siguiente plus the taps the
+# bar asks for. Fails if the recap never opens or a Siguiente press scrolls the page back up
+# by more than a screen. Everything is served locally; Firebase is blocked, nothing is saved.
+name: Presentar walk
+
+on:
+  pull_request:
+    paths:
+      - 'public/espanol/**'
+      - 'public/js/story-presentar.js'
+      - 'public/js/story-tracking.js'
+      - 'public/js/espanol-checks.js'
+      - 'public/assets/css/story-presentar.css'
+      - 'tests/presentar-walk.test.mjs'
+      - '.github/workflows/presentar-walk.yml'
+
+jobs:
+  walk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --no-package-lock playwright@1.63.0
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:presentar
