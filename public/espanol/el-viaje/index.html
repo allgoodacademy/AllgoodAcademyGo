@@ -80,6 +80,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 .gnow{font-size:13px;color:var(--color-ink-soft);margin:0 0 4px}
 .gset{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--creamb);border-radius:12px;padding:12px 14px;margin:10px 0;cursor:pointer}
 .gset input{width:22px;height:22px;margin-top:2px;accent-color:var(--orange);flex:none}
+.gai{font:13px/1.45 var(--font-ui);color:#666;margin:14px 2px 4px}
 .gset b{display:block;font:700 15px var(--font-display);color:#2b2b2b;margin-bottom:2px}
 .gset span{font-size:13px;color:#666}
 .avbtn{background:none;border:0;padding:2px;border-radius:50%;min-height:40px}
@@ -853,6 +854,7 @@ set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListen
     <div class="gpane" data-pane="settings" hidden>
       <label class="gset"><input type="checkbox" id="setText"><span><b>Always show the Spanish text</b>Normally each question is blurred until you tap Escuchar, so you listen first. Turn this on to read along instead.</span></label>
       <label class="gset"><input type="checkbox" id="setEn"><span><b>Show English under the story</b>Adds an English line under every story card. (You can also tap EN on any single card.)</span></label>
+      <p class="gai">The voices in this story are AI-generated (ElevenLabs).</p>
     </div>
   </div>
 </aside>
@@ -928,7 +930,21 @@ $$('img[data-jodi]').forEach(i=>i.src=JODI[i.dataset.jodi]);
 let VOICE=null;const hasTTS='speechSynthesis' in window;
 function pickVoice(){if(!hasTTS)return;const v=speechSynthesis.getVoices();VOICE=v.find(x=>/es[-_]MX/i.test(x.lang))||v.find(x=>/es[-_]US/i.test(x.lang))||v.find(x=>/^es/i.test(x.lang))||null}
 if(hasTTS){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}else document.body.classList.add('showtext');
-function say(t){T('ev_audio_play',{t});if(!hasTTS)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang=VOICE?VOICE.lang:'es-MX';if(VOICE)u.voice=VOICE;u.rate=.92;speechSynthesis.speak(u)}catch(_){}}
+function sayTTS(t){if(!hasTTS)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang=VOICE?VOICE.lang:'es-MX';if(VOICE)u.voice=VOICE;u.rate=.92;speechSynthesis.speak(u)}catch(_){}}
+/* recorded voices (ElevenLabs, pre-rendered to /assets/audio/espanol/el-viaje/). Manifest fetched once on the first say(); each clip loads on tap. Any miss or load error falls back to sayTTS. */
+const AUD={m:null,p:null,el:null,n:0};
+function audManifest(){return AUD.p||(AUD.p=fetch('/assets/audio/espanol/el-viaje/manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(m=>AUD.m=m||{}))}
+function say(t){T('ev_audio_play',{t});
+  const k=String(t).replace(/[“”]/g,'').replace(/\s+/g,' ').trim(),n=++AUD.n;
+  if(hasTTS)try{speechSynthesis.cancel()}catch(_){}
+  if(typeof Audio!=='function'){sayTTS(t);return}
+  let a=AUD.el;if(!a){a=AUD.el=new Audio();a.preload='none'}
+  try{a.pause()}catch(_){}
+  const go=m=>{if(n!==AUD.n)return;const u=m[k];if(!u){sayTTS(t);return}
+    const fail=()=>{if(n===AUD.n){AUD.n++;sayTTS(t)}};
+    a.onerror=fail;a.src=u;
+    try{const q=a.play();if(q&&q.catch)q.catch(e=>{if(!e||e.name!=='AbortError')fail()})}catch(_){fail()}};
+  if(AUD.m)go(AUD.m);else audManifest().then(go)}
 function wireSay(root){(root||document).querySelectorAll('.say').forEach(b=>{if(b._w)return;b._w=1;b.innerHTML=SPK+' '+b.textContent;b.addEventListener('click',()=>{say(b.dataset.say);const p=b.parentElement.querySelector('.ptxt');if(p)setTimeout(()=>p.classList.remove('blur'),1400)})})}
 wireSay();
 $$('.ptxt.blur').forEach(p=>{p.title='Tap to show the text';p.addEventListener('click',()=>p.classList.remove('blur'))});
