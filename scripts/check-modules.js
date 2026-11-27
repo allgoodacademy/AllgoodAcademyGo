@@ -88,7 +88,7 @@ try {
 } catch (e) {
   fail(`public/data/modules-registry.json: not valid JSON — ${e.message}`);
 }
-const TYPES = new Set(['game', 'lab', 'challenge', 'sim']);
+const TYPES = new Set(['game', 'lab', 'challenge', 'sim', 'story']);
 const seenIds = new Set();
 for (const m of REGISTRY) {
   if (!m.id) { fail('registry: an entry has no id'); continue; }
@@ -116,7 +116,7 @@ for (const m of REGISTRY) {
   // A STREAMED game is visible and assignable but reports outside the core funnel (see the
   // `stream` contract in the registry's _comment). Like `hidden`, it is a decision someone
   // made, so it must say why; unlike `hidden`, it stays on every surface a teacher uses.
-  if (m.stream !== undefined && m.type !== 'sim') {
+  if (m.stream !== undefined && m.type !== 'sim' && m.type !== 'story') {
     if (m.type !== 'game') fail(`registry: "${m.id}" has a \`stream\` but only games may report on their own stream`);
     if (typeof m.stream !== 'string' || !m.stream.trim() || m.stream === 'core') fail(`registry: "${m.id}" \`stream\` must be a non-empty string other than 'core', got ${JSON.stringify(m.stream)}`);
     if (m.hidden === true) fail(`registry: "${m.id}" is both hidden and streamed — pick one (hidden = off every surface; streamed = visible but off the funnel)`);
@@ -124,7 +124,10 @@ for (const m of REGISTRY) {
   }
   if (m.type === 'sim' && m.pack !== null) fail(`registry: sim "${m.id}" must have pack: null (got ${JSON.stringify(m.pack)})`);
   if (m.type !== 'game' && m.type !== 'sim' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
-  if (m.pack && !PACKS[m.pack]) fail(`registry: "${m.id}" has unknown pack "${m.pack}"`);
+  // An Español story (2026-11-27) belongs to the 'espanol' pack, which is not a Lab Pack: it
+  // has no hub prefix or planned list in PACKS. Checked against espanol.json further down.
+  if (m.type === 'story' && m.pack !== 'espanol') fail(`registry: story "${m.id}" must have pack: "espanol" (got ${JSON.stringify(m.pack)})`);
+  if (m.pack && m.type !== 'story' && !PACKS[m.pack]) fail(`registry: "${m.id}" has unknown pack "${m.pack}"`);
   if (m.retired) {
     if (m.url) fail(`registry: retired "${m.id}" should have url: null — it has no live page`);
     continue;
@@ -550,7 +553,16 @@ for (const c of courses) {
   if (r.total !== c.stepsTotal) fail(`docs/insider-analytics.md: "${c.name}" total ${r.total} != Insider stepsTotal ${c.stepsTotal}`);
   if (r.unit !== c.stepLabel) fail(`docs/insider-analytics.md: "${c.name}" unit "${r.unit}" != Insider stepLabel "${c.stepLabel}"`);
 }
-for (const r of rows) if (!courses.find(c => c.name === r.name)) fail(`docs/insider-analytics.md: row "${r.name}" has no Insider COURSES entry`);
+// The Español stories (registry type 'story') have rows too: their unit is "sections reached"
+// and their total is the registry stepsTotal (which the story block below checks against the page).
+const docStories = REGISTRY.filter((m) => m.type === 'story' && !m.retired);
+for (const m of docStories) {
+  const r = rows.find(x => x.name === m.name);
+  if (!r) { fail(`docs/insider-analytics.md: no "Steps per module" row for story "${m.name}"`); continue; }
+  if (r.total !== Number(m.stepsTotal)) fail(`docs/insider-analytics.md: "${m.name}" total ${r.total} != registry stepsTotal ${m.stepsTotal}`);
+  if (r.unit !== 'sections reached') fail(`docs/insider-analytics.md: "${m.name}" unit "${r.unit}" != "sections reached"`);
+}
+for (const r of rows) if (!courses.find(c => c.name === r.name) && !docStories.find(m => m.name === r.name)) fail(`docs/insider-analytics.md: row "${r.name}" has no Insider COURSES entry`);
 
 // --- Challenge teacher sheets: an answer key is only useful while it is still true
 // Each sheet reproduces every option of every scenario in its Challenge. If somebody edits
@@ -733,6 +745,52 @@ try {
   // Every simulation the site lists must be assignable.
   for (const row of simsList) {
     if (!simEntries.some((m) => m.simulationId === row.id)) fail(`registry: simulation "${row.id}" is in public/data/simulations.json but has no type 'sim' registry entry, so Mission Control cannot assign it`);
+  }
+}
+
+// --- Español stories in the registry (type 'story', 2026-11-27)
+// Registered so they are tracked and Mission Control can assign them. ONE list of stories:
+// the registry is the tracking source of truth and public/data/espanol.json carries only the
+// card text, so the two must name exactly the same stories (ids, urls, names, in either
+// direction), and each story's page and Insider's ESPANOL list must agree with the registry.
+{
+  const storyEntries = REGISTRY.filter((m) => m.type === 'story' && !m.retired);
+  const esList = (() => { try { return JSON.parse(read('public/data/espanol.json')).stories || []; } catch (e) { return []; } })();
+  const insiderSrc = read('public/insider/index.html');
+  const insiderStories = [...(insiderSrc.match(/const ESPANOL = \[([\s\S]*?)\n\s*\];/) || ['', ''])[1]
+    .matchAll(/module:\s*'([^']+)'[^}]*?stepsTotal:\s*(\d+)/g)]
+    .map((x) => ({ module: x[1], stepsTotal: Number(x[2]) }));
+  if (!insiderStories.length) fail('insider: ESPANOL not found — the Español stories cannot be cross-checked');
+  for (const m of storyEntries) {
+    if (m.stream !== 'espanol') fail(`registry: story "${m.id}" must have stream: "espanol" (got ${JSON.stringify(m.stream)})`);
+    if (!(Number(m.stepsTotal) > 0)) fail(`registry: story "${m.id}" needs a numeric \`stepsTotal\``);
+    if (!Array.isArray(m.gameNames) || !m.gameNames.includes(m.name)) fail(`registry: story "${m.id}" gameNames must include its name "${m.name}" (the gameName its game_scores record carries)`);
+    if ((m.skillTags || []).some((t) => t && t.framework === 'internal')) fail(`registry: story "${m.id}" carries an internal skillTag — stories do no skill routing`);
+    const row = esList.find((x) => x.id === m.id);
+    if (!row) fail(`registry: story "${m.id}" is not in public/data/espanol.json`);
+    else {
+      if (row.url !== m.url) fail(`registry: story "${m.id}" url "${m.url}" != espanol.json url "${row.url}"`);
+      if (row.name !== m.name) fail(`registry: story "${m.id}" name "${m.name}" != espanol.json name "${row.name}"`);
+    }
+    const ins = insiderStories.find((x) => x.module === m.id);
+    if (!ins) fail(`insider: ESPANOL has no entry for story "${m.id}"`);
+    else if (ins.stepsTotal !== Number(m.stepsTotal)) fail(`registry: story "${m.id}" stepsTotal ${m.stepsTotal} != Insider ESPANOL stepsTotal ${ins.stepsTotal}`);
+    if (m.url && fs.existsSync(path.join(root, 'public', m.url, 'index.html'))) {
+      const page = read(path.join('public', m.url, 'index.html'));
+      const init = (page.match(/TM\.init\(\{[^}]*\}\)/) || [''])[0];
+      const mod = (init.match(/module:\s*'([^']+)'/) || [])[1];
+      const st = (init.match(/stream:\s*'([^']+)'/) || [])[1];
+      const steps = Number((init.match(/stepsTotal:\s*(\d+)/) || [])[1]);
+      if (mod !== m.id) fail(`public${m.url}index.html: Telemetry module "${mod}" != registry story id "${m.id}"`);
+      if (st !== 'espanol') fail(`public${m.url}index.html: Telemetry stream "${st}" != "espanol"`);
+      if (steps !== Number(m.stepsTotal)) fail(`public${m.url}index.html: Telemetry stepsTotal ${steps} != registry story stepsTotal ${m.stepsTotal}`);
+      const dataSteps = new Set([...page.matchAll(/data-step="(\d+)"/g)].map((x) => x[1])).size;
+      if (dataSteps !== Number(m.stepsTotal)) fail(`public${m.url}index.html: has ${dataSteps} distinct data-step sections, registry stepsTotal is ${m.stepsTotal}`);
+      if (!/<script src="\/js\/story-tracking\.js"><\/script>/.test(page)) fail(`public${m.url}index.html: does not load /js/story-tracking.js, so nothing it does is recorded`);
+    }
+  }
+  for (const row of esList) {
+    if (!storyEntries.some((m) => m.id === row.id)) fail(`registry: story "${row.id}" is in public/data/espanol.json but has no type 'story' registry entry, so it is not tracked or assignable`);
   }
 }
 

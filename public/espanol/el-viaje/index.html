@@ -7,6 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
 <script src="/js/reduced-motion.js"></script>
+<script src="/js/story-tracking.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 /*
@@ -871,15 +872,26 @@ const JODI={neutral:"/assets/jodi/jodi-neutral.svg",happy:"/assets/jodi/jodi-hap
 const SPK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
 const S={name:'',conf:{},choice:{},done:{},path:{}};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-/* ---------- telemetry: real Telemetry API shape; prototype logs to console + #debug panel ----------
-   Privacy: the start-screen name and anything typed in Puerta 5 are NEVER passed to any call below. */
+/* ---------- telemetry: the shared Telemetry API, through /js/story-tracking.js ----------
+   It loads AuthCore and Telemetry (and starts the student's session) and queues calls until
+   they are ready. Stream 'espanol'. Privacy: the start-screen name, anything typed in Puerta 5
+   and the class-vote hand counts are NEVER passed to any call below. #debug shows every call. */
 const DBG=location.hash==='#debug';let dbgEl=null;
 function dlog(kind,obj){try{console.log('[elviaje]',kind,obj)}catch(_){}if(!DBG)return;if(!dbgEl){dbgEl=document.createElement('div');dbgEl.id='dbg';dbgEl.innerHTML='<b>Telemetry · stream espanol</b><br>';document.body.appendChild(dbgEl)}dbgEl.insertAdjacentHTML('beforeend',`<div><b>${kind}</b> ${JSON.stringify(obj)}</div>`);dbgEl.scrollTop=1e6}
-const TM=window.Telemetry||{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{}),restart:()=>dlog('restart',{})};
+const ST=window.StoryTrack||null;
+if(ST&&DBG)ST.setDebug(dlog);
+const TM=ST?ST.TM:{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{}),restart:()=>dlog('restart',{})};
 TM.init({module:'el-viaje',gameName:'El Viaje',stream:'espanol',stepsTotal:12});
 const T=(e,d)=>TM.track(e,Object.assign({v:'1.11'},d||{}));
-function saveProgress(){const data={v:'1.11',done:S.done,choice:Object.assign({},S.choice,{5:S.choice[5]||undefined}),conf:S.conf,path:S.path};if(window.AuthCore&&window.AuthCore.saveModuleProgress){try{window.AuthCore.saveModuleProgress('el-viaje',data)}catch(_){}}else dlog('saveModuleProgress',{slug:'el-viaje',gates:Object.keys(S.done).length,path:S.path})}
-if(window.AuthCore&&window.AuthCore.startSession){try{window.AuthCore.startSession()}catch(_){}}
+/* First try only: Puerta 3's repair ("quiero decir que…") can raise the story's own confianza,
+   but the score a teacher and Insider see is the first answer. */
+function firstTry(n){return n===3?(S.choice[3]==='A'?1:0):(S.conf[n]||0)}
+function gatesNow(){const g={};[1,2,3,4,5].forEach(n=>{if(S.done[n])g[n]=firstTry(n)});return g}
+function pathNow(){return {f1:S.path.f1||null,f2:S.path.f2||null,f3:(S.path.f3||[]).join('+')||null}}
+function pushSummary(){TM.summary({gates:gatesNow(),path:pathNow(),mode:S.mode||'solo'})}
+/* module_progress/el-viaje: `state` is ONE string so each save replaces it whole (a merge would
+   keep an earlier playthrough's gates); `finished` stops a finished story from resuming. */
+function saveProgress(fin){const data={v:'1.11',finished:!!fin,state:JSON.stringify({done:S.done,choice:S.choice,conf:S.conf,path:S.path})};if(ST)ST.saveProgress('el-viaje',data);else dlog('saveModuleProgress',{slug:'el-viaje',gates:Object.keys(S.done).length,path:S.path})}
 
 /* ---------- people ---------- */
 const P={
@@ -1050,14 +1062,14 @@ $$('#f1p .path').forEach(b=>b.addEventListener('click',()=>{
   }
   T('fork_open',{fork:1,path:k});
 }));
-function doneF1(){setTimeout(()=>{$('#f1nx').hidden=false;saveProgress()},700)}
+function doneF1(){setTimeout(()=>{$('#f1nx').hidden=false;pushSummary();saveProgress()},700)}
 function prepG2(){const k=S.path.f1,it=S.path.f1item;const t=k==='tienda'?(it==='saco'?'Te mira y sonríe: “¡Qué elegante!”':'Te mira y sonríe: “¡Qué bonita camisa!”'):k==='valeria'?'Te reconoce: “¡Usted es quien perdió la maleta! Qué bueno que llegó.”':'Tu ropa del viaje se ve impecable.';$('#g2pre').textContent=t}
 
 /* ---------- FORK 2 · ¿Tiene alguna pregunta para mí? ---------- */
 const F2A={dia:'“Mucho café, muchas ideas… y cenamos juntos seguido. Hoy, por ejemplo: ¡está invitado!”',proyecto:'“Trabajaría con Diego en la nueva imagen de una cafetería del centro. Él le cuenta más en la cena.”',ciudad:'“El Paseo Santa Lucía, sin duda. Y tiene que probar el cabrito. Hoy cenamos con el equipo, ¡ahí lo prueba!”'};
 $$('#f2o .opt').forEach(o=>o.addEventListener('click',()=>{if(S.path.f2)return;const k=o.dataset.k;S.path.f2=k;o.classList.add('sel');lockOpts('#f2o');mood('f2m','smile');
   TM.choice({scenarioIndex:'f2',choiceIndex:['dia','proyecto','ciudad'].indexOf(k),category:'fork'});
-  reply($('#f2rep'),'Valeria',F2A[k]);say(F2A[k].replace(/[“”]/g,''));setTimeout(()=>{$('#f2nx').hidden=false;saveProgress()},900)}));
+  reply($('#f2rep'),'Valeria',F2A[k]);say(F2A[k].replace(/[“”]/g,''));setTimeout(()=>{$('#f2nx').hidden=false;pushSummary();saveProgress()},900)}));
 function prepCena(){const k=S.path.f2;$('#c5pre').textContent=k==='proyecto'?'Diego levanta la mano: “¿Tú eres quien va a trabajar conmigo en lo de la cafetería?”':k==='ciudad'?'Valeria: “Aquí el cabrito es el mejor de la ciudad.”':'Sofi: “¡Bienvenido a la cena de los jueves!”'}
 
 /* ---------- the dinner table: one scene, reused, so the food stays where it was served ---------- */
@@ -1126,7 +1138,7 @@ $('#f3go').addEventListener('click',()=>{
     $$('[data-dinner="g4"],[data-dinner="g5"]').forEach(m=>m.innerHTML=dinnerSVG(m.dataset.dinner));fitDinner();
     $('#f3hint').textContent='Tap your plates (front of the table) to hear them.';
     if(S.path.f2==='ciudad'&&order.has('cabrito'))setTimeout(()=>{dline('Valeria','“¡Me hizo caso con el cabrito!”');say('¡Me hizo caso con el cabrito!')},2600);
-    setTimeout(()=>{$('#f3nx').hidden=false;saveProgress()},2000);
+    setTimeout(()=>{$('#f3nx').hidden=false;pushSummary();saveProgress()},2000);
   },t+1300);
 });
 
@@ -1143,7 +1155,7 @@ function finish(n){
   setTimeout(()=>$$('#dots i')[n-1].classList.add('on'),1200);
   document.getElementById('g'+n+'nx').hidden=false;
   const GC={1:['facturé','facturaba'],2:['A','B','C'],3:['A','B','C'],4:['u','t'],5:['está','esté']};
-  TM.choice({scenarioIndex:n,choiceIndex:GC[n].indexOf(S.choice[n]),score:S.conf[n]||0,category:'gate'});saveProgress();
+  TM.choice({scenarioIndex:n,choiceIndex:GC[n].indexOf(S.choice[n]),score:firstTry(n),category:'gate'});pushSummary();saveProgress();
 }
 $$('[data-unlock]').forEach(b=>b.addEventListener('click',()=>{
   const n=b.dataset.unlock;let first=null;
@@ -1238,7 +1250,7 @@ $('#g5go').addEventListener('click',()=>{
   if(S.choice[5])return;const v=inp.value.trim().toLowerCase();const h=$('#g5hint');
   if(v==='este'||v==='esta'){h.textContent='Casi. Does it need an accent? Try the accent buttons.';return}
   if(v!=='esté'&&v!=='está'){h.textContent='¿Cuál forma de estar? Hint: is the apartment real yet, or are you still looking?';T('ev_hint',{gate:5,category:'other'});return}
-  h.textContent='';S.choice[5]=v;inp.disabled=true;$('#g5go').disabled=true;T('ev_gate_lock',{gate:5,choice:v});say('Busco un apartamento que '+v+' cerca del estudio.');
+  h.textContent='';S.choice[5]=v;inp.disabled=true;$('#g5go').disabled=true;T('ev_gate_lock',{gate:5,choice:v==='esté'?1:0});say('Busco un apartamento que '+v+' cerca del estudio.');
   setTimeout(()=>{
     if(v==='esté'){S.conf[5]=1;mood('g5m','smile');reply($('#g5rep'),'Diego','“¡Espérate! Mi primo renta uno a dos cuadras del estudio. Le escribo ahorita.”');say('¡Espérate! Mi primo renta uno a dos cuadras del estudio.');
       setTimeout(()=>{jodi(5,'happy',`<i>Esté</i> says you're still looking for one, any one, as long as it's close. <i>Está</i> would have said you already know which one. Diego only offered his cousin's place because <i>esté</i> told him you needed help.`);finish(5)},900)}
@@ -1250,12 +1262,10 @@ $('#g5go').addEventListener('click',()=>{
 /* ---------- CARTA ---------- */
 function buildCarta(){
   const c=Object.values(S.conf).reduce((a,b)=>a+b,0);
-  const gates={};[1,2,3,4,5].forEach(n=>gates['p'+n]=S.conf[n]||0);
-  const path={f1:S.path.f1,f2:S.path.f2,f3:(S.path.f3||[]).join('+')};
-  TM.complete({finalScore:c,percentage:Math.round(c/5*100),summary:{confianza:c,gates,path,mode:S.mode||'solo'}});
-  TM.summary({confianza:c,gates,path});
-  if(window.logModuleCompletion){try{window.logModuleCompletion({confianza:c})}catch(_){}}else dlog('game_scores (logModuleCompletion)',{gameName:'El Viaje',completed:true,confianza:c});
-  saveProgress();
+  const gates=gatesNow(),path=pathNow(),score=Object.values(gates).reduce((a,b)=>a+b,0);
+  TM.complete({finalScore:score,percentage:Math.round(score/5*100),summary:{gates,path,mode:S.mode||'solo',score,confianza:c}});
+  if(ST)ST.logCompletion('El Viaje',{score,finalScore:score,maxScore:5,confianza:c});else dlog('game_scores',{gameName:'El Viaje',completed:true,score,confianza:c});
+  saveProgress(true);
   const F1T={tienda:'You went shopping'+(S.path.f1item?': '+{azul:'camisa azul',blanca:'camisa blanca',saco:'saco gris'}[S.path.f1item]:'')+'.',recepcion:S.path.f1q==='plancha'?'The front desk lent you an iron.':'The hotel washed your clothes overnight.',valeria:'You texted Valeria, and she said casual was fine.'};
   const F2T={dia:'You asked about a normal day, and got invited to dinner.',proyecto:'You asked about your project: the café rebrand with Diego.',ciudad:'You asked what to see. She sent you to Paseo Santa Lucía and the cabrito.'};
   $('#camino').innerHTML=`<div><b>Fork 1 · la ropa</b>${F1T[S.path.f1]||'n/a'}</div><div><b>Fork 2 · tu pregunta</b>${F2T[S.path.f2]||'n/a'}</div><div><b>Fork 3 · el pedido</b>${(S.path.f3||[]).map(k=>MENU.find(m=>m.k===k).name).join(', ')||'n/a'}</div>`;
@@ -1315,10 +1325,58 @@ const CV=(()=>{
     b.querySelector('.cv-note').hidden=true;const res=b.querySelector('.cv-res');res.innerHTML='<div class="cv-h">Así votó la clase · how the class voted</div>'+html;res.hidden=false;
     b.querySelector('.cv-panel').hidden=false;b.querySelector('.cv-link').setAttribute('aria-expanded','true');
     b.querySelectorAll('.cv-b').forEach(x=>x.disabled=true);
-    T('class_vote',{gate:n,counts:counts[n],total:Math.max(...tot)});
+    T('class_vote',{gate:n});
   }
   document.querySelectorAll('.cv').forEach(b=>{const n=+b.dataset.g;build(n);b.querySelector('.cv-link').addEventListener('click',e=>toggle(n,e.currentTarget))});
   return {reveal,isOn:()=>on};
+})();
+
+/* ---------- Resume (2026-11-27) ----------
+   A student who left mid-story comes back to the next section, not the start. Finished
+   Puertas and forks show their stamp and the locked pick; their replies and Jodi notes are
+   not replayed. Reaching la carta is the completion, so it is never unlocked for them. */
+(function(){
+  if(!ST)return;
+  const ORDER=['g1','f1','g2','g3','f2','f3','g4','g5'];
+  ST.loadProgress('el-viaje').then(d=>{
+    if(!d||d.finished||typeof d.state!=='string')return;
+    let st;try{st=JSON.parse(d.state)}catch(_){return}
+    if(Object.keys(S.done).length||S.path.f1)return; // already playing on this load
+    const p=st.path||{};
+    const isDone=k=>k[0]==='g'?!!(st.done||{})[k.slice(1)]:(k==='f3'?Array.isArray(p.f3)&&p.f3.length>0:!!p[k]);
+    const reached=[];for(const k of ORDER){if(!isDone(k))break;reached.push(k)}
+    if(!reached.length)return;
+    Object.assign(S.done,st.done||{});Object.assign(S.choice,st.choice||{});Object.assign(S.conf,st.conf||{});Object.assign(S.path,p);
+    reached.forEach(k=>{
+      restoreSection(k);
+      if(k==='g5'){$('#g5nx').hidden=false;return}
+      const b=document.querySelector(`[data-unlock="${k}"]`);if(b)b.click();
+    });
+    const last=reached[reached.length-1];
+    const target=last==='g5'?$('#g5'):document.querySelector(`[data-after="${last}"]`);
+    T('resume',{at:last});pushSummary();
+    setTimeout(()=>{onScroll();if(target)target.scrollIntoView({behavior:'auto'})},250);
+  });
+  function note(el){if(el)el.insertAdjacentHTML('beforeend','<p class="small">Ya pasaste por aquí. <span lang="en">You answered this one last time.</span></p>')}
+  function restoreSection(k){
+    const sec=$('#'+k);if(!sec)return;
+    sec.querySelectorAll('.opt,.chip,.path,input').forEach(x=>x.disabled=true);
+    sec.querySelectorAll('button.go').forEach(x=>x.disabled=true);
+    if(k[0]==='f'){
+      if(k==='f1')sec.querySelectorAll('.path').forEach(x=>x.classList.toggle('sel',x.dataset.k===S.path.f1));
+      if(k==='f2')sec.querySelectorAll('.opt').forEach(x=>x.classList.toggle('sel',x.dataset.k===S.path.f2));
+      note($('#'+k+'rep')||$('#'+k+'body'));return;
+    }
+    const n=+k.slice(1);
+    const g=sec.querySelector('.gst');if(g){g.textContent='Abordado';g.classList.add('done')}
+    const dot=$$('#dots i')[n-1];if(dot)dot.classList.add('on');
+    const c=S.choice[n];
+    if(n===1){const ch=$('#g1chip');if(ch&&c)ch.textContent=c}
+    else if(n===5){const i=$('#g5in');if(i&&c)i.value=c}
+    else if(n===4){$$('#g4o1 .opt').forEach(o=>o.classList.toggle('sel',o.dataset.k===S.choice['4a']));$$('#g4o2 .opt').forEach(o=>o.classList.toggle('sel',o.dataset.k===c))}
+    else sec.querySelectorAll('.opt').forEach(o=>o.classList.toggle('sel',o.dataset.k===c));
+    note($('#g'+n+'rep')||$('#g'+n+'rep2'));
+  }
 })();
 }
 </script>

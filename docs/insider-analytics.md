@@ -78,6 +78,25 @@ which is what every figure on Insider is computed from. A module that passes `st
 | `seasons` | Reasons for the Seasons (`/simulations/seasons/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
 | `wolves-and-deer` | Wolves & Deer (`/simulations/wolves-and-deer/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
 | `snowball` | The Snowball (`/simulations/snowball/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
+| `espanol` | El Viaje (`/espanol/el-viaje/`) and El Mundial (`/espanol/el-mundial/`), both on one stream | **no** — its own **Español** page (`#/espanol`), from its own stream-filtered queries; their `game_scores` rows are split out by gameName. The student's existing session (a class member keeps their uid, so the class's teacher can read it under rules 6, 10b and 11b). Never the start-screen name, anything typed or the class-vote hand counts. Sessions tagged `?src=test` are left out of the Español page |
+
+**Español stories** (`/espanol/*`, 2026-11-27) report on one stream, `espanol`, loaded by
+`/js/story-tracking.js` (which loads AuthCore and Telemetry and queues the story's calls until
+they are ready). What each records:
+- `choice` events: every Puerta `{ scenarioIndex: 1–5, choiceIndex, score: 0|1, category: 'gate' }`,
+  once (a Puerta locks after one answer, so it is the first try; El Viaje's Puerta 3 repair
+  does not change it). Puertas 1–2 (and every El Viaje Puerta): `choiceIndex` is the option
+  picked; El Mundial's verb-chip Puertas 3–5: how many slots were right. Forks:
+  `{ scenarioIndex: 'f1'|'f2'|'f3', choiceIndex, category: 'fork' }`, no score (El Viaje f3:
+  how many dishes were ordered).
+- the session `summary`: `{ gates: { 1: 0|1, … }, path: { f1, … }, mode: 'solo'|'class' }`,
+  rewritten after every Puerta and fork, plus `score` at the end. Mission Control reads this.
+- `module_complete` once, on reaching la carta, and one `game_scores` doc
+  `{ gameName, completed: true, score, finalScore, maxScore: 5 }` (El Viaje adds its own `confianza`).
+- `module_progress/{el-viaje|el-mundial}`: `{ v, finished, state }`, `state` a JSON string of
+  the Puertas and paths so far, for resume.
+- custom events: `ev_start`, `ev_gate_lock`, `fork_open`, `class_mode` / `class_vote` (`{gate}`
+  only), `resume`, `ev_audio_play` and a few more. None carries a name or typed text.
 
 **Simulations** (`/simulations/*`) each report on their own stream and are in none of the core
 figures. Insider's Simulations page (`#/simulations`) loads every simulation's sessions and events
@@ -167,6 +186,8 @@ the moments that matter. Steps per module:
 | The Rumor Mill | rounds played | 10 |
 | Money Moves | rounds played | 10 |
 | Take the Bait | Real or Bait answers | 3 |
+| El Viaje | sections reached | 12 |
+| El Mundial | sections reached | 10 |
 
 The table above is hand-written but no longer hand-*checked*: `node scripts/check-modules.js`
 verifies every row against Insider's `COURSES` and against the shared registry, and fails on a

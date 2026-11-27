@@ -74,6 +74,7 @@
                 <a href="#/courses" data-route="courses" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="book-open" class="w-4 h-4"></i>Courses</a>
                 <a href="#/games" data-route="games" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="gamepad-2" class="w-4 h-4"></i>Games</a>
                 <a href="#/simulations" data-route="simulations" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="flask-conical" class="w-4 h-4"></i>Simulations</a>
+                <a href="#/espanol" data-route="espanol" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="languages" class="w-4 h-4"></i><span lang="es">Español</span></a>
                 <a href="#/sources" data-route="sources" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="signpost" class="w-4 h-4"></i>Sources</a>
                 <a href="#/classrooms" data-route="classrooms" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="school" class="w-4 h-4"></i>Classrooms</a>
                 <a href="#/inbox" data-route="inbox" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="inbox" class="w-4 h-4"></i>Inbox</a>
@@ -338,6 +339,20 @@
             { stream: 'wolves-and-deer', name: 'Wolves & Deer', url: '/simulations/wolves-and-deer/', prefix: 'wd', stepsTotal: 6 },
             { stream: 'snowball', name: 'The Snowball', url: '/simulations/snowball/', prefix: 'sb', stepsTotal: 6 },
         ];
+        /* ESPAÑOL STORIES (public/espanol/, 2026-11-27). Both report on ONE stream, 'espanol', so
+           they are partitioned out of the core figures like every non-core stream, and their
+           game_scores rows (by gameName) with them. The Español page reads D.espanol only.
+           `module` = the story's Telemetry.init module and registry id; stepsTotal matches it.
+           `gates` = its Puertas (choice events, category 'gate', scored 0/1 on the first try);
+           `forks` = its forks (category 'fork'; choiceIndex picks a label, or for a fork with
+           `count`, is how many items were picked). Sessions tagged ?src=test are the team's
+           own test visits and are left out of the page (it says how many). */
+        const ESPANOL = [
+            { module: 'el-viaje', name: 'El Viaje', url: '/espanol/el-viaje/', stepsTotal: 12, gameNames: ['El Viaje'], gates: 5,
+              forks: [{ id: 'f1', label: 'Fork 1 · la ropa', opts: ['tienda', 'recepción', 'Valeria'] }, { id: 'f2', label: 'Fork 2 · tu pregunta', opts: ['un día normal', 'el proyecto', 'la ciudad'] }, { id: 'f3', label: 'Fork 3 · el pedido', count: 'dishes' }] },
+            { module: 'el-mundial', name: 'El Mundial', url: '/espanol/el-mundial/', stepsTotal: 10, gameNames: ['El Mundial'], gates: 5,
+              forks: [{ id: 'f1', label: 'Fork · un día en Moscú', opts: ['la Plaza Roja', 'el metro', 'el súper'] }] },
+        ];
         /* GAMES (2026-11-25): every game linked from /educational-games/, plus Pattern Lab.
            The Games page is READ-ONLY reporting: it loads each game's sessions with its own
            module-filtered query (so a busy shared 5,000-session window can't hide a game) and
@@ -358,7 +373,7 @@
         ];
         const gameByModule = Object.fromEntries(GAMES.map(g => [g.module, g]));
         for (let i = COURSES.length - 1; i >= 0; i--) if (COURSES[i].offFunnel) COURSES.splice(i, 1);
-        const OFF_FUNNEL_GAMENAMES = new Set(OFF_FUNNEL_COURSES.flatMap(c => c.gameNames));
+        const OFF_FUNNEL_GAMENAMES = new Set([...OFF_FUNNEL_COURSES.flatMap(c => c.gameNames), ...ESPANOL.flatMap(st => st.gameNames)]);
         const courseByGameName = {};
         const courseByLaunchName = {};
         const courseBySlug = {};
@@ -386,6 +401,8 @@
             // The simulations' own data (public/simulations/*), one entry per stream in SIMS,
             // loaded by stream-filtered queries for the same reason as Take the Bait's.
             sims: {},
+            // The Español stories' own data (stream 'espanol'), for the Español page only.
+            espanol: { sessions: [], events: [], scores: [] },
             // Each game's own sessions (GAMES above), loaded by module-filtered queries; the
             // Games page reads only this and the game_scores rows, never the core arrays.
             games: {}, gameScores: [],
@@ -620,6 +637,14 @@
                 return [sim.stream, { sessions: ss, events: ee }];
             }));
 
+            // Español: one sessions + one events query for the shared 'espanol' stream.
+            const [esSessions, esEvents] = await Promise.all([
+                safe('espanol sessions', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('stream', '==', 'espanol'), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+                safe('espanol events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), where('stream', '==', 'espanol'), limit(10000)))).docs.map(d => ({ id: d.id, ...d.data() }))),
+            ]);
+            esSessions.forEach(x => { x.startMs = toMs(x.startedAt); x.lastMs = toMs(x.lastSeenAt); });
+            esEvents.forEach(x => { x.ms = toMs(x.ts) || x.clientTs || 0; });
+
             // Games: one sessions query per game (equality only, like Take the Bait's).
             const gameData = await Promise.all(GAMES.filter(g => g.module !== 'take-the-bait').map(async g => {
                 const ss = await safe(`${g.module} sessions`, async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('module', '==', g.module), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() })));
@@ -652,6 +677,7 @@
                 sessions: funnelSessions, events: funnelEvents, offFunnel, loadedAt: Date.now(),
                 ttb: { sessions: ttbSessions, events: ttbEvents },
                 sims: Object.fromEntries(simData),
+                espanol: { sessions: esSessions, events: esEvents, scores: scores.filter(x => ESPANOL.some(st => st.gameNames.includes(x.gameName))) },
                 games: Object.fromEntries(gameData),
             });
             // Every game_scores row whose gameName is a game's, core or off-funnel, for the Games page only.
@@ -841,7 +867,7 @@
         // ------------------------------------------------------------------
         // ROUTER
         // ------------------------------------------------------------------
-        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', games: 'Games', takethebait: 'Take the Bait', simulations: 'Simulations', sources: 'Where visits come from', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
+        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', games: 'Games', takethebait: 'Take the Bait', simulations: 'Simulations', espanol: 'Español', sources: 'Where visits come from', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
         function route() {
             if (mainView.classList.contains('hidden')) return;
             const hash = location.hash.replace(/^#\/?/, '');
@@ -849,7 +875,7 @@
             const page = TITLES[section] ? section : 'overview';
             document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === (page === 'takethebait' ? 'games' : page)));
             $('page-title').textContent = TITLES[page];
-            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, games: () => renderGames(arg), takethebait: () => gamesBackLink() + renderTakeTheBait(), simulations: () => renderSimulations(arg), sources: () => renderSources(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
+            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, games: () => renderGames(arg), takethebait: () => gamesBackLink() + renderTakeTheBait(), simulations: () => renderSimulations(arg), espanol: () => renderEspanol(arg), sources: () => renderSources(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
             const out = typeof render === 'function' ? render() : '';
             $('page').innerHTML = typeof out === 'function' ? out() : out;
             if (window.lucide) lucide.createIcons();
@@ -1098,6 +1124,66 @@
                 <div class="grid lg:grid-cols-2 gap-4">
                     ${card('Device', hbarRows(Object.entries(dev).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ label: k, pct: pct(n, sessions.length), n, tip: `${n} sessions` })), r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
                     ${card('Speed setting (levels finished)', hbarRows(spTotal ? [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['fast', 'Fast']].map(([k, l]) => ({ label: l, pct: pct(sp[k], spTotal), n: sp[k], tip: `${sp[k]} levels` })) : [], r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
+                </div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: ESPAÑOL (off-funnel; reads only D.espanol, never the core arrays)
+        // ------------------------------------------------------------------
+        const isTestVisit = (x) => !!(x && x.source && String(x.source.src || '').startsWith('test'));
+        function storyStats(st) {
+            const start = rangeStart();
+            const inRange = D.espanol.sessions.filter(x => x.module === st.module && (x.startMs || 0) >= start);
+            const tests = inRange.filter(isTestVisit);
+            const sessions = inRange.filter(x => !isTestVisit(x));
+            const ids = new Set(sessions.map(x => x.sessionId || x.id));
+            const events = D.espanol.events.filter(e => e.module === st.module && e.ms >= start && ids.has(e.sessionId));
+            const completed = sessions.filter(x => x.completed);
+            const act = completed.map(x => x.activeMs).filter(v => typeof v === 'number' && v > 0);
+            // First answer per session per Puerta / fork. Every Puerta locks after one answer,
+            // so this is the first try; a replay in a new session counts on its own.
+            const firsts = (cat) => { const seen = new Set(), out = []; events.filter(e => e.event === 'choice' && e.meta && e.meta.category === cat).sort((a, b) => a.ms - b.ms).forEach(e => { const k = e.sessionId + '|' + e.meta.scenarioIndex; if (!seen.has(k)) { seen.add(k); out.push(e); } }); return out; };
+            const gateEv = firsts('gate'), forkEv = firsts('fork');
+            const gates = Array.from({ length: st.gates }, (_, i) => i + 1).map(g => { const r = gateEv.filter(e => Number(e.meta.scenarioIndex) === g); const ok = r.filter(e => e.meta.score === 1).length; return { g, n: r.length, ok }; });
+            const forks = st.forks.map(f => { const r = forkEv.filter(e => e.meta.scenarioIndex === f.id); const dist = {}; r.forEach(e => { const i = e.meta.choiceIndex; const k = f.count ? `${i} ${f.count}` : (f.opts[i] || '?'); dist[k] = (dist[k] || 0) + 1; }); return { f, n: r.length, dist }; });
+            const classN = sessions.filter(x => x.summary && x.summary.mode === 'class').length;
+            return { st, sessions, tests: tests.length, events, completed, gates, forks, classN,
+                learners: new Set(sessions.map(x => x.uid)).size, medActive: act.length ? median(act) : null };
+        }
+        function renderEspanol(arg) {
+            const all = ESPANOL.map(storyStats);
+            const th = 'text-right font-bold py-1 px-2', dash = '<span class="text-slate-300">—</span>';
+            const tot = all.reduce((a, x) => ({ s: a.s + x.sessions.length, c: a.c + x.completed.length, t: a.t + x.tests }), { s: 0, c: 0, t: 0 });
+            const table = `<table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Story</th><th class="${th}">Sessions</th><th class="${th}">Unique learners</th><th class="${th}">Completed</th><th class="${th}">Median time</th><th class="${th}">Played as a class</th></tr></thead><tbody>${all.map(x => `<tr class="border-t border-slate-50"><td class="py-1.5"><a href="#/espanol/${x.st.module}" class="font-bold text-slate-700 hover:underline" lang="es">${esc(x.st.name)}</a></td><td class="text-right px-2">${x.sessions.length}</td><td class="text-right px-2">${x.learners}</td><td class="text-right px-2 font-bold">${x.completed.length} <span class="text-slate-400 font-normal">${x.sessions.length ? '(' + pct(x.completed.length, x.sessions.length) + '%)' : ''}</span></td><td class="text-right px-2">${x.medActive ? fmtDuration(x.medActive) : dash}</td><td class="text-right px-2">${x.sessions.length ? pct(x.classN, x.sessions.length) + '%' : dash}</td></tr>`).join('')}</tbody></table><p class="text-[10px] text-slate-400 mt-2">A session opens at a learner's first interaction, not on page load. Completed = reached la carta. Played as a class = the class vote was opened at least once (the hand counts themselves are never recorded).</p>`;
+            const x = all.find(a => a.st.module === arg) || all.slice().sort((a, b) => b.sessions.length - a.sessions.length)[0];
+            const st = x.st, n = x.sessions.length;
+            const chips = ESPANOL.map(s => `<a href="#/espanol/${s.module}" class="chip border border-slate-200 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${s === st ? 'active' : ''}" lang="es">${esc(s.name)}</a>`).join('');
+            const reach = Array.from({ length: st.stepsTotal }, (_, i) => i + 1).map(k => { const c = x.sessions.filter(s => (s.maxStep || 0) >= k).length; return { label: `Step ${k}`, pct: pct(c, n), n: c, tip: `${c} of ${n} sessions reached step ${k}` }; });
+            const gateRows = x.gates.map(g => ({ label: `Puerta ${g.g}`, pct: pct(g.ok, g.n), n: g.ok, of: g.n, tip: `${g.ok} of ${g.n} right on the first try` }));
+            const forkHtml = x.forks.map(({ f, n: fn, dist }) => `<div class="mb-3"><div class="text-[11px] font-bold text-slate-600 mb-1" lang="es">${esc(f.label)}</div>${fn ? hbarRows(Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, pct: pct(v, fn), n: v, tip: `${v} of ${fn}` })), r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`) : emptyMsg('No one has reached this fork in this range.')}</div>`).join('');
+            return `${errorStrip()}
+                <p class="text-[11px] text-slate-500 mb-4">The Español stories report on their own telemetry stream (<span class="font-mono">espanol</span>) and are in none of the core figures on the other pages. ${rangeLabel()} · ${tot.t ? `${tot.t} test visit${tot.t === 1 ? '' : 's'} (tagged <span class="font-mono">?src=test</span>) left out.` : 'no test visits in this range.'}</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    ${tile('Story sessions', tot.s, `${ESPANOL.length} stories`)}
+                    ${tile('Completed', tot.c, tot.s ? pct(tot.c, tot.s) + '% of sessions' : '')}
+                    ${tile('Played as a class', all.reduce((a, y) => a + y.classN, 0), 'sessions that opened the class vote')}
+                    ${tile('Unique learners', new Set(all.flatMap(y => y.sessions.map(s => s.uid))).size, 'across both stories')}
+                </div>
+                <div class="mb-6">${card('All stories', table)}</div>
+                <div class="flex flex-wrap gap-1 mb-4">${chips}</div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    ${tile('Sessions', n, `${x.learners} learner${x.learners === 1 ? '' : 's'}`)}
+                    ${tile('Completed', x.completed.length, n ? pct(x.completed.length, n) + '%' : '')}
+                    ${tile('Median time', x.medActive ? fmtDuration(x.medActive) : '—', 'active time, completed sessions')}
+                    ${tile('Played as a class', x.classN, n ? pct(x.classN, n) + '% of sessions' : '')}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-6">
+                    ${card(`Drop-off by step · ${esc(st.name)}`, n ? hbarRows(reach, r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`) : emptyMsg('No sessions in this range yet.'))}
+                    ${card('First try, per Puerta', x.gates.some(g => g.n) ? hbarRows(gateRows, r => `${r.of ? r.pct + '%' : '—'} <span class="text-slate-400 font-normal">(${r.n}/${r.of})</span>`) + '<p class="text-[10px] text-slate-400 mt-2">Each Puerta locks after one answer, so this is the first try. Puerta 5 counts right with at most one slip.</p>' : emptyMsg('No Puerta answered in this range yet.'))}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-6">
+                    ${card('Fork paths', forkHtml)}
+                    ${card('Finished playthroughs', (() => { const sc = D.espanol.scores.filter(r => st.gameNames.includes(r.gameName) && toMs(r.lastUpdated) >= rangeStart()); const v = sc.map(r => r.score).filter(y => typeof y === 'number'); return sc.length ? `<div class="space-y-2 text-xs"><div class="flex justify-between"><span class="text-slate-500">game_scores records</span><span class="font-bold">${sc.length}</span></div><div class="flex justify-between"><span class="text-slate-500">Median Puertas right (of 5)</span><span class="font-bold">${v.length ? median(v) : '—'}</span></div></div><p class="text-[10px] text-slate-400 mt-2">Includes test visits: game_scores carry no source tag.</p>` : emptyMsg('No finished playthroughs in this range yet.'); })())}
                 </div>`;
         }
 

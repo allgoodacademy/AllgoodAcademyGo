@@ -132,8 +132,9 @@ export async function joinClassroom(rawCode, { nickname } = {}) {
 // routes into the lesson that teaches what it found), then the lessons, then the Challenge
 // that tests the whole pack. The assignment arrays themselves carry no cross-type order.
 // A simulation (2026-11-25) comes last: it is its own activity, not part of a pack's sequence.
-const TYPE_ORDER = { game: 0, lab: 1, challenge: 2, sim: 3 };
-const TYPE_LABEL = { game: 'Game', lab: 'Lesson', challenge: 'Challenge', sim: 'Simulation' };
+// 'story' (2026-11-27): an Español story. Assigned in assignedSims, beside the simulations.
+const TYPE_ORDER = { game: 0, lab: 1, challenge: 2, sim: 3, story: 4 };
+const TYPE_LABEL = { game: 'Game', lab: 'Lesson', challenge: 'Challenge', sim: 'Simulation', story: 'Español story' };
 
 /**
  * Everything assigned to this student in this Task Force: the class-wide modules, games AND

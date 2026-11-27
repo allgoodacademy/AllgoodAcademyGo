@@ -556,6 +556,21 @@ export function buildCatalog(registryModules = []) {
         eventPrefix: m.eventPrefix || null,
         stepsTotal: Number(m.stepsTotal) || 0,
     }));
+    // Español stories (registry type 'story', 2026-11-27). Tracked and assigned exactly like a
+    // simulation (assignedSims, the sim drill-down, progress from their sessions), so they ride
+    // as type 'sim' with kind 'story'. Both stories share the 'espanol' stream, so stream is
+    // null here: a story's sessions and events are matched by its module id alone.
+    const stories = live.filter((m) => m.type === 'story').map((m) => ({
+        id: m.id,
+        name: m.name,
+        type: 'sim',
+        kind: 'story',
+        url: m.url || null,
+        minutes: Number(m.durationMinutes) > 0 ? Number(m.durationMinutes) : SIM_MINUTES,
+        stream: null,
+        eventPrefix: null,
+        stepsTotal: Number(m.stepsTotal) || 0,
+    }));
 
     return {
         // A capstone always renders last within its pack, whatever order the registry
@@ -571,10 +586,13 @@ export function buildCatalog(registryModules = []) {
             name: slug ? `${packLabel(slug)} games` : 'Other games',
             items: gamesByPack.get(slug),
         })),
-        simPacks: sims.length ? [{ slug: 'simulations', name: 'Simulations', items: sims }] : [],
+        simPacks: [
+            ...(sims.length ? [{ slug: 'simulations', name: 'Simulations', items: sims }] : []),
+            ...(stories.length ? [{ slug: 'espanol', name: 'Español stories', items: stories }] : []),
+        ],
         moduleIds: live.filter((m) => m.type === 'lab' || m.type === 'challenge').map((m) => m.id),
         gameIds: live.filter((m) => m.type === 'game').map((m) => m.id),
-        simIds: sims.map((m) => m.id),
+        simIds: [...sims, ...stories].map((m) => m.id),
         byId: new Map(live.map((m) => [m.id, m])),
     };
 }
@@ -591,17 +609,20 @@ export function assignmentSummary({ modules = [], games = [], sims = [], catalog
     const picked = [...modules, ...games, ...sims].map((id) => flat.get(id)).filter(Boolean);
     const mods = picked.filter((it) => it.type !== 'game' && it.type !== 'sim');
     const gms = picked.filter((it) => it.type === 'game');
-    const sms = picked.filter((it) => it.type === 'sim');
+    const sms = picked.filter((it) => it.type === 'sim' && it.kind !== 'story');
+    const sts = picked.filter((it) => it.type === 'sim' && it.kind === 'story');
     const minutes = picked.reduce((n, it) => n + it.minutes, 0);
 
     const parts = [];
     if (mods.length) parts.push(`${mods.length} module${mods.length === 1 ? '' : 's'}`);
     if (gms.length) parts.push(`${gms.length} game${gms.length === 1 ? '' : 's'}`);
     if (sms.length) parts.push(`${sms.length} simulation${sms.length === 1 ? '' : 's'}`);
+    if (sts.length) parts.push(`${sts.length} Español stor${sts.length === 1 ? 'y' : 'ies'}`);
     return {
         moduleCount: mods.length,
         gameCount: gms.length,
         simCount: sms.length,
+        storyCount: sts.length,
         minutes,
         label: parts.length
             ? `${parts.join(' + ')} assigned · about ${minutes} minute${minutes === 1 ? '' : 's'} of class time`

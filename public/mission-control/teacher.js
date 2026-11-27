@@ -236,12 +236,13 @@ const fmtMins = (ms) => {
 const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—');
 
 const ICONS = {
+    story: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>',
     lab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
     challenge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/></svg>',
     game: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="5"/><path d="M7 10v4M5 12h4"/><circle cx="16" cy="11" r=".8"/><circle cx="18" cy="13" r=".8"/></svg>',
     sim: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
 };
-const TYPE_LABEL = { lab: 'Lesson', challenge: 'Challenge', game: 'Game', sim: 'Simulation' };
+const TYPE_LABEL = { lab: 'Lesson', challenge: 'Challenge', game: 'Game', sim: 'Simulation', story: 'Español story' };
 const AVATAR_COLORS = ['#357889', '#CF4616', '#2E7D52', '#5B4B8A', '#8F5E0E', '#204B55'];
 function colorForUid(uid) {
     let h = 0;
@@ -591,10 +592,13 @@ function rebuildAll() {
 function itemOf(id) {
     const m = state.registryById.get(id);
     if (!m) return { id, name: (MODULE_DATA[id] && MODULE_DATA[id].name) || id, type: 'lab', minutes: 0 };
+    // An Español story is tracked like a simulation (derive.js buildCatalog), matched by its
+    // module id only: both stories share the 'espanol' stream.
+    const story = m.type === 'story';
     return {
-        id, name: m.name, type: m.type, url: m.url,
+        id, name: m.name, type: story ? 'sim' : m.type, kind: story ? 'story' : m.type, url: m.url,
         minutes: m.type === 'game' ? GAME_MINUTES : (Number(m.durationMinutes) || 15),
-        stream: m.stream, eventPrefix: m.eventPrefix, stepsTotal: Number(m.stepsTotal) || 0,
+        stream: story ? null : m.stream, eventPrefix: m.eventPrefix, stepsTotal: Number(m.stepsTotal) || 0,
         gameNames: m.gameNames || [], defaultDestination: m.defaultDestination || null,
     };
 }
@@ -992,8 +996,8 @@ function classItems() {
     const c = state.classroom || {};
     return [...(c.assignedModules || []), ...(c.assignedGames || []), ...(c.assignedSims || [])];
 }
-/* Español (2026-11-27): a destination only. A plain link to /espanol/: no assigning, no
-   progress, no track() event. Icon: Lucide "languages", copied from the bundled
+/* Español (2026-11-27): a link to the /espanol/ hub. The stories themselves are tracked and
+   assignable from their cards (Español view, Assign several); this card is only the way in. Icon: Lucide "languages", copied from the bundled
    /assets/js/lucide.min.js. Self-contained; the Mission Control redesign replaces it. */
 const ESPANOL_CARD = `<a class="es-card" href="/espanol/">
       <span class="ic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg></span>
@@ -1402,7 +1406,8 @@ $('drawer').addEventListener('click', (e) => {
    reasons games did — see the note above saveAssignments().
    ═════════════════════════════════════════════════════════════════════════════ */
 const KINDS = ['modules', 'games', 'sims'];
-const kindOf = (type) => (type === 'game' ? 'games' : (type === 'sim' ? 'sims' : 'modules'));
+// An Español story is assigned beside the simulations, in assignedSims (no new class field).
+const kindOf = (type) => (type === 'game' ? 'games' : (type === 'sim' || type === 'story' ? 'sims' : 'modules'));
 function classSet() {
     const c = state.classroom || {};
     return { modules: new Set(c.assignedModules || []), games: new Set(c.assignedGames || []), sims: new Set(c.assignedSims || []) };
@@ -1449,7 +1454,7 @@ function renderAssign() {
         const k = kindOf(item.type);
         const isClass = locked[k].has(item.id);
         const on = isClass || state.draft[k].has(item.id);
-        const type = item.type === 'challenge' ? 'challenge' : item.type;
+        const type = item.kind === 'story' ? 'story' : (item.type === 'challenge' ? 'challenge' : item.type);
         return `<button class="ac${isClass ? ' cls' : ''}" type="button" data-item="${esc(item.id)}" data-kind="${k}" aria-pressed="${on}"${isClass || state.readOnly ? ' disabled' : ''}>
             <span class="ic t-${type}" aria-hidden="true">${ICONS[type] || ICONS.lab}</span>
             <span class="grow"><b>${esc(item.name)}${isClass ? '<span class="wc">Whole class</span>' : ''}</b><span class="meta">${TYPE_LABEL[type] || 'Lesson'} · ${item.minutes} min</span></span>
@@ -1458,7 +1463,8 @@ function renderAssign() {
     const group = (title, sub, items) => `<div class="cat"><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p><div class="grid">${items.map(card).join('')}</div></div>`;
     const packs = state.catalog.packs.map((p) => group(p.name, p.slug ? 'Lab Pack' : 'Lessons', p.items)).join('');
     const games = state.catalog.gamePacks.flatMap((p) => p.items);
-    const sims = (state.catalog.simPacks || []).flatMap((p) => p.items);
+    const sims = (state.catalog.simPacks || []).flatMap((p) => p.items).filter((it) => it.kind !== 'story');
+    const stories = (state.catalog.simPacks || []).flatMap((p) => p.items).filter((it) => it.kind === 'story');
     const intro = scoped
         ? `<div class="scope"><span><strong>Assigning just for ${esc(scopeNames())}.</strong> This adds to what the whole class has — it doesn't replace it, and nobody else's list changes. Whole-class work is shown greyed.</span>
             <button class="btn ghost sm" type="button" id="btn-scope-class">Whole class instead</button></div>`
@@ -1471,6 +1477,7 @@ function renderAssign() {
     pane.innerHTML = ro + intro + packs
         + (games.length ? group('Games', `${GAME_MINUTES}–10 minutes · warm-ups and quick checks`, games) : '')
         + (sims.length ? group('Simulations', 'Project with Present mode, or students play on their own', sims) : '')
+        + (stories.length ? group('Español stories', 'Spanish stories students play on their own, about 30–35 minutes each', stories) : '')
         + (n && !state.readOnly ? `<div class="save" role="region" aria-label="Unsaved changes"><span>${scoped ? `Extra for ${esc(scopeNames())}` : esc(summary.label)}</span>
             <button class="btn ghost sm go" type="button" id="btn-cancel-assign">Cancel</button>
             <button class="btn sm" type="button" id="btn-save-assign">Save assignments (${plural(n, 'change')})</button></div>` : '');
@@ -1769,8 +1776,7 @@ function registryIdFor(m) {
     return r ? r.id : null;
 }
 function cardActions(m) {
-    // Español stories are not tracked or assignable yet: Try it only, and no launch log.
-    const tryIt = `<a class="btn ghost sm" href="${esc(m.url)}" data-name="${esc(m.name)}"${m.type === 'story' ? ' data-nolog' : ''}>Try it</a>`;
+    const tryIt = `<a class="btn ghost sm" href="${esc(m.url)}" data-name="${esc(m.name)}">Try it</a>`;
     const present = m.type === 'simulation' && m.present
         ? `<a class="btn ghost sm" href="${esc(m.url)}#present" data-name="${esc(m.name)}">Present</a>` : '';
     const id = state.code ? registryIdFor(m) : null;

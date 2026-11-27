@@ -953,7 +953,8 @@ test('extrasFromDoc collapses "no extras" and "malformed" to the same null', () 
 
 test('simulations are assignable: buildCatalog lists every registry sim with its stream and steps', () => {
     const cat = buildCatalog(REGISTRY.modules);
-    const sims = cat.simPacks.flatMap((p) => p.items);
+    // The Español stories ride in simPacks too, in their own group (tested below).
+    const sims = cat.simPacks.flatMap((p) => p.items).filter((x) => x.kind !== 'story');
     assert.deepEqual(sims.map((x) => x.id).sort(), ['reasons-for-the-seasons', 'snowball', 'water-cycle', 'wolves-and-deer']);
     for (const x of sims) {
         assert.equal(x.type, 'sim');
@@ -1133,4 +1134,46 @@ test('choiceLevelRows: one row per student per scored step, with the real choice
     assert.equal(rows[0].choice, meta.steps[0].choices[riskyIdx].text);
     assert.equal(rows[0].tag, 'RISKY');
     assert.equal(choicesFor(s, MODULE_DATA['privacy-security']).length, 0, 'another module\'s events are not mixed in');
+});
+
+/* ── Español stories (2026-11-27) ─────────────────────────────────────────── */
+test('buildCatalog puts both Español stories in their own group beside the simulations, as sims matched by module', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const grp = cat.simPacks.find((p) => p.slug === 'espanol');
+    assert.ok(grp, 'an espanol group exists');
+    assert.deepEqual(grp.items.map((x) => x.id).sort(), ['el-mundial', 'el-viaje']);
+    for (const it of grp.items) {
+        assert.equal(it.type, 'sim');
+        assert.equal(it.kind, 'story');
+        assert.equal(it.stream, null, 'both stories share a stream, so a story must not match by it');
+        assert.ok(it.stepsTotal > 0);
+        assert.ok(cat.simIds.includes(it.id), 'assignable');
+    }
+    // Stories never land in a Lab Pack or the games.
+    assert.ok(!cat.packs.some((p) => p.items.some((x) => x.id === 'el-viaje')));
+    assert.ok(!cat.gamePacks.some((p) => p.items.some((x) => x.id === 'el-viaje')));
+});
+
+test('a story counts only its own sessions: El Viaje sessions never finish El Mundial', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const [mundial, viaje] = ['el-mundial', 'el-viaje'].map((id) => cat.simPacks.flatMap((p) => p.items).find((x) => x.id === id));
+    const student = { raw: { sessions: [
+        { module: 'el-viaje', stream: 'espanol', maxStep: 12, completed: true, activeMs: 1000, startedAt: daysAgo(1) },
+    ] } };
+    assert.equal(simProgress(student, viaje).completed, true);
+    const m = simProgress(student, mundial);
+    assert.equal(m.completed, false);
+    assert.equal(m.sessions, 0);
+    student.raw.sessions.push({ module: 'el-mundial', stream: 'espanol', maxStep: 10, completed: true, summary: { gates: { 1: 1, 2: 0 }, path: { f1: 'metro' } } });
+    assert.equal(simProgress(student, mundial).completed, true);
+    assert.equal(drillSim(mundial, [student]).finished, 1);
+});
+
+test('assignmentSummary names Español stories separately from simulations', () => {
+    const cat = buildCatalog(REGISTRY.modules);
+    const sim = cat.simPacks.find((p) => p.slug === 'simulations').items[0].id;
+    const s = assignmentSummary({ modules: [], games: [], sims: [sim, 'el-viaje', 'el-mundial'], catalog: cat });
+    assert.equal(s.simCount, 1);
+    assert.equal(s.storyCount, 2);
+    assert.match(s.label, /1 simulation \+ 2 Español stories assigned/);
 });
