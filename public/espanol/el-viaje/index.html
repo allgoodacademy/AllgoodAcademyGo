@@ -934,17 +934,23 @@ function sayTTS(t){if(!hasTTS)return;try{speechSynthesis.cancel();const u=new Sp
 /* recorded voices (ElevenLabs, pre-rendered to /assets/audio/espanol/el-viaje/). Manifest fetched once on the first say(); each clip loads on tap. Any miss or load error falls back to sayTTS. */
 const AUD={m:null,p:null,el:null,n:0};
 function audManifest(){return AUD.p||(AUD.p=fetch('/assets/audio/espanol/el-viaje/manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(m=>AUD.m=m||{}))}
+/* say() resolves when this line is over: clip ended, replaced by a newer say(), or a time cap (browser voice: an estimate). Timed sequences wait on it so lines aren't cut off. */
 function say(t){T('ev_audio_play',{t});
-  const k=String(t).replace(/[“”]/g,'').replace(/\s+/g,' ').trim(),n=++AUD.n;
+  const k=String(t).replace(/[“”]/g,'').replace(/\s+/g,' ').trim(),n=++AUD.n,est=900+k.length*75;
+  let done;const p=new Promise(r=>{done=r});
+  const live=()=>{if(n!==AUD.n){done();return 0}return 1};
+  const tts=()=>{sayTTS(t);setTimeout(done,est)};
   if(hasTTS)try{speechSynthesis.cancel()}catch(_){}
-  if(typeof Audio!=='function'){sayTTS(t);return}
+  if(typeof Audio!=='function'){tts();return p}
   let a=AUD.el;if(!a){a=AUD.el=new Audio();a.preload='none'}
   try{a.pause()}catch(_){}
-  const go=m=>{if(n!==AUD.n)return;const u=m[k];if(!u){sayTTS(t);return}
-    const fail=()=>{if(n===AUD.n){AUD.n++;sayTTS(t)}};
-    a.onerror=fail;a.src=u;
+  if(AUD.end)AUD.end();AUD.end=done;
+  const go=m=>{if(!live())return;const u=m[k];if(!u){tts();return}
+    const fail=()=>{if(n===AUD.n){AUD.n++;tts()}};
+    a.onerror=fail;a.onended=()=>{if(n===AUD.n)done()};a.src=u;setTimeout(done,est+4000);
     try{const q=a.play();if(q&&q.catch)q.catch(e=>{if(!e||e.name!=='AbortError')fail()})}catch(_){fail()}};
-  if(AUD.m)go(AUD.m);else audManifest().then(go)}
+  if(AUD.m)go(AUD.m);else audManifest().then(go);
+  return p}
 function wireSay(root){(root||document).querySelectorAll('.say').forEach(b=>{if(b._w)return;b._w=1;b.innerHTML=SPK+' '+b.textContent;b.addEventListener('click',()=>{say(b.dataset.say);const p=b.parentElement.querySelector('.ptxt');if(p)setTimeout(()=>p.classList.remove('blur'),1400)})})}
 wireSay();
 $$('.ptxt.blur').forEach(p=>{p.title='Tap to show the text';p.addEventListener('click',()=>p.classList.remove('blur'))});
@@ -1052,9 +1058,9 @@ $$('#f1p .path').forEach(b=>b.addEventListener('click',()=>{
     renderPeople(body);wireSay(body);
     $$('#f1body .shirt').forEach(s=>s.addEventListener('click',()=>{
       if(S.path.f1item)return;S.path.f1item=s.dataset.k;s.classList.add('sel');const it=SHIRTS.find(x=>x.k===s.dataset.k);
-      say(it.name+', talla '+it.talla);
+      const said=say(it.name+', talla '+it.talla);
       $('#f1step').innerHTML=`<div class="reply"><div class="bub"><span class="by">Lupita</span>“Buena elección. ¿Se ${it.m?'lo':'la'} quiere probar?”</div></div><div class="opts" id="f1q" style="margin-top:10px"><button class="opt" data-k="si"><b>A</b>“Sí, por favor. ¿Dónde están los probadores?”</button><button class="opt" data-k="no"><b>B</b>“No, gracias. Me ${it.m?'lo':'la'} llevo así.”</button></div>`;
-      say('Buena elección. ¿Se '+(it.m?'lo':'la')+' quiere probar?');
+      said.then(()=>{if(!S.path.f1q)say('Buena elección. ¿Se '+(it.m?'lo':'la')+' quiere probar?')});
       $$('#f1q .opt').forEach(o=>o.addEventListener('click',()=>{if(S.path.f1q)return;S.path.f1q=o.dataset.k;o.classList.add('sel');lockOpts('#f1q');
         const t=o.dataset.k==='si'?'“Al fondo, a la derecha.” … Te queda '+(it.m?'perfecto':'perfecta')+'.':'“Muy bien.” … (Esperas que te quede.)';
         $('#f1step').insertAdjacentHTML('beforeend',`<div class="reply"><div class="bub"><span class="by">Lupita</span>${t}</div></div><div class="receipt">TIENDA EL CENTRO · MONTERREY<br>${it.name} talla ${it.talla} ....... $${it.precio.toLocaleString('es-MX')}.00<br>TOTAL MXN ................... $${it.precio.toLocaleString('es-MX')}.00<br>¡Gracias por su compra!</div>`);
@@ -1142,9 +1148,11 @@ $('#f3go').addEventListener('click',()=>{
   $('#d3wrap').scrollIntoView({behavior:'smooth',block:'center'});
   // the table orders too, then Memo repeats yours
   const seq=[['Diego','“Para mí, la carne asada, por favor.”'],['Sofi','“Unos frijoles charros para mí.”'],['Valeria','“Y yo, el cabrito, como siempre.”'],['Don Memo',line]];
-  let t=600;seq.forEach(([by,tx])=>{setTimeout(()=>{dline(by,tx);say(tx.replace(/[“”]/g,''))},t);t+=by==='Don Memo'?4200:2300});
+  const step=i=>{if(i===seq.length){served();return}const [by,tx]=seq[i];dline(by,tx);const t0=Date.now();
+    say(tx.replace(/[“”]/g,'')).then(()=>setTimeout(()=>step(i+1),Math.max(350,(by==='Don Memo'?4200:2300)-(Date.now()-t0))))};
+  setTimeout(()=>step(0),600);
   // Memo walks off to the kitchen and comes back with the food
-  setTimeout(()=>{const w=$('#waiter');if(w){w.style.transform='translateX(700px)';setTimeout(()=>{w.querySelector('.wmenu').style.display='none';w.querySelector('.wtray').style.display=''},1100)}$('#dline').hidden=true},t);
+  const served=()=>{const t=0;setTimeout(()=>{const w=$('#waiter');if(w){w.style.transform='translateX(700px)';setTimeout(()=>{w.querySelector('.wmenu').style.display='none';w.querySelector('.wtray').style.display=''},1100)}$('#dline').hidden=true},t);
   setTimeout(()=>{DIN.served=true;DIN.mine=S.path.f3.slice();
     const w=$('#waiter');
     $('#theirs_f3').innerHTML=Object.values(SEATS).map((s,i)=>plateSVG(MENU.find(m=>m.k===s.dish),s.px,s.py,.82,'plate',i*.25)).join('');
@@ -1156,7 +1164,7 @@ $('#f3go').addEventListener('click',()=>{
     $('#f3hint').textContent='Tap your plates (front of the table) to hear them.';
     if(S.path.f2==='ciudad'&&order.has('cabrito'))setTimeout(()=>{dline('Valeria','“¡Me hizo caso con el cabrito!”');say('¡Me hizo caso con el cabrito!')},2600);
     setTimeout(()=>{$('#f3nx').hidden=false;pushSummary();saveProgress()},2000);
-  },t+1300);
+  },t+1300)};
 });
 
 /* desk bell */
@@ -1243,13 +1251,13 @@ function end3(){const r=S.choice['3r'];
 /* ---------- PUERTA 4 ---------- */
 $$('#g4o1 .opt').forEach(o=>o.addEventListener('click',()=>{
   if(S.choice['4a'])return;const k=o.dataset.k;S.choice['4a']=k;o.classList.add('sel');lockOpts('#g4o1');T('ev_gate_lock',{gate:4,turn:1,choice:k});
-  const t=k==='u'?'“Sí, nací aquí en Monterrey.”':'“Eh… sí, soy de aquí.”';mood('g4m',k==='u'?'smile':'unsure');reply($('#g4rep1'),'Valeria',t);say(t.replace(/[“”]/g,''));
-  setTimeout(()=>{
+  const t=k==='u'?'“Sí, nací aquí en Monterrey.”':'“Eh… sí, soy de aquí.”';mood('g4m',k==='u'?'smile':'unsure');reply($('#g4rep1'),'Valeria',t);const said=say(t.replace(/[“”]/g,''));
+  said.then(()=>setTimeout(()=>{
     mood('g4m','laugh');
     $('#g4switch').innerHTML=`<div class="switch"><span class="bigq">“¡Tutéame!”</span><span class="sub lead">Valeria se ríe: “Ay, ya no estamos en la oficina. Tutéame, por favor.” Diego: “Aquí todos nos hablamos de tú.”</span></div>`;
     say('Ay, ya no estamos en la oficina. Tutéame, por favor.');
     setTimeout(()=>{$('#g4bwrap').hidden=false;$('#g4bwrap').scrollIntoView({behavior:'smooth',block:'center'})},1600);
-  },1100);
+  },300));
 }));
 $$('#g4o2 .opt').forEach(o=>o.addEventListener('click',()=>{
   if(S.choice[4])return;const k=o.dataset.k;S.choice[4]=k;o.classList.add('sel');lockOpts('#g4o2');T('ev_gate_lock',{gate:4,turn:2,choice:k});
@@ -1267,13 +1275,12 @@ $('#g5go').addEventListener('click',()=>{
   if(S.choice[5])return;const v=inp.value.trim().toLowerCase();const h=$('#g5hint');
   if(v==='este'||v==='esta'){h.textContent='Casi. Does it need an accent? Try the accent buttons.';return}
   if(v!=='esté'&&v!=='está'){h.textContent='¿Cuál forma de estar? Hint: is the apartment real yet, or are you still looking?';T('ev_hint',{gate:5,category:'other'});return}
-  h.textContent='';S.choice[5]=v;inp.disabled=true;$('#g5go').disabled=true;T('ev_gate_lock',{gate:5,choice:v==='esté'?1:0});say('Busco un apartamento que '+v+' cerca del estudio.');
-  setTimeout(()=>{
+  h.textContent='';S.choice[5]=v;inp.disabled=true;$('#g5go').disabled=true;T('ev_gate_lock',{gate:5,choice:v==='esté'?1:0});say('Busco un apartamento que '+v+' cerca del estudio.').then(()=>setTimeout(()=>{
     if(v==='esté'){S.conf[5]=1;mood('g5m','smile');reply($('#g5rep'),'Diego','“¡Espérate! Mi primo renta uno a dos cuadras del estudio. Le escribo ahorita.”');say('¡Espérate! Mi primo renta uno a dos cuadras del estudio.');
       setTimeout(()=>{jodi(5,'happy',`<i>Esté</i> says you're still looking for one, any one, as long as it's close. <i>Está</i> would have said you already know which one. Diego only offered his cousin's place because <i>esté</i> told him you needed help.`);finish(5)},900)}
     else{S.conf[5]=0;mood('g5m','unsure');reply($('#g5rep'),'Sofi','“Ah, ¿ya lo encontraste? ¿Cuál es?”');say('Ah, ¿ya lo encontraste? ¿Cuál es?');
       setTimeout(()=>{jodi(5,'thinking',`<i>Está</i> told the table you already have a specific apartment in mind, so nobody offered help. If you're still looking, the subjunctive <i>esté</i> says so: “one that's close, wherever it is.” Same verb, different reality.`);finish(5)},900)}
-  },900);
+  },300));
 });
 
 /* ---------- CARTA ---------- */
