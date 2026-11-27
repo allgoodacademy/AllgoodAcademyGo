@@ -1318,15 +1318,23 @@ test('item banks: five slots, five items per form, the right option first, a rul
     }
 });
 
-test('ESPANOL_CHECKS_ON: on for staging, previews and local; OFF on production and anywhere unexpected', async () => {
+// 2026-11-27: the founder reviewed the item bank and turned the checks on in production.
+// The host rules below still matter if the switch is ever turned off again, so they are tested
+// against a copy of site-config.js with the switch forced off (FLAG_OFF_SRC).
+test('ESPANOL_CHECKS_ON: on in production (founder, 2026-11-27); with the switch off, only staging, previews and local', async () => {
     const vm = await import('node:vm');
     const src = readFileSync(new URL('../public/js/site-config.js', import.meta.url), 'utf8');
-    const flag = (hostname) => { const window = { location: { hostname } }; vm.runInNewContext(src, { window }); return window.AG_CONFIG.ESPANOL_CHECKS_ON; };
+    const offSrc = src.replace('var PRODUCTION_ESPANOL_CHECKS = true;', 'var PRODUCTION_ESPANOL_CHECKS = false;');
+    assert.notEqual(offSrc, src);
+    const flagIn = (code, hostname) => { const window = { location: { hostname } }; vm.runInNewContext(code, { window }); return window.AG_CONFIG.ESPANOL_CHECKS_ON; };
+    for (const h of ['allgoodacademy.com', 'www.allgoodacademy.com', 'allgood-academy.web.app', 'allgood-academy.firebaseapp.com', 'allgood-academy--staging-ba3i7t07.web.app', 'localhost']) {
+        assert.equal(flagIn(src, h), true, `the checks are on for everyone, including "${h}"`);
+    }
     for (const h of ['allgoodacademy.com', 'www.allgoodacademy.com', 'allgood-academy.web.app', 'allgood-academy.firebaseapp.com', 'example.com', '', 'allgood-academy--staging.evil.com']) {
-        assert.equal(flag(h), false, `the checks must be off on "${h}"`);
+        assert.equal(flagIn(offSrc, h), false, `with the switch off, the checks must be off on "${h}"`);
     }
     for (const h of ['allgood-academy--staging-ba3i7t07.web.app', 'allgood-academy--pr97-claude-x-abc123.web.app', 'localhost', '127.0.0.1']) {
-        assert.equal(flag(h), true, `the checks should be on at "${h}"`);
+        assert.equal(flagIn(offSrc, h), true, `the checks should be on at "${h}"`);
     }
     // Nothing in a story or in Mission Control shows the checks without reading the flag.
     const checksSrc = readFileSync(new URL('../public/js/espanol-checks.js', import.meta.url), 'utf8');
@@ -1334,16 +1342,18 @@ test('ESPANOL_CHECKS_ON: on for staging, previews and local; OFF on production a
     // With the flag off, the file stops unless the preview was asked for, and then only starts for an admin.
     assert.match(checksSrc, /if \(!CFG\.checksPreviewAsked \|\| typeof CFG\.espanolChecksFor !== 'function' \|\| !ST\) return;/);
     assert.match(checksSrc, /if \(CFG\.espanolChecksFor\(u\)\) start\(\);/);
-    assert.match(src, /var PRODUCTION_ESPANOL_CHECKS = false;/, 'the production switch stays off until the founder flips it');
+    assert.match(src, /var PRODUCTION_ESPANOL_CHECKS = true;/, 'the founder turned the checks on in production on 2026-11-27');
 });
 
 /* ── Review of #97 (2026-11-27): the admin-only preview, and teacher-only Presentar ───────── */
 const vmod = await import('node:vm');
 const SITE_CONFIG_SRC = readFileSync(new URL('../public/js/site-config.js', import.meta.url), 'utf8');
-const configAt = (hostname, search = '') => { const window = { location: { hostname, search } }; vmod.runInNewContext(SITE_CONFIG_SRC, { window }); return window.AG_CONFIG; };
+// The preview only matters while the production switch is off, so these tests run on a copy with it off.
+const SITE_CONFIG_OFF_SRC = SITE_CONFIG_SRC.replace('var PRODUCTION_ESPANOL_CHECKS = true;', 'var PRODUCTION_ESPANOL_CHECKS = false;');
+const configAt = (hostname, search = '') => { const window = { location: { hostname, search } }; vmod.runInNewContext(SITE_CONFIG_OFF_SRC, { window }); return window.AG_CONFIG; };
 const ADMIN = { email: 'balgood93@gmail.com', emailVerified: true, isAnonymous: false };
 
-test('checks preview on production: only an admin account WITH ?checks=preview sees them', () => {
+test('checks preview on production (switch off): only an admin account WITH ?checks=preview sees them', () => {
     const plain = configAt('allgoodacademy.com');
     const asked = configAt('allgoodacademy.com', '?checks=preview');
     assert.equal(plain.ESPANOL_CHECKS_ON, false);
