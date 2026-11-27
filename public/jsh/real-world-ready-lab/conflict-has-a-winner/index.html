@@ -82,6 +82,7 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
     <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -247,7 +248,7 @@
 
         /* Shared: one instruction bar per Case. Updates as the Case moves through its steps. */
         .step-bar { border-left: 4px solid #C97D1A; background: #FEF3DC; border-radius: 0 12px 12px 0; padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px; }
-        .step-bar .step-num { width: 22px; height: 22px; border-radius: 999px; background: #C97D1A; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+        .step-bar .step-num { width: 22px; height: 22px; border-radius: 999px; background: #A15E0D; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
         .step-bar .step-text { font-size: 13px; color: #4a2f08; line-height: 1.45; }
         .step-bar.done { border-left-color: #059669; background: #ECFDF5; }
         .step-bar.done .step-num { background: #059669; }
@@ -277,7 +278,7 @@
         .chat-line { animation: fadeIn .3s ease-out; }
         .chat-them { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; border-bottom-left-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1f2937; max-width: 85%; }
         .chat-me { background: #FEF3DC; border: 1px solid #F3D9A8; border-radius: 14px; border-bottom-right-radius: 4px; padding: 8px 12px; font-size: 12px; color: #4a2f08; max-width: 85%; margin-left: auto; }
-        .chat-sys { font-size: 10px; text-align: center; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 0; }
+        .chat-sys { font-size: 10px; text-align: center; color: var(--color-ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 0; }
 
         /* ---- Case 2: position-to-need translator ---- */
         .pos-card { transition: transform .5s ease, opacity .5s ease, border-color .3s ease; }
@@ -313,8 +314,8 @@
         .audit-row.is-amber { border-color: #D97706; background: #FFFBEB; }
         .audit-row.is-green { border-color: #059669; background: #ECFDF5; }
         .audit-btn { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 6px 10px; border-radius: 999px; border: 1px solid #d1d5db; background: #fff; color: #4b5563; transition: all .15s ease; }
-        .audit-btn:hover { border-color: #C97D1A; color: #A8620E; }
-        .audit-btn.on { background: #C97D1A; border-color: #C97D1A; color: #fff; }
+        .audit-btn:hover { border-color: #C97D1A; color: #A15E0D; }
+        .audit-btn.on { background: #A15E0D; border-color: #A15E0D; color: #fff; }
         .audit-row.is-green .audit-btn { pointer-events: none; }
         .audit-row.is-green .audit-btn.on { background: #059669; border-color: #059669; }
         #c4-outcome { animation: fadeIn .5s ease-out; }
@@ -509,7 +510,7 @@ body.present .nav-shell.activity{display:none}
                         <strong id="whiteboard-title" class="text-amber-300 block text-sm font-heading"></strong>
                         <p id="whiteboard-desc" class="text-slate-300 leading-relaxed"></p>
                     </div>
-                    <button id="jodi-recall" onclick="window.recallJodi()" class="hidden w-full text-[10px] font-bold uppercase tracking-widest text-gb-accent hover:text-gb-accent-dark py-1 mb-2 items-center justify-center gap-1">
+                    <button id="jodi-recall" onclick="window.recallJodi()" class="hidden w-full text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark hover:text-gb-accent-dark py-1 mb-2 items-center justify-center gap-1">
                         <i data-lucide="rotate-ccw" class="w-3 h-3"></i> <span id="jodi-recall-label">Re-read what Jodi said</span>
                     </button>
                 </div>
@@ -523,7 +524,7 @@ body.present .nav-shell.activity{display:none}
                 <div class="page" id="page-1">
                     <div class="page-inner">
                     <div class="max-w-2xl mx-auto pt-8 px-4 sm:px-8 flex flex-col justify-center py-4">
-                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 1</span>
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 1</span>
                         <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1 mb-4">Conflict Has a Winner</h2>
                         <p class="text-sm text-gray-600 mb-4 leading-relaxed">Five arguments, one person. Theo is right in some of them and wrong in one, and in every single one the question isn't who wins &mdash; it's whether there was another way through that nobody went looking for.</p>
                         <div class="mb-6 card-shimmer rounded-xl p-4 border flex items-center gap-3">
@@ -576,7 +577,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 2</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 2</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Unspoken Need</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Group project, three weeks, two people. Theo and Sam want different topics, and both of them have stopped listening. Two positions are on the table. Neither one is the actual problem.</p>
                         </div>
@@ -607,7 +608,7 @@ body.present .nav-shell.activity{display:none}
 
                         <!-- Appears only once both real needs are on the table. -->
                         <div id="c2-door" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">Now look for the door</p>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-1">Now look for the door</p>
                             <p class="text-sm font-bold text-gray-900 mb-3">Is there an option that gives both of them that?</p>
                             <div id="door-options" class="space-y-2"></div>
                         </div>
@@ -645,7 +646,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 3</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 3</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Cost of Being Right</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Project group chat, six people. Jonah has just told everyone Theo's wrong about the trip form deadline. Theo has the form in front of him. It says Friday. <strong>Theo is right.</strong></p>
                         </div>
@@ -682,7 +683,7 @@ body.present .nav-shell.activity{display:none}
                         <div id="c3-replies" class="space-y-2 mb-3"></div>
 
                         <div id="c3-final" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-3">Frozen, side by side</p>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-3">Frozen, side by side</p>
                             <div class="grid grid-cols-2 gap-3 text-center">
                                 <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3"><p class="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Right</p><p class="text-2xl font-heading font-bold text-emerald-800">100%</p></div>
                                 <div class="rounded-xl bg-gb-accent-light border border-gb-accent/30 p-3"><p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark">Effective</p><p class="text-2xl font-heading font-bold text-gb-accent-dark" id="c3-final-work">100%</p></div>
@@ -715,7 +716,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 4</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 4</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">The Apology That Isn't Great</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Ravi told three people something Theo had told him privately &mdash; that he'd failed the swim test. Theo found out. He was upset, and said so. A day later, this arrived.</p>
                         </div>
@@ -737,7 +738,7 @@ body.present .nav-shell.activity{display:none}
                         <div id="c4-audit" class="space-y-2 mb-3"></div>
 
                         <div id="c4-response" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-1">One out of four. What does he do with that?</p>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-1">One out of four. What does he do with that?</p>
                             <p class="text-xs text-gray-500 mb-3">All three are real moves. None of them is marked wrong.</p>
                             <div id="c4-responses" class="space-y-2"></div>
                         </div>
@@ -772,7 +773,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 5</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 5</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">Both of Them Want You</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Amira and Jess fell out in the group chat on Sunday. Both of them are Theo's friends. Both of them have messaged him separately, and both of them want the same thing.</p>
                         </div>
@@ -793,13 +794,13 @@ body.present .nav-shell.activity{display:none}
                         <div id="c5-third" class="is-grey card-shimmer rounded-2xl border-2 border-dashed border-gray-300 p-4 mb-3">
                             <p class="text-[10px] font-bold uppercase tracking-widest text-ink-soft mb-1" id="c5-third-tag">&hellip;something else?</p>
                             <p class="text-sm text-gray-500 leading-relaxed" id="c5-third-text">Read both threads first.</p>
-                            <button id="c5-third-btn" onclick="window.declineFrame()" class="hidden mt-3 w-full items-center justify-center gap-2 bg-gb-accent hover:bg-gb-accent-dark text-white font-bold px-5 py-2.5 rounded-full text-xs uppercase tracking-widest transition-transform hover:scale-105">
+                            <button id="c5-third-btn" onclick="window.declineFrame()" class="hidden mt-3 w-full items-center justify-center gap-2 bg-gb-accent-dark hover:bg-gb-accent-dark text-white font-bold px-5 py-2.5 rounded-full text-xs uppercase tracking-widest transition-transform hover:scale-105">
                                 Send this to both of them
                             </button>
                         </div>
 
                         <div id="c5-standing" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-3">Where things stand</p>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-3">Where things stand</p>
                             <div class="grid grid-cols-2 gap-3 mb-3">
                                 <div class="rounded-xl bg-white border border-gray-200 p-3"><p class="text-xs font-bold text-gray-900 mb-1">Amira</p><span id="stand-amira" class="standing warm">Warm</span><p id="stand-amira-note" class="text-[11px] text-gray-500 mt-2 leading-snug"></p></div>
                                 <div class="rounded-xl bg-white border border-gray-200 p-3"><p class="text-xs font-bold text-gray-900 mb-1">Jess</p><span id="stand-jess" class="standing warm">Warm</span><p id="stand-jess-note" class="text-[11px] text-gray-500 mt-2 leading-snug"></p></div>
@@ -832,7 +833,7 @@ body.present .nav-shell.activity{display:none}
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-6 px-4 sm:px-8 flex flex-col justify-center py-4">
                         <div class="mb-5">
-                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent">Case 6</span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark">Case 6</span>
                             <h2 class="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mt-1">When You're the One Who's Wrong</h2>
                             <p class="text-sm text-gray-600 mt-2 leading-relaxed">Theo has been telling Nia that movie night is Saturday. Three messages in, she sends the screenshot. It says Friday. He's read it. He knows.</p>
                         </div>
@@ -861,7 +862,7 @@ body.present .nav-shell.activity{display:none}
                         <div id="c6-replies" class="space-y-2 mb-3"></div>
 
                         <div id="c6-compare" class="hidden card-shimmer rounded-2xl border-2 border-gb-accent/40 p-4 mb-3">
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent mb-3">Same three words, different price</p>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-3">Same three words, different price</p>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3"><p class="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">If he'd conceded on turn 1</p><p class="text-xs text-gray-800 italic">"That's my bad, you're right."</p><p class="text-[11px] font-bold text-emerald-800 mt-2">Cost: nothing</p></div>
                                 <div class="rounded-xl bg-gb-accent-light border border-gb-accent/30 p-3"><p class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark mb-1" id="c6-compare-when">What he actually did</p><p class="text-xs text-gray-800 italic" id="c6-compare-msg"></p><p class="text-[11px] font-bold text-gb-accent-dark mt-2" id="c6-compare-cost"></p></div>
@@ -892,7 +893,7 @@ body.present .nav-shell.activity{display:none}
                 <div class="page" id="page-7">
                     <div class="page-inner">
                     <div class="max-w-3xl mx-auto pt-10 px-4 sm:px-8 flex flex-col justify-center py-4 items-center text-center">
-                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent mb-3">Case 7</span>
+                        <span class="text-xs font-bold uppercase tracking-widest text-gb-accent-dark mb-3">Case 7</span>
 
                         <div id="case7-rating" class="mb-6 w-full max-w-md">
                             <h2 class="text-2xl font-heading font-bold text-gray-900 mb-1">Before You Go</h2>
@@ -925,7 +926,7 @@ body.present .nav-shell.activity{display:none}
                                 <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-gb-accent-light to-amber-100 border-4 border-gb-accent/40 shadow-inner flex items-center justify-center">
                                     <i data-lucide="merge" class="w-10 h-10 text-gb-accent-dark drop-shadow-sm"></i>
                                 </div>
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-gb-accent block mb-1">MINTED IN DOSSIER</span>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-gb-accent-dark block mb-1">MINTED IN DOSSIER</span>
                                 <h3 class="text-xl font-heading font-bold text-gray-900 mb-1">Conflict Has a Winner Foundation</h3>
                                 <!-- 8 = 'conflict' scenarios in the Real World Ready Challenge SCENARIO_DATA.
                                      Counted against the coverage map, not estimated. This counts Challenge
@@ -961,7 +962,7 @@ body.present .nav-shell.activity{display:none}
         <!-- HOME MODAL -->
         <div id="system-menu-modal" class="hidden-modal absolute inset-0 z-[250] bg-allgood-dark/70 flex items-center justify-center p-6 modal-transition backdrop-blur-sm">
             <div class="bg-jodi-warmth rounded-lg shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-gb-accent">
-                <div class="mb-4"><i data-lucide="home" class="w-10 h-10 mx-auto text-gb-accent"></i></div>
+                <div class="mb-4"><i data-lucide="home" class="w-10 h-10 mx-auto text-gb-accent-dark"></i></div>
                 <h2 class="text-xl font-heading font-bold text-allgood-dark mb-2">Where to, Agent?</h2>
                 <p class="text-sm text-gray-500 mb-6 font-body">You can pick this back up anytime.</p>
                 <div class="space-y-3">
@@ -1679,7 +1680,7 @@ body.present .nav-shell.activity{display:none}
                 return `<div class="inbox ${open ? 'is-open' : ''} ${dim ? 'is-dim' : ''}" id="inbox-${k}">
                     <div class="flex items-center justify-between px-3 py-2 border-b border-gray-100">
                         <span class="text-xs font-bold text-gray-900">${t.name}</span>
-                        ${open ? `<span class="text-[9px] font-bold uppercase tracking-widest text-gb-accent-dark">read</span>` : `<button class="text-[10px] font-bold uppercase tracking-widest text-white bg-gb-accent hover:bg-gb-accent-dark rounded-full px-3 py-1" onclick="window.openInbox('${k}')">Open</button>`}
+                        ${open ? `<span class="text-[9px] font-bold uppercase tracking-widest text-gb-accent-dark">read</span>` : `<button class="text-[10px] font-bold uppercase tracking-widest text-white bg-gb-accent-dark hover:bg-gb-accent-dark rounded-full px-3 py-1" onclick="window.openInbox('${k}')">Open</button>`}
                     </div>
                     <div class="p-3">
                         <p class="inbox-peek text-xs text-gray-500">${esc(t.msgs[0])} ${esc(t.msgs[1])}</p>

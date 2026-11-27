@@ -45,7 +45,7 @@ Around them:
 
 ## Type
 
-Two self-hosted, open-license (SIL OFL) fonts. **Gelasio** for display (headings, big numbers, titles), built to match Georgia's metrics. **Atkinson Hyperlegible Next** for everything you read or tap, made by the Braille Institute for low-vision readability. Both are served from allgoodacademy.com itself (`/assets/fonts/`, declared in `public/assets/css/fonts.css`), never from a font CDN, so a district filter can't block the text. Georgia and Verdana stay next in the fallback chain.
+Two self-hosted, open-license (SIL OFL) fonts. **Gelasio** for display (headings, big numbers, titles), built to match Georgia's metrics. **Atkinson Hyperlegible Next** for everything you read or tap, made by the Braille Institute for low-vision readability. Both are served from allgoodacademy.com itself (`/assets/fonts/`, declared in `public/assets/css/fonts.css`), never from a font CDN, so a district filter can't block the text. Georgia and Verdana stay next in the fallback chain. While the fonts load, every device paints a metric-matched stand-in (Georgia / Verdana resized on Mac, Windows and iPad; Tinos / Arimo resized on Chromebooks), so text doesn't re-wrap or jump when the real face arrives (AA-6, 2026-11-27).
 
 **Why self-hosted (done 2026-11-26, AA-1):** Georgia and Verdana come with Windows, Mac, iPad and iPhone. **Chromebooks don't include them.** ChromeOS ships its own core fonts (Arimo, Tinos, Cousine), so on a Chromebook the page falls back down the chain: headings become Tinos (a Times New Roman look-alike) and body text becomes ChromeOS's default sans-serif. Text always loads and stays readable, but most students (on Chromebooks) see a plainer version than the design shows. The fix, if wanted: self-host open-license fonts from allgoodacademy.com itself (filter-safe because they come from our own domain), such as Gelasio (built to match Georgia's sizing). The founder chose that fix (2026-11-25) and it has shipped: Chromebooks now see Gelasio and Atkinson Hyperlegible Next, with metric-matched Tinos/Arimo fallback faces so text doesn't jump while the fonts load.
 
@@ -432,7 +432,7 @@ Every sim is its own world. Before one is built, the Art Director writes its the
 | `accent-professional-brand-dark` | #5E2C6E |  | Pressed/hover for Professional Brand. |
 | `accent-professional-brand-light` | #F3E8F9 |  | Tint for Professional Brand. |
 | `accent-real-world-ready` | #C97D1A |  | Real World Ready Lab Pack amber, shared by all its GoodBlocks. Fill only: 3.3:1 as text — use the -dark for text. |
-| `accent-real-world-ready-dark` | #A8620E |  | Real World Ready text/pressed (4.75:1). |
+| `accent-real-world-ready-dark` | #A15E0D |  | Real World Ready text/pressed (5.09:1 on white, 4.63:1 on the -light tint). Was #A8620E until 2026-11-27 (AA-6): 4.32:1 on the tint. |
 | `accent-real-world-ready-light` | #FEF3DC |  | Real World Ready tint. |
 | `accent-room-to-think` | #9B3B5A |  | Room to Think Lab Pack berry, shared by all its GoodBlocks (6.6:1). |
 | `accent-room-to-think-dark` | #7A2B45 |  | Room to Think pressed. |

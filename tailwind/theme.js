@@ -21,6 +21,9 @@ module.exports = {
         'allgood-light': '#F7F7F7',
         'allgood-hover': '#EB8D69',
         'allgood-accent': '#2D6473',
+        // Small orange TEXT on light tints (orange-50, gray-50): the primary is 4.3-4.4:1
+        // there, this is 5.4:1+. Mirrors --color-orange-deep. Added 2026-11-27 (AA-6).
+        'allgood-primary-deep': '#B23A0F',
         // Secondary text that still passes AA: 4.6-5.3:1 on the canvas, white and
         // cream. Replaces Tailwind's text-gray-400 (#9CA3AF, 2.54:1 on white).
         'ink-soft': '#5C6E75',
@@ -35,7 +38,9 @@ module.exports = {
         // docs/goodblocks/real-world-ready-coverage-map.md, Q2).
         'rwr-accent': '#C97D1A',
         'rwr-accent-light': '#FEF3DC',
-        'rwr-accent-dark': '#A8620E',
+        // -dark is the text shade. Darkened from #A8620E on 2026-11-27 (AA-6): small text
+        // on the -light tint was 4.32:1; now 4.63:1 there and 5.09:1 on white.
+        'rwr-accent-dark': '#A15E0D',
         // Room to Think Lab Pack. Same structure and same reasoning as the Real World
         // Ready triplet above: one Lab-Pack accent, four Lucide icons, so this is shared
         // theme rather than a per-GoodBlock gb-accent-*.
@@ -46,9 +51,10 @@ module.exports = {
     // Fallback chains match --font-display / --font-ui in
     // public/assets/css/design-tokens.css; check-tokens.js enforces that.
     // Gelasio and Atkinson Hyperlegible Next are self-hosted (public/assets/css/fonts.css);
-    // the "Fallback" names are metric-matched faces defined there for Chromebooks.
+    // the "Fallback" names are metric-matched faces defined there: Georgia/Verdana-based
+    // for Mac/Windows/iPad, Tinos/Arimo-based for Chromebooks (AA-6).
     fontFamily: {
-        heading: ['Gelasio', 'Georgia', 'Gelasio Fallback', 'Times New Roman', 'serif'],
-        body: ['Atkinson Hyperlegible Next', 'Verdana', 'Atkinson Hyperlegible Next Fallback', 'Geneva', 'sans-serif'],
+        heading: ['Gelasio', 'Gelasio Fallback', 'Georgia', 'Gelasio Chromebook Fallback', 'Times New Roman', 'serif'],
+        body: ['Atkinson Hyperlegible Next', 'Atkinson Fallback', 'Verdana', 'Atkinson Chromebook Fallback', 'Geneva', 'sans-serif'],
     },
 };

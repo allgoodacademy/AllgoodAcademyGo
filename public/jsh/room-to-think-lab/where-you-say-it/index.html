@@ -68,6 +68,7 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
     <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -194,7 +195,7 @@
         /* Shared chat furniture. Every Case in this GoodBlock is a room with people in it. */
         .chat-them { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; border-bottom-left-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1f2937; max-width: 88%; }
         .chat-me { background: #FBEAF0; border: 1px solid #EBC6D3; border-radius: 14px; border-bottom-right-radius: 4px; padding: 8px 12px; font-size: 12px; color: #4a1224; max-width: 88%; margin-left: auto; }
-        .chat-sys { font-size: 10px; text-align: center; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 0; }
+        .chat-sys { font-size: 10px; text-align: center; color: var(--color-ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 0; }
         .chat-line { animation: fadeIn .3s ease-out; }
         .who-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; border-radius: 999px; padding: 2px 8px; }
         .who-pill.removed { background: #FEF2F2; color: #b91c1c; border-color: #FECACA; text-decoration: line-through; }
@@ -207,7 +208,7 @@
         .room-card:active { transform: scale(.99); }
         .room-card.is-used { background: #FDF4F7; border-color: #9B3B5A; }
         .room-title { font-size: 13px; font-weight: 700; color: #111827; }
-        .room-who { font-size: 10.5px; color: #6b7280; margin-top: 4px; }
+        .room-who { font-size: 10.5px; color: var(--color-ink-soft); margin-top: 4px; }
         .thread-box { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 10px 12px; }
         .thread-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #9B3B5A; margin-bottom: 6px; }
         .fixed-msg { background: #0f172a; color: #f8fafc; border-radius: 12px; padding: 12px 14px; font-size: 12.5px; line-height: 1.5; }
@@ -249,7 +250,7 @@
         .draft { border: 2px solid #E5E7EB; border-radius: 14px; background: #fff; padding: 14px; transition: border-color .18s ease, box-shadow .18s ease; }
         .draft.is-sent { border-color: #059669; background: #ECFDF5; }
         .draft.is-other { opacity: .72; }
-        .draft-to { font-size: 10px; color: #6b7280; font-family: ui-monospace, monospace; }
+        .draft-to { font-size: 10px; color: var(--color-ink-soft); font-family: ui-monospace, monospace; }
         .draft-body { font-size: 12px; color: #1f2937; line-height: 1.5; margin-top: 8px; }
         .diff-mark { background: #FEF08A; border-radius: 3px; padding: 0 2px; box-shadow: 0 0 0 1px #FDE047; }
         .cc-line { font-size: 10px; font-family: ui-monospace, monospace; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e5e7eb; }
@@ -1622,6 +1623,8 @@ body.present .nav-shell.activity{display:none}
                 if (c) c.textContent = `${c5ChannelIndex} since Thursday`;
             };
             push();
+            // Reduced motion (AA-6): instead of ticking on its own, it adds one line each time the student taps or clicks anywhere — the same pressure, tied to their own pace, nothing running by itself.
+            if (window.AG_REDUCED_MOTION) { c5ChannelTimer = 'tap'; document.addEventListener('click', push); return; }
             c5ChannelTimer = setInterval(push, 3200);
         }
 

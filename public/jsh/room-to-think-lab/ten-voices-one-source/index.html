@@ -84,6 +84,8 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
+    <script src="/js/time-limits.js"></script>
     <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -272,16 +274,20 @@
         .feed-post { border-bottom: 1px solid #f1f5f9; padding: 12px 14px; }
         .feed-avatar { width: 30px; height: 30px; border-radius: 999px; background: #FBEAF0; color: #7A2B45; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .feed-handle { font-size: 11px; font-weight: 700; color: #111827; }
-        .feed-time { font-size: 9px; color: #9ca3af; }
+        .feed-time { font-size: 9px; color: var(--color-ink-soft); }
         .feed-body { font-size: 12px; color: #1f2937; line-height: 1.45; margin-top: 6px; }
-        .feed-attr { font-size: 9.5px; color: #9ca3af; margin-top: 6px; font-style: italic; }
-        .feed-ghost { opacity: .35; }
+        .feed-attr { font-size: 9.5px; color: var(--color-ink-soft); margin-top: 6px; font-style: italic; }
+        /* The next post still loading in. It reads as faded through a grey card and grey
+           ink, not opacity, so its text stays at 4.5:1+ (AA-6; opacity .35 was 1.3-2.2:1). */
+        .feed-ghost { background: #F9FAFB; }
+        .feed-ghost .feed-handle, .feed-ghost .feed-body { color: var(--color-ink-soft); }
+        .feed-ghost .feed-avatar { background: #EEF0F2; color: var(--color-ink-soft); }
 
         /* ---- Case 2: self-set belief threshold (registry #29) ---- */
         #c2-feed { max-height: 340px; overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; }
         #c2-feed .feed-post { animation: fadeIn .35s ease-out; }
-        #c2-feed.is-frozen { opacity: .82; }
-        .c2-empty { padding: 28px 14px; text-align: center; font-size: 12px; color: #9ca3af; font-style: italic; }
+        #c2-feed.is-frozen { background: #F9FAFB; } /* frozen = greyed card, not opacity, so its text keeps 4.5:1 (AA-6) */
+        .c2-empty { padding: 28px 14px; text-align: center; font-size: 12px; color: var(--color-ink-soft); font-style: italic; }
         .believe-btn { width: 100%; border: 2px solid #9B3B5A; background: #FBEAF0; color: #7A2B45; border-radius: 14px; padding: 14px 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; transition: all .15s ease; }
         .believe-btn:hover:not(:disabled) { background: #9B3B5A; color: #fff; }
         .believe-btn:active:not(:disabled) { transform: scale(.985); }
@@ -314,10 +320,10 @@
         .src-card.is-lifted { border-color: #059669; background: #ECFDF5; box-shadow: 0 10px 22px -10px rgba(5,150,105,.6); transform: translateY(-3px); }
         .src-handle { font-size: 11px; font-weight: 700; color: #111827; }
         .src-claim { font-size: 12px; color: #1f2937; line-height: 1.4; margin-top: 3px; }
-        .src-attr { font-size: 9.5px; color: #9ca3af; font-style: italic; margin-top: 5px; }
+        .src-attr { font-size: 9.5px; color: var(--color-ink-soft); font-style: italic; margin-top: 5px; }
         .stack-badge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; background: #9B3B5A; color: #fff; border-radius: 999px; padding: 2px 7px; }
         .stack-members { margin-top: 8px; border-top: 1px dashed #E5B9C8; padding-top: 8px; animation: fadeIn .3s ease-out; }
-        .stack-member { font-size: 10.5px; color: #6b7280; padding: 3px 0; }
+        .stack-member { font-size: 10.5px; color: var(--color-ink-soft); padding: 3px 0; }
         .merge-log { font-size: 11.5px; line-height: 1.5; border-left: 3px solid #d1d5db; padding: 6px 10px; margin-top: 6px; color: #4b5563; animation: fadeIn .3s ease-out; }
         .merge-log.good { border-left-color: #059669; background: #ECFDF5; color: #065f46; }
         .merge-log.apart { border-left-color: #b45309; background: #FFFBEB; color: #92400e; }
@@ -601,6 +607,7 @@ body.present .nav-shell.activity{display:none}
                             </div>
                             <div class="sm:col-span-2 flex flex-col gap-3">
                                 <button id="c2-start-btn" onclick="window.startCase2Feed()" class="small-btn primary w-full py-3">Start the morning</button>
+                                <div id="c2-time"></div>
                                 <button id="c2-believe-btn" onclick="window.pressBelieve()" class="believe-btn" disabled>I'd believe it now</button>
                                 <div id="c2-readout" class="card-shimmer rounded-2xl border p-4 text-gray-500 italic text-xs">Your number will show up here.</div>
                             </div>
@@ -1195,7 +1202,7 @@ body.present .nav-shell.activity{display:none}
         // reset) can cancel it. Case 2's feed ticks go through it too.
         let pendingTimers = [];
         function scheduleUI(fn, ms) { const id = setTimeout(fn, ms); pendingTimers.push(id); return id; }
-        function clearPendingUI() { pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+        function clearPendingUI() { pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; if (c2Clock) { c2Clock.stop(); c2Clock = null; } }
         window._clearPendingUI = clearPendingUI;
 
         // THE feedback call for every Case. On desktop the bubble tucks behind the whiteboard
@@ -1294,7 +1301,12 @@ body.present .nav-shell.activity{display:none}
         let c2Frozen = false;
         let c2Timers = [];
 
-        function c2ClearTimers() { c2Timers.forEach(id => clearTimeout(id)); c2Timers = []; }
+        // The feed runs on an AGTime clock (/js/time-limits.js, AA-6): a post every 1.8s as
+        // before, and the window still closes the moment post nine lands unless the student
+        // adds time ("+ more time" keeps the button live after post nine) or turns the timer
+        // off (then "Stop the feed" ends it when they're ready). #present: Pause / +30s / Off.
+        var c2Clock = null;
+        function c2ClearTimers() { c2Timers.forEach(id => clearTimeout(id)); c2Timers = []; if (c2Clock) { c2Clock.stop(); c2Clock = null; } }
         // Case 2's own timers are registered with the shared scheduler as well, so
         // advanceFromPage()/the Case menu cancel them too. Belt and braces on purpose: a feed
         // tick that outlives the Case would append a post to a panel the student has left.
@@ -1325,18 +1337,30 @@ body.present .nav-shell.activity{display:none}
             document.getElementById('c2-status').textContent = 'Posts arriving';
             window.setStep(2, 1, 'Watch them land. <strong>Press the moment you\'d believe it</strong> — not when you\'re certain.');
 
-            for (let i = 0; i < YARA_POSTS.length; i++) {
-                c2Schedule(() => {
-                    if (c2Frozen) return;
-                    c2PostsShown = i + 1;
-                    c2RenderPost(i);
-                    // Armed only once something is actually on screen: pressing "I'd believe
-                    // it now" against an empty feed would log a number that counted nothing.
-                    document.getElementById('c2-believe-btn').disabled = false;
-                    document.getElementById('c2-status').textContent = `${c2PostsShown} of 9 posts`;
-                    if (c2PostsShown === YARA_POSTS.length) c2FeedRanOut();
-                }, C2_TICK_MS * (i + 1));
-            }
+            const showPost = (i) => {
+                if (c2Frozen) return;
+                c2PostsShown = i + 1;
+                c2RenderPost(i);
+                // Armed only once something is actually on screen: pressing "I'd believe
+                // it now" against an empty feed would log a number that counted nothing.
+                document.getElementById('c2-believe-btn').disabled = false;
+                document.getElementById('c2-status').textContent = `${c2PostsShown} of 9 posts`;
+            };
+            c2Clock = AGTime.countdown({
+                seconds: C2_TICK_MS * YARA_POSTS.length / 1000,
+                tickMs: 200,
+                mount: document.getElementById('c2-time'),
+                endLabel: 'Stop the feed',
+                onTick: (t) => {
+                    const due = Math.min(YARA_POSTS.length, Math.floor((t.elapsed * 1000 + 1) / C2_TICK_MS));
+                    while (!c2Frozen && c2PostsShown < due) showPost(c2PostsShown);
+                },
+                onExpire: () => {
+                    c2Clock = null;
+                    while (!c2Frozen && c2PostsShown < YARA_POSTS.length) showPost(c2PostsShown);
+                    c2FeedRanOut();
+                }
+            });
         };
 
         // Route A: the student pressed. N is whatever was on screen.
@@ -1627,11 +1651,14 @@ body.present .nav-shell.activity{display:none}
         let c3RepostTimer = null;
         function startRepostTicker() {
             if (c3RepostTimer) return;
-            c3RepostTimer = setInterval(() => {
+            const bump = () => {
                 c3Reposts += Math.floor(Math.random() * 3) + 1;
                 const el = document.getElementById('c3-reposts');
                 if (el) el.textContent = c3Reposts;
-            }, 2600);
+            };
+            // Reduced motion (AA-6): instead of ticking on its own, it climbs one step each time the student taps or clicks anywhere — the same pressure, tied to their own pace, nothing running by itself.
+            if (window.AG_REDUCED_MOTION) { c3RepostTimer = 'tap'; document.addEventListener('click', bump); return; }
+            c3RepostTimer = setInterval(bump, 2600);
         }
 
         const case3Board = makeMergeBoard({

@@ -18,6 +18,7 @@
      unchanged; only the destination lookup moved out of this file. -->
 <script type="module" src="/js/skill-routing.js"></script>
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
     <link rel="stylesheet" href="/assets/css/fonts.css">
     <link rel="stylesheet" href="/assets/css/tablet-chassis.css">
 <style>
@@ -199,7 +200,7 @@
     cursor: pointer; transition: opacity 0.15s, transform 0.1s;
   }
   .start-btn:hover { opacity: 0.9; transform: scale(1.02); }
-  .wordmark { font-family: var(--font-display); font-size: 0.8rem; color: rgba(255,255,255,0.2); margin-top: 16px; letter-spacing: 0.04em; }
+  .wordmark { font-family: var(--font-display); font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 16px; letter-spacing: 0.04em; }
 
   /* ── GAME (no timer — this game is deliberate, not fast) ── */
   #game { display: none; width: 100%; max-width: 540px; margin: auto 0; flex-direction: column; align-items: center; }
@@ -217,7 +218,7 @@
   .card-avatar { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
   .card-meta { flex: 1; min-width: 0; }
   .card-who { font-size: 12px; font-weight: 700; color: var(--color-dark); }
-  .card-context { font-size: 10px; color: #8a9fac; }
+  .card-context { font-size: 10px; color: var(--color-ink-soft); }
   .card-category { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.04em; white-space: nowrap; }
   .card-body { padding: 18px; }
   .card-situation { font-size: 14px; color: var(--color-dark); line-height: 1.6; margin-bottom: 12px; font-family: var(--font-display); }
@@ -227,7 +228,7 @@
   .choice-btn { padding: 16px 12px; border: none; border-radius: 14px; font-family: var(--font-ui); font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.1s; display: flex; flex-direction: column; align-items: center; gap: 7px; letter-spacing: 0.01em; }
   .choice-btn:hover { transform: scale(1.03); }
   .choice-btn .icon { font-size: 22px; }
-  .btn-smart { background: var(--smart-bg); color: var(--smart); }
+  .btn-smart { background: var(--smart-bg); color: color-mix(in srgb, var(--smart) 85%, var(--color-ink)); } /* 4.48 → 5.3:1 (AA-6) */
   .btn-costly { background: var(--costly-bg); color: var(--costly); }
   .hint { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
 
@@ -235,7 +236,9 @@
   #consequence { display: none; width: 100%; max-width: 540px; margin: auto 0; flex-direction: column; align-items: center; }
   .consequence { width: 100%; animation: cardIn 0.4s ease; text-align: center; }
   .consequence-icon { font-size: 44px; margin-bottom: 14px; display: block; }
-  .consequence-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 10px; }
+  /* The verdict colour is a bar beside white text: the colours themselves are under
+     4.5:1 on the dark shell (AA-6). */
+  .consequence-label { color: #fff !important; border-left: 4px solid; padding-left: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 10px; }
   .consequence-scene { background: rgba(255,255,255,0.05); border-radius: 14px; padding: 20px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.75; margin-bottom: 14px; text-align: left; font-family: var(--font-display); }
   .consequence-mechanism { font-size: 11px; color: var(--muted); line-height: 1.65; margin-bottom: 20px; padding: 14px 16px; background: rgba(255,255,255,0.04); border-radius: 12px; text-align: left; }
   .next-btn { background: var(--teal); color: white; border: none; padding: 13px 32px; border-radius: 50px; font-family: var(--font-ui); font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; }
@@ -250,10 +253,10 @@
   .end-row-label { color: var(--muted); }
   .end-row-val { font-weight: 700; color: var(--cream); }
   .jodi-moment { width: 100%; background: var(--teal); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; text-align: left; }
-  .jodi-moment-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; margin-bottom: 6px; }
+  .jodi-moment-label { font-size: 10px; font-weight: 700; color: #fff; letter-spacing: 0.08em; margin-bottom: 6px; }
   .jodi-moment-text { font-family: var(--font-display); font-size: 13px; color: white; line-height: 1.65; font-style: italic; }
   .deeper-card { width: 100%; background: rgba(53,120,137,0.14); border: 1px solid rgba(53,120,137,0.35); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; text-align: left; }
-  .deeper-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.08em; margin-bottom: 8px; }
+  .deeper-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.75); letter-spacing: 0.08em; margin-bottom: 8px; }
   .deeper-msg { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.65; margin-bottom: 14px; }
   .deeper-btn { background: var(--teal); color: white; border: none; padding: 12px; border-radius: 50px; font-family: var(--font-ui); font-size: 12px; font-weight: 700; cursor: pointer; width: 100%; }
   .play-again-btn { background: var(--orange); color: white; border: none; padding: 14px; border-radius: 50px; font-family: var(--font-ui); font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 8px; }
@@ -935,7 +938,7 @@ function showConsequence(data, correct, pick) {
   el.innerHTML = `
     <div class="consequence">
       <span class="consequence-icon">${verdictIcon}</span>
-      <div class="consequence-label" style="color:${verdictColor}">${verdictText}</div>
+      <div class="consequence-label" style="border-color:${verdictColor}">${verdictText}</div>
       <div class="consequence-scene">${data.scene}</div>
       <div class="consequence-mechanism">${data.mechanism}</div>
       <button class="next-btn" onclick="nextScenario()">${currentIdx < session.length - 1 ? 'Next situation →' : 'See results'}</button>

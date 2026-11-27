@@ -7,6 +7,8 @@
 <meta name="description" content="A savings simulation for grades 7–9. Roll a snowball down the hill of your life and find out why starting early beats saving more later.">
 <meta name="standards" content="NSPFE Saving 8-4, 8-5; Investing 8-6, 8-7; CCSS 7.RP.A.3, 8.F.A.3, HSF-LE.A.1, HSF-LE.A.3; CASEL Responsible Decision-Making">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
+<script src="/js/canvas-fonts.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 
 <style>
@@ -127,6 +129,7 @@ body.present .q{font-size:21px}
 .choice[aria-pressed="true"] .ltr{background:var(--accent);color:var(--color-surface)}
 .choice .big{display:block;font-family:var(--font-display);font-weight:700;font-size:17px}
 .choice .sm{display:block;font-size:13.5px;color:var(--ink2)}
+.choice[aria-pressed="true"] .sm{color:var(--ink)} /* ink2 is 4.47:1 on the --sel tint (AA-6) */
 .choice .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:4px;background:var(--accent);color:var(--color-surface)}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .btn{border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:9px 16px;cursor:pointer;font-weight:700;min-height:44px}
@@ -1170,6 +1173,7 @@ document.addEventListener("keydown", function(e){
 
 /* ---------- go ---------- */
 const ro=new ResizeObserver(function(){ resize(); draw(0); }); ro.observe(cv);
+if(window.AGFonts) AGFonts.ready(function(){ resize(); draw(0); }); // redraw canvas text in the web fonts (AA-6)
 resize(); enterStep(0); readout(true);
 requestAnimationFrame(loop);
 if(location.hash==="#present") setPresent(true);

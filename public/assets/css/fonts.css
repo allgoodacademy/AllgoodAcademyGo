@@ -33,10 +33,15 @@
      install; every one of those faces points at the same URL, so the browser
      downloads it once.
    - The "Fallback" faces are metric-matched stand-ins (size-adjust /
-     ascent-override) for the fonts a Chromebook falls back to while the woff2
-     loads: Tinos (= Times New Roman metrics) and Arimo (= Arial metrics). They
-     sit in --font-display / --font-ui after Georgia / Verdana, so text does not
-     jump when the real face swaps in. Values printed by scripts/build-fonts.py.
+     ascent-override) for whatever paints while the woff2 loads, so text does not
+     re-wrap or jump when the real face swaps in:
+       'Gelasio Fallback' / 'Atkinson Fallback'      Georgia / Verdana
+                                                     (Mac, Windows, iPad)
+       'Gelasio Chromebook Fallback' /               Tinos / Arimo
+       'Atkinson Chromebook Fallback'                (= Times New Roman / Arial)
+     Each sits right after its web font in --font-display / --font-ui (and the
+     theme.js twins); a face whose local() font is missing is skipped. Values
+     printed by scripts/build-fonts.py.
    - /assets/fonts/** is cached for a year (firebase.json). A changed font
      file needs a new file name, like the logo files.
    ============================================================================ */
@@ -176,8 +181,94 @@
 }
 
 /* --- Metric-matched fallbacks (see RULES above) ------------------------ */
+/* Mac, Windows and iPad: Verdana and Georgia are installed, so they are what
+   paints while the woff2 loads. Verdana is much wider than Atkinson Hyperlegible
+   Next (size-adjust 86.94%), which is what made text re-wrap and jump on swap.
+   Gelasio was drawn to Georgia's widths (100%) but sits on taller line metrics.
+   One face per weight/style the pages use, because Verdana Bold and Italic have
+   widths of their own. Measured from the fonts' own tables by
+   scripts/build-fonts.py --ms-fonts (AA-6, 2026-11-27). */
 @font-face {
   font-family: 'Gelasio Fallback';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Georgia');
+  size-adjust: 100%;
+  ascent-override: 92.77%;
+  descent-override: 34.18%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Gelasio Fallback';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Georgia Bold'),
+       local('Georgia-Bold');
+  size-adjust: 100%;
+  ascent-override: 92.77%;
+  descent-override: 34.18%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Gelasio Fallback';
+  font-style: italic;
+  font-weight: 400;
+  src: local('Georgia Italic'),
+       local('Georgia-Italic');
+  size-adjust: 100%;
+  ascent-override: 92.77%;
+  descent-override: 34.18%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Atkinson Fallback';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Verdana');
+  size-adjust: 86.94%;
+  ascent-override: 113.18%;
+  descent-override: 36.35%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Atkinson Fallback';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Verdana Bold'),
+       local('Verdana-Bold');
+  size-adjust: 83.71%;
+  ascent-override: 117.55%;
+  descent-override: 37.75%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Atkinson Fallback';
+  font-style: italic;
+  font-weight: 400;
+  src: local('Verdana Italic'),
+       local('Verdana-Italic');
+  size-adjust: 86.99%;
+  ascent-override: 113.12%;
+  descent-override: 36.33%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Atkinson Fallback';
+  font-style: italic;
+  font-weight: 700;
+  src: local('Verdana Bold Italic'),
+       local('Verdana-BoldItalic');
+  size-adjust: 83.71%;
+  ascent-override: 117.54%;
+  descent-override: 37.75%;
+  line-gap-override: 0%;
+}
+
+/* Chromebooks: no Verdana or Georgia. ChromeOS ships Tinos / Arimo, which share
+   Times New Roman / Arial metrics, and so do Liberation Serif / Sans on Linux. */
+@font-face {
+  font-family: 'Gelasio Chromebook Fallback';
+  font-weight: 400;
   src: local('Tinos'), local('Tinos Regular'), local('Tinos-Regular'),
        local('Liberation Serif'), local('LiberationSerif'),
        local('Times New Roman'), local('TimesNewRomanPSMT');
@@ -188,13 +279,40 @@
 }
 
 @font-face {
-  font-family: 'Atkinson Hyperlegible Next Fallback';
+  font-family: 'Atkinson Chromebook Fallback';
+  font-weight: 400;
   src: local('Arimo'), local('Arimo Regular'), local('Arimo-Regular'),
        local('Liberation Sans'), local('LiberationSans'),
        local('Arial'), local('ArialMT');
   size-adjust: 99.97%;
   ascent-override: 98.43%;
   descent-override: 31.61%;
+  line-gap-override: 0%;
+}
+
+/* Bold Tinos / Arimo have widths of their own; without these faces bold text was
+   faked from the regular and re-wrapped on swap (AA-6). */
+@font-face {
+  font-family: 'Gelasio Chromebook Fallback';
+  font-weight: 700;
+  src: local('Tinos Bold'), local('Tinos-Bold'),
+       local('Liberation Serif Bold'), local('LiberationSerif-Bold'),
+       local('Times New Roman Bold'), local('TimesNewRomanPS-BoldMT');
+  size-adjust: 120.54%;
+  ascent-override: 76.96%;
+  descent-override: 28.35%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Atkinson Chromebook Fallback';
+  font-weight: 700;
+  src: local('Arimo Bold'), local('Arimo-Bold'),
+       local('Liberation Sans Bold'), local('LiberationSans-Bold'),
+       local('Arial Bold'), local('Arial-BoldMT');
+  size-adjust: 99.44%;
+  ascent-override: 98.96%;
+  descent-override: 31.78%;
   line-gap-override: 0%;
 }
 

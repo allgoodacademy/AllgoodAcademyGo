@@ -31,7 +31,10 @@
   --color-teal-deep: #2D6473;   /* theme.js allgood-accent */
   --color-teal-wash: #E3EDEF;   /* marketing tint of the teal; no theme.js twin */
   --color-orange: #CF4616;      /* theme.js allgood-primary */
-  --color-orange-deep: #B23A0F; /* pressed/hover depth under the orange button */
+  --color-orange-deep: #B23A0F; /* theme.js allgood-primary-deep */
+  /* ^ pressed/hover depth under the orange button, and small orange text on light tints */
+  --color-orange-light: #EB8D69; /* theme.js allgood-hover */
+  /* ^ orange TEXT on the dark game shell: 7.2:1 on #0F1923, where the brand orange is 3.8:1. AA-6 */
   --color-grey: #4C4C4C;        /* theme.js allgood-dark */
   --color-light: #F7F7F7;       /* theme.js allgood-light */
 
@@ -68,9 +71,33 @@
      Since 2026-11-25 (AA-1) both chains lead with a self-hosted face, defined
      in fonts.css (load it beside this file): Gelasio, which matches Georgia's
      metrics, and Atkinson Hyperlegible Next. Georgia and Verdana stay next in
-     line; the "Fallback" faces are metric-matched Tinos / Arimo for Chromebooks,
-     which have neither Georgia nor Verdana, so text doesn't jump on swap.
+     line. Each web font is followed straight away by its metric-matched
+     "Fallback" face (Georgia / Verdana resized to the web font's metrics, AA-6),
+     and the Chromebook ones (Tinos / Arimo) come after Georgia / Verdana, so
+     text doesn't jump when the web font swaps in on any of them.
      ----------------------------------------------------------------------- */
-  --font-display: 'Gelasio', Georgia, 'Gelasio Fallback', 'Times New Roman', serif;
-  --font-ui: 'Atkinson Hyperlegible Next', Verdana, 'Atkinson Hyperlegible Next Fallback', Geneva, sans-serif;
+  --font-display: 'Gelasio', 'Gelasio Fallback', Georgia, 'Gelasio Chromebook Fallback', 'Times New Roman', serif;
+  --font-ui: 'Atkinson Hyperlegible Next', 'Atkinson Fallback', Verdana, 'Atkinson Chromebook Fallback', Geneva, sans-serif;
+}
+
+/* ============================================================================
+   REDUCED MOTION — every page (AA-6, WCAG 2.3.3 / 2.2.2)
+   When the OS asks for reduced motion, every CSS animation and transition runs
+   for 0.01ms, once, and stops on its LAST frame. That is deliberately not
+   `animation: none`: an element that animates in from opacity 0 (a chart line,
+   a card) would then stay invisible. Looping decoration (pulses, blinks, radar
+   rings, shimmer) stops after one instant pass. Smooth scrolling becomes a jump.
+   /js/reduced-motion.js covers what CSS cannot: JS smooth scrolls and SVG
+   <animate>. Canvas and timed JS motion is handled per page through
+   window.AG_REDUCED_MOTION.
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }

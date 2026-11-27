@@ -7,6 +7,8 @@
 <meta name="description" content="A seasons simulation for grades 6–8. Steer Earth around the Sun on a copper orrery and find out what really makes summer and winter.">
 <meta name="standards" content="NGSS MS-ESS1-1">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
+<script src="/js/canvas-fonts.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 /* VOICE: a planetarium after hours. Quiet, dark, one warm light: the Sun.
@@ -606,7 +608,7 @@ function frame(ts){
   draw(); schedule();
 }
 var spinAcc=0;
-function needsAnim(){ return spinning || S.testing || (S.step===0 && !REDUCED) || V.dragHint || V.focus==="axis"; }
+function needsAnim(){ return spinning || S.testing || (S.step===0 && !REDUCED) || (!REDUCED && (V.dragHint || V.focus==="axis")); } // reduced motion: the hint ring is drawn, still (AA-6)
 function schedule(){ if(rafId==null && needsAnim() && !document.hidden) rafId=requestAnimationFrame(frame); if(!needsAnim()) lastTs=null; }
 document.addEventListener("visibilitychange", function(){ activeClock(); schedule(); });
 function setSpin(on){ spinning=on&&timeOn; $$('[data-act="spin"]').forEach(function(b){ b.textContent=spinning?"\u275a\u275a Pause":"\u25b6 Spin the year"; b.setAttribute("aria-pressed",String(spinning)); }); schedule(); }
@@ -923,6 +925,7 @@ document.addEventListener("keydown", function(e){ if(e.ctrlKey||e.metaKey||e.alt
 var roT=null; function onResize(){ clearTimeout(roT); roT=setTimeout(function(){ resize(); draw(); },60); }
 if("ResizeObserver" in window) new ResizeObserver(onResize).observe(cv); else window.addEventListener("resize",onResize);
 resize(); applyCtl(); enter(0);
+if(window.AGFonts) AGFonts.ready(function(){ resize(); draw(); }); // redraw canvas text in the web fonts (AA-6)
 if(location.hash==="#present") setPresent(true);
 })();
 </script>

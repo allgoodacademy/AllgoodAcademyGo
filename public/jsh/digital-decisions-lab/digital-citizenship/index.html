@@ -110,6 +110,7 @@
     </script>
 
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
     <link rel="preload" href="/assets/fonts/gelasio/Gelasio-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -1916,17 +1917,22 @@ body.present .nav-shell.activity{display:none}
         // The share count climbing is the whole reason this Case differs from a private-vs-
         // public choice: waiting has a cost, and it lands on third parties. It was declared and
         // never started in the first build, so that pressure was completely invisible.
+        const spreadBump = () => {
+            spreadCount += Math.floor(Math.random() * 3) + 1;
+            const el = document.getElementById('spread-count');
+            if (el) el.textContent = `${spreadCount} shares`;
+        };
         window.startSpread = () => {
             if (spreadTimer || case5Locked) return;
-            spreadTimer = setInterval(() => {
-                spreadCount += Math.floor(Math.random() * 3) + 1;
-                const el = document.getElementById('spread-count');
-                if (el) el.textContent = `${spreadCount} shares`;
-            }, 4000);
+            // Reduced motion (AA-6): instead of ticking on its own, it climbs one step each time the student taps or clicks anywhere — the same pressure, tied to their own pace, nothing running by itself.
+            if (window.AG_REDUCED_MOTION) { spreadTimer = 'tap'; document.addEventListener('click', spreadBump); return; }
+            spreadTimer = setInterval(spreadBump, 4000);
         };
 
         window.stopSpread = () => {
-            if (spreadTimer) { clearInterval(spreadTimer); spreadTimer = null; }
+            if (spreadTimer === 'tap') document.removeEventListener('click', spreadBump);
+            else if (spreadTimer) clearInterval(spreadTimer);
+            spreadTimer = null;
         };
 
         window.toggleAction = (id) => {

@@ -17,9 +17,17 @@ Usage:
     python3 -I scripts/build-fonts.py gf/ofl
 
 It also prints the size-adjust / ascent-override values for the metric-matched
-fallback faces in public/assets/css/fonts.css. Those are measured against Liberation
-Serif / Liberation Sans, which share Tinos / Arimo's metrics (the ChromeOS fallbacks)
-and Times New Roman / Arial's.
+fallback faces in public/assets/css/fonts.css:
+  - the Chromebook faces, measured against Liberation Serif / Liberation Sans, which
+    share Tinos / Arimo's metrics (the ChromeOS fallbacks) and Times New Roman / Arial's;
+  - with --ms-fonts DIR, the Mac/Windows/iPad faces, measured against Georgia and
+    Verdana (regular, bold, italic, bold italic). Those fonts are not redistributable,
+    so they are not in the repo: point DIR at georgia*.ttf / verdana*.ttf from any
+    install (AA-6 measured the corefonts georgi32.exe / verdan32.exe files; Verdana and
+    Georgia's advance widths and vertical metrics are unchanged in later versions).
+
+    python3 -I scripts/build-fonts.py gf/ofl --ms-fonts ~/msfonts
+    python3 -I scripts/build-fonts.py --metrics-only --ms-fonts ~/msfonts
 """
 import os
 import shutil
@@ -114,8 +122,10 @@ def avg_width(font):
     return sum(hmtx[cmap[ord(ch)]][0] * w for ch, w in FREQ.items()) / total / upm
 
 
-def fallback_metrics(webfont_path, fallback_path, label):
+def fallback_metrics(webfont_path, fallback_path, label, wght=None):
     web = TTFont(webfont_path)
+    if wght is not None:
+        web = instancer.instantiateVariableFont(web, {'wght': wght})
     fb = TTFont(fallback_path)
     adjust = avg_width(web) / avg_width(fb)
     upm = web['head'].unitsPerEm
@@ -128,23 +138,48 @@ def fallback_metrics(webfont_path, fallback_path, label):
 
 
 def main():
-    if len(sys.argv) != 2:
-        sys.exit(__doc__)
-    src_root = sys.argv[1]
-    total = 0
-    for b in BUILDS:
-        dest = build(src_root, *b)
-        size = os.path.getsize(dest)
-        total += size
-        print(f'{os.path.relpath(dest, ROOT)}  {size / 1024:.1f} KB')
-    print(f'total {total / 1024:.1f} KB')
+    args = sys.argv[1:]
+    ms = None
+    if '--ms-fonts' in args:
+        i = args.index('--ms-fonts')
+        ms = args[i + 1]
+        del args[i:i + 2]
+    metrics_only = '--metrics-only' in args
+    args = [a for a in args if a != '--metrics-only']
+    if not metrics_only:
+        if len(args) != 1:
+            sys.exit(__doc__)
+        src_root = args[0]
+        total = 0
+        for b in BUILDS:
+            dest = build(src_root, *b)
+            size = os.path.getsize(dest)
+            total += size
+            print(f'{os.path.relpath(dest, ROOT)}  {size / 1024:.1f} KB')
+        print(f'total {total / 1024:.1f} KB')
+    gel = lambda f: os.path.join(OUT, 'gelasio', f)
+    atk = os.path.join(OUT, 'atkinson-hyperlegible-next', 'AtkinsonHyperlegibleNext-Variable.woff2')
+    atk_i = os.path.join(OUT, 'atkinson-hyperlegible-next', 'AtkinsonHyperlegibleNext-Italic-Variable.woff2')
     liberation = '/usr/share/fonts/truetype/liberation'
-    fallback_metrics(os.path.join(OUT, 'gelasio', 'Gelasio-Regular.woff2'),
+    fallback_metrics(gel('Gelasio-Regular.woff2'),
                      os.path.join(liberation, 'LiberationSerif-Regular.ttf'),
-                     'Gelasio Fallback (Tinos / Times New Roman)')
-    fallback_metrics(os.path.join(OUT, 'atkinson-hyperlegible-next', 'AtkinsonHyperlegibleNext-Variable.woff2'),
-                     os.path.join(liberation, 'LiberationSans-Regular.ttf'),
-                     'Atkinson Hyperlegible Next Fallback (Arimo / Arial)')
+                     'Gelasio Chromebook Fallback (Tinos / Times New Roman)')
+    fallback_metrics(atk, os.path.join(liberation, 'LiberationSans-Regular.ttf'),
+                     'Atkinson Chromebook Fallback (Arimo / Arial)')
+    fallback_metrics(gel('Gelasio-Bold.woff2'),
+                     os.path.join(liberation, 'LiberationSerif-Bold.ttf'),
+                     'Gelasio Chromebook Fallback 700 (Tinos Bold / Times New Roman Bold)')
+    fallback_metrics(atk, os.path.join(liberation, 'LiberationSans-Bold.ttf'),
+                     'Atkinson Chromebook Fallback 700 (Arimo Bold / Arial Bold)', 700)
+    if ms:
+        m = lambda f: os.path.join(ms, f)
+        fallback_metrics(gel('Gelasio-Regular.woff2'), m('georgia.ttf'), 'Gelasio Fallback 400 (Georgia)')
+        fallback_metrics(gel('Gelasio-Bold.woff2'), m('georgiab.ttf'), 'Gelasio Fallback 700 (Georgia Bold)')
+        fallback_metrics(gel('Gelasio-Italic.woff2'), m('georgiai.ttf'), 'Gelasio Fallback 400 italic (Georgia Italic)')
+        fallback_metrics(atk, m('verdana.ttf'), 'Atkinson Fallback 400 (Verdana)', 400)
+        fallback_metrics(atk, m('verdanab.ttf'), 'Atkinson Fallback 700 (Verdana Bold)', 700)
+        fallback_metrics(atk_i, m('verdanai.ttf'), 'Atkinson Fallback 400 italic (Verdana Italic)', 400)
+        fallback_metrics(atk_i, m('verdanaz.ttf'), 'Atkinson Fallback 700 italic (Verdana Bold Italic)', 700)
 
 
 if __name__ == '__main__':

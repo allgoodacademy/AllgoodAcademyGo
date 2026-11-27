@@ -18,6 +18,8 @@
      performance and then never read it; it does now. See /js/skill-routing.js. -->
 <script type="module" src="/js/skill-routing.js"></script>
     <link rel="stylesheet" href="/assets/css/design-tokens.css">
+    <script src="/js/reduced-motion.js"></script>
+    <script src="/js/time-limits.js"></script>
     <link rel="stylesheet" href="/assets/css/fonts.css">
     <link rel="stylesheet" href="/assets/css/tablet-chassis.css">
 <style>
@@ -197,7 +199,7 @@
     cursor: pointer; transition: opacity 0.15s, transform 0.1s;
   }
   .start-btn:hover { opacity: 0.9; transform: scale(1.02); }
-  .wordmark { font-family: var(--font-display); font-size: 0.8rem; color: rgba(255,255,255,0.2); margin-top: 16px; letter-spacing: 0.04em; }
+  .wordmark { font-family: var(--font-display); font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 16px; letter-spacing: 0.04em; }
 
   /* ── GAME ── */
   #game { display: none; width: 100%; max-width: 560px; margin: auto 0; flex-direction: column; align-items: center; }
@@ -232,21 +234,21 @@
   .msg-card { background: var(--warm-white); border-radius: 20px; width: 100%; overflow: hidden; margin-bottom: 14px; animation: cardIn 0.3s ease; }
   @keyframes cardIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
   .msg-header { padding: 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.06); display: flex; align-items: center; gap: 10px; }
-  .msg-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; color: white; }
+  .msg-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; flex-shrink: 0; color: white; } /* 19px bold = large text (AA-6) */
   .msg-meta { flex: 1; min-width: 0; }
   .msg-sender { font-size: 13px; font-weight: 700; color: var(--color-dark); }
-  .msg-sub { font-size: 10px; color: #8a9fac; }
+  .msg-sub { font-size: 10px; color: var(--color-ink-soft); }
   .forward-count { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; flex-shrink: 0; white-space: nowrap; }
-  .fc-low { background: #f0f4f6; color: #7A909F; }
-  .fc-mid { background: #FFF3E0; color: #E65100; }
+  .fc-low { background: #f0f4f6; color: var(--color-ink-soft); }
+  .fc-mid { background: #FFF3E0; color: var(--color-orange-deep); }
   .fc-high { background: #FDEAEA; color: #C0392B; }
   .msg-body { padding: 14px 16px; font-size: 14px; color: #1a1a1a; line-height: 1.6; }
   .msg-claim { font-weight: 700; color: var(--color-dark); margin-bottom: 6px; }
   .msg-detail { font-size: 11px; color: #555; margin-top: 8px; padding: 8px 10px; background: #f0ece6; border-radius: 6px; font-style: italic; }
-  .msg-source { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 10px; color: #8a9fac; }
+  .msg-source { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 10px; color: var(--color-ink-soft); }
 
   .verify-panel { display: none; background: var(--dark-card); border-radius: 14px; width: 100%; padding: 16px; margin-bottom: 14px; animation: cardIn 0.25s ease; }
-  .verify-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.06em; margin-bottom: 8px; }
+  .verify-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.75); letter-spacing: 0.06em; margin-bottom: 8px; }
   .verify-result { font-size: 13px; color: var(--cream); line-height: 1.6; }
   .verify-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .verify-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: vdot 1s ease-in-out infinite; }
@@ -258,16 +260,18 @@
   .action-btn { padding: 16px 8px; border: none; border-radius: 14px; font-family: var(--font-ui); font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.1s, opacity 0.1s; display: flex; flex-direction: column; align-items: center; gap: 7px; letter-spacing: 0.02em; }
   .action-btn:hover { transform: scale(1.03); }
   .action-btn svg { width: 20px; height: 20px; }
-  .btn-forward { background: #fff3f0; color: var(--orange); }
+  .btn-forward { background: #fff3f0; color: var(--color-orange-deep); }
   .btn-verify { background: #EEF6F9; color: var(--teal); }
   .btn-verify.verifying { opacity: 0.6; cursor: not-allowed; }
-  .btn-verify.done { background: #e8f5ee; color: var(--true-color); }
+  .btn-verify.done { background: #e8f5ee; color: color-mix(in srgb, var(--true-color) 85%, var(--color-ink)); } /* 4.48 → 5.3:1 (AA-6) */
   .btn-stop { background: #f0f4f6; color: #555; }
 
   /* ── CONSEQUENCE ── */
   #consequence { display: none; width: 100%; max-width: 560px; margin: auto 0; flex-direction: column; align-items: center; }
   .consequence { width: 100%; animation: cardIn 0.4s ease; text-align: center; }
-  .consequence-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 12px; }
+  /* The verdict colour is a bar beside white text: the colours themselves are under
+     4.5:1 on the dark shell (AA-6). */
+  .consequence-label { color: #fff !important; border-left: 4px solid; padding-left: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 12px; }
   .consequence-scene { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.75; margin-bottom: 16px; text-align: left; font-family: var(--font-display); }
   .consequence-mechanism { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 20px; padding: 14px 16px; background: rgba(255,255,255,0.04); border-radius: 12px; text-align: left; }
   .next-btn { background: var(--teal); color: white; border: none; padding: 14px 36px; border-radius: 50px; font-family: var(--font-ui); font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; transition: opacity 0.15s; }
@@ -283,10 +287,10 @@
   .end-row-label { color: var(--muted); }
   .end-row-val { font-weight: 700; color: var(--cream); }
   .jodi-moment { width: 100%; background: var(--teal); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
-  .jodi-moment-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; margin-bottom: 6px; }
+  .jodi-moment-label { font-size: 10px; font-weight: 700; color: #fff; letter-spacing: 0.08em; margin-bottom: 6px; }
   .jodi-moment-text { font-family: var(--font-display); font-size: 13px; color: white; line-height: 1.65; font-style: italic; }
   .deeper-card { width: 100%; background: rgba(53,120,137,0.14); border: 1px solid rgba(53,120,137,0.35); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; text-align: left; }
-  .deeper-label { font-size: 10px; font-weight: 700; color: var(--teal); letter-spacing: 0.08em; margin-bottom: 8px; }
+  .deeper-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.75); letter-spacing: 0.08em; margin-bottom: 8px; }
   .deeper-msg { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.65; margin-bottom: 14px; }
   .deeper-btn { background: var(--teal); color: white; border: none; padding: 12px; border-radius: 50px; font-family: var(--font-ui); font-size: 12px; font-weight: 700; cursor: pointer; width: 100%; }
   .play-again-btn { background: var(--orange); color: white; border: none; padding: 14px; border-radius: 50px; font-family: var(--font-ui); font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 8px; }
@@ -425,6 +429,7 @@ body.present .nav-shell.activity{display:none}
     <div class="hud-progress" id="progressDots"></div>
   </div>
   <div class="countdown-bar"><div class="countdown-fill" id="timerFill" style="width:100%"></div></div>
+  <div id="timerControls"></div>
   <div class="msg-card" id="msgCard"></div>
   <div class="verify-panel" id="verifyPanel"></div>
   <div class="actions">
@@ -1123,7 +1128,7 @@ function renderScenario() {
   const card = document.getElementById('msgCard');
   card.innerHTML = `
     <div class="msg-header">
-      <div class="msg-avatar" style="background:${s.avatarColor}">${s.avatarText}</div>
+      <div class="msg-avatar" style="background:${s.avatarColor};color:${avatarInk(s.avatarColor)}">${s.avatarText}</div>
       <div class="msg-meta">
         <div class="msg-sender">${s.sender}</div>
         <div class="msg-sub">${s.sub}</div>
@@ -1140,18 +1145,42 @@ function renderScenario() {
   startTimer();
 }
 
+// The clock runs through AGTime (/js/time-limits.js, AA-6): a student can add time or
+// turn it off, and a teacher projecting with #present gets Pause / +30s / Off. Untouched,
+// it still auto-forwards at 0, as it always has.
+function runTimer(seconds) {
+  if (timer) timer.stop();
+  const fill = document.getElementById('timerFill');
+  const bar = fill.parentNode;
+  const startLeft = timeLeft;
+  bar.style.visibility = '';
+  timer = AGTime.countdown({
+    seconds,
+    mount: document.getElementById('timerControls'),
+    theme: 'dark',
+    onTick: (t) => {
+      timeLeft = startLeft - t.elapsed;
+      if (t.off) { bar.style.visibility = 'hidden'; return; }
+      fill.style.width = (Math.min(1, t.left / 30) * 100) + '%';
+      fill.className = t.left <= 10 ? 'countdown-fill urgent' : 'countdown-fill';
+    },
+    onExpire: () => choose('forward') // auto-forward on timeout — impulsive!
+  });
+}
+
+// Initials on a coloured avatar: white or ink, whichever reads better on that colour (AA-6).
+function avatarInk(hex) {
+  const c = hex.replace('#', ''), v = [0, 2, 4].map(i => parseInt(c.substr(i, 2), 16) / 255).map(x => x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  return (1.05 / (L + 0.05)) >= ((L + 0.05) / (0.0386 + 0.05)) ? '#fff' : 'var(--color-ink)';
+}
+
 function startTimer() {
-  clearInterval(timer);
   timeLeft = 30;
   const fill = document.getElementById('timerFill');
   fill.style.width = '100%';
   fill.className = 'countdown-fill';
-  timer = setInterval(() => {
-    timeLeft--;
-    fill.style.width = (timeLeft / 30 * 100) + '%';
-    if (timeLeft <= 10) fill.className = 'countdown-fill urgent';
-    if (timeLeft <= 0) { clearInterval(timer); choose('forward'); } // auto-forward on timeout — impulsive!
-  }, 1000);
+  runTimer(30);
 }
 
 function doVerify() {
@@ -1169,7 +1198,8 @@ function doVerify() {
   // Pause the timer during verify — resumes below with 12 seconds left. 1.5s rather
   // than a longer wait: the timer is paused either way, but this still needs to read
   // as "checking something real," just not slow enough to feel like a load stall.
-  clearInterval(timer);
+  const timeUsedBeforeVerify = 30 - timeLeft;
+  if (timer) timer.stop();
 
   setTimeout(() => {
     verified = true; verifying = false;
@@ -1181,19 +1211,16 @@ function doVerify() {
     const fill = document.getElementById('timerFill');
     fill.style.width = (12 / 30 * 100) + '%';
     fill.className = 'countdown-fill urgent';
-    timer = setInterval(() => {
-      timeLeft--;
-      fill.style.width = (timeLeft / 30 * 100) + '%';
-      if (timeLeft <= 0) { clearInterval(timer); choose('forward'); }
-    }, 1000);
+    if (AGTime.isOff()) timeLeft = 30 - timeUsedBeforeVerify; // untimed: keep counting time used
+    runTimer(12);
   }, 1500);
 }
 
 function choose(action) {
-  clearInterval(timer);
+  if (timer) timer.stop();
   const s = session[currentIdx];
   const data = action === 'forward' ? s.forward : s.stop;
-  const timeUsed = 30 - timeLeft;
+  const timeUsed = Math.round(30 - timeLeft);
 
   // Scoring: +10 for correct call, +3 for incorrect call after verifying
   // (you had the information and still got it wrong).
@@ -1231,7 +1258,7 @@ function showConsequence(data, action, truth) {
   el.innerHTML = `
     <div class="consequence">
       <div class="network" id="consequenceNetwork"></div>
-      <div class="consequence-label" style="color:${actionColor}">${actionLabel}</div>
+      <div class="consequence-label" style="border-color:${actionColor}">${actionLabel}</div>
       <div class="consequence-scene">${data.scene}</div>
       <div class="consequence-mechanism">${data.mechanism}</div>
       <button class="next-btn" onclick="nextScenario()">${currentIdx < session.length - 1 ? 'Next message →' : 'See results'}</button>
