@@ -402,10 +402,10 @@ reads; no updates): `story`, `createdAt`, `puertas` (per row: `mode` quick or ex
 is in it. Quick votes are approximate shares and are labelled that way.
 
 **Embarque → Aduana** (`/js/espanol-checks.js`) is behind `ESPANOL_CHECKS_ON` in
-`/js/site-config.js`: on for the staging and preview channels and localhost, off in
-production until the item bank (`public/espanol/<story>/checks.json`, a draft) has had its
-native-speaker review. To turn it on in production, set `PRODUCTION_ESPANOL_CHECKS = true`
-there. With the flag off nothing is loaded or shown: no Embarque, no Aduana, no growth view,
+`/js/site-config.js`. The founder reviewed the item bank (`public/espanol/<story>/checks.json`)
+on 2026-11-27 and set `PRODUCTION_ESPANOL_CHECKS = true`, so it is on for all students in
+production as well as on staging, preview channels and localhost. If that switch is set back to
+false, production goes dark again. With the flag off nothing is loaded or shown: no Embarque, no Aduana, no growth view,
 no rubric.
 - Stored on the student's own `module_progress/{story}.checks`: `form` (the Embarque form;
   Aduana is the other), `emb` and `adu` (0 or 1 per skill slot), `embDone`, `aduDone`.

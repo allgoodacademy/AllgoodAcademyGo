@@ -10,12 +10,12 @@
 //
 // ESPANOL_CHECKS_ON: Embarque → Aduana in the Español stories (the before / after check, the
 // passport, the postcard prompt), and the growth view and postcard rubric in Mission Control.
-// The item bank (public/espanol/<story>/checks.json) is a DRAFT awaiting native-speaker
-// review. ON for the Firebase staging and preview channels and for local development; OFF on
-// production. TO TURN IT ON IN PRODUCTION after the review (the founder's decision): change
-// PRODUCTION_ESPANOL_CHECKS to true below. Nothing else needs to change.
+// The founder (a fluent former Spanish teacher) reviewed the item bank
+// (public/espanol/<story>/checks.json) on 2026-11-27 and turned it ON IN PRODUCTION for all
+// students: PRODUCTION_ESPANOL_CHECKS is true. Setting it back to false restores the old
+// behaviour (on only for staging, preview channels and local development).
 (function () {
-    var PRODUCTION_ESPANOL_CHECKS = false;
+    var PRODUCTION_ESPANOL_CHECKS = true;
 
     var host = '';
     try { host = String(window.location.hostname || '').toLowerCase(); } catch (e) { host = ''; }
