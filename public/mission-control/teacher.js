@@ -46,6 +46,7 @@ import {
 // The registry loader the games already share: one cached fetch of /data/modules-registry.json.
 import { loadRegistry } from '/js/skill-routing.js';
 import { createClass as createClassShared } from './classes.js';
+import { storyReport, studentStory, playedStoryIds } from './espanol-report.js';
 
 const { db, appId, auth, waitForAuthReady } = window.AuthCore;
 
@@ -293,6 +294,8 @@ const state = {
     eventsReadable: true,
     tab: 'overview',
     drillId: null,           // an assignment open on Overview
+    reportTab: null,         // Reports: lessons | challenges | games | sims | espanol
+    storyCfg: {},            // story id → its report.json (false while loading, null if it failed)
     filter: 'all',           // Students tab: all | check | done
     search: '',
     selected: new Set(),     // Students tab ticks
@@ -1021,11 +1024,12 @@ function workRow(id, justFor) {
     const it = itemOf(id);
     const who = justFor ? students.filter((s) => allAssignedIds(s.mine).includes(id)) : students;
     const done = who.filter((s) => statusFor(s, id).done).length;
+    const hint = it.kind === 'story' ? 'see where the class split' : 'see where they got stuck';
     const pct = who.length ? Math.round(done / who.length * 100) : 0;
     const verb = it.type === 'game' ? 'played' : 'finished';
     return `<button class="wi" type="button" data-drill="${esc(id)}">
         <span class="ic t-${it.type}" aria-hidden="true">${ICONS[shownType(it)] || ICONS.lab}</span>
-        <span><b>${esc(it.name)}</b><span class="meta">${TYPE_LABEL[shownType(it)] || 'Lesson'} · ${it.minutes} min${justFor ? ` · just for ${plural(who.length, 'student')}` : ''} · see where they got stuck</span></span>
+        <span><b>${esc(it.name)}</b><span class="meta">${TYPE_LABEL[shownType(it)] || 'Lesson'} · ${it.minutes} min${justFor ? ` · just for ${plural(who.length, 'student')}` : ''} · ${hint}</span></span>
         <span class="prog">${done} of ${who.length} ${verb}<span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span></span>
         <span class="chev" aria-hidden="true">›</span></button>`;
 }
@@ -1070,19 +1074,66 @@ function classSummaryHtml() {
       </div>`;
 }
 
-/* REPORTS: today's drill-downs, unchanged, in one place. Without one open, the list of
-   everything assigned (to the class, or to only some students); each opens its report.
-   (Prompt R reorganizes this into one tab per kind of work.) */
+/* REPORTS (2026-11-27, prompt R): one tab per kind of work. Each tab lists that kind's
+   assigned items for this class (Español also lists a story the class has played without it
+   being assigned); tapping one opens today's drill-down for it, unchanged. The last tab is
+   remembered per teacher, on this device. */
+const REPORT_TABS = [
+    { id: 'lessons', label: 'Lessons', none: 'No lessons assigned yet.', from: 'Lab Packs', href: '#packs' },
+    { id: 'challenges', label: 'Challenges', none: 'No Challenges assigned yet.', from: 'Lab Packs', href: '#packs' },
+    { id: 'games', label: 'Games', none: 'No games assigned yet.', from: 'Games', href: '#games' },
+    { id: 'sims', label: 'Simulations', none: 'No simulations assigned yet.', from: 'Simulations', href: '#sims' },
+    { id: 'espanol', label: 'Español', none: 'No Español stories assigned or played yet.', from: 'Español', href: '#espanol' },
+];
+function reportKindOf(id) {
+    const it = itemOf(id);
+    if (it.kind === 'story') return 'espanol';
+    if (it.type === 'sim') return 'sims';
+    if (it.type === 'game') return 'games';
+    return it.type === 'challenge' ? 'challenges' : 'lessons';
+}
+const stories = () => [...state.registryById.values()].filter((m) => m.type === 'story' && !m.retired);
+function reportIds() {
+    const out = unionAll();
+    for (const id of playedStoryIds(stories(), state.students)) if (!out.includes(id)) out.push(id);
+    return out;
+}
+const reportTabKey = () => `mc_reports_tab_${(state.user && state.user.uid) || 'me'}`;
+function reportTab() {
+    if (state.reportTab) return state.reportTab;
+    let saved = null;
+    try { saved = localStorage.getItem(reportTabKey()); } catch (e) { /* storage blocked */ }
+    state.reportTab = REPORT_TABS.some((t) => t.id === saved) ? saved : 'lessons';
+    return state.reportTab;
+}
+function setReportTab(id, focus) {
+    if (!REPORT_TABS.some((t) => t.id === id)) return;
+    state.reportTab = id;
+    try { localStorage.setItem(reportTabKey(), id); } catch (e) { /* storage blocked */ }
+    renderReports();
+    if (focus) { const b = $(`rtab-${id}`); if (b) b.focus(); }
+}
 function renderReports() {
     const pane = $('pane-reports');
     if (state.drillId) { pane.innerHTML = renderDrill(state.drillId); return; }
     const items = classItems();
-    const ids = unionAll();
-    pane.innerHTML = ids.length
-        ? `<div class="box"><h2>Assigned work</h2><p class="sub">Pick one to see each step, each choice and who got stuck.</p>
-            ${ids.map((id) => workRow(id, !items.includes(id))).join('')}
+    const ids = reportIds();
+    const cur = reportTab();
+    const tab = REPORT_TABS.find((t) => t.id === cur);
+    const mine = ids.filter((id) => reportKindOf(id) === cur);
+    const assigned = unionAll();
+    const tabs = REPORT_TABS.map((t) => {
+        const n = ids.filter((id) => reportKindOf(id) === t.id).length;
+        const on = t.id === cur;
+        return `<button class="rtab" type="button" role="tab" id="rtab-${t.id}" data-rtab="${t.id}" aria-selected="${on}" aria-controls="rpanel" tabindex="${on ? 0 : -1}"${t.id === 'espanol' ? ' lang="es"' : ''}>${t.label}<span class="n" lang="en">${n}<span class="sr"> to report</span></span></button>`;
+    }).join('');
+    const body = mine.length
+        ? `<div class="box"><h2${cur === 'espanol' ? ' lang="es"' : ''}>${tab.label}</h2><p class="sub">${cur === 'espanol' ? 'Pick a story to see where the class split at each Puerta.' : 'Pick one to see each step, each choice and who got stuck.'}</p>
+            ${mine.map((id) => workRow(id, assigned.includes(id) && !items.includes(id))).join('')}
             <p class="note">Counts include only students who joined this class.</p></div>`
-        : `<div class="box"><p class="empty">Nothing is assigned yet, so there is nothing to report. ${state.readOnly ? '' : '<button class="link" type="button" data-goto="assign">Choose work</button>'}</p></div>`;
+        : `<div class="box"><p class="empty">${tab.none} <a class="link" href="${tab.href}">Assign one from ${tab.from}.</a></p></div>`;
+    pane.innerHTML = `<div class="rtabs" role="tablist" aria-label="Reports, by kind of work">${tabs}</div>
+        <div role="tabpanel" id="rpanel" aria-labelledby="rtab-${cur}" tabindex="0">${body}</div>`;
 }
 function setupSteps(hasWork) {
     return `<div class="box"><h2>Set up your class in three steps</h2><p class="sub">Most teachers are ready in about five minutes.</p>
@@ -1115,15 +1166,18 @@ const eventsNote = () => (state.eventsReadable ? '' : '<p class="note">Showing e
 
 function renderDrill(id) {
     const it = itemOf(id);
-    const isClass = classItems().includes(id);
+    // A story the class played without it being assigned reports on everyone.
+    const isClass = classItems().includes(id) || !unionAll().includes(id);
     const who = isClass ? state.students : state.students.filter((s) => allAssignedIds(s.mine).includes(id));
-    const head = `<button class="back" type="button" data-back>‹ All assigned work</button>
+    const backTo = REPORT_TABS.find((t) => t.id === reportKindOf(id));
+    const head = `<button class="back" type="button" data-back>‹ All ${backTo ? backTo.label : 'assigned work'}</button>
       <div class="dhead"><span class="ic t-${it.type}" aria-hidden="true">${ICONS[shownType(it)] || ICONS.lab}</span>
-        <div><div class="eyebrow">${TYPE_LABEL[shownType(it)] || 'Lesson'}</div><h2>${esc(it.name)}</h2></div>
+        <div><div class="eyebrow">${TYPE_LABEL[shownType(it)] || 'Lesson'}</div><h2${it.kind === 'story' ? ' lang="es"' : ''}>${esc(it.name)}</h2></div>
         ${state.readOnly ? '' : '<button class="btn ghost sm" type="button" data-goto="students">Assign to someone else too</button>'}</div>`;
     let body = '';
     const n = who.length;
     if (!n) body = '<div class="box"><p class="empty">Nobody in this class has this yet.</p></div>';
+    else if (it.kind === 'story') body = drillStoryHtml(it, who);
     else if (it.type === 'sim') body = drillSimHtml(it, who);
     else if (it.type === 'game') body = drillGameHtml(it, who);
     else if (MODULE_DATA[id] && it.type === 'challenge') body = drillChallengeHtml(MODULE_DATA[id], who);
@@ -1193,6 +1247,48 @@ function drillSimHtml(it, who) {
     return `<div class="box"><h3>How far they got</h3><p class="sub">${d.played} of ${d.n} opened it, ${d.finished} reached the last step.${present}</p><div class="fun">${steps}</div></div>
       <div class="box"><h3>Predictions</h3><p class="sub">Each step asks for a guess before the model shows what happens.</p>${preds}
       ${talk(worthFiveMinutes(d))}</div>`;
+}
+
+/* ESPAÑOL STORIES (2026-11-27): where the class split at each Puerta, with the real Spanish.
+   The numbers come from espanol-report.js; the prompts, options and right answers from the
+   story's own report.json, fetched once per story. First tries are practice: the words here
+   are "picked" and "right answer", never a score or a grade. */
+function storyCfg(it) {
+    const hit = state.storyCfg[it.id];
+    if (hit !== undefined) return hit;      // the config, or null when it could not load
+    state.storyCfg[it.id] = false;          // loading
+    fetch(`${it.url}report.json`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((cfg) => {
+        state.storyCfg[it.id] = cfg && Array.isArray(cfg.puertas) ? cfg : null;
+        if (state.tab === 'reports' && state.drillId === it.id) renderReports();
+        if (state.panelUid) renderPanel(state.panelUid);
+    });
+    return false;
+}
+const countOrShare = (count, n, showPercent) => (showPercent ? `${count} <small>(${n ? Math.round(count / n * 100) : 0}%)</small>` : `${count} <small>of ${n}</small>`);
+function blankHtml(b, showPercent) {
+    const rows = b.options.map((o) => `<div class="eo${o.right ? ' ok' : ''}">
+          <div class="t" lang="es">${esc(o.text)}${o.right ? ' <span class="mk b" lang="en">✓ Right answer</span>' : ''}</div>
+          <div class="split" aria-hidden="true"><i style="width:${o.share}%"></i></div>
+          <div class="p">${countOrShare(o.count, b.n, showPercent)}</div></div>`).join('');
+    return `<div class="eblank">${b.sentence ? `<p class="q" lang="es">${esc(b.sentence)}</p>` : ''}${rows}</div>`;
+}
+function drillStoryHtml(it, who) {
+    const cfg = storyCfg(it);
+    if (cfg === false) return '<div class="box"><p class="empty">Loading this story\'s report…</p></div>';
+    if (!cfg) return '<div class="box"><p class="empty">This story\'s report could not load. Reload the page to try again.</p></div>';
+    const d = storyReport(it, cfg, who);
+    const head = `<div class="box"><h3><span lang="es">${esc(it.name)}</span> · ${d.finished} of ${d.n} finished</h3>
+        <p class="sub">${d.played} of ${d.n} opened it. What you see below is each student's first try at each Puerta. First tries are practice.</p>
+        ${d.worth ? `<div class="talk"><b>Worth five minutes tomorrow:</b> <span lang="es">${esc(d.worth.text)}</span></div>` : ''}
+        ${d.forks.map((f) => `<p class="efork"><b>Paths picked <span class="muted">(<span lang="es">${esc(f.label)}</span>, no right answer here)</span>:</b> <span lang="es">${f.options.map((o) => `${esc(o.text)} ${o.count}`).join(' · ')}</span></p>`).join('')}
+        ${eventsNote()}</div>`;
+    if (!d.played) return `${head}<div class="box"><p class="empty">Nobody in this class has opened it yet from a device that joined.</p></div>`;
+    const cards = d.puertas.map((p) => `<div class="box epu"><div class="eyebrow">Puerta ${p.n} · ${esc(p.label)}</div>
+        <p class="eprompt" lang="es">${esc(p.prompt)}</p>${p.ask ? `<p class="sub" lang="es">${esc(p.ask)}</p>` : ''}
+        ${p.answered
+            ? `<p class="sub">${p.right} of ${p.answered} got it on the first try${p.showPercent ? ` (${p.rate}%)` : ''}.${p.blanks.length > 1 ? ' Each blank is shown on its own.' : ''}</p>${p.blanks.map((b) => blankHtml(b, p.showPercent)).join('')}`
+            : '<p class="empty">Nobody has reached this Puerta yet.</p>'}</div>`).join('');
+    return head + cards;
 }
 
 /* One tap from a game's drill-down: give the lesson the game points to to the students who
@@ -1330,6 +1426,17 @@ function moduleNameFor(session) {
 
 function panelItemBody(s, id) {
     const it = itemOf(id);
+    if (it.kind === 'story') {
+        const cfg = storyCfg(it);
+        if (cfg === false) return '<div class="pick">Loading…</div>';
+        const d = studentStory(it, cfg || { puertas: [], forks: [] }, s);
+        const top = `<div class="pick">${d.finished ? 'Finished' : (d.opened ? 'Not finished yet' : 'Not started')}${d.lastActive ? ` · last active ${esc(relativeTime(d.lastActive))}` : ''}</div>`;
+        const rows = d.puertas.map((p) => `<div class="stepl"><span class="s${p.answered ? (p.right ? ' d' : ' h') : ''}">${p.n}</span>
+            <div>Puerta ${p.n} <span class="meta">· ${esc(p.label)}</span></div>
+            <span class="meta">${p.answered ? (p.right ? '✓ Right on the first try' : 'Not yet') : 'Not reached'}</span></div>`).join('');
+        const path = d.forks.filter((f) => f.text).map((f) => `<span lang="es">${esc(f.label)}: ${esc(f.text)}</span>`).join(' · ');
+        return `${top}${rows}${path ? `<div class="pick">Path: ${path}</div>` : ''}`;
+    }
     if (it.type === 'sim') {
         const p = simProgress(s, it);
         const reveals = Array.isArray(s.events) ? s.events.filter((e) => e.event === `${it.eventPrefix}_reveal` && e.meta) : [];
@@ -1368,6 +1475,7 @@ function renderPanel(uid) {
     const d = $('drawer');
     if (!s) { d.innerHTML = '<button class="x" type="button" data-close-panel aria-label="Close">×</button><p class="empty">That student is no longer in this class.</p>'; return; }
     const ids = allAssignedIds(s.mine);
+    for (const id of playedStoryIds(stories(), [s])) if (!ids.includes(id)) ids.push(id);
     const extraSet = new Set([...s.mine.extraModules, ...s.mine.extraGames, ...s.mine.extraSims]);
     const items = ids.map((id) => {
         const it = itemOf(id);
@@ -1695,6 +1803,8 @@ $('main').addEventListener('click', (e) => {
     const drill = e.target.closest('[data-drill]');
     if (drill) { state.drillId = drill.dataset.drill; setTab('reports'); return; }
     if (e.target.closest('[data-back]')) { state.drillId = null; renderReports(); return; }
+    const rt = e.target.closest('[data-rtab]');
+    if (rt) { setReportTab(rt.dataset.rtab, true); return; }
     const open = e.target.closest('[data-open]');
     if (open) { openPanel(open.dataset.open); return; }
     if (e.target.closest('[data-wall]')) { showWall(true); return; }
@@ -1707,6 +1817,17 @@ $('main').addEventListener('click', (e) => {
         if (go.dataset.goto === 'students' && state.drillId) toast('Tick the students, then "Assign to these".');
         setTab(go.dataset.goto);
     }
+});
+
+// Reports tabs: Left/Right (and Home/End) move between tabs and select, as tabs do.
+$('pane-reports').addEventListener('keydown', (e) => {
+    const t = e.target.closest('[data-rtab]');
+    if (!t) return;
+    const i = REPORT_TABS.findIndex((x) => x.id === t.dataset.rtab);
+    const to = { ArrowRight: (i + 1) % REPORT_TABS.length, ArrowLeft: (i + REPORT_TABS.length - 1) % REPORT_TABS.length, Home: 0, End: REPORT_TABS.length - 1 }[e.key];
+    if (to == null) return;
+    e.preventDefault();
+    setReportTab(REPORT_TABS[to].id, true);
 });
 
 document.addEventListener('keydown', (e) => {

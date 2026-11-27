@@ -1131,6 +1131,9 @@
         // PAGE: ESPAÑOL (off-funnel; reads only D.espanol, never the core arrays)
         // ------------------------------------------------------------------
         const isTestVisit = (x) => !!(x && x.source && String(x.source.src || '').startsWith('test'));
+        // A game_scores doc's id IS its telemetry session id (story-tracking.js logCompletion), so a
+        // finished playthrough from a ?src=test visit is found through its session, in any range.
+        const testSessionIds = () => new Set(D.espanol.sessions.filter(isTestVisit).map(x => x.sessionId || x.id));
         function storyStats(st) {
             const start = rangeStart();
             const inRange = D.espanol.sessions.filter(x => x.module === st.module && (x.startMs || 0) >= start);
@@ -1183,7 +1186,7 @@
                 </div>
                 <div class="grid lg:grid-cols-2 gap-4 mb-6">
                     ${card('Fork paths', forkHtml)}
-                    ${card('Finished playthroughs', (() => { const sc = D.espanol.scores.filter(r => st.gameNames.includes(r.gameName) && toMs(r.lastUpdated) >= rangeStart()); const v = sc.map(r => r.score).filter(y => typeof y === 'number'); return sc.length ? `<div class="space-y-2 text-xs"><div class="flex justify-between"><span class="text-slate-500">game_scores records</span><span class="font-bold">${sc.length}</span></div><div class="flex justify-between"><span class="text-slate-500">Median Puertas right (of 5)</span><span class="font-bold">${v.length ? median(v) : '—'}</span></div></div><p class="text-[10px] text-slate-400 mt-2">Includes test visits: game_scores carry no source tag.</p>` : emptyMsg('No finished playthroughs in this range yet.'); })())}
+                    ${card('Finished playthroughs', (() => { const sc = D.espanol.scores.filter(r => st.gameNames.includes(r.gameName) && toMs(r.lastUpdated) >= rangeStart() && !testSessionIds().has(r.sessionId)); const v = sc.map(r => r.score).filter(y => typeof y === 'number'); return sc.length ? `<div class="space-y-2 text-xs"><div class="flex justify-between"><span class="text-slate-500">game_scores records</span><span class="font-bold">${sc.length}</span></div><div class="flex justify-between"><span class="text-slate-500">Median Puertas right (of 5)</span><span class="font-bold">${v.length ? median(v) : '—'}</span></div></div><p class="text-[10px] text-slate-400 mt-2">Test visits are left out: a finished playthrough is matched to its session by id, and a session tagged <span class="font-mono">?src=test</span> is dropped.</p>` : emptyMsg('No finished playthroughs in this range yet.'); })())}
                 </div>`;
         }
 

@@ -1177,3 +1177,96 @@ test('assignmentSummary names Español stories separately from simulations', () 
     assert.equal(s.storyCount, 2);
     assert.match(s.label, /1 simulation \+ 2 Español stories assigned/);
 });
+
+/* ── The Español report (Reports > Español, 2026-11-27) ─────────────────────── */
+const { storyReport, studentStory, worthFiveStory, playedStoryIds, MIN_FOR_PERCENT } = await import('../public/mission-control/espanol-report.js');
+const MUNDIAL = { id: 'el-mundial', name: 'El Mundial', gameNames: ['El Mundial'], stepsTotal: 10 };
+const MUNDIAL_CFG = JSON.parse(readFileSync(new URL('../public/espanol/el-mundial/report.json', import.meta.url), 'utf8'));
+const VIAJE_CFG = JSON.parse(readFileSync(new URL('../public/espanol/el-viaje/report.json', import.meta.url), 'utf8'));
+const gateEv = (n, score, extra, at = 1000 + n) => ({ module: 'el-mundial', event: 'choice', clientTs: at, meta: { scenarioIndex: n, score, category: 'gate', ...extra } });
+const esStudent = (uid, events, { completed = false, state = null } = {}) => ({
+    uid, name: uid, events,
+    raw: {
+        sessions: [{ module: 'el-mundial', startedAt: 500, lastSeenAt: 5000, completed }],
+        scores: completed ? [{ gameName: 'El Mundial', completed: true }] : [],
+        progress: state ? { 'el-mundial': { state: JSON.stringify(state) } } : {},
+    },
+});
+
+test('Español report: first tries per Puerta, per blank, lowest first-try rate first', () => {
+    const students = [];
+    for (let i = 0; i < 6; i++) {
+        const knewIt = i < 2;   // 2 of 6 put conocía / conocí the right way round
+        students.push(esStudent(`s${i}`, [
+            gateEv(1, 1, { choiceIndex: 0 }),
+            gateEv(2, i < 5 ? 1 : 0, { choiceIndex: i < 5 ? 0 : 1 }),
+            gateEv(4, knewIt ? 1 : 0, { choiceIndex: knewIt ? 2 : 1, picks: knewIt ? { a: 'conocía', b: 'conocí' } : { a: 'conocía', b: 'conocía' } }),
+            { module: 'el-mundial', event: 'choice', clientTs: 900, meta: { scenarioIndex: 'f1', choiceIndex: i % 3, category: 'fork' } },
+        ], { completed: i < 4 }));
+    }
+    students.push({ uid: 'never', name: 'never', events: [], raw: { sessions: [], scores: [], progress: {} } });
+    const d = storyReport(MUNDIAL, MUNDIAL_CFG, students);
+    assert.equal(d.n, 7);
+    assert.equal(d.played, 6);
+    assert.equal(d.finished, 4);
+    assert.equal(d.puertas[0].n, 4, 'the Puerta with the lowest first-try rate comes first');
+    assert.equal(d.puertas[0].rate, 33);
+    assert.equal(d.puertas[0].showPercent, true);
+    const blankB = d.puertas[0].blanks.find((b) => b.key === 'b');
+    assert.deepEqual(blankB.options.map((o) => [o.k, o.count, o.right]), [['conocí', 2, true], ['conocía', 4, false]]);
+    assert.equal(d.worth.text, 'conocía vs. conocí: 4 of 6 picked conocía.');
+    assert.deepEqual(d.forks[0].options.map((o) => o.count), [2, 2, 2]);
+    // Puertas nobody reached go last, whatever their number.
+    assert.deepEqual(d.puertas.slice(-2).map((p) => p.answered), [0, 0]);
+    // The one-pick Puerta reads its option from choiceIndex.
+    const p2 = d.puertas.find((p) => p.n === 2);
+    assert.deepEqual(p2.blanks[0].options.map((o) => o.count), [5, 1]);
+});
+
+test('Español report: a replay never overwrites the first try', () => {
+    const s = esStudent('replayer', [
+        gateEv(4, 0, { picks: { a: 'conocí', b: 'conocía' } }, 1000),
+        gateEv(4, 1, { picks: { a: 'conocía', b: 'conocí' } }, 9000),
+    ], { state: { done: { 4: 1 }, choice: { 4: { a: 'conocía', b: 'conocí' } }, conf: { 4: 1 } } });
+    const mine = studentStory(MUNDIAL, MUNDIAL_CFG, s).puertas.find((p) => p.n === 4);
+    assert.equal(mine.right, false);
+    assert.deepEqual(mine.picks, { a: 'conocí', b: 'conocía' });
+});
+
+test('Español report: fewer than five students shows counts, not percentages', () => {
+    const three = [0, 1, 2].map((i) => esStudent(`t${i}`, [gateEv(1, i ? 1 : 0, { choiceIndex: i ? 0 : 1 })]));
+    const d = storyReport(MUNDIAL, MUNDIAL_CFG, three);
+    assert.equal(MIN_FOR_PERCENT, 5);
+    assert.equal(d.puertas.find((p) => p.n === 1).showPercent, false);
+});
+
+test('Español report: without readable events it falls back to the session summary and saved picks', () => {
+    const s = {
+        uid: 'x', name: 'x', events: null,
+        raw: {
+            sessions: [{ module: 'el-viaje', startedAt: 1, completed: true, summary: { gates: { 1: 1, 4: 0 }, path: { f1: 'recepcion', f2: 'ciudad' } } }],
+            scores: [],
+            progress: { 'el-viaje': { state: JSON.stringify({ done: { 1: 1, 4: 1 }, choice: { 1: 'facturaba', '4a': 'u', 4: 'u' }, conf: { 1: 1, 4: 0 } }) } },
+        },
+    };
+    const mine = studentStory({ id: 'el-viaje', gameNames: ['El Viaje'] }, VIAJE_CFG, s);
+    assert.equal(mine.finished, true);
+    assert.equal(mine.puertas[0].right, true);
+    assert.deepEqual(mine.puertas[3].picks, { a: 'u', b: 'u' });
+    assert.equal(mine.puertas[3].right, false);
+    assert.equal(mine.puertas[1].answered, false);
+    assert.deepEqual(mine.forks.map((f) => f.text), ['Recepción', 'Qué conocer en Monterrey']);
+});
+
+test('Español report: nothing to say when every first try was right, and played stories are found', () => {
+    assert.equal(worthFiveStory([{ n: 1, label: 'x', answered: 4, right: 4, blanks: [] }]), null);
+    const s = esStudent('p', []);
+    assert.deepEqual(playedStoryIds([MUNDIAL, { id: 'el-viaje', gameNames: ['El Viaje'] }], [s]), ['el-mundial']);
+});
+
+test('Español report: every word a teacher reads avoids score, grade, wrong and at risk', () => {
+    const src = readFileSync(new URL('../public/mission-control/teacher.js', import.meta.url), 'utf8');
+    const block = src.slice(src.indexOf('/* ESPAÑOL STORIES (2026-11-27)'), src.indexOf("/* One tap from a game's drill-down"));
+    const shown = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\$\{[^}]*\}/g, '');
+    for (const word of [/\bscore/i, /\bgrade/i, /\bwrong\b/i, /at risk/i]) assert.equal(word.test(shown), false, `the Español report says ${word}`);
+});

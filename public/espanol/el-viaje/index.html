@@ -1155,7 +1155,7 @@ function finish(n){
   setTimeout(()=>$$('#dots i')[n-1].classList.add('on'),1200);
   document.getElementById('g'+n+'nx').hidden=false;
   const GC={1:['facturé','facturaba'],2:['A','B','C'],3:['A','B','C'],4:['u','t'],5:['está','esté']};
-  TM.choice({scenarioIndex:n,choiceIndex:GC[n].indexOf(S.choice[n]),score:firstTry(n),category:'gate'});pushSummary();saveProgress();
+  TM.choice(Object.assign({scenarioIndex:n,choiceIndex:GC[n].indexOf(S.choice[n]),score:firstTry(n),category:'gate'},n===4?{picks:{a:S.choice['4a']||null,b:S.choice[4]}}:{}));/* picks: both turns of Puerta 4, for Reports */pushSummary();saveProgress();
 }
 $$('[data-unlock]').forEach(b=>b.addEventListener('click',()=>{
   const n=b.dataset.unlock;let first=null;

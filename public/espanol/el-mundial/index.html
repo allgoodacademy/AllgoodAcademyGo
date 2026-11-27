@@ -951,7 +951,7 @@ function jodi(n,m,txt){document.getElementById('g'+n+'jt').innerHTML=`<div class
 function finish(n){if(S.done[n])return;S.done[n]=1;setTimeout(()=>CV.reveal(n),0);const st=document.querySelector('#g'+n+' .gst');st.textContent='Abordado';st.classList.add('done');
   const sp=$('#stamp');sp.innerHTML=`P${n}<small>ABORDADO</small>`;sp.classList.remove('go2');void sp.offsetWidth;sp.classList.add('go2');
   setTimeout(()=>$$('#dots i')[n-1].classList.add('on'),1200);document.getElementById('g'+n+'nx').hidden=false;
-  TM.choice({scenarioIndex:n,choiceIndex:choiceIndexOf(n),score:S.conf[n]||0,category:'gate'});pushSummary();saveProgress()}
+  TM.choice(Object.assign({scenarioIndex:n,choiceIndex:choiceIndexOf(n),score:S.conf[n]||0,category:'gate'},typeof S.choice[n]==='object'?{picks:S.choice[n]}:{}));/* picks: each blank's verb, so Reports can show first tries per blank */pushSummary();saveProgress()}
 /* Puertas 1-2: the option picked (A=0, B=1, C=2). Puertas 3-5 (verb chips): how many slots were right. */
 function choiceIndexOf(n){const c=S.choice[n];if(typeof c==='string')return Math.max(0,['A','B','C'].indexOf(c));if(n===3)return [1,2,3].filter(i=>c&&c[i]===KEY3[i]).length;if(n===4)return c?(c.a==='conocía')+(c.b==='conocí'):0;if(n===5)return c?Object.keys(KEY5).filter(s=>okSlot(s,c[s])).length:0;return 0}
 $$('[data-unlock]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.unlock;let first=null;$$('[data-after="'+k+'"]').forEach(s=>{s.classList.remove('locked');if(!first)first=s;watch(s)});
