@@ -68,11 +68,18 @@
         setTimeout(poll, 50);
     })();
 
+    // PRESENTAR (?mode=presentar, /js/story-presentar.js): the teacher is running the story
+    // for the class on a projector. Their own progress and completion are not written (a
+    // class session must never read as solo play, or resume next time), and nothing is read
+    // back. What a presented session saves is one class-level document, written there.
+    var PRESENTAR = /[?&]mode=presentar(&|$)/.test(location.search);
+
     function clean(data) {
         try { return JSON.parse(JSON.stringify(data || {})); } catch (e) { return {}; }
     }
 
     function saveProgress(slug, data) {
+        if (PRESENTAR) return Promise.resolve();
         var d = clean(data);
         return ready.then(function (core) {
             if (core && core.saveModuleProgress) return core.saveModuleProgress(slug, d);
@@ -81,12 +88,14 @@
     }
 
     function loadProgress(slug) {
+        if (PRESENTAR) return Promise.resolve(null);
         return ready.then(function (core) {
             return core && core.loadModuleProgress ? core.loadModuleProgress(slug) : null;
         }).catch(function () { return null; });
     }
 
     function logCompletion(gameName, fields) {
+        if (PRESENTAR) return Promise.resolve();
         var f = clean(fields);
         return ready.then(function (core) {
             var user = core && core.auth && core.auth.currentUser;
@@ -104,6 +113,7 @@
 
     window.StoryTrack = {
         TM: TM,
+        presentar: PRESENTAR,
         ready: ready,
         setDebug: function (fn) { debug = typeof fn === 'function' ? fn : null; },
         saveProgress: saveProgress,

@@ -295,6 +295,7 @@ const state = {
     tab: 'overview',
     drillId: null,           // an assignment open on Overview
     reportTab: null,         // Reports: lessons | challenges | games | sims | espanol
+    presented: [],           // this class's presented sessions (Presentar en clase), newest first
     storyCfg: {},            // story id → its report.json (false while loading, null if it failed)
     filter: 'all',           // Students tab: all | check | done
     search: '',
@@ -471,6 +472,16 @@ async function load() {
         });
     } catch (e) {
         console.warn('[Mission Control] per-student extras unavailable — showing the class set only', e && e.code);
+    }
+
+    // Presented sessions (Presentar en clase): class-level vote counts the teacher saved from
+    // the projector. No student is in them. Unreadable is not fatal: the report just omits them.
+    state.presented = [];
+    try {
+        const pSnap = await getDocs(collection(db, 'artifacts', appId, 'classrooms', state.code, 'presented_sessions'));
+        state.presented = pSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+    } catch (e) {
+        console.warn('[Mission Control] presented sessions unavailable', e && e.code);
     }
 
     const rows = (await Promise.all(memberUids.map(async (uid) => {
@@ -1024,7 +1035,8 @@ function workRow(id, justFor) {
     const it = itemOf(id);
     const who = justFor ? students.filter((s) => allAssignedIds(s.mine).includes(id)) : students;
     const done = who.filter((s) => statusFor(s, id).done).length;
-    const hint = it.kind === 'story' ? 'see where the class split' : 'see where they got stuck';
+    const np = it.kind === 'story' ? presentedFor(id).length : 0;
+    const hint = it.kind === 'story' ? `see where the class split${np ? ` · ${plural(np, 'presented session')}` : ''}` : 'see where they got stuck';
     const pct = who.length ? Math.round(done / who.length * 100) : 0;
     const verb = it.type === 'game' ? 'played' : 'finished';
     return `<button class="wi" type="button" data-drill="${esc(id)}">
@@ -1096,8 +1108,10 @@ const stories = () => [...state.registryById.values()].filter((m) => m.type === 
 function reportIds() {
     const out = unionAll();
     for (const id of playedStoryIds(stories(), state.students)) if (!out.includes(id)) out.push(id);
+    for (const p of state.presented) if (state.registryById.has(p.story) && !out.includes(p.story)) out.push(p.story);
     return out;
 }
+const presentedFor = (id) => state.presented.filter((p) => p.story === id);
 const reportTabKey = () => `mc_reports_tab_${(state.user && state.user.uid) || 'me'}`;
 function reportTab() {
     if (state.reportTab) return state.reportTab;
@@ -1272,23 +1286,57 @@ function blankHtml(b, showPercent) {
           <div class="p">${countOrShare(o.count, b.n, showPercent)}</div></div>`).join('');
     return `<div class="eblank">${b.sentence ? `<p class="q" lang="es">${esc(b.sentence)}</p>` : ''}${rows}</div>`;
 }
+/* Presented sessions (Presentar en clase), kept apart from solo play: these are the class's
+   votes by show of hands, saved by the teacher from the projector. A quick vote ("nearly
+   everyone", "split") is an approximate share, and says so. */
+function presentedHtml(it, cfg) {
+    const list = presentedFor(it.id);
+    if (!list.length) return '';
+    const sessions = list.map((p) => {
+        const puertas = (cfg.puertas || []).map((pc) => {
+            const saved = p.puertas && p.puertas[pc.n];
+            if (!saved || !Array.isArray(saved.rows)) return '';
+            const rows = pc.blanks.map((b, bi) => {
+                const r = saved.rows[bi];
+                if (!r) return '';
+                const quick = r.mode === 'quick';
+                const total = quick ? 0 : Object.values(r.counts || {}).reduce((a, c) => a + (Number(c) || 0), 0);
+                const opts = b.options.map((o) => {
+                    const pct = Number((r.shares || {})[o.k]) || 0;
+                    const right = b.right.includes(o.k);
+                    return `<div class="eo${right ? ' ok' : ''}"><div class="t" lang="es">${esc(o.text || o.k)}${right ? ' <span class="mk b" lang="en">✓ Right answer</span>' : ''}${r.pick === o.k ? ' <span class="mk o" lang="en">Class pick</span>' : ''}</div>
+                      <div class="split" aria-hidden="true"><i style="width:${pct}%"></i></div>
+                      <div class="p">${quick ? `about ${pct}%` : `${Number((r.counts || {})[o.k]) || 0} <small>of ${total}</small>`}</div></div>`;
+                }).join('');
+                return `<div class="eblank">${b.sentence ? `<p class="q" lang="es">${esc(b.sentence)}</p>` : ''}${opts}${quick ? '<p class="note" style="margin-top:4px">Quick vote: approximate, not a count.</p>' : ''}</div>`;
+            }).join('');
+            return `<div class="epres"><div class="eyebrow">Puerta ${pc.n} · ${esc(pc.label)}</div>${rows}</div>`;
+        }).join('');
+        const forks = (cfg.forks || []).map((f) => { const o = f.options.find((x) => x.k === (p.forks || {})[f.key]); return o ? `<span lang="es">${esc(f.label)}: ${esc(o.text)}</span>` : ''; }).filter(Boolean).join(' · ');
+        return `<details class="as"${list.length === 1 ? ' open' : ''}><summary><span><b style="font-size:13.5px">Presented ${esc(fmtDate(toMillis(p.createdAt)))}</b><div class="meta">The class voted by show of hands${forks ? ` · path: ${forks}` : ''}</div></span></summary>
+            <div class="body">${puertas || '<p class="empty">No votes were saved in this session.</p>'}</div></details>`;
+    }).join('');
+    return `<div class="box epu"><h3>${plural(list.length, 'presented session')}</h3>
+        <p class="sub">Played together on the projector with Presentar en clase. These are class votes, kept apart from what students did on their own. No student is named or counted.</p>${sessions}</div>`;
+}
 function drillStoryHtml(it, who) {
     const cfg = storyCfg(it);
     if (cfg === false) return '<div class="box"><p class="empty">Loading this story\'s report…</p></div>';
     if (!cfg) return '<div class="box"><p class="empty">This story\'s report could not load. Reload the page to try again.</p></div>';
     const d = storyReport(it, cfg, who);
-    const head = `<div class="box"><h3><span lang="es">${esc(it.name)}</span> · ${d.finished} of ${d.n} finished</h3>
+    const head = `<div class="box"><h3><span lang="es">${esc(it.name)}</span> · ${d.finished} of ${d.n} finished${presentedFor(it.id).length ? ` · ${plural(presentedFor(it.id).length, 'presented session')}` : ''}</h3>
         <p class="sub">${d.played} of ${d.n} opened it. What you see below is each student's first try at each Puerta. First tries are practice.</p>
         ${d.worth ? `<div class="talk"><b>Worth five minutes tomorrow:</b> <span lang="es">${esc(d.worth.text)}</span></div>` : ''}
         ${d.forks.map((f) => `<p class="efork"><b>Paths picked <span class="muted">(<span lang="es">${esc(f.label)}</span>, no right answer here)</span>:</b> <span lang="es">${f.options.map((o) => `${esc(o.text)} ${o.count}`).join(' · ')}</span></p>`).join('')}
         ${eventsNote()}</div>`;
-    if (!d.played) return `${head}<div class="box"><p class="empty">Nobody in this class has opened it yet from a device that joined.</p></div>`;
+    const shown = presentedHtml(it, cfg);
+    if (!d.played) return `${head}<div class="box"><p class="empty">Nobody in this class has opened it on their own yet from a device that joined.</p></div>${shown}`;
     const cards = d.puertas.map((p) => `<div class="box epu"><div class="eyebrow">Puerta ${p.n} · ${esc(p.label)}</div>
         <p class="eprompt" lang="es">${esc(p.prompt)}</p>${p.ask ? `<p class="sub" lang="es">${esc(p.ask)}</p>` : ''}
         ${p.answered
             ? `<p class="sub">${p.right} of ${p.answered} got it on the first try${p.showPercent ? ` (${p.rate}%)` : ''}.${p.blanks.length > 1 ? ' Each blank is shown on its own.' : ''}</p>${p.blanks.map((b) => blankHtml(b, p.showPercent)).join('')}`
             : '<p class="empty">Nobody has reached this Puerta yet.</p>'}</div>`).join('');
-    return head + cards;
+    return head + cards + shown;
 }
 
 /* One tap from a game's drill-down: give the lesson the game points to to the students who
@@ -1902,12 +1950,16 @@ function cardActions(m) {
     const tryIt = `<a class="btn ghost sm" href="${esc(m.url)}" data-name="${esc(m.name)}">Try it</a>`;
     const present = m.type === 'simulation' && m.present
         ? `<a class="btn ghost sm" href="${esc(m.url)}#present" data-name="${esc(m.name)}">Present</a>` : '';
+    // Español stories: the class plays it together on the projector (story-presentar.js).
+    // Teacher-only like everything here; the class code rides along so the recap can save.
+    const presentar = m.type === 'story' && state.code
+        ? `<a class="btn ghost sm" href="${esc(m.url)}?mode=presentar&amp;class=${encodeURIComponent(state.code)}" data-name="${esc(m.name)}" lang="es">Presentar en clase</a>` : '';
     const id = state.code ? registryIdFor(m) : null;
-    if (!id || !state.registryById.has(id)) return tryIt + present;
+    if (!id || !state.registryById.has(id)) return tryIt + present + presentar;
     const kind = kindOf(m.type === 'simulation' ? 'sim' : m.type);
     const on = ((state.classroom && state.classroom[CLASS_FIELD[kind]]) || []).includes(id);
     const assign = `<button class="btn sm assign${on ? ' on' : ''}" type="button" data-assign-card="${esc(id)}" data-kind="${kind}"${state.readOnly ? ' disabled' : ''}>${on ? 'Assigned ✓' : 'Assign'}<span class="sr"> ${esc(m.name)}${on ? ' (tap to unassign)' : ''}</span></button>`;
-    return tryIt + present + assign;
+    return tryIt + present + presentar + assign;
 }
 async function toggleCardAssign(btn) {
     if (state.readOnly || !state.code) return;
