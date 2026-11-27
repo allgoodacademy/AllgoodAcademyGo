@@ -243,6 +243,8 @@ const ACTIVITY_PAGES = [
     'public/educational-games/the-rumor-mill/index.html',
     'public/educational-games/pattern-lab/index.html',
     'public/educational-games/takethebait/index.html',
+    // Practice apps (2026-11-27): the app fills the screen under the bar; the task panel is its own row.
+    'public/practice/glimmer/index.html',
 ];
 const PAGES = [
     // Site pages: the bar sticks to the top as you scroll.
@@ -267,6 +269,7 @@ const PAGES = [
     // Hubs.
     { file: 'public/educational-games/index.html', slug: 'games',        skin: 'light' },
     { file: 'public/simulations/index.html',       slug: 'simulations',  skin: 'light' },
+    { file: 'public/practice/index.html',          slug: 'practice',     skin: 'light' },
     { file: 'public/dashboard/index.html',         slug: 'dashboard',    skin: 'light' },
     // Teacher sign-in. Its "Teacher sign in" link is the one marked as here (and the link
     // is gone for a signed-in teacher, whose class is on /dashboard/ — see the session script).
