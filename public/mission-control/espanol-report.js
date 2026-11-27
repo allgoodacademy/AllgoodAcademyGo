@@ -178,14 +178,43 @@ export function growthReport(checksCfg, storyId, students = []) {
     return { n, boarded, showPercent: n >= MIN_FOR_PERCENT, slots: out, worth };
 }
 
-/* The same view for one presented session: the class's quick votes before and after. Each
-   saved item is { pick, right } where `right` is the approximate share who had it right. */
+/* The same view for one presented session: the class's quick votes before and after, as
+   words: 'right' (the class picked the right answer), 'other' (it picked another one) or
+   'split'. Never a percentage: nobody counted (AA-17). Saved items are { pick, right } with
+   `right` true / false / null (split). Sessions saved before 2026-11-27 stored an invented
+   share in `right` (90 for the right pick); they read the same way. */
+export function presentedCheck(item) {
+    if (!item) return null;
+    if (item.pick === 'split' || item.right === null) return 'split';
+    if (typeof item.right === 'number') return item.right >= 90 ? 'right' : 'other';
+    return item.right === true ? 'right' : 'other';
+}
 export function presentedGrowth(checksCfg, saved) {
     if (!saved || !Array.isArray(saved.emb) || !saved.emb.length) return null;
     const slots = (checksCfg && checksCfg.slots) || [];
     return slots.map((sl, i) => ({
         skill: sl.skill,
-        emb: saved.emb[i] ? Number(saved.emb[i].right) || 0 : null,
-        adu: saved.adu && saved.adu[i] ? Number(saved.adu[i].right) || 0 : null,
+        emb: presentedCheck(saved.emb[i]),
+        adu: presentedCheck(saved.adu && saved.adu[i]),
     }));
+}
+
+/* One saved Presentar vote row, read the same way whichever shape it was saved in.
+   Exact: { mode: 'exact', counts, total }. Quick: { mode: 'quick', quick } where `quick` is
+   the option the class picked or 'split'; there are no numbers for a quick vote. Rows saved
+   before 2026-11-27 have no `quick` and carry invented `shares` (90 / 5 / 5, or equal for a
+   split): the label is read back from them and the numbers are dropped. */
+export function presentedVote(r) {
+    if (!r) return null;
+    if (r.mode === 'exact') {
+        const counts = {};
+        let total = 0;
+        for (const [k, c] of Object.entries(r.counts || {})) { counts[k] = Number(c) || 0; total += counts[k]; }
+        return { mode: 'exact', counts, total };
+    }
+    if (typeof r.quick === 'string' && r.quick) return { mode: 'quick', quick: r.quick };
+    const vals = Object.entries(r.shares || {}).map(([k, v]) => [k, Number(v) || 0]);
+    if (vals.length > 1 && vals.every(([, v]) => v === vals[0][1])) return { mode: 'quick', quick: 'split' };
+    if (vals.length) return { mode: 'quick', quick: vals.sort((a, b) => b[1] - a[1])[0][0] };
+    return { mode: 'quick', quick: r.pick || 'split' };
 }

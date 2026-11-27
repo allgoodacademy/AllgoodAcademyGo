@@ -1129,7 +1129,7 @@ console.log('\nPresented sessions (Presentar en clase):');
   const PRES = (db, code) => collection(db, 'artifacts', APP, 'classrooms', code, 'presented_sessions');
   const session = (over = {}) => ({
     v: 1, story: 'el-mundial', classroomCode: 'KM7QPD', teacherUid: 'teacher_1', createdAt: serverTimestamp(),
-    puertas: { 1: { rows: [{ key: null, mode: 'quick', counts: null, shares: { A: 90, B: 5, C: 5 }, pick: 'A', right: true }] } },
+    puertas: { 1: { rows: [{ key: null, mode: 'quick', quick: 'A', pick: 'A', right: true }, { key: '1', mode: 'exact', counts: { A: 18, B: 6 }, pick: 'A', right: true }] } },
     forks: { f1: 'plaza' }, checks: null, ...over,
   });
   await env.withSecurityRulesDisabled(async (ctx) => {

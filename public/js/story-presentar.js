@@ -16,17 +16,21 @@
 //   - THE VOTE. At a Puerta the class-vote panel ("¿Juegan en clase? Cuenten las manos") is
 //     the main event: quick buttons by default (Casi todos A · Dividido · Casi todos B), or
 //     exact hand counts (+ / −, or the A / B / C keys). Revelar stays locked until there is a
-//     vote. On reveal: bars with numbers, the right answer marked with ✓ and words, and then
+//     vote. On reveal: the right answer marked with ✓ and words, the class's pick tagged, bars
+//     and numbers ONLY for an exact count (a quick vote shows words, never a percentage), then
 //     the story plays the branch for the CLASS'S MAJORITY PICK by pressing the story's own
 //     buttons, so a wrong majority plays the wrong branch exactly as it does solo.
 //   - Space plays the audio. English stays hidden until the teacher presses E.
 //   - THE RECAP. First-vote result per Puerta, the one worth five minutes tomorrow, and
 //     Guardar en Mission Control, which writes ONE presented-session document to the
-//     teacher's own class (firestore.rules #6d): story, date, per-Puerta counts and whether
-//     they were quick (approximate) or exact, and the fork picked. Nothing else.
+//     teacher's own class (firestore.rules #6d): story, date, per-Puerta votes exactly as
+//     entered (the quick label, or the hand counts), and the fork picked. Nothing else.
 //
-// PRIVACY. No name is asked, shown or stored. Quick votes are saved as approximate shares
-// and labelled that way in Mission Control. /js/story-tracking.js skips the teacher's own
+// NO INVENTED NUMBERS (2026-11-27, AA-17). Nobody counts a quick vote, so it never becomes a
+// percentage: not on the projector, not in the recap, not in the saved session. Numbers
+// appear only when the teacher entered counts, and then they are those counts.
+//
+// PRIVACY. No name is asked, shown or stored. /js/story-tracking.js skips the teacher's own
 // progress and completion records in this mode, so a class session never reads as solo play.
 (function () {
     var q;
@@ -398,20 +402,20 @@
     }
     // Which option the story plays: the majority, or the teacher's pick when there is none.
     function playPick(row) { return majority(row) || row.tie; }
-    // Quick votes are approximate by design: "nearly everyone" reads as about 90%.
-    function shares(row) {
-        var out = {};
-        if (row.mode === 'exact') { var t = total(row); row.opts.forEach(function (o) { out[o.k] = t ? Math.round((row.counts[o.k] || 0) / t * 100) : 0; }); return out; }
-        var n = row.opts.length;
-        row.opts.forEach(function (o) { out[o.k] = row.quick === SPLIT ? Math.round(100 / n) : (o.k === row.quick ? 90 : Math.round(10 / (n - 1))); });
+    // Percent of the hands counted for each option. Exact counts only: a quick vote has none.
+    function pcts(snap) {
+        var t = snap.counts ? snap.opts.reduce(function (a, o) { return a + (snap.counts[o.k] || 0); }, 0) : 0;
+        var out = { total: t };
+        snap.opts.forEach(function (o) { out[o.k] = t ? Math.round((snap.counts[o.k] || 0) / t * 100) : 0; });
         return out;
     }
     function snapRow(row) {
         var pick = playPick(row);
         return {
             key: row.key, label: row.label, sentence: row.sentence, mode: row.mode,
+            quick: row.mode === 'quick' ? row.quick : null,
             counts: row.mode === 'exact' ? row.opts.reduce(function (a, o) { a[o.k] = row.counts[o.k] || 0; return a; }, {}) : null,
-            shares: shares(row), pick: pick, right: row.right ? row.right.indexOf(pick) >= 0 : null,
+            pick: pick, right: row.right ? row.right.indexOf(pick) >= 0 : null,
             opts: row.opts.map(function (o) { return { k: o.k, label: o.label }; }), rightKeys: row.right || [],
         };
     }
@@ -544,15 +548,26 @@
         paintVote(n);
     }
 
+    function tags(snapRow, o, classPick) {
+        return (snapRow.rightKeys.indexOf(o.k) >= 0 ? '<span class="pm-ok" lang="es">✓ Respuesta correcta</span>' : '')
+            + (classPick === o.k ? '<span class="pm-pick" lang="es">Voto de la clase</span>' : '');
+    }
+    // A vote's result. Exact counts: bars and the real numbers ("18 de 24 · 75%"). A quick
+    // vote: words only, the class's pick and the right answer, with no bar and no number.
     function barsHtml(snapRow) {
-        var approx = snapRow.mode === 'quick';
-        var t = approx ? 0 : snapRow.opts.reduce(function (a, o) { return a + (snapRow.counts[o.k] || 0); }, 0);
+        if (snapRow.mode === 'quick') {
+            var split = snapRow.quick === SPLIT;
+            var classPick = split ? null : snapRow.quick;
+            var shown = snapRow.opts.filter(function (o) { return o.k === classPick || snapRow.rightKeys.indexOf(o.k) >= 0; });
+            return '<div class="pm-qres"><p class="pm-ql" lang="es">' + (split ? 'Dividido · La clase estaba dividida.' : 'Casi todos') + '</p>'
+                + shown.map(function (o) { return '<p class="w" lang="es">' + esc(o.label) + tags(snapRow, o, classPick) + '</p>'; }).join('') + '</div>';
+        }
+        var p = pcts(snapRow);
         return '<div class="pm-bars">' + snapRow.opts.map(function (o) {
             var ok = snapRow.rightKeys.indexOf(o.k) >= 0;
-            var pct = snapRow.shares[o.k] || 0;
-            return '<span class="w" lang="es">' + esc(o.label) + (ok ? '<span class="pm-ok" lang="es">✓ Respuesta correcta</span>' : '') + (snapRow.pick === o.k ? '<span class="pm-pick" lang="es">Voto de la clase</span>' : '') + '</span>'
-                + '<span class="tr' + (ok ? ' ok' : '') + '" aria-hidden="true"><i style="width:' + pct + '%"></i></span>'
-                + '<span class="val">' + (approx ? 'aprox. ' + pct + '%' : (snapRow.counts[o.k] || 0) + ' de ' + t + ' · ' + pct + '%') + '</span>';
+            return '<span class="w" lang="es">' + esc(o.label) + tags(snapRow, o, snapRow.pick) + '</span>'
+                + '<span class="tr' + (ok ? ' ok' : '') + '" aria-hidden="true"><i style="width:' + p[o.k] + '%"></i></span>'
+                + '<span class="val">' + (snapRow.counts[o.k] || 0) + ' de ' + p.total + ' · ' + p[o.k] + '%</span>';
         }).join('') + '</div>';
     }
     // The bars for `snap`. `final`: the last box of the Puerta, which offers Volver a votar.
@@ -639,25 +654,38 @@
 
     /* ── recap + save ───────────────────────────────────────────────────────── */
     var recapOpen = false;
+    // The row most worth revisiting. Order only, never shown: a quick vote for another answer
+    // first, then exact counts by how few had it right, then a split class.
     function worthLine() {
         var worst = null;
         Object.keys(votes).forEach(function (n) {
             firstRows(votes[n]).forEach(function (r) {
                 if (!r.rightKeys.length) return;
-                var rightShare = r.rightKeys.reduce(function (a, k) { return a + (r.shares[k] || 0); }, 0);
-                if (rightShare < 100 && (!worst || rightShare < worst.share)) worst = { n: Number(n), share: rightShare, row: r };
+                var rank;
+                if (r.mode === 'quick') rank = r.quick === SPLIT ? 101 : r.rightKeys.indexOf(r.quick) >= 0 ? null : -1;
+                else { var p = pcts(r); rank = p.total ? r.rightKeys.reduce(function (a, k) { return a + p[k]; }, 0) : null; if (rank === 100) rank = null; }
+                if (rank != null && (!worst || rank < worst.rank)) worst = { n: Number(n), rank: rank, row: r };
             });
         });
         if (!worst) return '';
-        var cfg = puertaCfg(worst.n);
-        var miss = worst.row.opts.filter(function (o) { return worst.row.rightKeys.indexOf(o.k) < 0; }).sort(function (a, b) { return (worst.row.shares[b.k] || 0) - (worst.row.shares[a.k] || 0); })[0];
-        return 'Puerta ' + worst.n + (cfg ? ' · ' + esc(cfg.label) : '') + (miss ? ': ' + (worst.row.mode === 'quick' ? 'about ' : '') + (worst.row.shares[miss.k] || 0) + '% picked <span lang="es">' + esc(miss.label) + '</span>.' : '.');
+        var cfg = puertaCfg(worst.n), r = worst.row;
+        var head = 'Puerta ' + worst.n + (cfg ? ' · ' + esc(cfg.label) : '');
+        if (r.mode === 'quick') {
+            if (r.quick === SPLIT) return head + ': the class was split.';
+            var picked = r.opts.filter(function (o) { return o.k === r.quick; })[0];
+            return head + ': the class picked <span lang="es">' + esc(picked ? picked.label : r.quick) + '</span>.';
+        }
+        var p = pcts(r);
+        var miss = r.opts.filter(function (o) { return r.rightKeys.indexOf(o.k) < 0; }).sort(function (a, b) { return (r.counts[b.k] || 0) - (r.counts[a.k] || 0); })[0];
+        return head + (miss ? ': ' + (r.counts[miss.k] || 0) + ' of ' + p.total + ' picked <span lang="es">' + esc(miss.label) + '</span> (' + p[miss.k] + '%).' : '.');
     }
     function sessionDoc(uid) {
         var puertas = {};
         Object.keys(votes).forEach(function (n) {
             if (!firstRows(votes[n]).length) return;
-            puertas[n] = { rows: firstRows(votes[n]).map(function (r) { return { key: r.key == null ? null : String(r.key), mode: r.mode, counts: r.counts, shares: r.shares, pick: r.pick, right: r.right }; }) };
+            puertas[n] = { rows: firstRows(votes[n]).map(function (r) { var out = { key: r.key == null ? null : String(r.key), mode: r.mode, pick: r.pick, right: r.right };
+                if (r.mode === 'quick') out.quick = r.quick; else out.counts = r.counts;
+                return out; }) };
         });
         var checks = window.StoryChecks && window.StoryChecks.presentedResults ? window.StoryChecks.presentedResults() : null;
         return { v: 1, story: SLUG, classroomCode: CODE, teacherUid: uid, puertas: puertas, forks: forkPicks(), checks: checks || null };

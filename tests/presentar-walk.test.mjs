@@ -4,6 +4,9 @@
 //   - the recap ("Resumen de la clase") opens at the end, and
 //   - no Siguiente press ever moves the page UP by more than one screen (the "it sends me
 //     back to the top" bug). Atrás is never pressed here.
+//   - NO INVENTED NUMBERS (AA-17): a quick vote shows no "%" anywhere, in the reveal panel or
+//     in the recap. The `exact` walks count hands at the first Puerta (3 for the first
+//     option, 1 for the second) and the reveal and recap show "3 de 4 · 75%".
 // Projector sizes: 1440×660 and 1280×720.
 //
 // Needs Playwright with Chromium (pre-installed in Claude Code cloud sessions; elsewhere
@@ -42,7 +45,7 @@ function serve() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function walk(browser, base, slug, viewport) {
+async function walk(browser, base, slug, viewport, exact = false) {
     const ctx = await browser.newContext({ viewport });
     const page = await ctx.newPage();
     const errors = [];
@@ -74,7 +77,19 @@ async function walk(browser, base, slug, viewport) {
         if (el) el.click(); return !!el;
     }, sel);
 
-    let presses = 0, waits = 0;
+    let presses = 0, waits = 0, reveals = 0, counted = false;
+    // After a Revelar: the newest result panel. A quick vote's has no "%" at all.
+    const checkReveal = async () => {
+        await sleep(150);
+        const res = await page.evaluate(() => Array.from(document.querySelectorAll('.pm-vote .pm-res')).map((r) => ({ text: r.textContent, quick: !!r.querySelector('.pm-qres'), bars: !!r.querySelector('.pm-bars') })));
+        assert.ok(res.length, `${slug}: no result panel after Revelar`);
+        for (const r of res) {
+            if (r.quick && !r.bars) assert.doesNotMatch(r.text, /%/, `${slug}: a quick vote showed a percentage: ${r.text}`);
+            assert.doesNotMatch(r.text, /aprox/, `${slug}: "aprox." is back`);
+        }
+        reveals++;
+        return res;
+    };
     // PRESENTAR_SHOTS=<dir>: a screenshot the first time each bar message shows (for a PR).
     const SHOTS = process.env.PRESENTAR_SHOTS, shot = new Set();
     for (let step = 0; step < 400; step++) {
@@ -96,6 +111,18 @@ async function walk(browser, base, slug, viewport) {
         if (!m) continue;
         assert.doesNotMatch(m, /Elijan la respuesta de la clase en la historia/, `${slug}: the vote could not drive the story`);
         if (/cinco preguntas/.test(m)) { await clickShown('.ea-votes .ea-v, #ea-go'); continue; }
+        if (exact && !counted && /Primero voten|Primero el voto/.test(m)) {
+            // Count hands at the first Puerta: 3 for the first option, 1 for the second.
+            counted = true;
+            await clickShown('.pm-vote [data-mode="exact"]');
+            await sleep(100);
+            for (const [o, times] of [[0, 3], [1, 1]]) for (let t = 0; t < times; t++) await clickShown(`.pm-vote .pm-cnt button[data-d="1"][data-o="${o}"]`);
+            await sleep(100);
+            await clickShown('.pm-vote [data-reveal]');
+            const res = await checkReveal();
+            assert.ok(res.some((r) => /3 de 4 · 75%/.test(r.text) && /1 de 4 · 25%/.test(r.text)), `${slug}: the exact count did not show 3 de 4 · 75%: ${res.map((r) => r.text).join(' | ')}`);
+            continue;
+        }
         if (/Primero voten|Falta el voto|Primero el voto/.test(m)) {
             // Vote "Casi todos" for the first option in each row still empty, then Revelar.
             await page.evaluate(() => {
@@ -106,10 +133,11 @@ async function walk(browser, base, slug, viewport) {
             });
             await sleep(100);
             await clickShown('.pm-vote [data-reveal]');
+            await checkReveal();
             continue;
         }
-        if (/Toquen Revelar/.test(m)) { await clickShown('.pm-vote [data-reveal]'); continue; }
-        if (/No hay mayoría/.test(m)) { await clickShown('.pm-vote [data-tie]'); await clickShown('.pm-vote [data-reveal]'); continue; }
+        if (/Toquen Revelar/.test(m)) { await clickShown('.pm-vote [data-reveal]'); await checkReveal(); continue; }
+        if (/No hay mayoría/.test(m)) { await clickShown('.pm-vote [data-tie]'); await clickShown('.pm-vote [data-reveal]'); await checkReveal(); continue; }
         if (/elijan un camino/.test(m)) {
             if (!(await clickShown('section.fork:not(.locked) .path'))) {
                 if (!(await clickShown('section.fork:not(.locked) .opts .opt'))) await clickShown('section.fork:not(.locked) .mi');
@@ -134,6 +162,22 @@ async function walk(browser, base, slug, viewport) {
         }
     }
     assert.ok(await recapOpen(), `${slug} ${viewport.width}×${vh}: the recap never opened\n${log.slice(-15).join('\n')}`);
+    assert.ok(reveals > 0, `${slug}: no vote was revealed`);
+    // The recap: quick votes are words only; an exact count shows the real numbers.
+    const recap = await page.evaluate(() => ({
+        quick: Array.from(document.querySelectorAll('.pm-recap .pm-qres')).map((q) => q.textContent),
+        bars: Array.from(document.querySelectorAll('.pm-recap .pm-bars')).map((q) => q.textContent),
+        worth: (document.querySelector('.pm-recap .worth') || { textContent: '' }).textContent,
+        all: document.querySelector('.pm-recap').textContent,
+    }));
+    assert.ok(recap.quick.length, `${slug}: the recap shows no quick vote`);
+    for (const q of recap.quick) assert.doesNotMatch(q, /%/, `${slug}: the recap shows a percentage for a quick vote: ${q}`);
+    assert.doesNotMatch(recap.all, /aprox|about \d/, `${slug}: the recap invents a number`);
+    if (exact) assert.ok(recap.bars.some((b) => /3 de 4 · 75%/.test(b)), `${slug}: the recap lost the exact count`);
+    else {
+        assert.equal(recap.bars.length, 0, `${slug}: bars for a quick-only session`);
+        assert.doesNotMatch(recap.all, /%/, `${slug}: a quick-only recap shows a percentage`);
+    }
     assert.deepEqual(errors, [], `${slug}: page errors`);
     await ctx.close();
     return { presses, waits };
@@ -141,13 +185,13 @@ async function walk(browser, base, slug, viewport) {
 
 const SIZES = [{ width: 1440, height: 660 }, { width: 1280, height: 720 }];
 for (const slug of ['el-viaje', 'el-mundial']) {
-    for (const viewport of SIZES) {
-        test(`Presentar walk: ${slug} at ${viewport.width}×${viewport.height}, Siguiente only, never back up the page`, { skip: !chromium && 'Playwright is not installed', timeout: 600000 }, async () => {
+    for (const [viewport, exact] of [[SIZES[0], false], [SIZES[1], true]]) {
+        test(`Presentar walk: ${slug} at ${viewport.width}×${viewport.height}, Siguiente only, never back up the page, ${exact ? 'hands counted at Puerta 1' : 'quick votes only'}`, { skip: !chromium && 'Playwright is not installed', timeout: 600000 }, async () => {
             const srv = await serve();
             const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
             try {
                 const { port } = srv.address();
-                const r = await walk(browser, `http://127.0.0.1:${port}`, slug, viewport);
+                const r = await walk(browser, `http://127.0.0.1:${port}`, slug, viewport, exact);
                 assert.ok(r.presses > 10);
             } finally {
                 await browser.close();

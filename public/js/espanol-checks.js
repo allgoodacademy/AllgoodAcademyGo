@@ -137,10 +137,9 @@
                 if (answers.length !== i) return;
                 var j = b.dataset.j;
                 if (PRESENTAR) {
-                    // Approximate shares, like every quick vote: about 90% / 50% / 10% right.
-                    var n = it.o.length;
-                    var right = j === 'split' ? Math.round(100 / n) : (Number(j) === it.a ? 90 : Math.round(10 / (n - 1)));
-                    presented[phase].push({ pick: j === 'split' ? 'split' : Number(j), right: right });
+                    // Only what the class showed: its pick, and whether that was the right
+                    // answer (null when the class was split). Never a percentage (AA-17).
+                    presented[phase].push(j === 'split' ? { pick: 'split', right: null } : { pick: Number(j), right: Number(j) === it.a });
                     answers.push(j !== 'split' && Number(j) === it.a ? 1 : 0);
                 } else {
                     answers.push(Number(j) === it.a ? 1 : 0);
@@ -188,7 +187,7 @@
         }).join('');
         adu.innerHTML = '<div class="ea-pass one"><div class="l"><p class="ea-lbl">Mi pasaporte · ' + BANK.title + '</p>'
             + '<p class="ea-big" tabindex="-1" id="ea-pp">Al embarcar: ' + p1 + ' de 5. En la aduana: ' + p2 + ' de 5.</p>' + rows
-            + (PRESENTAR ? '<p class="ea-note" lang="en">Class votes by show of hands. Quick votes are approximate.</p>' : '')
+            + (PRESENTAR ? '<p class="ea-note" lang="en">Class votes by show of hands.</p>' : '')
             + '<div class="ea-post" lang="en"><b lang="es">La postal.</b> ' + BANK.postcard + ' Write it on paper or in Google Classroom; your teacher reads it there. Nothing is typed here.</div></div></div>';
         delete adu.dataset.pmWait;
         carta.classList.remove('ea-wait');
