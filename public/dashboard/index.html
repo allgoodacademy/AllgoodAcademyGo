@@ -246,7 +246,6 @@ h1,h2,h3{font-family:var(--font-display);font-weight:400;letter-spacing:-.02em;m
 .t-game .ic{background:var(--plum-wash);color:var(--plum)}
 .t-simulation .ic{background:var(--sage-wash);color:var(--sage)}
 .t-story .ic{background:var(--orange-wash);color:var(--orange-deep)}
-.t-practice .ic{background:var(--teal-wash);color:var(--teal-deep)}
 .pill{flex:none;align-self:flex-start;display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .pill.done{background:var(--sage-wash);color:var(--sage)}
 .pill.going{background:var(--orange-wash);color:var(--orange-deep)}
@@ -533,7 +532,6 @@ body.present .nav-shell.activity{display:none}
           <div class="sechead"><h1 class="view-title" id="games-title" tabindex="-1">Games</h1><a href="/educational-games/">All games</a></div>
           <p>Quick games, about 5 to 10 minutes. Each one ends by pointing you at the lesson for whatever it found you need.</p>
           <div class="grid" id="games-body"></div>
-          <div id="practice-wrap" hidden><div class="packlbl" style="margin-top:22px">Practice apps · New <a href="/practice/">What's this?</a></div><div class="grid" id="practice-body"></div></div>
         </section>
 
         <!-- SIMULATIONS -->
@@ -596,8 +594,8 @@ const PACKS = [
 // Digital Decisions Challenge also has to be a current-version run: a v1 score still shows
 // as played, but is not a current completion.
 const CURRENT_VERSION = { ddc: 'dd-v2' };
-const KIND = { lab: 'Lesson', challenge: 'Challenge', game: 'Game', simulation: 'Simulation', story: 'Historia', practice: 'Practice app' };
-const FALLBACK_ICON = { lab: 'book-open', challenge: 'trophy', game: 'gamepad-2', simulation: 'cloud-rain', story: 'languages', practice: 'app-window' };
+const KIND = { lab: 'Lesson', challenge: 'Challenge', game: 'Game', simulation: 'Simulation', story: 'Historia' };
+const FALLBACK_ICON = { lab: 'book-open', challenge: 'trophy', game: 'gamepad-2', simulation: 'cloud-rain', story: 'languages' };
 
 async function getJSON(url) {
     const res = await fetch(url, { cache: 'no-cache' });
@@ -615,10 +613,7 @@ const [registryData, simsData, espanolData] = await Promise.all([
 // this page renders them from simulations.json, so they are left out of MODULES here.
 // Español stories (type 'story') are in the registry too, for tracking and assigning; their
 // cards come from espanol.json (STORIES below), so they are left out of MODULES as well.
-const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden && m.type !== 'sim' && m.type !== 'story' && m.type !== 'practice');
-// Practice apps (2026-11-27): made-up copies of everyday software, listed under Games. Not
-// counted as games (no badge or 'Games finished' change) and not assignable yet.
-const PRACTICE = (registryData.modules || []).filter((m) => m.type === 'practice' && m.url && !m.retired && !m.hidden);
+const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden && m.type !== 'sim' && m.type !== 'story');
 const SIMS = (simsData.simulations || []).filter((s) => s.url).map((s) => ({ ...s, type: 'simulation' }));
 // Español stories: the card text from espanol.json, joined to the registry entry (same id) for
 // gameNames, so a finished story (game_scores) reads Done like everything else.
@@ -712,8 +707,6 @@ function renderCatalog() {
     $('packs-count').textContent = `${lessonsTotal} lessons · ${challengesTotal} Challenges`;
     const games = MODULES.filter((m) => m.type === 'game');
     $('games-body').innerHTML = games.length ? games.map((m) => card(m)).join('') : '<p class="empty">Games could not load just now.</p>';
-    $('practice-wrap').hidden = !PRACTICE.length;
-    $('practice-body').innerHTML = PRACTICE.map((m) => `<a class="card t-practice" href="${esc(m.url)}" data-name="${esc(m.name)}"><span class="ic"><i data-lucide="app-window"></i></span><span class="grow"><b>${esc(m.name)}</b><span class="meta">${esc([KIND.practice, minutesOf(m)].filter(Boolean).join(' · '))}</span></span></a>`).join('');
     $('sims-body').innerHTML = SIMS.length ? SIMS.map((s) => card(s)).join('') : '<p class="empty">Simulations could not load just now.</p>';
     $('n-packs').textContent = lessonsTotal + challengesTotal || '';
     $('n-games').textContent = games.length || '';

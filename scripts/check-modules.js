@@ -88,7 +88,7 @@ try {
 } catch (e) {
   fail(`public/data/modules-registry.json: not valid JSON — ${e.message}`);
 }
-const TYPES = new Set(['game', 'lab', 'challenge', 'sim', 'story', 'practice']);
+const TYPES = new Set(['game', 'lab', 'challenge', 'sim', 'story']);
 const seenIds = new Set();
 for (const m of REGISTRY) {
   if (!m.id) { fail('registry: an entry has no id'); continue; }
@@ -116,15 +116,14 @@ for (const m of REGISTRY) {
   // A STREAMED game is visible and assignable but reports outside the core funnel (see the
   // `stream` contract in the registry's _comment). Like `hidden`, it is a decision someone
   // made, so it must say why; unlike `hidden`, it stays on every surface a teacher uses.
-  if (m.stream !== undefined && m.type !== 'sim' && m.type !== 'story' && m.type !== 'practice') {
+  if (m.stream !== undefined && m.type !== 'sim' && m.type !== 'story') {
     if (m.type !== 'game') fail(`registry: "${m.id}" has a \`stream\` but only games may report on their own stream`);
     if (typeof m.stream !== 'string' || !m.stream.trim() || m.stream === 'core') fail(`registry: "${m.id}" \`stream\` must be a non-empty string other than 'core', got ${JSON.stringify(m.stream)}`);
     if (m.hidden === true) fail(`registry: "${m.id}" is both hidden and streamed — pick one (hidden = off every surface; streamed = visible but off the funnel)`);
     if (!(m.streamReason && String(m.streamReason).trim().length > 30)) fail(`registry: streamed game "${m.id}" needs a \`streamReason\` saying why it is outside the core funnel`);
   }
   if (m.type === 'sim' && m.pack !== null) fail(`registry: sim "${m.id}" must have pack: null (got ${JSON.stringify(m.pack)})`);
-  if (m.type === 'practice' && m.pack !== null) fail(`registry: practice app "${m.id}" must have pack: null (got ${JSON.stringify(m.pack)})`);
-  if (m.type !== 'game' && m.type !== 'sim' && m.type !== 'practice' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
+  if (m.type !== 'game' && m.type !== 'sim' && !m.retired && !m.pack) fail(`registry: "${m.id}" is a ${m.type} with no pack`);
   // An Español story (2026-11-27) belongs to the 'espanol' pack, which is not a Lab Pack: it
   // has no hub prefix or planned list in PACKS. Checked against espanol.json further down.
   if (m.type === 'story' && m.pack !== 'espanol') fail(`registry: story "${m.id}" must have pack: "espanol" (got ${JSON.stringify(m.pack)})`);
@@ -746,35 +745,6 @@ try {
   // Every simulation the site lists must be assignable.
   for (const row of simsList) {
     if (!simEntries.some((m) => m.simulationId === row.id)) fail(`registry: simulation "${row.id}" is in public/data/simulations.json but has no type 'sim' registry entry, so Mission Control cannot assign it`);
-  }
-}
-
-// --- practice apps in the registry (type 'practice', 2026-11-27)
-// A made-up copy of everyday software under public/practice/. Its page, the /practice/ hub
-// and Insider's GAMES list must all agree with the registry, and it must stay out of the
-// skill routing and off the core funnel (stream 'practice').
-{
-  const practice = REGISTRY.filter((m) => m.type === 'practice' && !m.retired);
-  const hub = fs.existsSync(path.join(root, 'public/practice/index.html')) ? read('public/practice/index.html') : '';
-  const insiderSrc = read('public/insider/index.html');
-  const insiderGames = (insiderSrc.match(/const GAMES = \[([\s\S]*?)\n\s*\];/) || ['', ''])[1];
-  for (const m of practice) {
-    if (m.stream !== 'practice') fail(`registry: practice app "${m.id}" must report on stream 'practice' (got ${JSON.stringify(m.stream)})`);
-    if (!(Number(m.stepsTotal) > 0)) fail(`registry: practice app "${m.id}" needs a numeric \`stepsTotal\``);
-    if ((m.skillTags || []).some((t) => t && t.framework === 'internal')) fail(`registry: practice app "${m.id}" carries an internal skillTag — practice apps do no skill routing`);
-    if (!m.hidden && !hub.includes(`href="${m.url}"`)) fail(`public/practice/index.html: no card links to practice app "${m.id}" (${m.url})`);
-    if (!new RegExp(`module:\\s*'${m.id}'`).test(insiderGames)) fail(`insider: GAMES has no entry for practice app "${m.id}"`);
-    if (m.url && fs.existsSync(path.join(root, 'public', m.url, 'index.html'))) {
-      const page = read(path.join('public', m.url, 'index.html'));
-      const init = (page.match(/Telemetry\.init\(\{[^}]*\}\)/) || [''])[0];
-      const mod = (init.match(/module:\s*'([^']+)'/) || [])[1];
-      const st = (init.match(/stream:\s*'([^']+)'/) || [])[1];
-      const steps = Number((init.match(/stepsTotal:\s*(\d+)/) || [])[1]);
-      if (mod !== m.id) fail(`public${m.url}index.html: Telemetry module "${mod}" != registry practice id "${m.id}"`);
-      if (st !== m.stream) fail(`public${m.url}index.html: Telemetry stream "${st}" != registry stream "${m.stream}"`);
-      if (steps !== Number(m.stepsTotal)) fail(`public${m.url}index.html: Telemetry stepsTotal ${steps} != registry stepsTotal ${m.stepsTotal}`);
-      if (/skill-routing\.js/.test(page)) fail(`public${m.url}index.html: a practice app must not load skill-routing.js`);
-    }
   }
 }
 
