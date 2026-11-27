@@ -8,6 +8,7 @@
 <meta name="standards" content="NGSS MS-LS2-2; MS-LS2-1; MS-LS2-4">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
 <script src="/js/reduced-motion.js"></script>
+<script src="/js/canvas-fonts.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 /* VOICE: a field biologist's winter. Quiet, cold air, a warm notebook.
@@ -706,6 +707,7 @@ if("IntersectionObserver" in window){ new IntersectionObserver(function(es){ onS
 function redrawAll(){ map.resize(); logv.resize(); map.draw(model,clock,0); logv.draw(model); }
 var roT=null;
 if("ResizeObserver" in window){ new ResizeObserver(function(){ clearTimeout(roT); roT=setTimeout(redrawAll,60); }).observe($(".world")); } else window.addEventListener("resize", function(){ clearTimeout(roT); roT=setTimeout(redrawAll,60); });
+if(window.AGFonts) AGFonts.ready(redrawAll); // redraw canvas text in the web fonts (AA-6)
 new MutationObserver(function(){ loadColors(); redrawAll(); }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 if(window.matchMedia){ var mq=matchMedia("(prefers-color-scheme: dark)"); var onScheme=function(){ loadColors(); redrawAll(); }; if(mq.addEventListener) mq.addEventListener("change",onScheme); else if(mq.addListener) mq.addListener(onScheme); }
 function setPlaying(on){ playing=!!on; var b=$("#play"); b.setAttribute("aria-pressed",String(playing)); b.textContent=playing?"Pause":"Fly"; lastTs=null; simAcc=0; }

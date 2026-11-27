@@ -51,9 +51,10 @@ module.exports = {
     // Fallback chains match --font-display / --font-ui in
     // public/assets/css/design-tokens.css; check-tokens.js enforces that.
     // Gelasio and Atkinson Hyperlegible Next are self-hosted (public/assets/css/fonts.css);
-    // the "Fallback" names are metric-matched faces defined there for Chromebooks.
+    // the "Fallback" names are metric-matched faces defined there: Georgia/Verdana-based
+    // for Mac/Windows/iPad, Tinos/Arimo-based for Chromebooks (AA-6).
     fontFamily: {
-        heading: ['Gelasio', 'Georgia', 'Gelasio Fallback', 'Times New Roman', 'serif'],
-        body: ['Atkinson Hyperlegible Next', 'Verdana', 'Atkinson Hyperlegible Next Fallback', 'Geneva', 'sans-serif'],
+        heading: ['Gelasio', 'Gelasio Fallback', 'Georgia', 'Gelasio Chromebook Fallback', 'Times New Roman', 'serif'],
+        body: ['Atkinson Hyperlegible Next', 'Atkinson Fallback', 'Verdana', 'Atkinson Chromebook Fallback', 'Geneva', 'sans-serif'],
     },
 };

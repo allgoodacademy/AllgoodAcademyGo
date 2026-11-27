@@ -8,6 +8,7 @@
 <meta name="standards" content="NSPFE Saving 8-4, 8-5; Investing 8-6, 8-7; CCSS 7.RP.A.3, 8.F.A.3, HSF-LE.A.1, HSF-LE.A.3; CASEL Responsible Decision-Making">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
 <script src="/js/reduced-motion.js"></script>
+<script src="/js/canvas-fonts.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 
 <style>
@@ -1172,6 +1173,7 @@ document.addEventListener("keydown", function(e){
 
 /* ---------- go ---------- */
 const ro=new ResizeObserver(function(){ resize(); draw(0); }); ro.observe(cv);
+if(window.AGFonts) AGFonts.ready(function(){ resize(); draw(0); }); // redraw canvas text in the web fonts (AA-6)
 resize(); enterStep(0); readout(true);
 requestAnimationFrame(loop);
 if(location.hash==="#present") setPresent(true);

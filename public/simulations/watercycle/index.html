@@ -8,6 +8,7 @@
 <meta name="standards" content="NGSS MS-ESS2-4">
 <link rel="stylesheet" href="/assets/css/design-tokens.css">
 <script src="/js/reduced-motion.js"></script>
+<script src="/js/canvas-fonts.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <style>
 /* Page roles. Every value is a brand token, or a token mixed with another token. */
@@ -738,6 +739,7 @@ if("IntersectionObserver" in window){ new IntersectionObserver(function(es){ onS
 var roT=null;
 if("ResizeObserver" in window){ new ResizeObserver(function(){ clearTimeout(roT); roT=setTimeout(function(){ view.resize(); view.draw(); drawIsland(); },60); }).observe($("#cv")); }
 else window.addEventListener("resize", function(){ clearTimeout(roT); roT=setTimeout(function(){ view.resize(); view.draw(); drawIsland(); },60); });
+if(window.AGFonts) AGFonts.ready(function(){ view.draw(); drawIsland(); }); // redraw canvas text in the web fonts (AA-6)
 new MutationObserver(function(){ loadColors(); view.draw(); drawIsland(); }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 if(window.matchMedia){ var mq=matchMedia("(prefers-color-scheme: dark)"); var onScheme=function(){ loadColors(); view.draw(); drawIsland(); }; if(mq.addEventListener) mq.addEventListener("change",onScheme); else if(mq.addListener) mq.addListener(onScheme); }
 $("#pause").addEventListener("click", function(){ paused=!paused; this.setAttribute("aria-pressed",String(paused)); this.textContent=paused?"Play":"Pause"; schedule(); });
