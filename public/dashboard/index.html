@@ -243,6 +243,7 @@ h1,h2,h3{font-family:var(--font-display);font-weight:400;letter-spacing:-.02em;m
 .t-challenge .ic{background:var(--orange-wash);color:var(--orange-deep)}
 .t-game .ic{background:var(--plum-wash);color:var(--plum)}
 .t-simulation .ic{background:var(--sage-wash);color:var(--sage)}
+.t-story .ic{background:var(--orange-wash);color:var(--orange-deep)}
 .pill{flex:none;align-self:flex-start;display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .pill.done{background:var(--sage-wash);color:var(--sage)}
 .pill.going{background:var(--orange-wash);color:var(--orange-deep)}
@@ -427,8 +428,8 @@ body.present .nav-shell.activity{display:none}
           <a class="tab" href="#packs" data-view="packs"><i data-lucide="book-open"></i>Lab Packs<span class="n" id="n-packs"></span></a>
           <a class="tab" href="#games" data-view="games"><i data-lucide="gamepad-2"></i>Games<span class="n" id="n-games"></span></a>
           <a class="tab" href="#sims" data-view="sims"><i data-lucide="globe"></i>Simulations<span class="n" id="n-sims"></span></a>
-          <!-- Español: a link out to /espanol/, not a view (no data-view, no count). Student-reachable: no tracking. check-modules.js keeps it here. -->
-          <a class="tab" href="/espanol/" lang="es"><i data-lucide="languages" aria-hidden="true"></i>Español</a>
+          <!-- Español (2026-11-27): a view like Games and Simulations, its story cards from /data/espanol.json. Student-reachable: no tracking (no launch log). check-modules.js keeps it here. -->
+          <a class="tab" href="#espanol" data-view="espanol"><i data-lucide="languages" aria-hidden="true"></i><span lang="es">Español</span><span class="n" id="n-espanol"></span></a>
           <a class="tab" href="#profile" data-view="profile"><i data-lucide="user-round"></i>Profile</a>
         </div>
         <div class="rail-foot">
@@ -538,6 +539,13 @@ body.present .nav-shell.activity{display:none}
           <div class="grid" id="sims-body"></div>
         </section>
 
+        <!-- ESPAÑOL -->
+        <section class="view" data-view="espanol" aria-labelledby="espanol-title" hidden>
+          <div class="sechead"><h1 class="view-title" id="espanol-title" tabindex="-1" lang="es">Español</h1><a href="/espanol/">Visit the Español hub</a></div>
+          <p>Short stories set in real places, all in Spanish. In every story, the Spanish you choose changes what happens next.</p>
+          <div class="grid" id="espanol-body"></div>
+        </section>
+
         <div class="view-foot">
           <a href="/">Home</a>
           <a href="/privacy.html">Privacy</a>
@@ -584,17 +592,18 @@ const PACKS = [
 // Digital Decisions Challenge also has to be a current-version run: a v1 score still shows
 // as played, but is not a current completion.
 const CURRENT_VERSION = { ddc: 'dd-v2' };
-const KIND = { lab: 'Lesson', challenge: 'Challenge', game: 'Game', simulation: 'Simulation' };
-const FALLBACK_ICON = { lab: 'book-open', challenge: 'trophy', game: 'gamepad-2', simulation: 'cloud-rain' };
+const KIND = { lab: 'Lesson', challenge: 'Challenge', game: 'Game', simulation: 'Simulation', story: 'Historia' };
+const FALLBACK_ICON = { lab: 'book-open', challenge: 'trophy', game: 'gamepad-2', simulation: 'cloud-rain', story: 'languages' };
 
 async function getJSON(url) {
     const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`${url} HTTP ${res.status}`);
     return res.json();
 }
-const [registryData, simsData] = await Promise.all([
+const [registryData, simsData, espanolData] = await Promise.all([
     fetch('/data/modules-registry.json', { cache: 'no-cache' }).then((r) => r.json()).catch((e) => { console.error('[Dashboard] registry', e); return { modules: [] }; }),
     getJSON('/data/simulations.json').catch((e) => { console.error('[Dashboard] simulations', e); return { simulations: [] }; }),
+    getJSON('/data/espanol.json').catch((e) => { console.error('[Dashboard] español', e); return { stories: [] }; }),
 ]);
 // Everything live and listed: retired modules have no page, and a hidden module (Pattern
 // Lab) is deliberately on no surface of the site, this one included.
@@ -602,6 +611,8 @@ const [registryData, simsData] = await Promise.all([
 // this page renders them from simulations.json, so they are left out of MODULES here.
 const MODULES = (registryData.modules || []).filter((m) => m.url && !m.retired && !m.hidden && m.type !== 'sim');
 const SIMS = (simsData.simulations || []).filter((s) => s.url).map((s) => ({ ...s, type: 'simulation' }));
+// Español stories: not tracked yet, so no progress pill and no launch log (see the launch log).
+const STORIES = (espanolData.stories || []).filter((s) => s.url).map((s) => ({ ...s, type: 'story' }));
 // Comms (/js/message-hq.js) builds its topic chips from this.
 window.MODULE_REGISTRY = MODULES.filter((m) => m.type !== 'game').map((m) => ({ ...m, category: m.type }));
 
@@ -609,7 +620,7 @@ let STATUS = new Map();   // module id -> { state: 'go' | 'done', best, frac, at
 
 function pillFor(m) {
     const s = STATUS.get(m.id);
-    if (!s) return m.type === 'game' || m.type === 'simulation' ? '' : '<span class="pill todo">Not started</span>';
+    if (!s) return m.type === 'game' || m.type === 'simulation' || m.type === 'story' ? '' : '<span class="pill todo">Not started</span>';
     if (s.state === 'done') return `<span class="pill done">${m.type === 'challenge' && s.best != null ? `Done · ${s.best}/${m.maxScore}` : 'Done ✓'}</span>`;
     return `<span class="pill going">${m.type === 'challenge' && s.best != null ? `Best ${s.best}/${m.maxScore}` : 'In progress'}</span>`;
 }
@@ -626,23 +637,24 @@ let CARD_ACTIONS = null;
 function card(m, { where, pill } = {}) {
     const type = m.type || 'simulation';
     const hub = m.hub || {};
-    const meta = [KIND[type], minutesOf(m), where].filter(Boolean).join(' · ');
+    const meta = [KIND[type], type === 'story' ? m.place : '', minutesOf(m), where].filter(Boolean).join(' · ');
     if (CARD_ACTIONS) {
         return `<div class="card tcard t-${esc(type)}">
             <span class="ic"><i data-lucide="${esc(hub.icon || FALLBACK_ICON[type])}"></i></span>
             <span class="grow"><b>${esc(m.name)}</b><span class="meta">${esc(meta)}</span>${pill != null ? pill : pillFor(m)}<span class="cacts">${CARD_ACTIONS(m)}</span></span>
         </div>`;
     }
-    return `<a class="card t-${esc(type)}" href="${esc(m.url)}" data-name="${esc(m.name)}">
+    const story = type === 'story';
+    return `<a class="card t-${esc(type)}" href="${esc(m.url)}" data-name="${esc(m.name)}"${story ? ' data-nolog' : ''}>
         <span class="ic"><i data-lucide="${esc(hub.icon || FALLBACK_ICON[type])}"></i></span>
-        <span class="grow"><b>${esc(m.name)}</b><span class="meta">${esc(meta)}</span></span>${pill != null ? pill : pillFor(m)}
+        <span class="grow"><b${story ? ' lang="es"' : ''}>${esc(m.name)}</b><span class="meta">${esc(meta)}</span></span>${pill != null ? pill : pillFor(m)}
     </a>`;
 }
 
 // --- Views: Home, Lab Packs, Games, Simulations. One short view at a time. -----------------
 // A teacher's Mission Control views are added by the teacher module (addViews) and exist
 // for nobody else: an unknown hash, a teacher one included, shows Home.
-const VIEWS = new Set(['home', 'packs', 'games', 'sims', 'profile']);
+const VIEWS = new Set(['home', 'packs', 'games', 'sims', 'espanol', 'profile']);
 let onViewShown = null;
 function showView(name, { focus } = {}) {
     const view = VIEWS.has(name) ? name : 'home';
@@ -693,6 +705,8 @@ function renderCatalog() {
     $('n-packs').textContent = lessonsTotal + challengesTotal || '';
     $('n-games').textContent = games.length || '';
     $('n-sims').textContent = SIMS.length || '';
+    $('espanol-body').innerHTML = STORIES.length ? STORIES.map((s) => card(s)).join('') : '<p class="empty">The stories could not load just now. <a href="/espanol/">Open the Español hub</a>.</p>';
+    $('n-espanol').textContent = STORIES.length || '';
     renderNew();
     renderProgress();
     icons();
@@ -1276,7 +1290,8 @@ $('save-sheet').addEventListener('keydown', (e) => {
 document.addEventListener('click', (e) => {
     const a = e.target.closest('a[data-name]');
     const user = auth.currentUser;
-    if (!a || !user) return;
+    // Español stories are not tracked yet (AA-8): no launch log, no GA event.
+    if (!a || !user || a.hasAttribute('data-nolog')) return;
     if (typeof window.gtag === 'function') window.gtag('event', 'launch_module', { module_name: a.dataset.name });
     addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'launches'), {
         courseName: a.dataset.name, targetUrl: a.getAttribute('href'), timestamp: serverTimestamp(),

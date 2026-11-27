@@ -1769,7 +1769,8 @@ function registryIdFor(m) {
     return r ? r.id : null;
 }
 function cardActions(m) {
-    const tryIt = `<a class="btn ghost sm" href="${esc(m.url)}" data-name="${esc(m.name)}">Try it</a>`;
+    // Español stories are not tracked or assignable yet: Try it only, and no launch log.
+    const tryIt = `<a class="btn ghost sm" href="${esc(m.url)}" data-name="${esc(m.name)}"${m.type === 'story' ? ' data-nolog' : ''}>Try it</a>`;
     const present = m.type === 'simulation' && m.present
         ? `<a class="btn ghost sm" href="${esc(m.url)}#present" data-name="${esc(m.name)}">Present</a>` : '';
     const id = state.code ? registryIdFor(m) : null;
