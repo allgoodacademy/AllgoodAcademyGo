@@ -75,6 +75,7 @@
                 <a href="#/games" data-route="games" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="gamepad-2" class="w-4 h-4"></i>Games</a>
                 <a href="#/simulations" data-route="simulations" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="flask-conical" class="w-4 h-4"></i>Simulations</a>
                 <a href="#/espanol" data-route="espanol" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="languages" class="w-4 h-4"></i><span lang="es">Español</span></a>
+                <a href="#/help" data-route="help" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="life-buoy" class="w-4 h-4"></i>Help</a>
                 <a href="#/sources" data-route="sources" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="signpost" class="w-4 h-4"></i>Sources</a>
                 <a href="#/classrooms" data-route="classrooms" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="school" class="w-4 h-4"></i>Classrooms</a>
                 <a href="#/inbox" data-route="inbox" class="nav-link flex items-center gap-2 px-4 md:px-3 py-3 md:py-2 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap"><i data-lucide="inbox" class="w-4 h-4"></i>Inbox</a>
@@ -117,6 +118,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { ARTICLES as HELP_ARTICLES, TOURS as HELP_TOURS, SHORTCUTS as HELP_SHORTCUTS } from '/help/help-data.js';
         import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, doc, collection, collectionGroup, getDocs, deleteDoc, setDoc, query, where, orderBy, limit, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
@@ -403,6 +405,8 @@
             sims: {},
             // The Español stories' own data (stream 'espanol'), for the Español page only.
             espanol: { sessions: [], events: [], scores: [] },
+            // The Help Center's own events (module 'help', stream 'help'), for the Help page only.
+            help: [],
             // Each game's own sessions (GAMES above), loaded by module-filtered queries; the
             // Games page reads only this and the game_scores rows, never the core arrays.
             games: {}, gameScores: [],
@@ -645,6 +649,10 @@
             esSessions.forEach(x => { x.startMs = toMs(x.startedAt); x.lastMs = toMs(x.lastSeenAt); });
             esEvents.forEach(x => { x.ms = toMs(x.ts) || x.clientTs || 0; });
 
+            // Help Center: one events query (equality only). Read by the Help page alone.
+            const helpEvents = await safe('help events', async () => (await getDocs(query(collection(db, 'artifacts', appId, 'events'), where('module', '==', 'help'), limit(10000)))).docs.map(d => ({ id: d.id, ...d.data() })));
+            helpEvents.forEach(x => { x.ms = toMs(x.ts) || x.clientTs || 0; });
+
             // Games: one sessions query per game (equality only, like Take the Bait's).
             const gameData = await Promise.all(GAMES.filter(g => g.module !== 'take-the-bait').map(async g => {
                 const ss = await safe(`${g.module} sessions`, async () => (await getDocs(query(collection(db, 'artifacts', appId, 'sessions'), where('module', '==', g.module), limit(5000)))).docs.map(d => ({ id: d.id, ...d.data() })));
@@ -677,6 +685,7 @@
                 sessions: funnelSessions, events: funnelEvents, offFunnel, loadedAt: Date.now(),
                 ttb: { sessions: ttbSessions, events: ttbEvents },
                 sims: Object.fromEntries(simData),
+                help: helpEvents,
                 espanol: { sessions: esSessions, events: esEvents, scores: scores.filter(x => ESPANOL.some(st => st.gameNames.includes(x.gameName))) },
                 games: Object.fromEntries(gameData),
             });
@@ -867,7 +876,7 @@
         // ------------------------------------------------------------------
         // ROUTER
         // ------------------------------------------------------------------
-        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', games: 'Games', takethebait: 'Take the Bait', simulations: 'Simulations', espanol: 'Español', sources: 'Where visits come from', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
+        const TITLES = { overview: 'Overview', users: 'Users', courses: 'Courses', games: 'Games', takethebait: 'Take the Bait', simulations: 'Simulations', espanol: 'Español', help: 'Help Center', sources: 'Where visits come from', classrooms: 'Classrooms', inbox: 'Inbox', feedback: 'Course Feedback', tools: 'Tools' };
         function route() {
             if (mainView.classList.contains('hidden')) return;
             const hash = location.hash.replace(/^#\/?/, '');
@@ -875,7 +884,7 @@
             const page = TITLES[section] ? section : 'overview';
             document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.route === (page === 'takethebait' ? 'games' : page)));
             $('page-title').textContent = TITLES[page];
-            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, games: () => renderGames(arg), takethebait: () => gamesBackLink() + renderTakeTheBait(), simulations: () => renderSimulations(arg), espanol: () => renderEspanol(arg), sources: () => renderSources(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
+            const render = { overview: renderOverview, users: renderUsers, courses: () => arg ? renderCourseDetail(arg) : renderCourses, games: () => renderGames(arg), takethebait: () => gamesBackLink() + renderTakeTheBait(), simulations: () => renderSimulations(arg), espanol: () => renderEspanol(arg), help: renderHelp, sources: () => renderSources(arg), classrooms: renderClassrooms, inbox: renderInbox, feedback: renderFeedback, tools: renderTools }[page];
             const out = typeof render === 'function' ? render() : '';
             $('page').innerHTML = typeof out === 'function' ? out() : out;
             if (window.lucide) lucide.createIcons();
@@ -1124,6 +1133,83 @@
                 <div class="grid lg:grid-cols-2 gap-4">
                     ${card('Device', hbarRows(Object.entries(dev).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ label: k, pct: pct(n, sessions.length), n, tip: `${n} sessions` })), r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
                     ${card('Speed setting (levels finished)', hbarRows(spTotal ? [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['fast', 'Fast']].map(([k, l]) => ({ label: l, pct: pct(sp[k], spTotal), n: sp[k], tip: `${sp[k]} levels` })) : [], r => `${r.n} <span class="text-slate-400 font-normal">(${r.pct}%)</span>`))}
+                </div>`;
+        }
+
+        // ------------------------------------------------------------------
+        // PAGE: HELP CENTER (reads only D.help: module 'help', stream 'help')
+        // Storyboard: claude/help-center-storyboard-v1.0.md. The headline is "Helped": a real
+        // success (assigned, saved, joined…) within 10 minutes of reading an article or touring.
+        // Search words exist only for teachers (help.js never records a student's words).
+        // ------------------------------------------------------------------
+        function renderHelp() {
+            const start = rangeStart();
+            const H = D.help.filter(e => e.ms >= start && e.meta);
+            const ev = name => H.filter(e => e.event === name);
+            const th = 'text-right font-bold py-1 px-2', dash = '<span class="text-slate-300">—</span>';
+            const count = (arr, key) => { const m = new Map(); arr.forEach(e => { const k = key(e); if (k != null && k !== '') m.set(k, (m.get(k) || 0) + 1); }); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+            const opens = ev('help_open'), searches = ev('help_search'), arts = ev('help_article'), reads = ev('help_read'), votes = ev('help_vote'), stuck = ev('help_stuck'), tours = ev('help_tour'), cuts = ev('help_shortcut'), wins = ev('help_success');
+            const noRes = searches.filter(e => !e.meta.found);
+            const tq = searches.filter(e => e.meta.q);
+            const artName = id => (HELP_ARTICLES.find(a => a.id === id) || {}).title || id;
+            const tourStarts = tours.filter(e => e.meta.event === 'start'), tourDone = tours.filter(e => e.meta.event === 'done');
+            const helpedPct = pct(wins.length, new Set(arts.map(e => e.uid + '|' + e.meta.article)).size + tourStarts.length);
+
+            const topQ = count(tq, e => e.meta.q.toLowerCase()).slice(0, 12);
+            const missQ = count(noRes.filter(e => e.meta.q), e => e.meta.q.toLowerCase()).slice(0, 12);
+            const missOther = noRes.filter(e => !e.meta.q).length;
+            const qList = (rows, empty) => rows.length ? `<div class="space-y-1 text-xs">${rows.map(([q, n]) => `<div class="flex justify-between gap-2"><span class="text-slate-700 truncate">${esc(q)}</span><span class="font-bold">${n}</span></div>`).join('')}</div>` : emptyMsg(empty);
+
+            const artRows = HELP_ARTICLES.map(a => {
+                const o = arts.filter(e => e.meta.article === a.id), r = reads.filter(e => e.meta.article === a.id).map(e => e.meta.secs).filter(x => typeof x === 'number');
+                const up = votes.filter(e => e.meta.article === a.id && e.meta.vote === 'up').length, down = votes.filter(e => e.meta.article === a.id && e.meta.vote === 'down').length;
+                const people = new Set(o.map(e => e.uid)).size, won = wins.filter(e => e.meta.article === a.id).length;
+                return { a, opens: o.length, people, med: r.length ? median(r) : null, up, down, won, stuck: stuck.filter(e => e.meta.article === a.id).length };
+            }).sort((x, y) => y.opens - x.opens);
+            const artTable = `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-400 uppercase tracking-wide text-[10px]"><tr><th class="text-left font-bold py-1">Article</th><th class="${th}">Opens</th><th class="${th}">Median read</th><th class="${th}">👍</th><th class="${th}">👎</th><th class="${th}">Helped</th><th class="${th}">Still stuck</th></tr></thead><tbody>${artRows.map(x => `<tr class="border-t border-slate-50"><td class="py-1.5 pr-2"><span class="font-bold text-slate-700">${esc(x.a.title)}</span> <span class="text-[10px] text-slate-400 uppercase">${x.a.who === 'teacher' ? 'Teachers' : 'Students'}</span></td><td class="text-right px-2">${x.opens || dash}</td><td class="text-right px-2">${x.med != null ? x.med + 's' : dash}</td><td class="text-right px-2">${x.up || dash}</td><td class="text-right px-2">${x.down || dash}</td><td class="text-right px-2 font-bold">${x.a.success ? (x.people ? `${x.won} <span class="text-slate-400 font-normal">(${pct(x.won, x.people)}%)</span>` : dash) : '<span class="text-slate-300" title="No success event for this article">n/a</span>'}</td><td class="text-right px-2">${x.stuck || dash}</td></tr>`).join('')}</tbody></table></div>
+                <p class="text-[10px] text-slate-400 mt-2">Helped = a real success (e.g. something assigned, a save code made, a class joined) within 10 minutes of reading, counted against the number of different people who opened the article. Read rarely followed by success? Rewrite it.</p>`;
+
+            const tourCards = Object.entries(HELP_TOURS).map(([id, t]) => {
+                const tt = tours.filter(e => e.meta.tour === id);
+                // One run = a start and what follows it from the same person and visit, up to their next start.
+                // Furthest step per run, so Back/forward and Skip can't count a step twice.
+                const runs = [], open = new Map();
+                [...tt].sort((a, b) => a.ms - b.ms).forEach(e => {
+                    const k = e.uid + '|' + (e.sessionId || '');
+                    if (e.meta.event === 'start') { const r = { max: 1, end: null }; runs.push(r); open.set(k, r); return; }
+                    const r = open.get(k); if (!r) return;
+                    r.max = Math.max(r.max, Number(e.meta.step) || 1);
+                    if (e.meta.event !== 'step' && e.meta.event !== 'skip') { r.end = e.meta.event; open.delete(k); }
+                });
+                const started = runs.length;
+                const reached = n => runs.filter(r => r.max >= n).length;
+                const done = runs.filter(r => r.end === 'done').length, already = runs.filter(r => r.end === 'already').length;
+                const quits = count(tt.filter(e => e.meta.event === 'exit'), e => e.meta.step);
+                const rows = t.steps.map((st, i) => ({ label: `Step ${i + 1}`, pct: pct(reached(i + 1), started), n: reached(i + 1), tip: st.text.replace(/\*\*/g, '') })).concat([{ label: 'Finished', pct: pct(done, started), n: done, tip: 'Reached the end' }]);
+                return card(`Tour: ${esc(t.title)} · ${t.who === 'teacher' ? 'teachers' : 'students'}`, started ? hbarRows(rows, r => `${r.pct}% <span class="text-slate-400 font-normal">(${r.n})</span>`) + `<p class="text-[10px] text-slate-400 mt-2">${quits.length ? `Most people who quit, quit at <b>step ${quits[0][0]}</b> (${quits[0][1]}).` : 'Nobody has quit this tour.'}${already ? ` ${already} were already saved.` : ''}</p>` : emptyMsg('Nobody has started this tour in this range.'));
+            }).join('');
+
+            const viewRows = count(opens.filter(e => e.meta.mode === 'panel'), e => e.meta.view).slice(0, 8);
+            const maxV = viewRows.length ? viewRows[0][1] : 1;
+            return `${errorStrip()}
+                <p class="text-[11px] text-slate-500 mb-4">The Help Center reports on its own stream (<span class="font-mono">help</span>) and is in none of the other pages' figures. ${rangeLabel()}.</p>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    ${tile('Help opened', opens.length, `${new Set(opens.map(e => e.uid)).size} different people`)}
+                    ${tile('Searches', searches.length, `${noRes.length} found nothing`)}
+                    ${tile('Articles opened', arts.length, `median read ${reads.length ? median(reads.map(e => e.meta.secs || 0)) + 's' : '—'}`)}
+                    ${tile('Tours finished', `${tourDone.length} / ${tourStarts.length}`, tourStarts.length ? `${pct(tourDone.length, tourStarts.length)}% of tours started` : 'none started yet')}
+                    ${tile('Helped', wins.length, `${helpedPct}% · success within 10 min`)}
+                    ${tile('"Still stuck"', stuck.length, 'pressed "Message us"')}
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4 mb-6">
+                    ${card('Searches that found nothing · write these next', qList(missQ, 'No teacher searches came up empty.') + (missOther ? `<p class="text-[10px] text-slate-400 mt-2">Plus ${missOther} from students or visitors (their words are never recorded).</p>` : ''))}
+                    ${card('Top teacher searches', qList(topQ, 'No teacher searches in this range.'))}
+                </div>
+                <div class="mb-6">${card('Every article', artTable)}</div>
+                <div class="grid lg:grid-cols-3 gap-4 mb-6">${tourCards}</div>
+                <div class="grid lg:grid-cols-2 gap-4">
+                    ${card('Where help gets opened (dashboard view)', viewRows.length ? hbarRows(viewRows.map(([v, n]) => ({ label: v, pct: pct(n, maxV), n })), r => `${r.n}`) : emptyMsg('Nobody has opened the ? panel in this range.'))}
+                    ${card('"Do it for me" shortcuts', (() => { const rows = count(cuts, e => e.meta.shortcut); return rows.length ? `<div class="space-y-1 text-xs">${rows.map(([k, n]) => `<div class="flex justify-between"><span class="text-slate-700">${esc((HELP_SHORTCUTS[k] || {}).label || k)}</span><span class="font-bold">${n}</span></div>`).join('')}</div>` : emptyMsg('No shortcuts used in this range.'); })())}
                 </div>`;
         }
 

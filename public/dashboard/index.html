@@ -71,6 +71,7 @@
 <script src="/js/site-config.js"></script>
 <link rel="stylesheet" href="/assets/css/fonts.css">
 <link rel="stylesheet" href="/assets/css/tablet-chassis.css">
+<link rel="stylesheet" href="/help/help.css">
 <!-- Only for Comms: /js/message-hq.js builds its modal from Tailwind classes. This page's
      own layout uses the plain CSS below. -->
 <link rel="stylesheet" href="/assets/css/tailwind.min.css">
@@ -570,6 +571,9 @@ body.present .nav-shell.activity{display:none}
 
 
 <script type="module">
+// Help Center (/help/help.js): the dashboard announces real successes, so help can tell
+// whether an article or a tour worked (help_success within 10 minutes). Names only, no data.
+const agTrack = (name) => { try { window.dispatchEvent(new CustomEvent('ag:track', { detail: { name } })); } catch (e) { /* never break the page */ } };
 import {
     doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, deleteField, collection, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
@@ -983,6 +987,7 @@ async function joinWith(code, nickname, msgEl, btn) {
         closeSave();
         $('join-msg').className = 'msg ok';
         $('join-msg').textContent = `You're in ${result.name}.`;
+        agTrack('class_joined');
         await refresh();
         return true;
     } finally {
@@ -1220,6 +1225,7 @@ document.addEventListener('click', async (e) => {
             SAVE_STATE = 'code';
             renderSave();
             STEPS.code(code, name);
+            agTrack('save_code_created');
         } catch (err) {
             console.error('[Dashboard] save with code', err);
             saveMsg(errText(err));
@@ -1244,6 +1250,7 @@ document.addEventListener('click', async (e) => {
                 return;
             }
             closeSave();
+            agTrack('save_google');
             await refresh();
         } catch (err) {
             if (!/popup-closed-by-user|cancelled-popup-request/.test(err.code || '')) { console.error('[Dashboard] save with Google', err); saveMsg(errText(err)); }
@@ -1254,7 +1261,7 @@ document.addEventListener('click', async (e) => {
         b.disabled = true; b.textContent = 'Checking…';
         try {
             const r = await SAVE.openWithCode($('have-code').value);
-            if (r.ok) { location.reload(); return; }
+            if (r.ok) { agTrack('save_code_used'); setTimeout(() => location.reload(), 300); return; }
             saveMsg(r.reason === 'format' ? "That doesn't look like a save code. Check the spelling and the dashes."
                 : r.reason === 'rate' ? SAVE_ERRORS['auth/too-many-requests']
                 : "We couldn't find that save code. Check it and try again.");
@@ -1266,7 +1273,7 @@ document.addEventListener('click', async (e) => {
         const pending = SAVE.openWithGoogle();
         try {
             const r = await pending;
-            if (r.ok) { location.reload(); return; }
+            if (r.ok) { agTrack('save_code_used'); setTimeout(() => location.reload(), 300); return; }
             saveMsg(r.reason === 'not_found' ? 'That Google account has no saved progress yet.' : errText(null));
         } catch (err) {
             if (!/popup-closed-by-user|cancelled-popup-request/.test(err.code || '')) { console.error('[Dashboard] open with Google', err); saveMsg(errText(err)); }
@@ -1370,5 +1377,6 @@ if (user) {
     if (location.hash === '#save' && SAVE && !SAVE_STATE && PROFILE.role !== 'teacher') openSave('save');
 }
 </script>
+<script type="module" src="/help/help.js"></script>
 </body>
 </html>

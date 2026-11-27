@@ -20,6 +20,8 @@
 # And the founder check: the founder's job line lives in nav/founder.js and is generated into
 # the homepage strip and the About page (`npm run build:founder`), so switching its wording
 # is one change in one file.
+# And the help check (scripts/check-help.js): every button a Help Center article or tour names
+# must still exist on the dashboard, so help can't quietly describe a screen that changed.
 name: Module registry check
 
 on:
@@ -39,3 +41,4 @@ jobs:
       - run: node scripts/check-tokens.js
       - run: node scripts/build-nav.js --check
       - run: node scripts/build-founder.js --check
+      - run: node scripts/check-help.js

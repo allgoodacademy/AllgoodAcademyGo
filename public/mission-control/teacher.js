@@ -339,6 +339,9 @@ function showGate(title, body, linkText, linkHref) {
    Events carry NO uid, email, class code, nickname or student data — only the event name
    and, at most, a content type or guide id. */
 function track(name, params) {
+    // The Help Center listens for real successes (assigned, class made, guide downloaded) to
+    // credit the article or tour that helped. The name only, never the params.
+    try { window.dispatchEvent(new CustomEvent('ag:track', { detail: { name } })); } catch (e) { /* never break the page */ }
     if (typeof window.gtag !== 'function') return;
     try { window.gtag('event', name, { ...(params || {}), transport_type: 'beacon' }); } catch (e) { /* never break the page */ }
 }
