@@ -1070,7 +1070,7 @@ console.log('\nESPAÑOL — a class member plays El Mundial / El Viaje; their te
   });
   for (const [module, gameName, steps, sid, gates, path] of [
     ['el-mundial', 'El Mundial', 10, 'es_mundial_1', { 1: 1, 2: 0, 3: 1, 4: 1, 5: 1 }, { f1: 'metro' }],
-    ['el-viaje', 'El Viaje', 12, 'es_viaje_1', { 1: 1, 2: 1, 3: 0, 4: 1, 5: 1 }, { f1: 'tienda', f2: 'dia', f3: 'tacos+agua' }],
+    ['el-viaje', 'El Viaje', 12, 'es_viaje_1', { 1: 1, 2: 0, 3: 1, 4: 1, 5: 1 }, { f1: 'tienda', f2: 'dia', f3: 'tacos+agua' }],
   ]) {
     await it(`${gameName}: the student writes its session on the 'espanol' stream, with the summary`, async () => {
       await assertSucceeds(setDoc(SESS(kid, sid), {

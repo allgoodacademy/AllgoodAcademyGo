@@ -243,6 +243,8 @@ const ICONS = {
     sim: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
 };
 const TYPE_LABEL = { lab: 'Lesson', challenge: 'Challenge', game: 'Game', sim: 'Simulation', story: 'Español story' };
+// What a teacher is shown: an Español story is tracked as a sim (itemOf) but labelled as a story.
+const shownType = (it) => (it && it.kind === 'story' ? 'story' : it.type);
 const AVATAR_COLORS = ['#357889', '#CF4616', '#2E7D52', '#5B4B8A', '#8F5E0E', '#204B55'];
 function colorForUid(uid) {
     let h = 0;
@@ -1022,8 +1024,8 @@ function workRow(id, justFor) {
     const pct = who.length ? Math.round(done / who.length * 100) : 0;
     const verb = it.type === 'game' ? 'played' : 'finished';
     return `<button class="wi" type="button" data-drill="${esc(id)}">
-        <span class="ic t-${it.type}" aria-hidden="true">${ICONS[it.type] || ICONS.lab}</span>
-        <span><b>${esc(it.name)}</b><span class="meta">${TYPE_LABEL[it.type] || 'Lesson'} · ${it.minutes} min${justFor ? ` · just for ${plural(who.length, 'student')}` : ''} · see where they got stuck</span></span>
+        <span class="ic t-${it.type}" aria-hidden="true">${ICONS[shownType(it)] || ICONS.lab}</span>
+        <span><b>${esc(it.name)}</b><span class="meta">${TYPE_LABEL[shownType(it)] || 'Lesson'} · ${it.minutes} min${justFor ? ` · just for ${plural(who.length, 'student')}` : ''} · see where they got stuck</span></span>
         <span class="prog">${done} of ${who.length} ${verb}<span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span></span>
         <span class="chev" aria-hidden="true">›</span></button>`;
 }
@@ -1116,8 +1118,8 @@ function renderDrill(id) {
     const isClass = classItems().includes(id);
     const who = isClass ? state.students : state.students.filter((s) => allAssignedIds(s.mine).includes(id));
     const head = `<button class="back" type="button" data-back>‹ All assigned work</button>
-      <div class="dhead"><span class="ic t-${it.type}" aria-hidden="true">${ICONS[it.type] || ICONS.lab}</span>
-        <div><div class="eyebrow">${TYPE_LABEL[it.type] || 'Lesson'}</div><h2>${esc(it.name)}</h2></div>
+      <div class="dhead"><span class="ic t-${it.type}" aria-hidden="true">${ICONS[shownType(it)] || ICONS.lab}</span>
+        <div><div class="eyebrow">${TYPE_LABEL[shownType(it)] || 'Lesson'}</div><h2>${esc(it.name)}</h2></div>
         ${state.readOnly ? '' : '<button class="btn ghost sm" type="button" data-goto="students">Assign to someone else too</button>'}</div>`;
     let body = '';
     const n = who.length;
@@ -1371,8 +1373,8 @@ function renderPanel(uid) {
         const it = itemOf(id);
         const st = statusFor(s, id);
         const pill = st.done ? '<span class="tag ok">Finished</span>' : (st.started ? '<span class="tag new">In progress</span>' : '<span class="tag grey">Not started</span>');
-        return `<details class="as"><summary><span class="ic t-${it.type}" aria-hidden="true">${ICONS[it.type] || ICONS.lab}</span>
-            <span><b style="font-size:13.5px">${esc(it.name)}</b><div class="meta">${TYPE_LABEL[it.type] || 'Lesson'}${extraSet.has(id) ? ' · just for them' : ''}</div></span>${pill}</summary>
+        return `<details class="as"><summary><span class="ic t-${it.type}" aria-hidden="true">${ICONS[shownType(it)] || ICONS.lab}</span>
+            <span><b style="font-size:13.5px">${esc(it.name)}</b><div class="meta">${TYPE_LABEL[shownType(it)] || 'Lesson'}${extraSet.has(id) ? ' · just for them' : ''}</div></span>${pill}</summary>
             <div class="body">${panelItemBody(s, id)}</div></details>`;
     }).join('');
     const sessions = (s.raw.sessions || []).slice()
