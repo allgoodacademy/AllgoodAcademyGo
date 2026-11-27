@@ -1,0 +1,25 @@
+# Fails a PR when El Viaje says a line that has no recorded clip, or the clip folder and
+# manifest drift from scripts/espanol-audio/el-viaje.lines.json. It only reads committed
+# files: no ElevenLabs key, no network. To fix a failure, update el-viaje.lines.json and run
+# `npm run audio:el-viaje` from a session on the AllgoodAcademyGo environment
+# (see CLAUDE.md and docs/espanol-audio.md).
+name: Español audio check
+
+on:
+  pull_request:
+    paths:
+      - 'public/espanol/**'
+      - 'public/assets/audio/**'
+      - 'scripts/espanol-audio/**'
+      - 'scripts/render-espanol-audio.mjs'
+      - 'tests/espanol-audio.test.mjs'
+
+jobs:
+  audio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run test:espanol-audio

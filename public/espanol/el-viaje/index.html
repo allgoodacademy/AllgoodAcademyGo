@@ -102,7 +102,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 .sopt span{font-size:12.5px;color:#666}
 @media (max-width:760px){.hbtn span{display:none}.hbtn{padding:4px 6px}.hbtn svg{margin:0 4px}}
 /* intro */
-.intro{min-height:calc(100vh - var(--site-h));display:grid;place-items:center;text-align:center;padding:100px 20px 60px;position:relative;overflow:hidden}
+.intro{min-height:calc(100vh - var(--nav-h));display:grid;place-items:center;text-align:center;padding:100px 20px 60px;position:relative;overflow:hidden}
 .intro .sky{position:absolute;inset:0;z-index:0;width:100%;height:100%}
 .intro .in{position:relative;z-index:1;max-width:640px}
 .kick{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange2)}
@@ -117,9 +117,11 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 
 /* scrolly chapters */
 .chap{position:relative}
-.stage{position:sticky;top:var(--site-h);height:calc(100vh - var(--site-h));overflow:hidden}
+/* Scenes start under the story bar and fill what is left of the screen (v1.12). The steps' negative
+   margin uses the same terms, so a chapter's length never changes when the site nav comes and goes. */
+.stage{position:sticky;top:calc(var(--site-h) + var(--hud-h));height:calc(100vh - var(--site-h) - var(--hud-h));height:calc(100svh - var(--site-h) - var(--hud-h));overflow:hidden}
 .stage svg.scene{position:absolute;inset:0;width:100%;height:100%}
-.steps{position:relative;margin-top:calc(var(--site-h) - 100vh);z-index:3;pointer-events:none}
+.steps{position:relative;margin-top:calc(var(--site-h) + var(--hud-h) - 100vh);margin-top:calc(var(--site-h) + var(--hud-h) - 100svh);z-index:3;pointer-events:none}
 .step{min-height:95vh;display:flex;align-items:center;padding:0 6vw}
 .step.r{justify-content:flex-end}
 .step.top{align-items:flex-start;padding-top:24vh}
@@ -204,9 +206,9 @@ body.showtext .ptxt.blur{filter:none}
 .turnlabel{font:11px var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--color-ink-soft);margin-bottom:6px}
 
 /* phone */
-.phone{position:absolute;right:8vw;top:50%;transform:translateY(-50%);width:min(300px,70vw);aspect-ratio:9/17;background:#0c0c0c;border-radius:34px;padding:12px;box-shadow:0 30px 60px rgba(0,0,0,.6);opacity:0;transition:opacity .6s,transform .6s}
+.phone{position:absolute;right:8vw;top:50%;transform:translateY(-50%);height:min(560px,calc(100% - 48px));width:auto;aspect-ratio:9/17;background:#0c0c0c;border-radius:34px;padding:12px;box-shadow:0 30px 60px rgba(0,0,0,.6);opacity:0;transition:opacity .6s,transform .6s}
 .phone.vis{opacity:1}
-.phone .scr{background:#ECE5DD;border-radius:24px;height:100%;padding:12px 10px;display:flex;flex-direction:column;gap:8px}
+.phone .scr{background:#ECE5DD;border-radius:24px;height:100%;padding:12px 10px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
 .phone .hd{background:var(--cyan);color:#fff;border-radius:12px;padding:8px 10px;font-size:12px}
 .phone .b{background:#fff;color:#2b2b2b;border-radius:12px;padding:8px 10px;font-size:13px;max-width:88%;opacity:0;transform:translateY(8px);transition:.5s;cursor:pointer;border:0;text-align:left;font-family:var(--font-ui)}
 .phone .b.me{background:#DCF8C6;margin-left:auto}
@@ -220,7 +222,7 @@ body.showtext .ptxt.blur{filter:none}
 .carta{min-height:100vh;padding:110px 5vw 80px;background:linear-gradient(180deg,#f1ece2,#e7dfd0);color:var(--dark)}
 .carta .gin{display:grid;grid-template-columns:1.2fr 1fr;gap:28px;align-items:start}
 .mail{background:#fff;border-radius:16px;padding:22px 24px;box-shadow:0 20px 50px rgba(0,0,0,.18)}
-.mail .from{font-size:12px;color:#888}
+.mail .from{font-size:12px;color:#666}
 .mail h2{color:var(--cyan2);font-size:28px;margin:10px 0}
 .mail p{font:18px/1.6 var(--font-display);margin:0 0 10px}
 .meter{display:flex;gap:6px;margin-top:14px}
@@ -251,8 +253,14 @@ body.showtext .ptxt.blur{filter:none}
 .dline{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:#fff;color:#2b2b2b;border-radius:14px;padding:8px 14px;font:17px var(--font-display);max-width:90%;text-align:center;box-shadow:0 8px 20px rgba(0,0,0,.35);animation:pop .4s}
 .dline .by{display:block;font:11px var(--font-ui);color:var(--color-ink-soft)}
 .talk.solo{grid-template-columns:1fr}
-#waiter,#waiter5{transition:transform 1.1s ease-in-out}
-.w5{transform:translateX(700px)}
+.memo{transition:transform 1.1s ease-in-out}
+/* the flight map, zoomed to the route on a phone: bigger labels, the far-off ones hidden */
+#s0 svg.mapzoom .mcity{font-size:30px}#s0 svg.mapzoom .mreg{font-size:24px}#s0 svg.mapzoom .mgulf{font-size:34px}#s0 svg.mapzoom .msierra{font-size:20px}#s0 svg.mapzoom .mz-hide{display:none}
+.memo.w-out{transform:translateX(var(--away,700px))}
+/* the dinner scroll's story cards ride low, over the table, never over a face (v1.12) */
+#c5 .step{align-items:flex-end;padding-bottom:5vh}
+#c5 .step .nc{position:sticky;bottom:5vh}
+.step .nc{transition:opacity .25s}.step .nc.gone{opacity:0;pointer-events:none}
 .dish{cursor:pointer}
 /* forks */
 .fork{position:relative;min-height:100vh;padding:110px 5vw 70px;overflow:hidden}
@@ -279,9 +287,9 @@ body.showtext .ptxt.blur{filter:none}
 .bell:active svg{transform:translateY(3px)}
 .receipt{font:13px/1.6 "Courier New",monospace;background:#fff;border:1px dashed #c9b9a8;padding:10px 14px;border-radius:8px;display:inline-block;margin-top:10px}
 .menu{background:#fffaf0;border:1px solid var(--creamb);border-radius:12px;padding:14px 16px;margin:8px 0 12px}
-.menu h4{margin:0 0 8px;font:700 16px var(--font-display);color:var(--bronze);letter-spacing:.06em;text-transform:uppercase}
+.menu h2{margin:0 0 8px;font:700 16px var(--font-display);color:#8a5a26;letter-spacing:.06em;text-transform:uppercase}
 .mi{display:flex;justify-content:flex-start;gap:6px;align-items:center;text-align:left;width:100%;background:#fff;border:2px solid var(--creamb);border-radius:10px;padding:9px 12px;margin:6px 0;font:16px var(--font-display);color:#333;min-height:46px}
-.mi small{font:12px var(--font-ui);color:#888}
+.mi small{font:12px var(--font-ui);color:#666}
 .mi>small:last-child{margin-left:auto}
 .mi.sel{border-color:var(--orange);background:#fff4ee}
 .mi.sel::before{content:"✓ ";color:var(--orange);font-weight:700}
@@ -294,13 +302,21 @@ body.showtext .ptxt.blur{filter:none}
 .camino b{display:block;font:11px var(--font-ui);letter-spacing:.14em;color:var(--bronze2);text-transform:uppercase;margin-bottom:4px}
 #dbg{position:fixed;right:12px;bottom:12px;width:min(380px,92vw);max-height:40vh;overflow:auto;background:rgba(7,17,22,.95);border:1px solid #2c4c57;border-radius:10px;z-index:90;font:11px/1.5 "Courier New",monospace;color:#7fd3e6;padding:10px}
 #dbg b{color:#fff}
-@media (max-width:760px){.paths,.rack,.camino{grid-template-columns:1fr}}
+@media (max-width:760px){.paths,.camino{grid-template-columns:1fr}
+  /* the clothing rack is a sideways swipe row on a phone, so Lupita's reply lands right under it (v1.12) */
+  .rack{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;padding:2px 2px 8px;margin-right:-8px;-webkit-overflow-scrolling:touch}
+  .rack .shirt{flex:0 0 46%;scroll-snap-align:start}.rack .shirt svg{width:64%}}
 
 @media (max-width:760px){
   .talk{grid-template-columns:1fr}.who{max-width:150px}
   .carta .gin{grid-template-columns:1fr}.tiles{grid-template-columns:1fr 1fr}
-  .phone{right:50%;transform:translate(50%,-50%);top:42%}
+  /* phone: the hotel phone sits in the top of the scene, fully visible; the story card keeps the bottom (v1.12) */
+  .phone{right:50%;transform:translateX(50%);top:10px;height:calc(100% - 20px - var(--card-room));padding:8px;border-radius:26px}
+  .phone .scr{border-radius:19px;padding:8px 7px;gap:6px}.phone .hd{font-size:11px;padding:6px 8px}.phone .b{font-size:12px;padding:6px 8px}
   .step{padding:0 4vw}.step.r{justify-content:center}
+  /* phone: each story card rides at the bottom of the screen while its step is on, so it never sits on a face or the phone */
+  .step,.step.top{align-items:flex-end;padding-top:0;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  .step .nc{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));width:100%;max-width:none}
   .hud{gap:8px;padding:8px 10px}.hud .tog{padding:5px 9px;font-size:11px}.pass{padding:5px 7px;font-size:0}.pass i{width:9px;height:9px}
   .prompt{flex-direction:column}.sent{font-size:18px}.gate{padding-top:90px}
   .hud .brand{font-size:15px}.hud .tog.hide-sm{display:none}
@@ -332,9 +348,11 @@ body.showtext .ptxt.blur{filter:none}
 /* The site nav (AA-7) sits above the story's own bar: .hud, .bar, .stage and the save pop-up
    start below it. --site-h is the closed nav's height; the script after the nav keeps it exact.
    A solid strip behind the nav, and it stacks over .hud so the phone menu opens over the story. */
-:root{--site-h:74px;--nav-fade:var(--ink);--nav-fade-end:var(--ink)}
+:root{--card-room:200px;--site-h:74px;--nav-h:74px;--hud-h:58px;--nav-fade:var(--ink);--nav-fade-end:var(--ink)}
 html{scroll-padding-top:var(--site-h)}
-body .nav-shell{z-index:61}
+body .nav-shell{z-index:61;transition:transform .25s ease}
+body .nav-shell.nav-away{transform:translateY(-100%)}
+.hud,.bar{transition:top .25s ease}
 </style>
 </head>
 <body>
@@ -440,20 +458,34 @@ body.present .nav-shell.activity{display:none}
 </script>
 <!-- END GENERATED NAV -->
 <script>
-// Keeps --site-h equal to the site nav's closed height, so the story's bar sits right under it.
-(function(){var s=document.querySelector('.nav-shell');if(!s)return;var r=document.documentElement;
-function set(){if(s.querySelector('.site-nav.open'))return;r.style.setProperty('--site-h',s.offsetHeight+'px')}
-set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListener('resize',set);})();
+// The site nav slides away on scroll-down and comes back on scroll-up (v1.12), so a phone keeps its
+// screen for the story; the story's own bar (.hud) stays pinned. Three variables, kept exact here:
+//   --nav-h   the site nav's closed height (constant; the intro uses it so the page never changes length)
+//   --site-h  how much of the site nav is showing right now: --nav-h, or 0 while it is away
+//   --hud-h   the story bar's height (the scenes start under it)
+// The nav markup itself is generated (nav/nav.js); this only toggles a class on .nav-shell.
+(function(){var s=document.querySelector('.nav-shell');if(!s)return;var r=document.documentElement,away=false,last=Math.max(0,scrollY),navH=s.offsetHeight;
+function open(){return !!s.querySelector('.site-nav.open')}
+function set(){if(open())away=false;else navH=s.offsetHeight;s.classList.toggle('nav-away',away);
+  r.style.setProperty('--nav-h',navH+'px');r.style.setProperty('--site-h',(away?0:navH)+'px');
+  var h=document.querySelector('.hud');if(h)r.style.setProperty('--hud-h',h.offsetHeight+'px')}
+function scrolled(){var y=Math.max(0,scrollY),d=y-last;if(Math.abs(d)<8&&y>navH)return;last=y;
+  var a=d>0&&y>navH&&!open()&&!s.contains(document.activeElement);if(a!==away){away=a;set()}}
+s.addEventListener('focusin',function(){if(away){away=false;set()}});
+addEventListener('scroll',scrolled,{passive:true});addEventListener('resize',set);
+if(window.ResizeObserver){var ro=new ResizeObserver(set);ro.observe(s);document.addEventListener('DOMContentLoaded',function(){var h=document.querySelector('.hud');if(h)ro.observe(h);set()})}
+set();})();
 </script>
 <div class="bar" id="bar"></div>
 <header class="hud">
   <a class="brand" href="/espanol/" aria-label="Back to the Español hub" title="Back to the Español hub"><span class="back" aria-hidden="true">←</span>El <b>Viaje</b></a>
   <span class="sp"></span>
-  <button class="hbtn" id="openGuide" aria-haspopup="dialog" aria-controls="guide"><img data-jodi="neutral" alt="" class="javatar"><span>Guía de Jodi</span></button>
+  <button class="hbtn" id="openGuide" aria-haspopup="dialog" aria-controls="guide" aria-label="Guía de Jodi"><img data-jodi="neutral" alt="" class="javatar"><span>Guía de Jodi</span></button>
   <button class="avbtn" id="openSave" aria-haspopup="dialog" aria-controls="savepop" aria-label="Your profile"><span class="av" id="hav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span></button>
   <div class="pass" aria-label="Pasaporte">PASAPORTE <span id="dots"><i></i> <i></i> <i></i> <i></i> <i></i></span></div>
 </header>
 
+<main id="story">
 <!-- INTRO -->
 <section class="intro" id="intro">
   <svg class="sky" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -499,29 +531,74 @@ set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListen
         </g>
         <!-- counter -->
         <g id="counter" class="fade">
+          <!-- ATL airline agent (v1.12). Built like Jodi in a 400×400 space (face rx 56/ry 64, almond eyes with a highlight, stroke nose and mouth), placed at the counter. Her arms are drawn after the counter so one hand rests on the jammed printer. -->
+          <g id="agent" transform="translate(130,215) scale(.5)">
+            <path d="M70 400 Q74 262 200 236 Q326 262 330 400Z" fill="#4A3520" opacity=".15" transform="translate(0,7)"/>
+            <circle cx="200" cy="50" r="30" fill="#2B2320"/><ellipse cx="200" cy="126" rx="70" ry="78" fill="#2B2320"/>
+            <rect x="180" y="180" width="40" height="60" fill="#C68A5E"/><path d="M180 196 Q200 214 220 196 L220 214 Q200 226 180 214Z" fill="#A8704A" opacity=".6"/>
+            <path d="M70 400 Q74 262 200 236 Q326 262 330 400Z" fill="#1f3a5a"/><path d="M200 236 Q326 262 330 400 L236 400 Q238 300 200 236Z" fill="#172e48"/>
+            <path d="M164 240 L200 306 L236 240Z" fill="#f4f1ea"/>
+            <path d="M150 244 L200 330 L176 400 M250 244 L200 330 L224 400" stroke="#172e48" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="96" y="308" width="56" height="16" rx="4" fill="#E0B07A"/><rect x="102" y="313" width="30" height="5" rx="2" fill="#7a5228"/>
+            <path d="M258 304 q14 -10 28 0 q-14 4 -28 0Z M268 300 l4 -8 l4 8" fill="#E0B07A" stroke="#E0B07A" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M158 236 Q200 262 242 236 L240 254 Q200 280 160 254Z" fill="#CF4616"/>
+            <path d="M206 266 L190 322 L210 316 L222 270Z" fill="#CF4616"/><path d="M218 266 L238 314 L252 300 L230 262Z" fill="#A8380F"/>
+            <ellipse cx="214" cy="262" rx="15" ry="12" fill="#A8380F"/>
+            <ellipse cx="144" cy="146" rx="9" ry="13" fill="#C68A5E"/><ellipse cx="256" cy="146" rx="9" ry="13" fill="#C68A5E"/>
+            <ellipse cx="200" cy="140" rx="56" ry="64" fill="#C68A5E"/>
+            <path d="M144 132 Q148 70 200 66 Q254 70 256 132 Q244 92 196 94 Q166 100 144 132Z" fill="#2B2320"/>
+            <path d="M166 124 Q178 118 190 123 M210 123 Q222 118 234 124" stroke="#2B2320" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+            <path d="M168 144 Q180 134 192 144 Q180 151 168 144Z M208 144 Q220 134 232 144 Q220 151 208 144Z" fill="#23303A"/>
+            <circle cx="184" cy="141" r="2.4" fill="#fff"/><circle cx="224" cy="141" r="2.4" fill="#fff"/>
+            <path d="M200 150 Q195 164 203 168" stroke="#A8704A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M186 182 Q200 190 214 182" stroke="#7a3b2a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <circle cx="170" cy="168" r="10" fill="#E59677" opacity=".3"/><circle cx="230" cy="168" r="10" fill="#E59677" opacity=".3"/>
+          </g>
           <rect x="140" y="420" width="560" height="160" rx="10" fill="#2b3a41"/>
           <rect x="140" y="410" width="560" height="16" rx="5" fill="#357889"/>
           <text x="170" y="470" font-family="Verdana" font-size="20" fill="#cfe3ea">ATL · DOCUMENTACIÓN</text>
           <rect x="470" y="556" width="200" height="22" rx="4" fill="#59666b"/>
           <g id="bag"><rect x="500" y="456" width="140" height="100" rx="14" fill="#B0773A"/><rect x="548" y="436" width="44" height="24" rx="6" fill="none" stroke="#7a5228" stroke-width="8"/><rect x="500" y="496" width="140" height="8" fill="#8f5f2c"/></g>
-          <g id="printer"><rect x="300" y="480" width="110" height="74" rx="8" fill="#d9d9d9"/><rect x="316" y="490" width="78" height="10" rx="3" fill="#9aa"/></g>
-          <g id="jam" opacity="0"><path d="M320 548 l70 -6 l-6 50 l-62 8z" fill="#fff" transform="rotate(-12 350 570)"/><rect x="150" y="508" width="140" height="34" rx="6" fill="#3a1d14"/><text x="220" y="532" text-anchor="middle" font-family="Verdana" font-weight="bold" font-size="20" fill="#ff9b73">¡ATASCO!</text></g>
+          <g id="printer"><ellipse cx="356" cy="410" rx="62" ry="6" fill="#4A3520" opacity=".15"/><rect x="300" y="352" width="112" height="58" rx="10" fill="#d9d9d9"/><rect x="300" y="396" width="112" height="14" rx="5" fill="#b9bcbd"/><rect x="316" y="362" width="80" height="10" rx="4" fill="#8f9a9c"/><circle cx="398" cy="388" r="4" fill="#3E9B6B"/></g>
+          <g id="jam" opacity="0"><path d="M324 366 q30 -26 66 -10 l-8 -40 q-30 -8 -54 12z" fill="#fff"/><path d="M336 340 q20 -12 40 -4" stroke="#c9c9c9" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="150" y="508" width="140" height="34" rx="6" fill="#3a1d14"/><text x="220" y="532" text-anchor="middle" font-family="Verdana" font-weight="bold" font-size="20" fill="#ff9b73">¡ATASCO!</text></g>
           <g id="notag" opacity="0"><rect x="520" y="380" width="140" height="34" rx="6" fill="#CF4616"/><text x="590" y="403" text-anchor="middle" font-family="Verdana" font-size="15" fill="#fff" font-weight="bold">SIN ETIQUETA</text></g>
+          <g id="agentArms" transform="translate(130,215) scale(.5)">
+            <path d="M84 300 Q60 340 70 376 L176 372 L178 392 L62 396 Q40 350 66 290Z" fill="#1f3a5a"/><rect x="150" y="370" width="10" height="24" rx="3" fill="#E0B07A"/>
+            <ellipse cx="180" cy="384" rx="20" ry="12" fill="#C68A5E"/>
+            <path d="M296 268 Q340 254 366 252 L372 284 Q336 292 310 318Z" fill="#172e48"/><rect x="358" y="252" width="9" height="32" rx="3" fill="#E0B07A" transform="rotate(-8 362 268)"/>
+            <path d="M370 262 Q392 252 410 262 Q414 276 398 284 L372 284Z" fill="#C68A5E"/><path d="M388 266 L404 266 M386 274 L402 276" stroke="#A8704A" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
         </g>
         <!-- traveler -->
         <g id="trav" class="fade" style="transition:transform 1.2s,opacity .7s">
           <g transform="translate(760,380)"><circle cx="40" cy="20" r="24" fill="#c08a64"/><path d="M14 10 Q40 -16 66 10 L64 18 Q40 4 16 18Z" fill="#2a1a14"/><path d="M8 52 Q40 38 72 52 L78 190 L2 190Z" fill="#EB8D69"/><rect x="74" y="80" width="30" height="20" rx="3" fill="#fff"/></g>
         </g>
       </g>
+      <!-- Flight map (v1.12): coastlines projected from real coordinates (lon/lat → x = (lon+108)·35.6, y = (37−lat)·40), like El Mundial's prologue map. -->
       <g id="mapScene" opacity="0" style="transition:opacity .8s">
-        <rect width="1200" height="800" fill="#0f1c24"/>
-        <g stroke="rgba(255,255,255,.05)"><path d="M0 100H1200M0 200H1200M0 300H1200M0 400H1200M0 500H1200M0 600H1200M0 700H1200M100 0V800M200 0V800M300 0V800M400 0V800M500 0V800M600 0V800M700 0V800M800 0V800M900 0V800M1000 0V800M1100 0V800"/></g>
-        <path d="M0 0 H1200 V380 Q1120 420 1060 470 Q980 520 900 500 Q820 470 760 520 Q690 590 640 640 Q560 700 480 640 Q420 600 400 680 L380 800 H0Z" fill="#1d3240"/>
-        <text x="760" y="640" font-family="Georgia" font-style="italic" font-size="22" fill="#3d5d70">Golfo de México</text>
-        <path id="route" d="M880 230 Q640 120 390 450" fill="none" stroke="#CF4616" stroke-width="4" stroke-dasharray="1 0"/>
-        <circle cx="880" cy="230" r="9" fill="#EB8D69"/><text x="900" y="226" font-family="Verdana" font-size="20" fill="#fff">ATL · Atlanta</text>
-        <circle cx="390" cy="450" r="9" fill="#EB8D69"/><text x="200" y="490" font-family="Verdana" font-size="20" fill="#fff">MTY · Monterrey</text>
+        <rect x="-400" y="-200" width="2000" height="1200" fill="#12303f"/>
+        <path d="M1228 -40 L1153 -8 L1139 16 L1157 68 L1121 92 L1072 124 L1047 128 L1025 152 L997 172 L965 200 L947 240 L947 280 L961 312 L975 344 L993 400 L997 440 L983 472 L958 476 L936 444 L922 412 L901 376 L897 340 L879 312 L854 280 L819 292 L805 284 L765 264 L726 268 L708 264 L684 264 L655 272 L662 300 L669 320 L641 312 L612 316 L577 300 L523 288 L473 304 L452 324 L413 348 L384 376 L377 408 L384 444 L374 480 L367 512 L367 580 L377 616 L384 652 L413 688 L424 716 L456 736 L481 754 L516 744 L552 736 L587 740 L616 704 L627 660 L630 640 L659 628 L705 616 L744 620 L755 640 L733 696 L723 748 L705 820 L274 820 L231 776 L206 764 L160 748 L121 712 L96 664 L100 620 L82 576 L57 552 L21 508 L-18 468 L-400 468 L-400 -200 L1600 -200 L1600 -40Z" fill="#27465a" stroke="#4A3520" stroke-opacity=".15" stroke-width="10" stroke-linejoin="round" paint-order="stroke"/>
+        <path d="M822 604 L854 576 L926 556 L979 560 L1050 584 L1104 620 L1153 652 L1207 672 L1207 684 L1157 684 L1086 684 L1068 652 L1015 616 L943 592 L904 600 L872 600 L840 616Z" fill="#27465a"/>
+        <g stroke="rgba(255,255,255,.05)"><path d="M-400 100H1600M-400 200H1600M-400 300H1600M-400 400H1600M-400 500H1600M-400 600H1600M-400 700H1600M100 -200V1000M200 -200V1000M300 -200V1000M400 -200V1000M500 -200V1000M600 -200V1000M700 -200V1000M800 -200V1000M900 -200V1000M1000 -200V1000M1100 -200V1000"/></g>
+        <path d="M384 444 L349 436 L303 380 L267 332 L235 288 L189 292 L171 320 L125 296 L53 208 L-400 208" fill="none" stroke="#8fb4c1" stroke-opacity=".55" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round"/>
+        <path d="M50 200 L178 200 L178 -200 M178 20 L285 20 L285 96 L356 120 L427 128 L498 136 L498 240 L509 280" fill="none" stroke="#8fb4c1" stroke-opacity=".22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <g aria-hidden="true"><path d="M193 460 L217 430 L241 460Z" fill="#355a6c"/><path d="M217 430 L241 460 L223 460Z" fill="#2c4d5e"/><path d="M218 484 L242 454 L266 484Z" fill="#355a6c"/><path d="M242 454 L266 484 L248 484Z" fill="#2c4d5e"/><path d="M239 504 L263 474 L287 504Z" fill="#355a6c"/><path d="M263 474 L287 504 L269 504Z" fill="#2c4d5e"/><path d="M261 528 L285 498 L309 528Z" fill="#355a6c"/><path d="M285 498 L309 528 L291 528Z" fill="#2c4d5e"/><path d="M275 564 L299 534 L323 564Z" fill="#355a6c"/><path d="M299 534 L323 564 L305 564Z" fill="#2c4d5e"/><path d="M286 604 L310 574 L334 604Z" fill="#355a6c"/><path d="M310 574 L334 604 L316 604Z" fill="#2c4d5e"/><path d="M296 644 L320 614 L344 644Z" fill="#355a6c"/><path d="M320 614 L344 644 L326 644Z" fill="#2c4d5e"/><path d="M311 684 L335 654 L359 684Z" fill="#355a6c"/><path d="M335 654 L359 684 L341 684Z" fill="#2c4d5e"/></g>
+        <g font-family="Georgia" font-style="italic" fill="#6f93a6">
+          <text class="mgulf" x="520" y="540" font-size="26">Golfo de México</text>
+          <text class="mz-hide" x="1010" y="330" font-size="20" fill="#4f7389">Océano Atlántico</text>
+        </g>
+        <g font-family="Verdana" fill="#9fc0cc" font-size="17" letter-spacing="3">
+          <text class="mreg" x="250" y="200">TEXAS</text>
+          <text class="mreg" x="520" y="80">ESTADOS UNIDOS</text>
+          <text class="mreg" x="180" y="672">MÉXICO</text>
+          <text class="mz-hide" x="900" y="372" font-size="13">FLORIDA</text>
+        </g>
+        <text class="msierra" x="302" y="486" font-family="Georgia" font-style="italic" font-size="15" fill="#8fb4c1" transform="rotate(66 302 486)">Sierra Madre Oriental</text>
+        <path id="route" d="M841 130 Q560 250 273 452" fill="none" stroke="#CF4616" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="841" cy="130" r="10" fill="#357889" stroke="#fff" stroke-width="2.5"/><text class="mcity" x="826" y="112" text-anchor="end" font-family="Verdana" font-size="20" fill="#fff">Atlanta · ATL</text>
+        <circle cx="273" cy="452" r="10" fill="#EB8D69" stroke="#fff" stroke-width="2.5"/><text class="mcity" x="292" y="458" font-family="Verdana" font-size="20" fill="#fff">Monterrey · MTY</text>
         <g id="plane"><path d="M-22 0 L20 -4 L26 0 L20 4Z M-4 -2 L-12 -22 L-4 -22 L8 -2Z M-4 2 L-12 22 L-4 22 L8 2Z M-20 -1 L-26 -10 L-21 -10 L-14 -1Z M-20 1 L-26 10 L-21 10 L-14 1Z" fill="#fff"/></g>
+      </g>
       </g>
     </svg>
     <div class="nc fade" id="email" style="position:absolute;right:7vw;top:22%;max-width:420px;background:#fff;color:#333;z-index:2">
@@ -635,7 +712,7 @@ set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListen
     <div class="talk">
       <div class="who"><div data-person="valeria" data-mouth="g2m"></div><div class="nm"><span>Valeria · directora creativa</span></div></div>
       <div class="panel">
-        <div class="prompt"><button class="say" data-say="Buenos días. Soy Valeria Garza, directora creativa. ¿Cómo le fue en el viaje?">Escuchar</button><span class="ptxt blur">“Buenos días. Soy Valeria Garza, directora creativa. ¿Cómo le fue en el viaje?”</span></div>
+        <div class="prompt"><button class="say" data-say="Buenos días. Soy Valeria Garza, directora creativa. ¿Cómo está? ¿Qué tal el viaje?">Escuchar</button><span class="ptxt blur">“Buenos días. Soy Valeria Garza, directora creativa. ¿Cómo está? ¿Qué tal el viaje?”</span></div>
         <div class="turnlabel">Tu respuesta</div>
         <div class="opts" id="g2o">
           <button class="opt" data-k="A"><b>A</b>“Mucho gusto, señora Garza. Muy bien, gracias. ¿Y usted?”</button>
@@ -732,7 +809,7 @@ set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListen
     <div class="talk solo"><div class="panel">
         <div class="prompt"><button class="say" data-say="Buenas noches. ¿Qué les traigo?">Escuchar</button><span class="ptxt blur">“Buenas noches. ¿Qué les traigo?”</span></div>
         <div class="turnlabel">Don Memo · el mesero</div>
-        <div class="menu"><h4>Menú · La Silla</h4><div id="menu"></div></div>
+        <div class="menu"><h2>Menú · La Silla</h2><div id="menu"></div></div>
         <p class="hint" id="f3hint">Pick up to 3 dishes, then order. Prices in Mexican pesos.</p>
         <button class="go" id="f3go" disabled>Pedir</button>
         <div id="f3rep"></div>
@@ -746,16 +823,16 @@ set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListen
 <section class="gate locked" id="g4" data-after="f3" data-step="10">
   <div class="gbg" style="background:#1c1626"><div class="dmount" data-dinner="g4"></div></div>
   <div class="gin">
-    <div class="gsign"><span class="gnum">4</span><span class="gttl">Tutéame · La cena</span><span class="gst">Embarcando</span></div>
+    <div class="gsign"><span class="gnum">4</span><span class="gttl">Háblame de tú · La cena</span><span class="gst">Embarcando</span></div>
     <div class="talk">
       <div class="who"><div data-person="valeria" data-mouth="g4m"></div><div class="nm"><span>Valeria</span></div></div>
       <div class="panel" id="g4a">
         <div class="turnlabel">Turno 1</div>
-        <div class="prompt"><button class="say" data-say="¿Ya había estado en México antes?">Escuchar</button><span class="ptxt blur">“¿Ya había estado en México antes?”</span></div>
+        <div class="prompt"><button class="say" data-say="¿Es su primera vez en México?">Escuchar</button><span class="ptxt blur">“¿Es su primera vez en México?”</span></div>
         <div class="cv" data-g="4"><button class="cv-link" aria-expanded="false">¿Juegan en clase? Cuenten manos</button><div class="cv-panel" hidden></div></div>
         <div class="opts" id="g4o1">
-          <button class="opt" data-k="u"><b>A</b>“No, es mi primera vez. ¿Usted es de aquí?”</button>
-          <button class="opt" data-k="t"><b>B</b>“No, es mi primera vez. ¿Tú eres de aquí?”</button>
+          <button class="opt" data-k="u"><b>A</b>“Sí, es mi primera vez. ¿Usted es de aquí?”</button>
+          <button class="opt" data-k="t"><b>B</b>“Sí, es mi primera vez. ¿Tú eres de aquí?”</button>
         </div>
         <div id="g4rep1"></div>
       </div>
@@ -782,14 +859,14 @@ set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListen
 <section class="gate locked" id="g5" data-after="g4" data-step="11">
   <div class="gbg" style="background:#1c1626"><div class="dmount" data-dinner="g5"></div></div>
   <div class="gin">
-    <div class="gsign"><span class="gnum">5</span><span class="gttl">Busco un apartamento…</span><span class="gst">Embarcando</span></div>
+    <div class="gsign"><span class="gnum">5</span><span class="gttl">Busco un departamento…</span><span class="gst">Embarcando</span></div>
     <div class="talk">
       <div class="who"><div data-person="sofi" data-mouth="g5m"></div><div class="nm"><span>Sofi</span></div></div>
       <div class="panel">
         <div class="prompt"><button class="say" data-say="Oye, si te dan la pasantía, ¿dónde vas a vivir?">Escuchar</button><span class="ptxt blur">“Oye, si te dan la pasantía, ¿dónde vas a vivir?”</span></div>
         <div class="turnlabel">Termina la frase · verbo: estar</div>
         <p class="hint" style="margin:0 0 6px">Click the box and type the right form of <i>estar</i>. Need an accent? Tap a letter below.</p>
-        <div class="typed"><span class="sent" style="margin:0">“Busco un apartamento que</span><input id="g5in" aria-label="forma de estar" placeholder="escribe aquí" autocomplete="off" spellcheck="false"><span class="sent" style="margin:0">cerca del estudio.”</span></div>
+        <div class="typed"><span class="sent" style="margin:0">“Busco un departamento que</span><input id="g5in" aria-label="forma de estar" placeholder="escribe aquí" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"><span class="sent" style="margin:0">cerca del estudio.”</span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px">
           <button class="acc">á</button><button class="acc">é</button><button class="acc">í</button><button class="acc">ó</button><button class="acc">ú</button><button class="acc">ñ</button>
         </div>
@@ -837,6 +914,7 @@ set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListen
   </div>
 </section>
 
+</main>
 <div class="stamp" id="stamp"></div>
 
 <!-- JODI'S GUIDE (drawer) -->
@@ -885,7 +963,7 @@ const ST=window.StoryTrack||null;
 if(ST&&DBG)ST.setDebug(dlog);
 const TM=ST?ST.TM:{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{}),restart:()=>dlog('restart',{})};
 TM.init({module:'el-viaje',gameName:'El Viaje',stream:'espanol',stepsTotal:12});
-const T=(e,d)=>TM.track(e,Object.assign({v:'1.11'},d||{}));
+const T=(e,d)=>TM.track(e,Object.assign({v:'1.12'},d||{}));
 /* First try only: Puerta 3's repair ("quiero decir que…") can raise the story's own confianza,
    but the score a teacher and Insider see is the first answer. */
 function firstTry(n){return n===3?(S.choice[3]==='A'?1:0):(S.conf[n]||0)}
@@ -894,7 +972,7 @@ function pathNow(){return {f1:S.path.f1||null,f2:S.path.f2||null,f3:(S.path.f3||
 function pushSummary(){TM.summary({gates:gatesNow(),path:pathNow(),mode:S.mode||'solo'})}
 /* module_progress/el-viaje: `state` is ONE string so each save replaces it whole (a merge would
    keep an earlier playthrough's gates); `finished` stops a finished story from resuming. */
-function saveProgress(fin){const data={v:'1.11',finished:!!fin,state:JSON.stringify({done:S.done,choice:S.choice,conf:S.conf,path:S.path})};if(ST)ST.saveProgress('el-viaje',data);else dlog('saveModuleProgress',{slug:'el-viaje',gates:Object.keys(S.done).length,path:S.path})}
+function saveProgress(fin){const data={v:'1.12',finished:!!fin,state:JSON.stringify({done:S.done,choice:S.choice,conf:S.conf,path:S.path})};if(ST)ST.saveProgress('el-viaje',data);else dlog('saveModuleProgress',{slug:'el-viaje',gates:Object.keys(S.done).length,path:S.path})}
 
 /* ---------- people ---------- */
 const P={
@@ -906,6 +984,7 @@ const P={
   clerk:{skin:'#c89470',hair:'#5a3020',top:'#6b4a8a',style:'pony'},
   desk:{skin:'#9a6a48',hair:'#1a120d',top:'#2D6473',style:'short'}
 };
+const BROW={flat:'M62 66 L73 64 M87 64 L98 66',raised:'M62 66 L73 64 M87 59 L98 56'};
 const MOUTH={smile:'M68 92 Q80 102 92 92',neutral:'M70 94 L90 94',unsure:'M70 96 Q80 91 90 96',laugh:'M66 90 Q80 108 94 90 Z'};
 function personG(k,mouthId){
   const p=P[k];let back='',front='M46 68 Q48 30 80 32 Q112 30 114 68 Q100 50 80 52 Q60 50 46 68Z',extra='';
@@ -915,12 +994,13 @@ function personG(k,mouthId){
   const m=mouthId?` id="${mouthId}"`:'';
   if(p.vest)extra+='';
   const vest=p.vest?`<path d="M44 132 L80 200 L116 132 L128 240 L32 240Z" fill="#2a2a2a"/><path d="M74 120 L80 132 L86 120Z" fill="#8a2a2a"/>`:'';
-  return `<ellipse cx="80" cy="236" rx="56" ry="6" fill="#4A3520" opacity=".18"/>${back}<path d="M24 240 Q26 124 80 116 Q134 124 136 240Z" fill="${p.top}"/><path d="M24 240 Q26 190 40 168 Q60 200 80 204 Q100 200 120 168 Q134 190 136 240Z" fill="#000" opacity=".12"/>${vest}<rect x="70" y="98" width="20" height="22" fill="${p.skin}"/><circle cx="80" cy="72" r="34" fill="${p.skin}"/>${extra}<path d="${front}" fill="${p.hair}"/><path d="M80 40 Q108 44 112 76 Q108 98 90 104 Q104 88 104 70 Q100 50 80 40Z" fill="#000" opacity=".08"/><ellipse cx="68" cy="76" rx="3.6" ry="4.2" fill="#23303A"/><ellipse cx="92" cy="76" rx="3.6" ry="4.2" fill="#23303A"/><circle cx="69.3" cy="74.6" r="1.2" fill="#fff"/><circle cx="93.3" cy="74.6" r="1.2" fill="#fff"/><path d="M62 66 L73 64 M87 64 L98 66" stroke="#2a1a14" stroke-width="2.4" stroke-linecap="round"/><path${m} d="${MOUTH.neutral}" stroke="#5a2a1a" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  return `<ellipse cx="80" cy="236" rx="56" ry="6" fill="#4A3520" opacity=".18"/>${back}<path d="M24 240 Q26 124 80 116 Q134 124 136 240Z" fill="${p.top}"/><path d="M24 240 Q26 190 40 168 Q60 200 80 204 Q100 200 120 168 Q134 190 136 240Z" fill="#000" opacity=".12"/>${vest}<rect x="70" y="98" width="20" height="22" fill="${p.skin}"/><circle cx="80" cy="72" r="34" fill="${p.skin}"/>${extra}<path d="${front}" fill="${p.hair}"/><path d="M80 40 Q108 44 112 76 Q108 98 90 104 Q104 88 104 70 Q100 50 80 40Z" fill="#000" opacity=".08"/><ellipse cx="68" cy="76" rx="3.6" ry="4.2" fill="#23303A"/><ellipse cx="92" cy="76" rx="3.6" ry="4.2" fill="#23303A"/><circle cx="69.3" cy="74.6" r="1.2" fill="#fff"/><circle cx="93.3" cy="74.6" r="1.2" fill="#fff"/><path${mouthId?` id="${mouthId}b"`:''} d="${BROW.flat}" stroke="#2a1a14" stroke-width="2.4" stroke-linecap="round" fill="none"/><path${m} d="${MOUTH.neutral}" stroke="#5a2a1a" stroke-width="3" fill="none" stroke-linecap="round"/>`;
 }
 function renderPeople(root){(root||document).querySelectorAll('[data-person]').forEach(d=>{d.innerHTML=`<svg viewBox="0 0 160 240" role="img" aria-label="${d.dataset.person}">${personG(d.dataset.person,d.dataset.mouth)}</svg>`})}
 renderPeople();
 $$('[data-person-svg]').forEach(g=>{g.innerHTML=`<g transform="scale(1.35)">${personG(g.dataset.personSvg).replace(MOUTH.neutral,MOUTH.smile)}</g>`});
-function mood(id,m){const el=document.getElementById(id);if(!el)return;el.setAttribute('d',MOUTH[m]);el.setAttribute('fill',m==='laugh'?'#5a2a1a':'none')}
+function mood(id,m){const el=document.getElementById(id);if(!el)return;el.setAttribute('d',MOUTH[m]);el.setAttribute('fill',m==='laugh'?'#5a2a1a':'none');brow(id,false)}
+function brow(id,up){const b=document.getElementById(id+'b');if(b)b.setAttribute('d',up?BROW.raised:BROW.flat)}
 $$('img[data-jodi]').forEach(i=>i.src=JODI[i.dataset.jodi]);
 
 /* string lights */
@@ -964,12 +1044,12 @@ function sizePlane(){const g=document.querySelector('#iplane>g');if(g)g.setAttri
 /* intro plane: still for reduced motion */
 if(matchMedia('(prefers-reduced-motion: reduce)').matches){const ip=$('#iplane'),pa=$('#ipath');if(ip&&pa){ip.querySelector('animateMotion').remove();const L=pa.getTotalLength(),p=pa.getPointAtLength(L*.8),q=pa.getPointAtLength(L*.8+2);ip.setAttribute('transform',`translate(${p.x},${p.y}) rotate(${Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI})`)}}
 /* ---------- Jodi's guide ---------- */
-const WORDS=[['la pasantía','internship'],['facturar (una maleta)','to check (a bag)'],['la etiqueta','tag, label'],['atascarse','to jam, get stuck'],['la báscula','scale'],['el pase de abordar','boarding pass'],['la puerta','gate; door'],['el equipaje','luggage'],['la recogida de equipaje','baggage claim'],['la maleta','suitcase'],['el Cerro de la Silla','Saddle Mountain (Monterrey)'],['la talla','clothing size'],['el probador','fitting room'],['probarse','to try on'],['la plancha','iron (for clothes)'],['la lavandería','laundry service'],['la sala de juntas','meeting room'],['el mesero','waiter'],['el cabrito','roast young goat'],['los frijoles charros','cowboy beans'],['la carne asada','grilled steak'],['el agua de jamaica','hibiscus drink'],['¡Buen provecho!','Enjoy your meal!'],['tutear','to use tú with someone'],['¡Tutéame!','Call me tú!'],['el depa','apartment (short for departamento)'],['la cuadra','city block'],['ahorita','right now / in a bit (Mexico)'],['quiero decir que…','what I mean is…']];
+const WORDS=[['la pasantía','internship'],['facturar (una maleta)','to check (a bag)'],['la etiqueta','tag, label'],['atascarse','to jam, get stuck'],['la báscula','scale'],['el pase de abordar','boarding pass'],['la puerta','gate; door'],['el equipaje','luggage'],['la recogida de equipaje','baggage claim'],['la maleta','suitcase'],['el Cerro de la Silla','Saddle Mountain (Monterrey)'],['la talla','clothing size'],['el probador','fitting room'],['probarse','to try on'],['la plancha','iron (for clothes)'],['la lavandería','laundry service'],['la sala de juntas','meeting room'],['el mesero','waiter'],['el cabrito','roast young goat'],['los frijoles charros','cowboy beans'],['la carne asada','grilled steak'],['el agua de jamaica','hibiscus drink'],['¡Buen provecho!','Enjoy your meal!'],['tutear','to use tú with someone'],['¡Háblame de tú!','Use tú with me!'],['el depa','apartment (short for departamento)'],['la cuadra','city block'],['ahorita','right now / in a bit (Mexico)'],['quiero decir que…','what I mean is…']];
 const RULES=[
  {k:1,t:'Pretérito vs. imperfecto',d:'Both are past tenses, but they tell the listener different things. <b>Pretérito</b> = a completed event (it happened, it\'s done). <b>Imperfecto</b> = background, or something <i>in progress</i> when something else happened.',ex:'Yo <b>leía</b> cuando <b>sonó</b> el teléfono.<br><small>I was reading (in progress) when the phone rang (event).</small>'},
  {k:2,t:'Tú vs. usted',d:'<b>Usted</b> is for people you just met, people older or senior to you, and customer-service situations. <b>Tú</b> is for friends, family and peers, or anyone who invites you to use it.',ex:'<b>¿Cómo está usted?</b> (a new boss)<br><b>¿Cómo estás?</b> (a friend)'},
  {k:3,t:'El condicional: "would"',d:'For hypotheticals ("what would you do if…?"), use the conditional: the infinitive + <b>-ía</b>. If you answer in the past or present instead, people hear a real story or a habit.',ex:'¿Qué <b>harías</b>? → Yo <b>hablaría</b> con ellos.<br><small>What would you do? → I would talk to them.</small>'},
- {k:4,t:'Tutéame: when the rule changes',d:'If someone says <b>"tutéame"</b> or <b>"háblame de tú"</b>, they\'re inviting you to switch to tú. Accepting the invitation is the friendly move.',ex:'—Tutéame, por favor. —¡Claro! ¿Y tú, de dónde eres?'},
+ {k:4,t:'Háblame de tú: when the rule changes',d:'If someone says <b>"háblame de tú"</b>, they\'re inviting you to switch to tú. Accepting the invitation is the friendly move.',ex:'—Háblame de tú, por favor. —¡Claro! ¿Y tú, de dónde eres?'},
  {k:5,t:'Subjuntivo with "que": does it exist yet?',d:'After <b>que</b>, the <b>indicative</b> describes something specific you already know. The <b>subjunctive</b> describes something you\'re still looking for, any one that fits.',ex:'Tengo un perro que <b>es</b> tranquilo. (a real dog I know)<br>Busco un perro que <b>sea</b> tranquilo. (any dog like that)'},
  {k:0,t:'Fixing a misunderstanding',d:'Fluent speakers repair all the time. If someone misunderstood you, say so and restate it.',ex:'<b>No, perdón, quiero decir que…</b> · <b>Me expliqué mal.</b>'}];
 $('#wordlist').innerHTML=WORDS.map(([es,en])=>`<div class="wrow" data-q="${(es+' '+en).toLowerCase()}"><b>${es}</b><span>${en}</span><button aria-label="Escuchar ${es}" data-say="${es}">${SPK}</button></div>`).join('');
@@ -1014,8 +1094,9 @@ function setStage(id,n){
     $('#trav').style.transform=n>=4?'translateX(520px)':'none';
     $('#atlScene').style.opacity=n>=5?0:1;$('#atlScene').style.transition='opacity .8s';
     $('#mapScene').setAttribute('opacity',n>=5?1:0);
+    fitScene();
   }
-  if(id==='s5'){const w=$('#waiter5');if(w)w.style.transform=n>=3?'none':'translateX(700px)'}
+  if(id==='s5'){memoOut($('#waiter5'),n<3);spot('c5',n===3?'memo':n===2?({proyecto:'diego',ciudad:'valeria'}[S.path.f2]||'sofi'):n===1?'valeria':null)}
   if(id==='s2'){
     $('#phone').classList.toggle('vis',n>=2);
     $$('#phone .b').forEach((b,i)=>b.classList.toggle('vis',n>=2&&(i<2||n>=3)));
@@ -1027,7 +1108,9 @@ function onScroll(){
   $('#bar').style.width=(scrollY/(doc.scrollHeight-vh)*100)+'%';
   $$('.chap:not(.locked)').forEach(ch=>{
     const st=ch.querySelector('.stage');let cur=0;
-    ch.querySelectorAll('.step').forEach(s=>{const r=s.getBoundingClientRect();if(r.top<vh*.6)cur=+s.dataset.s});
+    ch.querySelectorAll('.step').forEach(s=>{const r=s.getBoundingClientRect();if(r.top<vh*.6)cur=+s.dataset.s;
+      /* a card that rides the bottom (phone, dinner) fades as its step ends, so it never slides up over the art */
+      const nc=s.querySelector('.nc');if(nc&&getComputedStyle(nc).position==='sticky')nc.classList.toggle('gone',r.bottom<vh*.92)});
     setStage(st.id,cur);
     const r=ch.getBoundingClientRect(),p=Math.min(1,Math.max(0,-r.top/(r.height-vh)));
     if(!window.AG_REDUCED_MOTION) st.querySelectorAll('[data-par]').forEach(g=>g.setAttribute('transform',`translate(${p*+g.dataset.par},0)`));
@@ -1042,9 +1125,32 @@ const io=('IntersectionObserver' in window)?new IntersectionObserver(es=>es.forE
 function watch(s){if(io&&s.dataset.step)io.observe(s)}
 $$('[data-step]').forEach(s=>{if(!s.classList.contains('locked'))watch(s)});
 
-/* mobile: show the whole airport scene instead of cropping it */
-function fitScene(){const sv=$('#s0 svg.scene');if(sv)sv.setAttribute('preserveAspectRatio',innerWidth<700?'xMidYMid meet':'xMidYMid slice');$('#s0').style.background='#121a1e'}
+/* mobile: show the whole airport scene instead of cropping it, at the top of the screen (the story card
+   keeps the bottom). The flight map zooms to the ATL → MTY route on a phone and its labels grow (v1.12). */
+function fitScene(){const sv=$('#s0 svg.scene');if(!sv)return;const ph=innerWidth<700,map=(stageState.s0||0)>=5;
+  sv.setAttribute('preserveAspectRatio',ph?'xMidYMin meet':'xMidYMid slice');sv.setAttribute('viewBox',ph?(map?'170 50 720 640':'130 110 830 520'):'0 0 1200 800');
+  sv.classList.toggle('mapzoom',ph&&map);$('#s0').style.background=map?'#12303f':'#121a1e'}
 fitScene();addEventListener('resize',fitScene);
+/* phone: the hotel phone leaves room for the tallest story card of its chapter */
+function cardRoom(){let h=0;$$('#c2 .nc').forEach(n=>h=Math.max(h,n.offsetHeight));if(h)document.documentElement.style.setProperty('--card-room',(h+24)+'px')}
+addEventListener('resize',cardRoom);setTimeout(cardRoom,0);
+/* After a tap reveals something below (a reply, a receipt, the next choice), bring it into view so the
+   tap visibly did something (v1.12). Only scrolls when it's off-screen; jumps instead of gliding under
+   reduced motion (reduced-motion.js). */
+function bringIntoView(el){if(!el)return;requestAnimationFrame(()=>{const r=el.getBoundingClientRect(),vh=(window.visualViewport?visualViewport.height:innerHeight),top=(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--site-h'))||0)+(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-h'))||0)+12;
+  let dy=0;if(r.bottom>vh-16)dy=Math.min(r.bottom-vh+24,r.top-top);else if(r.top<top)dy=r.top-top;if(Math.abs(dy)>4){KB.ours();window.scrollBy({top:dy,behavior:window.AG_REDUCED_MOTION?'auto':'smooth'})}})}
+/* Puerta 5 on a phone: opening or closing the on-screen keyboard resizes the visual viewport, and iOS
+   was landing the page back at the top of the scrolly. While a text box is focused (and for 1.5 s after
+   it closes) a viewport resize puts the page back where it was. Nothing here scrolls on resize otherwise;
+   our own bringIntoView() tells it so it doesn't fight a deliberate scroll (v1.12). */
+const KB=(()=>{let y=null,until=0,mine=0;const typing=e=>e.target&&e.target.matches&&e.target.matches('input,textarea');
+  document.addEventListener('focusin',e=>{if(typing(e)){y=scrollY;until=Infinity}});
+  document.addEventListener('focusout',e=>{if(typing(e))until=Date.now()+1500});
+  addEventListener('scroll',()=>{if(until===Infinity&&!resizing)y=scrollY},{passive:true});
+  let resizing=0;const hold=()=>{if(y==null||Date.now()>until||Date.now()<mine)return;resizing=1;const fix=()=>{if(Math.abs(scrollY-y)>40)window.scrollTo({top:y,behavior:'auto'})};
+    fix();requestAnimationFrame(fix);setTimeout(fix,120);setTimeout(()=>{fix();resizing=0},350)};
+  if(window.visualViewport)visualViewport.addEventListener('resize',hold);addEventListener('resize',hold);
+  return {ours(){mine=Date.now()+1200;if(until!==Infinity)until=0}}})();
 
 /* ---------- FORK 1 · Tu ropa está en la maleta ---------- */
 const SH=c=>`<svg viewBox="0 0 120 110"><path d="M38 8 L18 18 L4 44 L22 52 L28 40 L28 104 L92 104 L92 40 L98 52 L116 44 L102 18 L82 8 Q60 24 38 8Z" fill="${c}"/><path d="M38 8 Q60 24 82 8 L76 6 Q60 16 44 6Z" fill="#000" opacity=".15"/><path d="M60 22 L60 104" stroke="#000" stroke-opacity=".12" stroke-width="2"/></svg>`;
@@ -1060,10 +1166,11 @@ $$('#f1p .path').forEach(b=>b.addEventListener('click',()=>{
       if(S.path.f1item)return;S.path.f1item=s.dataset.k;s.classList.add('sel');const it=SHIRTS.find(x=>x.k===s.dataset.k);
       const said=say(it.name+', talla '+it.talla);
       $('#f1step').innerHTML=`<div class="reply"><div class="bub"><span class="by">Lupita</span>“Buena elección. ¿Se ${it.m?'lo':'la'} quiere probar?”</div></div><div class="opts" id="f1q" style="margin-top:10px"><button class="opt" data-k="si"><b>A</b>“Sí, por favor. ¿Dónde están los probadores?”</button><button class="opt" data-k="no"><b>B</b>“No, gracias. Me ${it.m?'lo':'la'} llevo así.”</button></div>`;
+      bringIntoView($('#f1step'));
       said.then(()=>{if(!S.path.f1q)say('Buena elección. ¿Se '+(it.m?'lo':'la')+' quiere probar?')});
       $$('#f1q .opt').forEach(o=>o.addEventListener('click',()=>{if(S.path.f1q)return;S.path.f1q=o.dataset.k;o.classList.add('sel');lockOpts('#f1q');
         const t=o.dataset.k==='si'?'“Al fondo, a la derecha.” … Te queda '+(it.m?'perfecto':'perfecta')+'.':'“Muy bien.” … (Esperas que te quede.)';
-        $('#f1step').insertAdjacentHTML('beforeend',`<div class="reply"><div class="bub"><span class="by">Lupita</span>${t}</div></div><div class="receipt">TIENDA EL CENTRO · MONTERREY<br>${it.name} talla ${it.talla} ....... $${it.precio.toLocaleString('es-MX')}.00<br>TOTAL MXN ................... $${it.precio.toLocaleString('es-MX')}.00<br>¡Gracias por su compra!</div>`);
+        $('#f1step').insertAdjacentHTML('beforeend',`<div class="reply"><div class="bub"><span class="by">Lupita</span>${t}</div></div><div class="receipt">TIENDA EL CENTRO · MONTERREY<br>${it.name} talla ${it.talla} ....... $${it.precio.toLocaleString('es-MX')}.00<br>TOTAL MXN ................... $${it.precio.toLocaleString('es-MX')}.00<br>¡Gracias por su compra!</div>`);bringIntoView($('#f1step .receipt'));
         if(o.dataset.k==='si')say('Al fondo, a la derecha.');doneF1()}));
     }));
   }
@@ -1072,20 +1179,20 @@ $$('#f1p .path').forEach(b=>b.addEventListener('click',()=>{
     renderPeople(body);
     $('#bell').addEventListener('click',()=>{ding();if(S.path.f1rang)return;S.path.f1rang=1;mood('dkm','smile');
       $('#f1step').innerHTML=`<div class="reply"><div class="bub"><span class="by">Recepción</span>“Buenas noches. ¿En qué le puedo ayudar?”</div></div><div class="opts" id="f1q" style="margin-top:10px"><button class="opt" data-k="plancha"><b>A</b>“¿Me podría prestar una plancha?”</button><button class="opt" data-k="lavanderia"><b>B</b>“¿Tienen servicio de lavandería?”</button></div>`;
-      setTimeout(()=>say('Buenas noches. ¿En qué le puedo ayudar?'),300);
+      bringIntoView($('#f1step'));setTimeout(()=>say('Buenas noches. ¿En qué le puedo ayudar?'),300);
       $$('#f1q .opt').forEach(o=>o.addEventListener('click',()=>{if(S.path.f1q)return;S.path.f1q=o.dataset.k;o.classList.add('sel');lockOpts('#f1q');
         const t=o.dataset.k==='plancha'?'“Claro que sí. Se la subo a su cuarto en diez minutos.”':'“Sí. Si nos la deja ahorita, se la entregamos mañana a las ocho.”';
-        $('#f1step').insertAdjacentHTML('beforeend',`<div class="reply"><div class="bub"><span class="by">Recepción</span>${t}</div></div>`);say(t.replace(/[“”]/g,''));doneF1()}));
+        $('#f1step').insertAdjacentHTML('beforeend',`<div class="reply"><div class="bub"><span class="by">Recepción</span>${t}</div></div>`);bringIntoView($('#f1step').lastElementChild);say(t.replace(/[“”]/g,''));doneF1()}));
     });
   }
   if(k==='valeria'){
     body.innerHTML=`<div class="fpanel"><div class="turnlabel">Escríbele a Valeria · pick your message</div><div class="opts" id="f1q"><button class="opt" data-k="formal"><b>A</b>“Buenas noches, Valeria. Perdón por la hora: mi maleta se perdió. ¿Habría problema si llego con ropa casual?”</button><button class="opt" data-k="corto"><b>B</b>“Buenas noches. Se perdió mi maleta 😬 ¿Está bien si llego con ropa casual?”</button></div><div id="f1step"></div></div>`;
     $$('#f1q .opt').forEach(o=>o.addEventListener('click',()=>{if(S.path.f1q)return;S.path.f1q=o.dataset.k;o.classList.add('sel');lockOpts('#f1q');
-      $('#f1step').innerHTML=`<div class="reply"><div class="bub"><span class="by">Valeria · WhatsApp</span>“¡Para nada! Aquí somos muy relajados. Lo importante es que llegó bien. Nos vemos mañana.”</div></div>`;say('¡Para nada! Aquí somos muy relajados. Lo importante es que llegó bien. Nos vemos mañana.');doneF1()}));
+      $('#f1step').innerHTML=`<div class="reply"><div class="bub"><span class="by">Valeria · WhatsApp</span>“¡Para nada! Aquí somos muy relajados. Lo importante es que llegó bien. Nos vemos mañana.”</div></div>`;bringIntoView($('#f1step'));say('¡Para nada! Aquí somos muy relajados. Lo importante es que llegó bien. Nos vemos mañana.');doneF1()}));
   }
   T('fork_open',{fork:1,path:k});
 }));
-function doneF1(){setTimeout(()=>{$('#f1nx').hidden=false;pushSummary();saveProgress()},700)}
+function doneF1(){setTimeout(()=>{$('#f1nx').hidden=false;bringIntoView($('#f1nx'));pushSummary();saveProgress()},700)}
 function prepG2(){const k=S.path.f1,it=S.path.f1item;const t=k==='tienda'?(it==='saco'?'Te mira y sonríe: “¡Qué elegante!”':'Te mira y sonríe: “¡Qué bonita camisa!”'):k==='valeria'?'Te reconoce: “¡Usted es quien perdió la maleta! Qué bueno que llegó.”':'Tu ropa del viaje se ve impecable.';$('#g2pre').textContent=t}
 
 /* ---------- FORK 2 · ¿Tiene alguna pregunta para mí? ---------- */
@@ -1095,37 +1202,55 @@ $$('#f2o .opt').forEach(o=>o.addEventListener('click',()=>{if(S.path.f2)return;c
   reply($('#f2rep'),'Valeria',F2A[k]);say(F2A[k].replace(/[“”]/g,''));setTimeout(()=>{$('#f2nx').hidden=false;pushSummary();saveProgress()},900)}));
 function prepCena(){const k=S.path.f2;$('#c5pre').textContent=k==='proyecto'?'Diego levanta la mano: “¿Tú eres quien va a trabajar conmigo en lo de la cafetería?”':k==='ciudad'?'Valeria: “Aquí el cabrito es el mejor de la ciudad.”':'Sofi: “¡Bienvenido a la cena de los jueves!”'}
 
-/* ---------- the dinner table: one scene, reused, so the food stays where it was served ---------- */
-const SEATS={diego:{x:100,dish:'asada',px:226,py:560},valeria:{x:420,dish:'cabrito',px:540,py:552},sofi:{x:740,dish:'frijoles',px:860,py:560}};
-const YOU=[{x:430,y:690},{x:600,y:704},{x:770,y:690}];
+/* ---------- the dinner table: one scene, reused, so the food stays where it was served ----------
+   v1.12: two compositions. 'wide' for a landscape box; 'tall' for a phone, where all three diners and
+   Don Memo stay in frame (the wide one was cropped). Whoever is speaking is lit and the others dim a
+   little (spot()); Don Memo walks in when he speaks (.w-out → in; reduced motion: he just appears). */
+const DISH={diego:'asada',valeria:'cabrito',sofi:'frijoles'};
+const DLAY={
+  wide:{vb:'0 0 1200 800',s:1.35,seat:{diego:[100,205],valeria:[420,205],sofi:[740,205]},memo:[990,150,1.45],away:700,tb:[600,640,580,160],
+    plate:{diego:[226,560],valeria:[540,552],sofi:[860,560]},ps:.82,you:[[430,690],[600,704],[770,690]],ys:1,candle:[600,560],nap:[470,612,730,612],lx:[-8,26]},
+  tall:{vb:'0 40 800 840',s:1.1,seat:{diego:[12,236],valeria:[206,226],sofi:[400,236]},memo:[592,166,1.2],away:440,tb:[400,664,392,172],
+    plate:{diego:[100,568],valeria:[294,560],sofi:[488,568]},ps:.6,you:[[250,728],[400,742],[550,728]],ys:.78,candle:[400,592],nap:[200,660,600,660],lx:[-2,13]}
+};
 const DIN={served:false,mine:[]};
+function layOf(m){const r=m.getBoundingClientRect();const w=r.width||innerWidth,h=r.height||innerHeight;return w/h<1.15?'tall':'wide'}
 function plateSVG(m,x,y,s,cls,delay){const sc=s||1;return m.drink
   ?`<g class="dish ${cls||''}" data-say="${m.name}" data-lab="${m.name.toLowerCase()} · ${m.en}" style="${delay!=null?`animation-delay:${delay}s`:''}" transform="translate(${x} ${y}) scale(${sc})"><ellipse cx="0" cy="40" rx="40" ry="11" fill="#000" opacity=".2"/><path d="M-28 -50 L28 -50 L22 38 L-22 38Z" fill="#e8f4f6" opacity=".9"/><path d="M-25 -26 L25 -26 L20 35 L-20 35Z" fill="${m.art}"/></g>`
   :`<g class="dish ${cls||''}" data-say="${m.name}" data-lab="${m.name.toLowerCase()} · ${m.en}" style="${delay!=null?`animation-delay:${delay}s`:''}" transform="translate(${x} ${y}) scale(${sc})"><ellipse cx="0" cy="14" rx="96" ry="30" fill="#000" opacity=".16"/><ellipse cx="0" cy="0" rx="92" ry="30" fill="#efe7da"/><ellipse cx="0" cy="-4" rx="64" ry="18" fill="${m.art}"/><ellipse cx="-16" cy="-9" rx="22" ry="5" fill="#fff" opacity=".18"/></g>`}
-function dinnerSVG(where){
-  let lights='';for(let i=-8;i<26;i++){const x=40+i*75,y=110+Math.sin(i*0.8)*28+(i%2?18:0);lights+=`<circle cx="${x}" cy="${y}" r="7"><animate attributeName="opacity" values="1;.45;1" dur="${2+((i+8)%4)*.6}s" repeatCount="indefinite"/></circle>`}
-  const ppl=Object.entries(SEATS).map(([k,s])=>`<g transform="translate(${s.x},205) scale(1.35)">${personG(k).replace(MOUTH.neutral,MOUTH.smile)}</g>`).join('');
-  const settings=[...Object.values(SEATS).map(s=>({x:s.px,y:s.py,sm:1})),...YOU.slice(1,2).map(p=>({x:p.x,y:p.y}))].map(p=>`<g transform="translate(${p.x} ${p.y})"><ellipse rx="${p.sm?84:104}" ry="${p.sm?24:30}" fill="#c9b08a" opacity=".55"/><rect x="${p.sm?92:112}" y="-12" width="10" height="34" rx="3" fill="#ddd" opacity=".8"/></g>`).join('');
-  const theirs=DIN.served?Object.values(SEATS).map(s=>plateSVG(MENU.find(m=>m.k===s.dish),s.px,s.py,.82)).join(''):'';
-  const mine=DIN.served?DIN.mine.map((k,i)=>plateSVG(MENU.find(m=>m.k===k),YOU[i].x,YOU[i].y,1)).join(''):'';
-  const waiter=(where==='c5'||where==='f3')?`<g id="${where==='f3'?'waiter':'waiter5'}" class="${where==='c5'?'w5':''}"><g transform="translate(990,150) scale(1.45)">${personG('memo')}<g class="wmenu"><rect x="104" y="150" width="46" height="62" rx="4" fill="#7a2a1a" transform="rotate(-8 127 181)"/><rect x="110" y="158" width="34" height="4" fill="#E0B07A" transform="rotate(-8 127 181)"/></g><g class="wtray" style="display:none"><ellipse cx="128" cy="150" rx="40" ry="8" fill="#b8b8b8"/><rect x="120" y="150" width="10" height="40" fill="#f2efe8"/></g></g></g>`:'';
-  return `<svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-    <defs><radialGradient id="glow_${where}" cx=".5" cy=".7" r=".8"><stop offset="0" stop-color="#4a2f30"/><stop offset="1" stop-color="#14121f"/></radialGradient></defs>
+function theirPlates(L,cls){return Object.entries(L.plate).map(([k,p],i)=>plateSVG(MENU.find(m=>m.k===DISH[k]),p[0],p[1],L.ps,cls,cls?i*.25:null)).join('')}
+function myPlates(L,cls){return DIN.mine.map((k,i)=>plateSVG(MENU.find(m=>m.k===k),L.you[i][0],L.you[i][1],L.ys,cls,cls?.8+i*.3:null)).join('')}
+function dinnerSVG(where,lay){
+  const L=DLAY[lay];let lights='';for(let i=L.lx[0];i<L.lx[1];i++){const x=40+i*75,y=110+Math.sin(i*0.8)*28+(i%2?18:0);lights+=`<circle cx="${x}" cy="${y}" r="7"><animate attributeName="opacity" values="1;.45;1" dur="${2+((i+8)%4)*.6}s" repeatCount="indefinite"/></circle>`}
+  const ppl=Object.entries(L.seat).map(([k,p])=>`<g class="pp" data-who="${k}"><g transform="translate(${p[0]},${p[1]}) scale(${L.s})">${personG(k).replace(MOUTH.neutral,MOUTH.smile)}</g></g>`).join('');
+  const st=(x,y,k,big)=>`<g transform="translate(${x} ${y}) scale(${k})"><ellipse rx="${big?104:84}" ry="${big?30:24}" fill="#c9b08a" opacity=".55"/><rect x="${big?112:92}" y="-12" width="10" height="34" rx="3" fill="#ddd" opacity=".8"/></g>`;
+  const settings=Object.values(L.plate).map(p=>st(p[0],p[1],L.ps/.82)).join('')+st(L.you[1][0],L.you[1][1],L.ys,1);
+  const [tx,ty,trx,trY]=L.tb,[cx,cy]=L.candle,n=L.nap;
+  const out=where==='c5'?!((stageState.s5||0)>=3):(where==='f3'&&DIN.away);
+  const waiter=(where==='c5'||where==='f3')?`<g id="${where==='f3'?'waiter':'waiter5'}" class="memo${out?' w-out':''}" style="--away:${L.away}px"><g class="pp" data-who="memo"><g transform="translate(${L.memo[0]},${L.memo[1]}) scale(${L.memo[2]})">${personG('memo')}<g class="wmenu"${DIN.served?' style="display:none"':''}><rect x="104" y="150" width="46" height="62" rx="4" fill="#7a2a1a" transform="rotate(-8 127 181)"/><rect x="110" y="158" width="34" height="4" fill="#E0B07A" transform="rotate(-8 127 181)"/></g><g class="wtray"${DIN.served?'':' style="display:none"'}><ellipse cx="128" cy="150" rx="40" ry="8" fill="#b8b8b8"/><rect x="120" y="150" width="10" height="40" fill="#f2efe8"/></g></g></g></g>`:'';
+  return `<svg viewBox="${L.vb}" preserveAspectRatio="${lay==='tall'?'xMidYMin meet':'xMidYMid meet'}" aria-hidden="true">
+    <defs><radialGradient id="glow_${where}" cx=".5" cy=".7" r=".8"><stop offset="0" stop-color="#4a2f30"/><stop offset="1" stop-color="#14121f"/></radialGradient>
+    <filter id="dim_${where}"><feComponentTransfer><feFuncR type="linear" slope=".62"/><feFuncG type="linear" slope=".62"/><feFuncB type="linear" slope=".68"/></feComponentTransfer></filter></defs>
     <rect x="-1400" y="-400" width="4000" height="1600" fill="url(#glow_${where})"/>
     <path d="M-600 90 Q-300 190 0 110 T600 110 T1200 120 T1800 110" stroke="#555" stroke-width="2" fill="none"/>
     <g fill="#ffd28a">${lights}</g>
     ${ppl}
-    <ellipse cx="600" cy="640" rx="580" ry="160" fill="#5a3a24"/><ellipse cx="600" cy="622" rx="560" ry="142" fill="#7a5230"/>
-    <g><rect x="586" y="560" width="28" height="40" rx="6" fill="#f3e2b8"/><path d="M600 548 q6 6 0 12 q-6-6 0-12" fill="#ffcf6b"/><ellipse cx="600" cy="600" rx="22" ry="6" fill="#3a2a1a" opacity=".4"/></g>
-    <g fill="#a8183a" opacity=".85"><ellipse cx="470" cy="612" rx="18" ry="7"/></g><g fill="#3e7a3a"><ellipse cx="730" cy="612" rx="18" ry="7"/></g>
-    ${settings}<g id="theirs_${where}">${theirs}</g><g id="mine_${where}">${mine}</g>
+    <ellipse cx="${tx}" cy="${ty}" rx="${trx}" ry="${trY}" fill="#5a3a24"/><ellipse cx="${tx}" cy="${ty-18}" rx="${trx-20}" ry="${trY-18}" fill="#7a5230"/>
+    <g transform="translate(${cx} ${cy})"><rect x="-14" y="0" width="28" height="40" rx="6" fill="#f3e2b8"/><path d="M0 -12 q6 6 0 12 q-6-6 0-12" fill="#ffcf6b"/><ellipse cx="0" cy="40" rx="22" ry="6" fill="#3a2a1a" opacity=".4"/></g>
+    <ellipse cx="${n[0]}" cy="${n[1]}" rx="18" ry="7" fill="#a8183a" opacity=".85"/><ellipse cx="${n[2]}" cy="${n[3]}" rx="18" ry="7" fill="#3e7a3a"/>
+    ${settings}<g id="theirs_${where}">${DIN.served?theirPlates(L):''}</g><g id="mine_${where}">${DIN.served?myPlates(L):''}</g>
     ${waiter}
   </svg>`}
-function renderDinner(){$$('[data-dinner]').forEach(m=>{m.innerHTML=dinnerSVG(m.dataset.dinner)});wireDishes();fitDinner()}
-function fitDinner(){$$('[data-dinner] svg').forEach(s=>{const box=s.parentElement.getBoundingClientRect();const wide=box.width/box.height>1.15;s.setAttribute('preserveAspectRatio',wide?'xMidYMid meet':'xMidYMax slice')})}
+function renderDinner(){$$('[data-dinner]').forEach(m=>{const lay=layOf(m);m.dataset.lay=lay;m.innerHTML=dinnerSVG(m.dataset.dinner,lay)});wireDishes();SPOT.forEach((who,w)=>spot(w,who))}
+/* re-compose a mount only when its shape crosses between landscape and portrait (rotation, unlock) */
+function fitDinner(){let ch=0;$$('[data-dinner]').forEach(m=>{const lay=layOf(m);if(m.dataset.lay!==lay){m.dataset.lay=lay;m.innerHTML=dinnerSVG(m.dataset.dinner,lay);ch=1}});if(ch){wireDishes();SPOT.forEach((who,w)=>spot(w,who))}}
 addEventListener('resize',fitDinner);
+const SPOT=new Map();
+function spot(where,who){SPOT.set(where,who||null);$$(`[data-dinner="${where}"] .pp`).forEach(g=>{const dim=!!who&&g.dataset.who!==who;if(dim)g.setAttribute('filter',`url(#dim_${where})`);else g.removeAttribute('filter')})}
+const WHO={'Diego':'diego','Sofi':'sofi','Valeria':'valeria','Don Memo':'memo'};
+function memoOut(w,out){if(w)w.classList.toggle('w-out',out)}
 function wireDishes(){$$('[data-dinner="f3"] .dish').forEach(p=>{if(p._w)return;p._w=1;p.addEventListener('click',()=>{say(p.dataset.say);const l=$('#dlab'),r=p.getBoundingClientRect(),sr=$('#d3wrap').getBoundingClientRect();l.textContent=p.dataset.lab;const half=Math.min(sr.width/2-4,l.offsetWidth/2+8);l.style.left=Math.max(half,Math.min(sr.width-half,r.left+r.width/2-sr.left))+'px';l.style.top=(r.top-sr.top+10)+'px';l.classList.add('vis');clearTimeout(l._t);l._t=setTimeout(()=>l.classList.remove('vis'),2200)})})}
-function dline(by,txt){const d=$('#dline');d.hidden=false;d.innerHTML=`<span class="by">${by}</span>${txt}`;d.style.animation='none';void d.offsetWidth;d.style.animation=''}
+function dline(by,txt){const d=$('#dline');d.hidden=false;d.innerHTML=`<span class="by">${by}</span>${txt}`;d.style.animation='none';void d.offsetWidth;d.style.animation='';spot('f3',WHO[by])}
 
 /* ---------- FORK 3 · El pedido (ordering sim: plates land on the table) ---------- */
 const MENU=[
@@ -1144,23 +1269,23 @@ $('#f3go').addEventListener('click',()=>{
   $$('#menu .mi').forEach(b=>b.disabled=true);$('#f3go').disabled=true;
   TM.choice({scenarioIndex:'f3',choiceIndex:items.length,category:'fork'});T('order',{items:S.path.f3});
   const line=`“Muy bien. Y para usted: ${listES(items.map(i=>i.the))}. Ahorita se los traigo.”`;
-  reply($('#f3rep'),'Don Memo',line);
-  $('#d3wrap').scrollIntoView({behavior:'smooth',block:'center'});
+  reply($('#f3rep'),'Don Memo',line,'',true);/* the table, not the text: the plates land there */
+  KB.ours();$('#d3wrap').scrollIntoView({behavior:'smooth',block:'center'});
   // the table orders too, then Memo repeats yours
   const seq=[['Diego','“Para mí, la carne asada, por favor.”'],['Sofi','“Unos frijoles charros para mí.”'],['Valeria','“Y yo, el cabrito, como siempre.”'],['Don Memo',line]];
   const step=i=>{if(i===seq.length){served();return}const [by,tx]=seq[i];dline(by,tx);const t0=Date.now();
     say(tx.replace(/[“”]/g,'')).then(()=>setTimeout(()=>step(i+1),Math.max(350,(by==='Don Memo'?4200:2300)-(Date.now()-t0))))};
   setTimeout(()=>step(0),600);
   // Memo walks off to the kitchen and comes back with the food
-  const served=()=>{const t=0;setTimeout(()=>{const w=$('#waiter');if(w){w.style.transform='translateX(700px)';setTimeout(()=>{w.querySelector('.wmenu').style.display='none';w.querySelector('.wtray').style.display=''},1100)}$('#dline').hidden=true},t);
-  setTimeout(()=>{DIN.served=true;DIN.mine=S.path.f3.slice();
-    const w=$('#waiter');
-    $('#theirs_f3').innerHTML=Object.values(SEATS).map((s,i)=>plateSVG(MENU.find(m=>m.k===s.dish),s.px,s.py,.82,'plate',i*.25)).join('');
-    $('#mine_f3').innerHTML=DIN.mine.map((k,i)=>plateSVG(MENU.find(m=>m.k===k),YOU[i].x,YOU[i].y,1,'plate',.8+i*.3)).join('');
-    if(w)w.style.transform='none';
+  const served=()=>{const t=0;setTimeout(()=>{DIN.away=true;memoOut($('#waiter'),true);setTimeout(()=>{const w=$('#waiter');if(w){w.querySelector('.wmenu').style.display='none';w.querySelector('.wtray').style.display=''}},1100);$('#dline').hidden=true;spot('f3')},t);
+  setTimeout(()=>{DIN.served=true;DIN.away=false;DIN.mine=S.path.f3.slice();
+    const L=DLAY[$('#d3').dataset.lay||'wide'];
+    $('#theirs_f3').innerHTML=theirPlates(L,'plate');
+    $('#mine_f3').innerHTML=myPlates(L,'plate');
+    memoOut($('#waiter'),false);
     wireDishes();dline('Don Memo','“Aquí tienen. ¡Buen provecho!”');say('Aquí tienen. ¡Buen provecho!');
     // food stays on the table in the next scenes
-    $$('[data-dinner="g4"],[data-dinner="g5"]').forEach(m=>m.innerHTML=dinnerSVG(m.dataset.dinner));fitDinner();
+    $$('[data-dinner="c5"],[data-dinner="g4"],[data-dinner="g5"]').forEach(m=>m.innerHTML=dinnerSVG(m.dataset.dinner,m.dataset.lay||layOf(m)));
     $('#f3hint').textContent='Tap your plates (front of the table) to hear them.';
     if(S.path.f2==='ciudad'&&order.has('cabrito'))setTimeout(()=>{dline('Valeria','“¡Me hizo caso con el cabrito!”');say('¡Me hizo caso con el cabrito!')},2600);
     setTimeout(()=>{$('#f3nx').hidden=false;pushSummary();saveProgress()},2000);
@@ -1171,8 +1296,8 @@ $('#f3go').addEventListener('click',()=>{
 let AC=null;function ding(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=1760;g.gain.setValueAtTime(.25,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+1.2);o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+1.2)}catch(_){}}
 
 /* ---------- gate helpers ---------- */
-function reply(el,by,txt,cls){el.insertAdjacentHTML('beforeend',`<div class="reply ${cls||''}"><div class="bub"><span class="by">${by}</span>${txt}</div></div>`)}
-function jodi(n,m,txt){document.getElementById('g'+n+'jt').innerHTML=`<div class="jt"><img src="${JODI[m]}" alt="Jodi"><div><h3>Jodi's take</h3><p>${txt}</p></div></div>`}
+function reply(el,by,txt,cls,stay){el.insertAdjacentHTML('beforeend',`<div class="reply ${cls||''}"><div class="bub"><span class="by">${by}</span>${txt}</div></div>`);if(!stay)bringIntoView(el.lastElementChild)}
+function jodi(n,m,txt){const j=document.getElementById('g'+n+'jt');j.innerHTML=`<div class="jt"><img src="${JODI[m]}" alt="Jodi"><div><h3>Jodi's take</h3><p>${txt}</p></div></div>`;bringIntoView(j.firstElementChild)}
 function finish(n){
   if(S.done[n])return;S.done[n]=1;setTimeout(()=>CV.reveal(n),0);
   const sec=document.getElementById('g'+n);const st=sec.querySelector('.gst');st.textContent='Abordado';st.classList.add('done');
@@ -1200,7 +1325,7 @@ const chip=$('#g1chip');
 chip.addEventListener('click',()=>{if(S.done[1])return;chip.textContent=chip.textContent==='facturé'?'facturaba':'facturé';say(chip.textContent)});
 $('#g1go').addEventListener('click',()=>{
   if(S.choice[1])return;const v=chip.textContent;S.choice[1]=v;chip.disabled=true;$('#g1go').disabled=true;T('ev_gate_lock',{gate:1,choice:v});
-  const scr=$('#g1scr');scr.hidden=false;
+  const scr=$('#g1scr');scr.hidden=false;bringIntoView(scr);
   const lines=v==='facturaba'
     ?['BÚSQUEDA DE EQUIPAJE','interpreta: <b>en proceso · interrumpido</b>','→ la maleta nunca recibió etiqueta','→ buscando en ATL · MOSTRADOR 14…','<span class="ok">✓ ENCONTRADA · sin etiqueta, en la báscula</span>']
     :['BÚSQUEDA DE EQUIPAJE','interpreta: <b>terminado · maleta etiquetada</b>','→ buscando en el sistema de conexiones…','→ MTY · banda 3 · ATL transferencias…','<span class="no">✗ NO ENCONTRADA en conexiones</span>'];
@@ -1237,7 +1362,7 @@ $('#g3go').addEventListener('click',()=>{
   if(k==='A'){S.conf[3]=1;setTimeout(end3,900)}
   else{
     S.conf[3]=0;
-    setTimeout(()=>{$('#g3fix').innerHTML=`<div class="turnlabel" style="margin-top:16px">She misunderstood. Fix it?</div><div class="opts" id="g3f"><button class="opt" data-k="fix"><b>A</b>“No, perdón, quiero decir que <i>escucharía</i> sus comentarios.”</button><button class="opt" data-k="let"><b>B</b>Let it slide.</button></div>`;
+    setTimeout(()=>{$('#g3fix').innerHTML=`<div class="turnlabel" style="margin-top:16px">She misunderstood. Fix it?</div><div class="opts" id="g3f"><button class="opt" data-k="fix"><b>A</b>“No, perdón, quiero decir que <i>escucharía</i> sus comentarios.”</button><button class="opt" data-k="let"><b>B</b>Let it slide.</button></div>`;bringIntoView($('#g3fix'));
       $$('#g3f .opt').forEach(o=>o.addEventListener('click',()=>{if(S.choice['3r'])return;S.choice['3r']=o.dataset.k;lockOpts('#g3f');o.classList.add('sel');T('ev_repair',{taken:o.dataset.k==='fix'});
         if(o.dataset.k==='fix'){S.conf[3]=1;mood('g3m','smile');reply($('#g3fix'),'Valeria','“Ah, ya entiendo. Muy bien.”');say('Ah, ya entiendo. Muy bien.')}
         else{mood('g3m','neutral');reply($('#g3fix'),'Valeria','“Bueno… sigamos.”')}
@@ -1252,30 +1377,39 @@ function end3(){const r=S.choice['3r'];
 $$('#g4o1 .opt').forEach(o=>o.addEventListener('click',()=>{
   if(S.choice['4a'])return;const k=o.dataset.k;S.choice['4a']=k;o.classList.add('sel');lockOpts('#g4o1');T('ev_gate_lock',{gate:4,turn:1,choice:k});
   const t=k==='u'?'“Sí, nací aquí en Monterrey.”':'“Eh… sí, soy de aquí.”';mood('g4m',k==='u'?'smile':'unsure');reply($('#g4rep1'),'Valeria',t);const said=say(t.replace(/[“”]/g,''));
-  said.then(()=>setTimeout(()=>{
-    mood('g4m','laugh');
-    $('#g4switch').innerHTML=`<div class="switch"><span class="bigq">“¡Tutéame!”</span><span class="sub lead">Valeria se ríe: “Ay, ya no estamos en la oficina. Tutéame, por favor.” Diego: “Aquí todos nos hablamos de tú.”</span></div>`;
-    say('Ay, ya no estamos en la oficina. Tutéame, por favor.');
-    setTimeout(()=>{$('#g4bwrap').hidden=false;$('#g4bwrap').scrollIntoView({behavior:'smooth',block:'center'})},1600);
+  /* v1.12: "Háblame de tú" only plays after usted. A student who jumped to tú before being invited
+     gets Valeria's reaction to the jump instead (a raised eyebrow), then the dinner goes on. Scoring is
+     unchanged: Puerta 4 is still scored on turn 2. */
+  said.then(()=>setTimeout(()=>{let line;
+    if(k==='u'){mood('g4m','laugh');
+      $('#g4switch').innerHTML=`<div class="switch"><span class="bigq">“¡Háblame de tú!”</span><span class="sub lead">Valeria se ríe: “Ay, ya no estamos en la oficina. Háblame de tú, por favor.” Diego: “Aquí todos nos hablamos de tú.”</span></div>`;
+      line=say('Ay, ya no estamos en la oficina. Háblame de tú, por favor.')}
+    else{mood('g4m','neutral');brow('g4m',true);
+      $('#g4switch').innerHTML=`<div class="switch"><span class="bigq">“…de tú.”</span><span class="sub lead">Valeria levanta una ceja: “Bueno… ya que estamos, de tú.” Diego: “Aquí todos nos hablamos de tú.”</span></div>`;
+      line=say('Bueno… ya que estamos, de tú.')}
+    bringIntoView($('#g4switch'));
+    line.then(()=>setTimeout(()=>{$('#g4bwrap').hidden=false;bringIntoView($('#g4bwrap'))},500));
   },300));
 }));
 $$('#g4o2 .opt').forEach(o=>o.addEventListener('click',()=>{
   if(S.choice[4])return;const k=o.dataset.k;S.choice[4]=k;o.classList.add('sel');lockOpts('#g4o2');T('ev_gate_lock',{gate:4,turn:2,choice:k});
   if(k==='t'){S.conf[4]=1;mood('g4dm','laugh');mood('g4m','smile');reply($('#g4rep2'),'Diego','“¡Ya eres del equipo!”');say('¡Ya eres del equipo!');
-    setTimeout(()=>{jodi(4,'happy',`Usted was right in turn 1, and tú was right in turn 2. What changed was the relationship, and she told you so out loud. Answering an invitation to tú with tú says “I heard you, and I accept.”`);finish(4)},900)}
+    setTimeout(()=>{jodi(4,'happy',(S.choice['4a']==='t'?`In turn 1, tú came before she offered it, and she noticed (that eyebrow). She let it go, but the switch was hers to make. `:'')+`Usted was right in turn 1, and tú was right in turn 2. What changed was the relationship, and she told you so out loud. Answering an invitation to tú with tú says “I heard you, and I accept.”`);finish(4)},900)}
   else{S.conf[4]=0;mood('g4dm','unsure');mood('g4m','neutral');reply($('#g4rep2'),'Valeria','“De tú, de tú…” <span class="small">(the table goes quiet for a second)</span>');say('De tú, de tú.');
-    setTimeout(()=>{jodi(4,'concerned',`Your instinct was respect, and that's a good instinct. But usted was right two minutes ago. Once she invites you to tú, staying formal quietly says “I'm keeping my distance,” the opposite of what you meant.`);finish(4)},900)}
+    setTimeout(()=>{jodi(4,'concerned',S.choice['4a']==='t'?`Tú came too early in turn 1 and usted came too late in turn 2. Usted fits until she invites you; once she says <i>de tú</i>, staying formal quietly says “I'm keeping my distance.”`:`Your instinct was respect, and that's a good instinct. But usted was right two minutes ago. Once she invites you to tú, staying formal quietly says “I'm keeping my distance,” the opposite of what you meant.`);finish(4)},900)}
 }));
 
 /* ---------- PUERTA 5 ---------- */
 const inp=$('#g5in');
 $$('.acc').forEach(b=>b.addEventListener('click',()=>{const s=inp.selectionStart??inp.value.length;inp.value=inp.value.slice(0,s)+b.textContent+inp.value.slice(inp.selectionEnd??s);inp.focus();inp.setSelectionRange(s+1,s+1)}));
 inp.addEventListener('keydown',e=>{if(e.key==='Enter')$('#g5go').click()});
+/* any capitalization is accepted and shown lowercase ("ESTá" → "está"); scoring already ignores case */
+inp.addEventListener('input',()=>{const v=inp.value,l=v.toLowerCase();if(v!==l){const a=inp.selectionStart,b=inp.selectionEnd;inp.value=l;try{inp.setSelectionRange(a,b)}catch(_){}}});
 $('#g5go').addEventListener('click',()=>{
   if(S.choice[5])return;const v=inp.value.trim().toLowerCase();const h=$('#g5hint');
   if(v==='este'||v==='esta'){h.textContent='Casi. Does it need an accent? Try the accent buttons.';return}
   if(v!=='esté'&&v!=='está'){h.textContent='¿Cuál forma de estar? Hint: is the apartment real yet, or are you still looking?';T('ev_hint',{gate:5,category:'other'});return}
-  h.textContent='';S.choice[5]=v;inp.disabled=true;$('#g5go').disabled=true;T('ev_gate_lock',{gate:5,choice:v==='esté'?1:0});say('Busco un apartamento que '+v+' cerca del estudio.').then(()=>setTimeout(()=>{
+  h.textContent='';S.choice[5]=v;inp.disabled=true;$('#g5go').disabled=true;T('ev_gate_lock',{gate:5,choice:v==='esté'?1:0});say('Busco un departamento que '+v+' cerca del estudio.').then(()=>setTimeout(()=>{
     if(v==='esté'){S.conf[5]=1;mood('g5m','smile');reply($('#g5rep'),'Diego','“¡Espérate! Mi primo renta uno a dos cuadras del estudio. Le escribo ahorita.”');say('¡Espérate! Mi primo renta uno a dos cuadras del estudio.');
       setTimeout(()=>{jodi(5,'happy',`<i>Esté</i> says you're still looking for one, any one, as long as it's close. <i>Está</i> would have said you already know which one. Diego only offered his cousin's place because <i>esté</i> told him you needed help.`);finish(5)},900)}
     else{S.conf[5]=0;mood('g5m','unsure');reply($('#g5rep'),'Sofi','“Ah, ¿ya lo encontraste? ¿Cuál es?”');say('Ah, ¿ya lo encontraste? ¿Cuál es?');
@@ -1300,7 +1434,7 @@ function buildCarta(){
     ['Puerta 1',ch[1],ch[1]==='facturaba'?'Rubén searched the Atlanta counter and found it.':'Rubén searched tagged connections and found nothing.',ch[1]==='facturaba'?'Facturé: he would have searched for a tagged bag, in the wrong place.':'Facturaba: he would have checked the Atlanta counter and found it right away.'],
     ['Puerta 2',{A:'¿Y usted?',B:'¿y tú?',C:'distinguida directora'}[ch[2]],{A:'A warm “Pase, por favor.”',B:'A small pause.',C:'“¡Ay, qué formal!”'}[ch[2]],ch[2]==='A'?'Tú would have earned a small pause. The ceremony would have earned a laugh.':'Usted, said simply, earns a warm welcome.'],
     ['Puerta 3',{A:'escucharía',B:'escuché',C:'escucho'}[ch[3]],ch[3]==='A'?'She heard a hypothetical. “Perfecto.”':'She heard a '+(ch[3]==='B'?'true story':'habit')+(ch['3r']==='fix'?', and you repaired it.':'.'),ch[3]==='A'?'Escuché: she would have asked when it happened.':'Escucharía: she would have heard “what I would do.”'],
-    ['Puerta 4',ch[4]==='t'?'¿Y a ti?':'¿Y a usted?',ch[4]==='t'?'“¡Ya eres del equipo!”':'“De tú, de tú…”',ch[4]==='t'?'Usted after “tutéame” would have kept your distance.':'Tú would have said “I accept the invitation.”'],
+    ['Puerta 4',ch[4]==='t'?'¿Y a ti?':'¿Y a usted?',ch[4]==='t'?'“¡Ya eres del equipo!”':'“De tú, de tú…”',ch[4]==='t'?'Usted after “háblame de tú” would have kept your distance.':'Tú would have said “I accept the invitation.”'],
     ['Puerta 5',ch[5],ch[5]==='esté'?'Diego offered his cousin\'s apartment.':'Sofi asked which one you found.',ch[5]==='esté'?'Está: they would have assumed you already had one.':'Esté: Diego would have offered his cousin\'s place.']
   ];
   $('#tiles').innerHTML=tiles.map(t=>`<div class="tile"><span class="k">${t[0]}</span><span class="said">${t[1]}</span><span>${t[2]}</span><span class="alt">${t[3]}</span><button>¿Y si…?</button></div>`).join('');

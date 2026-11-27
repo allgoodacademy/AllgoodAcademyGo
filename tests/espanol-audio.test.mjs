@@ -26,6 +26,13 @@ test('every source line has a manifest entry and an MP3 on disk', () => {
   assert.equal(Object.keys(manifest).length, src.lines.length, 'manifest has entries that are not in the source');
 });
 
+test('the clip folder holds only clips the manifest uses', () => {
+  const dir = path.join(ROOT, 'public/assets/audio/espanol/el-viaje');
+  const used = new Set(Object.values(manifest).map(u => path.basename(u)));
+  const orphans = fs.readdirSync(dir).filter(f => f.endsWith('.mp3') && !used.has(f));
+  assert.deepEqual(orphans, [], 'unused MP3s: delete them');
+});
+
 test('every speaker has a voice', () => {
   for (const l of src.lines) assert.ok(src.cast[l.speaker], `no voice for ${l.speaker}`);
 });
@@ -65,7 +72,10 @@ function pageLines() {
   }
   // facturé/facturaba chip and the two accepted Puerta 5 answers
   add('facturé'); add('facturaba');
-  for (const v of ['esté', 'está']) add('Busco un apartamento que ' + v + ' cerca del estudio.');
+  // Puerta 5's sentence, read from the page so a wording change there is caught here too
+  const p5 = js.match(/say\('(Busco un [^']+ que )'\+v\+'( cerca del estudio\.)'\)/);
+  assert.ok(p5, 'Puerta 5 say() not found');
+  for (const v of ['esté', 'está']) add(p5[1] + v + p5[2]);
   return out;
 }
 

@@ -102,7 +102,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-
 .sopt span{font-size:12.5px;color:#666}
 @media (max-width:760px){.hbtn span{display:none}.hbtn{padding:4px 6px}.hbtn svg{margin:0 4px}}
 /* intro */
-.intro{min-height:calc(100vh - var(--site-h));display:grid;place-items:center;text-align:center;padding:100px 20px 60px;position:relative;overflow:hidden}
+.intro{min-height:calc(100vh - var(--nav-h));display:grid;place-items:center;text-align:center;padding:100px 20px 60px;position:relative;overflow:hidden}
 .intro .sky{position:absolute;inset:0;z-index:0;width:100%;height:100%}
 .intro .in{position:relative;z-index:1;max-width:640px}
 .kick{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange2)}
@@ -374,9 +374,11 @@ body.showtext .ptxt.blur{filter:none}
 /* The site nav (AA-7) sits above the story's own bar: .hud, .bar, .stage and the save pop-up
    start below it. --site-h is the closed nav's height; the script after the nav keeps it exact.
    A solid strip behind the nav, and it stacks over .hud so the phone menu opens over the story. */
-:root{--site-h:74px;--nav-fade:var(--ink);--nav-fade-end:var(--ink)}
+:root{--site-h:74px;--nav-h:74px;--hud-h:58px;--nav-fade:var(--ink);--nav-fade-end:var(--ink)}
 html{scroll-padding-top:var(--site-h)}
-body .nav-shell{z-index:61}
+body .nav-shell{z-index:61;transition:transform .25s ease}
+body .nav-shell.nav-away{transform:translateY(-100%)}
+.hud,.bar{transition:top .25s ease}
 </style>
 </head>
 <body>
@@ -482,10 +484,23 @@ body.present .nav-shell.activity{display:none}
 </script>
 <!-- END GENERATED NAV -->
 <script>
-// Keeps --site-h equal to the site nav's closed height, so the story's bar sits right under it.
-(function(){var s=document.querySelector('.nav-shell');if(!s)return;var r=document.documentElement;
-function set(){if(s.querySelector('.site-nav.open'))return;r.style.setProperty('--site-h',s.offsetHeight+'px')}
-set();if(window.ResizeObserver)new ResizeObserver(set).observe(s);addEventListener('resize',set);})();
+// The site nav slides away on scroll-down and comes back on scroll-up (v1.12), so a phone keeps its
+// screen for the story; the story's own bar (.hud) stays pinned. Three variables, kept exact here:
+//   --nav-h   the site nav's closed height (constant; the intro uses it so the page never changes length)
+//   --site-h  how much of the site nav is showing right now: --nav-h, or 0 while it is away
+//   --hud-h   the story bar's height (the scenes start under it)
+// The nav markup itself is generated (nav/nav.js); this only toggles a class on .nav-shell.
+(function(){var s=document.querySelector('.nav-shell');if(!s)return;var r=document.documentElement,away=false,last=Math.max(0,scrollY),navH=s.offsetHeight;
+function open(){return !!s.querySelector('.site-nav.open')}
+function set(){if(open())away=false;else navH=s.offsetHeight;s.classList.toggle('nav-away',away);
+  r.style.setProperty('--nav-h',navH+'px');r.style.setProperty('--site-h',(away?0:navH)+'px');
+  var h=document.querySelector('.hud');if(h)r.style.setProperty('--hud-h',h.offsetHeight+'px')}
+function scrolled(){var y=Math.max(0,scrollY),d=y-last;if(Math.abs(d)<8&&y>navH)return;last=y;
+  var a=d>0&&y>navH&&!open()&&!s.contains(document.activeElement);if(a!==away){away=a;set()}}
+s.addEventListener('focusin',function(){if(away){away=false;set()}});
+addEventListener('scroll',scrolled,{passive:true});addEventListener('resize',set);
+if(window.ResizeObserver){var ro=new ResizeObserver(set);ro.observe(s);document.addEventListener('DOMContentLoaded',function(){var h=document.querySelector('.hud');if(h)ro.observe(h);set()})}
+set();})();
 </script>
 <div class="bar" id="bar"></div>
 <header class="hud">
