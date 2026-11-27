@@ -89,7 +89,7 @@ for (const l of todo) {
   try {
     buf = await tts(l, model);
   } catch (e) {
-    if (e.status === 401 || e.status === 403) { console.error(`STOP: ElevenLabs refused the request (${e.status}). Check the key; nothing else is attempted.`); process.exit(1); }
+    if (e.status === 401 || e.status === 403) { console.error(`STOP: ElevenLabs refused the request (${e.status}). Check the key and its permissions (it needs Text to Speech); nothing else is attempted.\n  ElevenLabs said: ${e.body}`); process.exit(1); }
     // Model not available: fall back once, before anything was rendered with the first model.
     if ((e.status === 400 || e.status === 422) && /model/i.test(e.body) && model !== FALLBACK_MODEL && rendered === 0 && !opt('--model')) {
       console.warn(`model ${model} was rejected; falling back to ${FALLBACK_MODEL} for this run`);
