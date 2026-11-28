@@ -10,8 +10,8 @@
 // only calls it if it is already there, so it never adds analytics to a page that has none.
 (function () {
   'use strict';
-  var VIDEO_ID = 'iJIFkJJiCcQ';
-  var SRC = 'https://www.youtube-nocookie.com/embed/' + VIDEO_ID + '?autoplay=1&rel=0';
+  var VIDEO_ID = 'gtqMYPqLkPo';
+  var SRC = 'https://www.youtube-nocookie.com/embed/' + VIDEO_ID + '?autoplay=1&rel=0&cc_load_policy=0';
   var TITLE = 'Welcome to Allgood Academy: a quick tour for teachers';
 
   var dialog, frame, closeBtn, opener, savedOverflow, savedPadding;
