@@ -1,0 +1,61 @@
+/* Welcome video (K1): the click-to-load modal shared by the homepage and /for-teachers/.
+   Behaviour lives in /js/welcome-video.js. The button itself uses each page's own
+   .btn .btn-secondary; .wv-row only spaces it under the hero buttons. */
+
+.wv-row{margin-top:14px;display:flex;flex-wrap:wrap}
+/* Same breakpoint at which both pages stack their hero buttons full width. */
+@media(max-width:960px){.wv-row{flex-direction:column;align-items:stretch}}
+.wv-btn .wv-tri{display:inline-block;margin-right:8px;font-size:.85em;color:var(--color-teal-deep)}
+button.btn.wv-btn{font-family:var(--font-ui);line-height:inherit}
+
+.wv-backdrop{
+  position:fixed;inset:0;z-index:1000;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(15,25,35,.82);
+}
+.wv-backdrop[hidden]{display:none}
+.wv-dialog{width:100%;max-width:960px}
+.wv-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+.wv-title{
+  margin:0;font-family:var(--font-ui);font-size:15px;font-weight:700;line-height:1.35;
+  color:var(--color-surface);letter-spacing:-.01em;
+}
+.wv-close{
+  flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--color-surface);color:var(--color-ink);
+}
+.wv-close:hover{color:var(--color-teal-deep)}
+.wv-close:focus-visible{outline:3px solid var(--color-orange);outline-offset:3px}
+
+/* 16:9 frame. The poster is our own image (no YouTube thumbnail); the iframe covers it once
+   it paints. */
+.wv-frame{
+  position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:14px;
+  background:var(--color-dark) url('/assets/dashboard/orbit.jpg') center/cover no-repeat;
+}
+.wv-poster{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.wv-play{
+  width:76px;height:76px;border-radius:50%;background:rgba(255,255,255,.92);position:relative;
+}
+.wv-play::after{
+  content:"";position:absolute;left:31px;top:24px;
+  border-style:solid;border-width:14px 0 14px 22px;
+  border-color:transparent transparent transparent var(--color-teal-deep);
+}
+.wv-time{
+  position:absolute;right:14px;bottom:12px;padding:3px 9px;border-radius:6px;
+  font-family:var(--font-ui);font-size:13px;font-weight:700;color:#fff;background:rgba(15,25,35,.78);
+}
+.wv-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+@media(prefers-reduced-motion:no-preference){
+  .wv-backdrop:not([hidden]){animation:wv-fade .18s ease-out}
+  @keyframes wv-fade{from{opacity:0}to{opacity:1}}
+}
+
+@media(max-width:640px){
+  .wv-backdrop{padding:16px 0}
+  .wv-head{padding:0 16px}
+  .wv-frame{border-radius:0}
+}
