@@ -28,7 +28,7 @@ function load(story) {
 }
 
 test('every story with recorded voices is checked', () => {
-  assert.ok(['el-viaje', 'la-selva', 'el-mundial'].every(s => STORIES.includes(s)), `stories found: ${STORIES.join(', ')}`);
+  assert.ok(['el-viaje', 'la-selva', 'el-mundial', 'la-habana'].every(s => STORIES.includes(s)), `stories found: ${STORIES.join(', ')}`);
 });
 
 for (const story of STORIES) {
@@ -203,6 +203,41 @@ const EXTRACT = {
     assert.deepEqual(unknown, [], 'say() is passed something this test does not know how to read: teach the el-mundial extractor about it');
     return out;
   },
+  // La Habana: dialogue lines L(who, es, en), English narration N(text) (looked up without its
+  // HTML tags), Kate's English K(text) (spoken without a leading "(stage direction)"), every
+  // es:'…' (field cards, Embarque / Aduana items, the Puerta sentences), the Puerta replies
+  // (yes:[es,en] / no:[es,en]) and the transfer sentences, built for each verb the page offers.
+  // Every say() call site must pass one of the expressions below.
+  'la-habana': ({ js }) => {
+    const out = new Set();
+    const un = s => s.replace(/\\'/g, "'");
+    const add = t => out.add(norm(un(t)));
+    const Q = "'((?:[^'\\\\]|\\\\.)*)'";
+    const all = (re, k = 1, f = x => x) => { const ms = [...js.matchAll(re)]; assert.ok(ms.length, `pattern not found: ${re}`); ms.forEach(m => add(f(un(m[k])))); };
+    all(new RegExp(`\\bL\\(${Q},${Q}`, 'g'), 2);
+    all(new RegExp(`\\bN\\(${Q}\\)`, 'g'), 1, t => t.replace(/<[^>]+>/g, ''));
+    // K() drops a leading "(…)" before speaking: read that rule from the page, not from here
+    assert.ok(js.includes("data-say=\"${t.replace(/^\\([^)]*\\)\\s*/,'')"), 'K() no longer speaks its text the way this test reads it');
+    all(new RegExp(`\\bK\\(${Q}\\)`, 'g'), 1, t => t.replace(/^\([^)]*\)\s*/, ''));
+    all(new RegExp(`\\bkate:${Q}`, 'g'), 1, t => t.replace(/^\([^)]*\)\s*/, ''));
+    all(new RegExp(`\\bes:${Q}`, 'g'));
+    all(new RegExp(`\\b(?:yes|no):\\[${Q},`, 'g'));
+    const verbs = js.match(/\[('[^']+'(?:,'[^']+')*)\]\.forEach\(\(v,i\)=>/);
+    assert.ok(verbs, 'transfer verbs not found');
+    const V = Function(`return [${verbs[1]}]`)();
+    const qs = [...js.matchAll(new RegExp(`\\{q:${Q},ok:`, 'g'))].map(m => un(m[1]));
+    assert.ok(qs.length === 2 && V.length === 2, 'transfer sentences not found');
+    for (const q of qs) for (const v of V) add(q.replace('___', v));
+
+    const OK = new Set(['es.dataset.es', 'n.dataset.say', 'f.dataset.es', 'F[k].es', 'it.es', 'op.es', 'ok?o.yes[0]:o.no[0]', "it.q.replace('___',v)"]);
+    const sites = [...js.matchAll(/\bsay\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)]
+      .map(m => m[1].replace(/,'(es|en)'$/, '').trim())
+      .filter(a => a && a !== 't,lang');
+    assert.ok(sites.length > 8, 'say() call sites not found');
+    const unknown = sites.filter(a => !OK.has(a) && !/^'.*'$/.test(a));
+    assert.deepEqual(unknown, [], 'say() is passed something this test does not know how to read: teach the la-habana extractor about it');
+    return out;
+  },
 };
 
 test('El Viaje: say() keeps the speechSynthesis fallback and the existing telemetry call', () => {
@@ -227,6 +262,15 @@ test('El Mundial: one shared Audio element, stop-before-play, browser speech as 
   assert.match(js, /const u=m\[k\];if\(!u\)\{tts\(\);return\}/, 'a line missing from the manifest falls back to the browser voice');
   assert.match(js, /function say\(t,lang\)\{T\('ev_audio_play',\{\}\);/, 'say() keeps the ev_audio_play telemetry call');
   assert.match(js, /function sayTTS\(t,lang\)\{if\(!hasTTS\)return;try\{speechSynthesis\.cancel\(\);/);
+  assert.equal((js.match(/speechSynthesis\.speak\(/g) || []).length, 1, 'only sayTTS() may use the browser voice');
+  assert.match(js, /\naudManifest\(\);\n/, 'the manifest is fetched as the page loads, so the first tap plays at once');
+});
+
+test('La Habana: one shared Audio element, stop-before-play, browser speech as the fallback', () => {
+  const { js } = load('la-habana');
+  assert.match(js, /let a=AUD\.el;if\(!a\)\{a=AUD\.el=new Audio\(\);a\.preload='none'\}/, 'one shared Audio element');
+  assert.match(js, /try\{a\.pause\(\)\}catch\(e\)\{\}/, 'stops what was playing before the next clip');
+  assert.match(js, /const u=m\[k\];if\(!u\)\{tts\(\);return\}/, 'a line missing from the manifest falls back to the browser voice');
   assert.equal((js.match(/speechSynthesis\.speak\(/g) || []).length, 1, 'only sayTTS() may use the browser voice');
   assert.match(js, /\naudManifest\(\);\n/, 'the manifest is fetched as the page loads, so the first tap plays at once');
 });

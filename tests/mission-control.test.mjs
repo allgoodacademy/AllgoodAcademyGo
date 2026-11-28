@@ -1141,7 +1141,7 @@ test('buildCatalog puts every Español story in its own group beside the simulat
     const cat = buildCatalog(REGISTRY.modules);
     const grp = cat.simPacks.find((p) => p.slug === 'espanol');
     assert.ok(grp, 'an espanol group exists');
-    assert.deepEqual(grp.items.map((x) => x.id).sort(), ['el-mundial', 'el-viaje', 'la-selva']);
+    assert.deepEqual(grp.items.map((x) => x.id).sort(), ['el-mundial', 'el-viaje', 'la-habana', 'la-selva']);
     for (const it of grp.items) {
         assert.equal(it.type, 'sim');
         assert.equal(it.kind, 'story');
@@ -1322,6 +1322,29 @@ test('growth view: La selva has three picture-tap items per check, and its stude
     assert.equal(g.boarded, 2);
     assert.deepEqual(g.slots.map((s) => [s.emb, s.adu]), [[1, 2], [1, 1], [0, 2]]);
     assert.match(g.worth, /^Color \+ plural/);
+});
+
+test('growth view: La Habana has four picture taps per check, plus the two transfer sentences', () => {
+    const cfg = JSON.parse(readFileSync(new URL('../public/espanol/la-habana/checks.json', import.meta.url), 'utf8'));
+    assert.equal(cfg.slots.length, 4);
+    assert.equal(cfg.A.length, 4);
+    assert.equal(cfg.B.length, 4);
+    assert.equal(cfg.transfer.items.length, 2);
+    const kid = (uid, checks) => ({ uid, name: uid, events: [], raw: { sessions: [], scores: [], progress: { 'la-habana': { checks } } } });
+    const g = growthReport(cfg, 'la-habana', [
+        kid('a', { v: 1, form: 'A', emb: [1, 0, 1, 0], adu: [1, 1, 1, 1], tr: [1, 1], embDone: true, aduDone: true, trDone: true }),
+        kid('b', { v: 1, form: 'A', emb: [0, 0, 1, 1], adu: [1, 0, 1, 1], tr: [1, 0], embDone: true, aduDone: true, trDone: true }),
+        kid('c', { v: 1, form: 'A', emb: [1, 1, 1, 1], adu: [1, 1], tr: [], embDone: true, aduDone: false, trDone: false }),   // left mid-Aduana
+    ]);
+    assert.equal(g.n, 2);
+    assert.equal(g.boarded, 3);
+    assert.deepEqual(g.slots.map((s) => [s.emb, s.adu]), [[1, 2], [0, 1], [2, 2], [1, 2]]);
+    assert.match(g.worth, /^rico\/rica/);
+    assert.equal(g.transfer.n, 2);
+    assert.deepEqual(g.transfer.items.map((x) => x.right), [2, 1]);
+    // A story with no transfer reports none.
+    const selva = JSON.parse(readFileSync(new URL('../public/espanol/la-selva/checks.json', import.meta.url), 'utf8'));
+    assert.equal(growthReport(selva, 'la-selva', []).transfer, null);
 });
 
 test('La selva report: each Puerta is one picture tap; first tries and the fork come from choice events', () => {

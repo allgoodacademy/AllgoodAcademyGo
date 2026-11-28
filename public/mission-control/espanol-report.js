@@ -177,7 +177,20 @@ export function growthReport(checksCfg, storyId, students = []) {
     const worth = lowest && lowest.adu < n
         ? `${lowest.skill}: ${lowest.adu} of ${n} got it at the Aduana (${lowest.emb} of ${n} at Embarque).`
         : null;
-    return { n, boarded, showPercent: n >= MIN_FOR_PERCENT, slots: out, worth };
+    // TRANSFER (La Habana, 2026-11-28): checks.json's `transfer.items`, answered after the Aduana
+    // and saved as checks.tr (0|1 per item). Counted over the students who finished it.
+    const items = (checksCfg && checksCfg.transfer && checksCfg.transfer.items) || [];
+    let transfer = null;
+    if (items.length) {
+        const did = students.map((s) => {
+            const c = s && s.raw && s.raw.progress && s.raw.progress[storyId] && s.raw.progress[storyId].checks;
+            return c && Array.isArray(c.tr) && c.tr.length >= items.length ? c.tr : null;
+        }).filter(Boolean);
+        const tn = did.length;
+        transfer = { label: checksCfg.transfer.label || 'Transfer', n: tn, showPercent: tn >= MIN_FOR_PERCENT,
+            items: items.map((it, i) => { const right = did.filter((r) => Number(r[i]) > 0).length; return { q: it.q, right, pct: share(right, tn) }; }) };
+    }
+    return { n, boarded, showPercent: n >= MIN_FOR_PERCENT, slots: out, worth, transfer };
 }
 
 /* The same view for one presented session: the class's quick votes before and after, as

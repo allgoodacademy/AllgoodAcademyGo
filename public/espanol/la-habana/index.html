@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>La Habana · Allgood Academy</title>
+<meta name="robots" content="noindex, nofollow">
+<!-- A signed-in teacher who opens this story from the /espanol/ hub gets Presentar en clase by
+     default (/js/story-tracking.js). Everyone else gets the story. ?mode=solo turns it off. -->
+<meta name="ag-presentar-default" content="hub">
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
+<script src="/js/site-config.js"></script>
+<script src="/js/story-tracking.js"></script>
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<style>
+
+/* VOICE: a warm field guide for beginners, calm and clear, never babyish.
+   IDEA: a morning rainforest walk; gates are wooden trail markers, progress is the passport.
+   PICTURE: layered daylight canopy, real Costa Rican animals drawn flat and accurate.
+   COLOUR and TYPE: forest greens and morning sky, bronze signs, one orange action; Gelasio + Atkinson Hyperlegible Next.
+   LAYOUT: one centered column of scenes; each scene a framed 15:8 picture with its card under it. */
+:root{color-scheme:light;--orange:var(--color-orange);--orange-d:#A8380F;--teal:var(--color-teal);--teal-d:#245866;--bronze:#B0773A;--bronze-d:#7A4E1F;
+--cream:var(--color-cream);--paper:#F5E6D3;--ink:#1F2A24;--ink2:#4A5650;--ok:#2E7D4F;--ok-wash:#E3F1E7;--forest:#12343B;--sky:#F3D27C;
+--site-h:74px;--nav-h:74px;--nav-fade:var(--forest);--nav-fade-end:var(--forest)}
+*{box-sizing:border-box;min-width:0}
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--site-h) + 56px)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--forest);color:var(--ink);font:17px/1.55 var(--font-ui);overflow-x:clip}
+h1,h2,.serif{font-family:var(--font-display)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid #FFB347;outline-offset:3px}
+.bar{position:sticky;top:var(--site-h);transition:top .25s ease;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px max(4vw,14px);background:rgba(18,52,59,.95);color:#F4EFE6;font-size:14px}
+.bar b{font-weight:700}
+.pass{display:flex;align-items:center;gap:8px}
+.pass .bk{background:var(--teal-d);border-radius:8px;padding:5px 9px;display:flex;gap:6px;align-items:center}
+.slot{width:26px;height:26px;border-radius:50%;border:2px dashed #9FC2B4;display:grid;place-items:center;font-size:12px;font-weight:700;color:transparent}
+.slot.on{border:2px solid #fff;background:var(--ok);color:#fff;animation:thunk .5s ease}
+@keyframes thunk{0%{transform:scale(2.2) rotate(-20deg);opacity:0}70%{transform:scale(.9)}100%{transform:scale(1)}}
+.tools{display:flex;gap:6px;align-items:center}
+.tool{display:none;background:var(--bronze);color:#fff;border-radius:999px;padding:4px 10px;font-size:13px}
+.tool.on{display:inline-block}
+.sec{max-width:1040px;margin:0 auto;padding:28px max(4vw,14px) 40px}
+.locked{display:none}
+.frame{position:relative;border-radius:18px;overflow:hidden;box-shadow:0 2px 4px rgba(5,20,25,.18),0 14px 34px rgba(10,30,20,.22);background:var(--sky)}
+.frame>svg{display:block;width:100%;height:auto}
+.card{background:var(--cream);border-radius:16px;padding:20px 24px;margin-top:-28px;position:relative;box-shadow:0 1px 2px rgba(10,30,20,.12),0 10px 24px rgba(10,30,20,.18);border:1px solid #EADFCB;max-width:760px;margin-inline:auto}
+.card+.card{margin-top:14px}
+.eyebrow{font-size:14px;color:var(--teal-d);font-weight:700}
+h1{font-size:clamp(40px,7vw,64px);line-height:1.05;letter-spacing:-.02em;margin:4px 0 2px;color:var(--forest)}
+h2{font-size:clamp(26px,4vw,34px);line-height:1.1;letter-spacing:-.02em;margin:0 0 6px;color:var(--forest)}
+.sub{font-size:20px;color:var(--ink2);margin:0 0 10px}
+.lvl{display:flex;gap:4px;align-items:center;font-size:14px;color:var(--ink2)}
+.lvl i{width:34px;height:8px;border-radius:4px;background:#D8D2C6}.lvl i.f{background:var(--bronze)}
+.go{background:var(--orange);color:#fff;border:0;border-radius:999px;padding:12px 26px;font-weight:700;font-size:18px;min-height:48px}
+.go:hover{background:var(--orange-d)}.go[disabled]{background:#B9B2A6;cursor:not-allowed}
+.ghost{background:none;border:2px solid var(--teal);color:var(--teal-d);border-radius:999px;padding:8px 18px;font-weight:700;min-height:44px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
+.start-grid{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:18px;align-items:center}
+.polaroid{background:#fff;padding:10px 10px 30px;border-radius:4px;transform:rotate(3deg);box-shadow:0 6px 14px rgba(0,0,0,.25);font-size:13px;color:var(--ink2);text-align:center}
+.polaroid div{aspect-ratio:1;background:repeating-linear-gradient(45deg,#E9E2D4 0 10px,#F2ECE0 10px 20px);display:grid;place-items:center;margin-bottom:6px;font-size:12px;padding:8px}
+@media(max-width:600px){.start-grid{grid-template-columns:1fr}.polaroid{width:170px;margin:4px auto 0}}
+.line{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 12px;align-items:start;margin:10px 0}
+.who{grid-column:2;font-size:13px;font-weight:700;color:var(--teal-d)}
+.play{grid-row:span 3;width:44px;height:44px;border-radius:50%;border:0;background:var(--teal);color:#fff;display:grid;place-items:center}
+.play svg{width:22px;height:22px}
+.es{grid-column:2;margin:0;font-size:21px;font-family:var(--font-display);transition:filter .3s}
+.es.blur{filter:blur(6px);cursor:pointer;user-select:none}
+.en-row{grid-column:2;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.en-btn{background:none;border:1px solid #B9B2A6;border-radius:6px;font-size:13px;padding:1px 8px;color:var(--ink2);min-height:28px}
+.en{margin:0;color:var(--ink2);font-size:15px}
+.narr{display:flex;gap:12px;align-items:center;font-size:17px}
+.narr .play{grid-row:auto;background:var(--bronze);flex:none}
+.narr p{margin:0}
+.tip{border-bottom:2px dotted var(--teal);cursor:help}
+.ficha{display:grid;grid-template-columns:44px minmax(0,1fr);gap:2px 12px;background:#fff;border:2px solid #D9E7DC;border-radius:14px;padding:12px 14px;margin-top:12px}
+.ficha .play{grid-row:span 3;background:var(--ok)}.ficha b{font-family:var(--font-display);font-size:19px}.ficha .sci{font-size:13px;color:var(--ink2)}.ficha p{margin:2px 0 0;font-size:15px}
+.fichas h3{font:700 15px var(--font-ui);color:var(--teal-d);margin:16px 0 0}
+.real-row{grid-column:2;margin-top:6px}
+.foto summary,.foto-link{display:inline-block;cursor:pointer;font-weight:700;font-size:14px;color:var(--teal-d);border:2px solid var(--teal);border-radius:999px;padding:5px 14px;text-decoration:none;list-style:none}
+.foto summary::-webkit-details-marker{display:none}.foto[open] summary{background:var(--teal);color:#fff}
+.foto img{display:block;width:min(320px,100%);border-radius:10px;margin-top:8px;border:4px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.18)}.foto small{display:block;font-size:13px;color:var(--ink2);margin-top:4px}
+.pin .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.8s ease-out infinite}
+@keyframes pulse{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+.pin:hover .disc,.pin:focus-visible .disc{fill:#fff}
+.why{background:#FFF8EC;border:2px solid #F0DDBE;border-radius:14px;padding:12px 14px;margin-top:12px;font-size:15px}
+.culture{background:#EAF1E4;border-left:0;border-radius:12px;padding:10px 14px;font-size:15px;margin-top:10px}
+/* boarding pass */
+.bpass{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:760px;margin:0 auto}
+.bp-top{background:var(--bronze);color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.bp-top b{font-family:var(--font-display);font-size:22px}
+.dots{display:flex;gap:6px}.dots i{width:14px;height:14px;border-radius:50%;border:2px solid #fff}.dots i.d{background:#fff}
+.bp-body{padding:16px 18px 20px;border-top:3px dashed #E1D3BE}
+.pics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:10px}
+.pic{position:relative;background:#F6F1E7;border:3px solid #E1D8C6;border-radius:14px;padding:8px;min-height:120px}
+.pic svg{width:100%;height:auto;display:block}
+.pic:hover{border-color:var(--teal)}
+.pic[aria-pressed=true]{border-color:var(--orange);background:#FFF4EC}
+.pic .ab{position:absolute;top:6px;left:8px;font-size:13px;font-weight:700;color:var(--ink2)}
+.pic.right{border-color:var(--ok);background:var(--ok-wash)}
+.pic[disabled]{cursor:default}
+.ready{text-align:center;padding:10px 0 4px}
+.ready h2{color:var(--ok)}
+/* gate sign */
+.sign{background:var(--bronze);color:#fff;border-radius:12px;padding:12px 18px;display:flex;gap:16px;align-items:center;box-shadow:inset 0 -6px 0 rgba(0,0,0,.18),0 6px 14px rgba(0,0,0,.3);max-width:760px;margin:0 auto 16px;flex-wrap:wrap}
+.sign .n{font-family:var(--font-display);font-size:44px;line-height:1;font-weight:700}
+.sign .t{font-size:14px;letter-spacing:.02em}.sign .t b{display:block;font-size:20px}
+.status{margin-left:auto;background:#4A2E12;border-radius:8px;padding:6px 12px;font-weight:700;font-size:15px}
+.status.ok{background:var(--ok)}
+.binos{max-width:560px;margin:14px auto 0}
+.binos svg{width:100%;height:auto;display:block}
+.jodi{display:flex;gap:12px;align-items:flex-start;background:#fff;border:2px solid var(--paper);border-radius:14px;padding:12px 14px;margin-top:12px}
+.jav{flex:none;width:52px;height:52px;border-radius:50%;background:var(--paper);display:grid;place-items:center;font-family:var(--font-display);font-weight:700;color:var(--teal-d);font-size:22px}
+.jodi p{margin:2px 0 0}
+.note{font-size:13px;color:#C9D9CF;text-align:center;margin:8px 0 0}
+.hot{cursor:pointer}.hot:focus{outline:none}.hot:focus-visible .ring{stroke:#FFB347;stroke-width:5}
+.chip{font:700 18px var(--font-ui)}
+.fin{text-align:center;color:#F4EFE6}
+.polaroid img{display:block;width:100%;aspect-ratio:1;object-fit:cover;margin-bottom:6px}
+.based{font-size:14px;color:var(--ink2);margin:10px 0 0}
+.real{display:flex;gap:14px;align-items:center;background:#1F2A24;color:#F4EFE6;border-radius:14px;padding:10px 12px;margin-top:12px;animation:slide .5s ease}
+.real img{width:96px;height:96px;object-fit:cover;border-radius:6px;border:4px solid #fff;transform:rotate(-3deg);flex:none}
+.real small{display:block;color:#B9D3C4;font-size:13px}
+@keyframes slide{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+.roll{background:var(--bronze);color:#fff;border-radius:999px;padding:4px 10px;font-size:13px}
+.lens{max-width:420px;margin:14px auto 0}.lens svg{width:100%;height:auto;display:block}
+
+/* La Habana additions */
+.title-photo{position:relative}
+.title-photo img{display:block;width:100%;aspect-ratio:15/8;object-fit:cover}
+.title-photo figcaption{position:absolute;right:12px;bottom:40px;background:rgba(18,52,59,.86);color:#F4EFE6;font-size:13px;padding:4px 10px;border-radius:999px}
+.rain path{animation:fall .9s linear infinite}
+.rain path:nth-child(3n){animation-delay:-.3s}.rain path:nth-child(3n+1){animation-delay:-.6s}
+@keyframes fall{from{transform:translateY(-40px)}to{transform:translateY(40px)}}
+.says{display:grid;gap:12px;margin-top:12px}
+.say-opt{display:grid;grid-template-columns:34px 44px minmax(0,1fr);gap:10px;align-items:center;text-align:left;background:#fff;border:3px solid #E1D8C6;border-radius:16px;padding:10px 14px;min-height:64px}
+.say-opt .ab{font-weight:700;color:var(--ink2);font-size:15px}
+.say-opt .q{font-family:var(--font-display);font-size:21px;color:var(--ink)}
+.say-opt .mini{width:40px;height:40px;border-radius:50%;background:var(--teal);color:#fff;display:grid;place-items:center}
+.say-opt .mini svg{width:20px;height:20px}
+.say-opt:hover{border-color:var(--teal)}
+.say-opt[aria-pressed=true]{border-color:var(--orange);background:#FFF4EC}
+.say-opt.right{border-color:var(--ok);background:var(--ok-wash)}
+.say-opt.wrongpick{border-color:#C8553D}
+.say-opt[disabled]{cursor:default}
+.jodi img{width:64px;height:64px;flex:none}
+.kate{background:#EEF5F6;border-radius:12px;padding:8px 12px;font-size:15px;margin-top:8px}
+.vb{font-weight:700;color:var(--orange-d)}.vb2{font-weight:700;color:var(--teal-d)}
+.coming{color:#F4EFE6;max-width:760px;margin:0 auto}
+.coming ol{padding-left:22px;line-height:1.8}
+.coming img{width:100%;border-radius:14px;margin-top:10px;aspect-ratio:16/7;object-fit:cover}
+@media(max-width:560px){.bar>span:first-child{display:none}.bar{justify-content:flex-end}.roll,.pass .bk{white-space:nowrap}}
+.title-photo img{object-position:30% 60%}
+.pic{color:var(--ink)}.pic small{color:var(--ink2)}.pic[disabled]{color:var(--ink)}.pic[disabled] small{color:var(--ink2)}
+/* Kate's lines (English): a ▶ like every other line */
+.kline{display:flex;gap:12px;align-items:center}.kline .play{grid-row:auto;flex:none}.kline p{margin:0}
+/* The site nav (generated, nav/nav.js) sits above the story bar and slides away on scroll-down,
+   as on La selva. --site-h is how much of it shows; the script after the nav keeps it exact. */
+body .nav-shell{z-index:61;transition:transform .25s ease}
+body .nav-shell.nav-away{transform:translateY(-100%)}
+.tools>*,.pass .bk>*{flex:none}.roll{white-space:nowrap}
+/* A Puerta's scene and its gate are two sections that open together: keep them as close as one. */
+section.gate{padding-top:0}
+/* Presentar en clase (/js/story-presentar.js): each Puerta's class-vote box lives in .cv, which
+   only shows there. Its stylesheet sizes .opt / .slot for a projector; keep this page's. */
+.cv{display:none}
+body.presentar .cv{display:block;margin-top:12px}
+body.presentar .pic.opt,body.presentar .say-opt.opt{padding:10px 14px;font-size:inherit}
+body.presentar .bar .slot{font-size:12px}
+</style>
+</head>
+<body>
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
+<div class="nav-shell">
+  <div class="wrap">
+    <nav class="nav site-nav">
+      <a class="wordmark" href="/">Allgood<em>Academy</em></a>
+      <div class="nav-right">
+        <div class="nav-links" id="site-nav-links">
+          <a class="nav-link" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
+        <button class="nav-menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-nav-links"><svg class="bars" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="x" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+    </nav>
+  </div>
+</div>
+<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>
+<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-menu{display:none}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+  .nav-shell{padding-top:10px}
+  .nav-shell .wrap{padding-left:12px;padding-right:12px}
+  .site-nav.has-menu.nav{flex-wrap:wrap;gap:6px;row-gap:0;border-radius:26px;padding:6px 6px 6px 18px}
+  .site-nav.has-menu .wordmark{font-size:20px;margin-right:auto;min-width:0;overflow:hidden;text-overflow:clip}
+  .site-nav.has-menu .nav-cta{order:1;margin-left:0;padding:8px 16px}
+  .site-nav.has-menu .nav-menu{order:2;display:inline-flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;padding:0;margin:0;border:0;border-radius:999px;background:var(--color-teal-wash);color:var(--color-teal-deep);cursor:pointer}
+  .site-nav.has-menu .nav-menu svg{display:block;width:20px;height:20px}
+  .site-nav.has-menu .nav-menu .x,.site-nav.has-menu.open .nav-menu .bars{display:none}
+  .site-nav.has-menu.open .nav-menu .x{display:block}
+  .site-nav.has-menu .nav-links{order:3;display:none;margin:8px 0 4px;padding:6px 12px 0 0;border-top:1px solid var(--color-teal-wash)}
+  .site-nav.has-menu.open .nav-links{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+  .site-nav.has-menu.open .nav-links .nav-link{display:block;font-size:15px;line-height:1.4;padding:12px 14px;border-radius:14px;white-space:normal;max-width:none;text-align:left}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+  .site-nav.has-menu.nav{padding-left:14px;padding-right:6px;gap:4px}
+  .site-nav.has-menu .wordmark{font-size:17px}
+  .site-nav.has-menu .nav-cta{padding:8px 11px;font-size:12px}
+  .site-nav.has-menu .nav-menu{width:38px;height:38px}
+}
+</style>
+<script>
+(function(){
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if((s||a)&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.remove();
+  // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
+  // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
+  // writes it onto the session doc. See docs/insider-analytics.md.
+  try{if(!sessionStorage.getItem('ag_src')){var q=new URLSearchParams(location.search),c=function(v){v=String(v||'').toLowerCase();return /^[a-z0-9._-]{1,40}$/.test(v)?v:(v?'other':'');},r='';try{var h=document.referrer?new URL(document.referrer).host:'';r=h&&h!==location.host?c(h):'';}catch(e){}var o={src:c(q.get('src')),utmSource:c(q.get('utm_source')),utmMedium:c(q.get('utm_medium')),utmCampaign:c(q.get('utm_campaign')),refHost:r};sessionStorage.setItem('ag_src',JSON.stringify(o));}}catch(e){/* storage blocked - no source recorded */}
+  var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
+  if(!btn)return;
+  nav.classList.add('has-menu');
+  function set(o){nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false');btn.setAttribute('aria-label',o?'Close menu':'Menu');}
+  btn.addEventListener('click',function(){set(!nav.classList.contains('open'));});
+  nav.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('.nav-links a'))set(false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&nav.classList.contains('open')){set(false);btn.focus();}});
+  document.addEventListener('click',function(e){if(!nav.contains(e.target))set(false);});
+})();
+</script>
+<!-- END GENERATED NAV -->
+<script>
+// The site nav slides away on scroll-down and comes back on scroll-up, so a phone keeps its
+// screen for the story; the story's own bar (.bar) stays pinned under it. Same as La selva:
+//   --nav-h   the site nav's closed height
+//   --site-h  how much of the site nav is showing right now: --nav-h, or 0 while it is away
+(function(){var s=document.querySelector('.nav-shell');if(!s)return;var r=document.documentElement,away=false,last=Math.max(0,scrollY),navH=s.offsetHeight;
+function open(){return !!s.querySelector('.site-nav.open')}
+function set(){if(open())away=false;else navH=s.offsetHeight;s.classList.toggle('nav-away',away);
+  r.style.setProperty('--nav-h',navH+'px');r.style.setProperty('--site-h',(away?0:navH)+'px')}
+function scrolled(){var y=Math.max(0,scrollY),d=y-last;if(Math.abs(d)<8&&y>navH)return;last=y;
+  var a=d>0&&y>navH&&!open()&&!s.contains(document.activeElement);if(a!==away){away=a;set()}}
+s.addEventListener('focusin',function(){if(away){away=false;set()}});
+addEventListener('scroll',scrolled,{passive:true});addEventListener('resize',set);
+if(window.ResizeObserver){var ro=new ResizeObserver(set);ro.observe(s)}
+set();})();
+</script>
+<header class="bar"><span><b>Allgood Academy</b> · Español · Novato</span>
+<span class="tools"><span class="roll" id="roll" aria-live="polite">Tus fotos: 0</span>
+<span class="pass" aria-label="Pasaporte: 4 Puertas"><span class="bk"><span>Pasaporte</span>
+ <span class="slot" id="s1">1</span><span class="slot" id="s2">2</span><span class="slot" id="s3">3</span><span class="slot" id="s4">4</span></span></span></span>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="speaker" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol></svg>
+<main id="story">
+<!-- The sections are static so the build checks can read them: data-step is the section number
+     TM.step() reports (14 in all), and a scored Puerta is <section class="gate…" id="g<n>">. The
+     story's script fills each one. pm-step / gate / fork / carta tell Presentar en clase how to
+     step through them. -->
+<section class="sec pm-step" id="intro" data-step="1" aria-label="La Habana"></section>
+<section class="sec pm-step locked" id="embarque" data-step="2" aria-label="Embarque"></section>
+<section class="sec pm-step locked" id="aeropuerto" data-step="3" aria-label="El aeropuerto"></section>
+<section class="sec pm-step locked" id="casa" data-step="4" aria-label="La casa particular"></section>
+<section class="gate sec locked" id="g1" data-step="5" aria-label="Puerta 1"></section>
+<section class="sec pm-step locked" id="cena" data-step="6" aria-label="La cena"></section>
+<section class="gate sec locked" id="g2" data-step="7" aria-label="Puerta 2"></section>
+<section class="fork sec locked" id="f1" data-step="8" aria-label="Mañana libre"></section>
+<section class="sec pm-step locked" id="wifi" data-step="9" aria-label="El parque wifi"></section>
+<section class="gate sec locked" id="g3" data-step="10" aria-label="Puerta 3"></section>
+<section class="sec pm-step locked" id="noche" data-step="11" aria-label="El Malecón de noche"></section>
+<section class="gate sec locked" id="g4" data-step="12" aria-label="Puerta 4"></section>
+<section class="sec pm-step locked" id="aduana" data-step="13" aria-label="Aduana"></section>
+<section class="carta sec locked" id="fin" data-step="14" aria-label="¡Hasta pronto, Habana!"></section>
+</main>
+<!-- The art (prototype v1.0, approved by William): flat shapes drawn in code, as on La selva. -->
+<script type="text/javascript">
+/* ===== La Habana art: flat shapes, one shade tone, soft warm shadows (Allgood house style) ===== */
+const ART={};
+
+/* ---------- people (same construction as La selva) ---------- */
+function person(o){const {x,y,s=1,skin,skin2,hair,top,top2,pants,shoe,wave,pony,bun,skirt,apron,pack,curls}=o;return `<g transform="translate(${x} ${y}) scale(${s})">
+<ellipse cx="0" cy="292" rx="62" ry="9" fill="#2A1E14" opacity=".16"/>
+${skirt?`<path d="M-48 188 L-58 262 Q0 274 58 262 L48 188Z" fill="${skirt}"/><path d="M-14 262 L-16 284 M14 262 L16 284" stroke="${skin}" stroke-width="12" stroke-linecap="round"/>`
+:`<path d="M-18 180 L-22 280 M18 180 L22 280" stroke="${pants}" stroke-width="24" stroke-linecap="round"/>`}
+<path d="M-34 286 h26 M8 286 h26" stroke="${shoe}" stroke-width="12" stroke-linecap="round"/>
+${pack?`<rect x="-40" y="76" width="80" height="96" rx="18" fill="${pack}"/>`:''}
+<path d="M-46 96 C-46 76 -26 66 0 66 C26 66 46 76 46 96 L50 196 C30 204 -30 204 -50 196Z" fill="${top}"/>
+<path d="M10 70 C30 72 46 82 46 100 L50 196 C40 200 26 202 14 202Z" fill="${top2}"/>
+${apron?`<path d="M-26 120 H26 L32 200 Q0 206 -32 200Z" fill="${apron}"/><path d="M-26 120 Q0 112 26 120" stroke="${apron}" stroke-width="4" fill="none"/>`:''}
+${pack?`<path d="M-30 70 L-34 150 M30 70 L34 150" stroke="${pack}" stroke-width="8" stroke-linecap="round"/>`:''}
+<path d="M-14 68 Q0 84 14 68" stroke="${top2}" stroke-width="4" fill="none"/>
+<path d="M-44 94 C-62 120 -62 160 -48 184" stroke="${top}" stroke-width="20" fill="none" stroke-linecap="round"/><circle cx="-47" cy="190" r="9" fill="${skin}"/>
+${wave?`<path d="M44 92 C66 76 72 46 64 20" stroke="${top2}" stroke-width="20" fill="none" stroke-linecap="round"/><circle cx="63" cy="12" r="10" fill="${skin}"/>`
+:`<path d="M44 94 C62 120 62 160 48 184" stroke="${top2}" stroke-width="20" fill="none" stroke-linecap="round"/><circle cx="47" cy="190" r="9" fill="${skin}"/>`}
+<rect x="-9" y="44" width="18" height="24" rx="6" fill="${skin2}"/>
+${pony?`<path d="M20 4 C40 10 44 40 34 62" stroke="${hair}" stroke-width="13" fill="none" stroke-linecap="round"/>`:''}
+${bun?`<circle cx="0" cy="-12" r="14" fill="${hair}"/>`:''}
+<ellipse cx="0" cy="22" rx="27" ry="30" fill="${skin}"/><ellipse cx="-26" cy="24" rx="5" ry="8" fill="${skin2}"/><ellipse cx="26" cy="24" rx="5" ry="8" fill="${skin2}"/>
+${curls?`<path d="M-30 20 C-40 -6 -20 -18 0 -16 C20 -18 40 -6 30 20 C26 4 18 0 0 0 C-18 0 -26 4 -30 20Z" fill="${hair}"/><circle cx="-26" cy="4" r="9" fill="${hair}"/><circle cx="26" cy="4" r="9" fill="${hair}"/><circle cx="-14" cy="-10" r="10" fill="${hair}"/><circle cx="12" cy="-11" r="10" fill="${hair}"/>`
+:`<path d="M-28 18 C-30 -14 30 -14 28 18 C22 2 10 -2 0 -2 C-14 -2 -24 4 -28 18Z" fill="${hair}"/>`}
+<ellipse cx="-10" cy="24" rx="3.2" ry="3.8" fill="#23303A"/><ellipse cx="10" cy="24" rx="3.2" ry="3.8" fill="#23303A"/><circle cx="-9" cy="22.6" r="1" fill="#fff"/><circle cx="11" cy="22.6" r="1" fill="#fff"/>
+<path d="M0 28 Q-3 34 1 35" stroke="${skin2}" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M-7 41 Q0 46 7 41" stroke="#7A3B2E" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<ellipse cx="-16" cy="34" rx="5" ry="3" fill="#E08A6E" opacity=".35"/><ellipse cx="16" cy="34" rx="5" ry="3" fill="#E08A6E" opacity=".35"/></g>`}
+const caridad=(x,y,s,wave)=>person({x,y,s,wave,skin:'#8A5A3C',skin2:'#74492F',hair:'#D9D4CC',curls:true,top:'#C8553D',top2:'#A9432F',skirt:'#2F5E7A',apron:'#F4EBD9',shoe:'#5B3A26'});
+const kate=(x,y,s,wave)=>person({x,y,s,wave,skin:'#F2C9A6',skin2:'#E2B08C',hair:'#C99A55',pony:true,top:'#2F7F86',top2:'#256A70',pants:'#3B4656',shoe:'#F1EDE6',pack:'#B0773A'});
+
+/* ---------- the pin (same as La selva) ---------- */
+function hotspot(k,x,y,lx,ly){const lab=F[k].es,w=lab.length*11.5+30;lx=lx??x;ly=ly??y+46;return `<g class="hot pin" tabindex="0" role="button" aria-label="Explore: ${lab}, ${F[k].en}" data-f="${k}">
+<circle class="hit" cx="${x}" cy="${y}" r="40" fill="#fff" opacity="0"/><circle class="pulse" cx="${x}" cy="${y}" r="20" fill="none" stroke="#FBF6EE" stroke-width="4"/>
+<circle class="disc ring" cx="${x}" cy="${y}" r="20" fill="#FBF6EE" stroke="#B0773A" stroke-width="4"/><circle cx="${x-3}" cy="${y-3}" r="7" fill="none" stroke="#245866" stroke-width="3.4"/><path d="M${x+2} ${y+2} l7 7" stroke="#245866" stroke-width="3.6" stroke-linecap="round"/>
+<rect x="${lx-w/2}" y="${ly-18}" width="${w}" height="34" rx="17" fill="#12343B" opacity=".88"/><text x="${lx}" y="${ly+5}" text-anchor="middle" style="font:700 17px 'Atkinson Hyperlegible Next',Verdana,sans-serif" fill="#FBF6EE">${lab}</text></g>`}
+
+/* ---------- 1. the baggage claim ---------- */
+ART.airport=()=>{
+ let lights='';for(let i=0;i<6;i++)lights+=`<rect x="${70+i*190}" y="22" width="120" height="16" rx="4" fill="#FFFBEA"/><rect x="${70+i*190}" y="38" width="120" height="5" fill="#E2DCC8"/>`;
+ let crowd='';const C=[['#6B7A8F',150],['#B5654A',230],['#E0B04F',330],['#4E8A7A',840],['#8C5A86',930],['#3F566E',1030]];
+ C.forEach(([c,x],i)=>{crowd+=`<g opacity=".9"><ellipse cx="${x}" cy="${240+(i%2)*6}" rx="22" ry="26" fill="${['#3A2A22','#2B1D14','#6B4A2E'][i%3]}"/><path d="M${x-42} 360 C${x-42} 290 ${x-26} 270 ${x} 270 C${x+26} 270 ${x+42} 290 ${x+42} 360Z" fill="${c}"/></g>`});
+ let slats='';for(let x=-40;x<1260;x+=46)slats+=`<path d="M${x} 404 l20 -30" stroke="#3A3F45" stroke-width="3"/>`;
+ return `<rect width="1200" height="560" fill="#E9DFCB"/>
+<rect width="1200" height="60" fill="#F4EFE3"/>${lights}
+<rect y="250" width="1200" height="140" fill="#D8C9A8"/>
+<rect x="760" y="70" width="380" height="140" rx="6" fill="#CFE1E6"/><path d="M950 70 V210 M760 140 H1140" stroke="#B9CDD3" stroke-width="6"/>
+<path d="M780 210 l40 -60 l30 30 l50 -50 l60 80Z" fill="#A9C7B6" opacity=".6"/>
+<g transform="translate(330 80)"><rect width="380" height="70" rx="8" fill="#1E4D6B"/><rect x="18" y="20" width="40" height="32" rx="6" fill="none" stroke="#fff" stroke-width="4"/><path d="M28 20 v-6 h20 v6" stroke="#fff" stroke-width="4" fill="none"/>
+<text x="74" y="31" style="font:700 22px 'Atkinson Hyperlegible Next',Verdana,sans-serif" fill="#fff">Recogida de equipaje</text><text x="74" y="56" style="font:400 16px 'Atkinson Hyperlegible Next',Verdana,sans-serif" fill="#BFD6E3">Baggage claim · Cinta 3</text></g>
+${crowd}
+<path d="M-20 372 H1220 V400 H-20Z" fill="#9AA3AB"/>
+<path d="M-20 400 H1220 V440 H-20Z" fill="#4A5056"/>${slats}
+<path d="M-20 440 H1220 V560 H-20Z" fill="#2F3338"/><rect y="440" width="1200" height="8" fill="#BAC2C9"/>
+<rect y="500" width="1200" height="60" fill="#C9BEA6"/>
+<!-- suitcase -->
+<g transform="translate(70 300)"><rect x="0" y="0" width="120" height="96" rx="12" fill="#C8553D"/><rect x="66" y="0" width="54" height="96" rx="0" fill="#A9432F"/><rect x="0" y="0" width="120" height="96" rx="12" fill="none"/>
+<path d="M40 0 v-14 h40 v14" stroke="#3A2A22" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M14 20 v56 M106 20 v56" stroke="#8E3727" stroke-width="4"/><rect x="18" y="38" width="30" height="18" rx="3" fill="#F4EBD9"/></g>
+<!-- plastic-wrapped bundle -->
+<g transform="translate(220 302)"><rect x="0" y="0" width="140" height="94" rx="16" fill="#3C8F6B"/><rect x="0" y="0" width="140" height="94" rx="16" fill="#7FC8A9" opacity=".75"/>
+<path d="M0 22 Q70 6 140 24 M0 48 Q70 32 140 50 M0 74 Q70 58 140 76" stroke="#E8F6EF" stroke-width="5" fill="none" opacity=".8"/><path d="M20 10 l30 70" stroke="#E8F6EF" stroke-width="3" opacity=".6"/></g>
+<!-- TV box -->
+<g transform="translate(390 220)"><rect x="0" y="0" width="250" height="176" rx="6" fill="#D9BE90"/><rect x="186" y="0" width="64" height="176" fill="#C6A974"/>
+<rect x="24" y="26" width="150" height="96" rx="6" fill="#2D3640"/><rect x="34" y="36" width="130" height="76" rx="3" fill="#4F7FA0"/><path d="M34 100 l40 -36 l26 22 l30 -30 l34 40 v16 h-130Z" fill="#6FA0BE"/>
+<path d="M88 122 v10 h22 v-10" fill="#2D3640"/><text x="24" y="160" style="font:700 22px 'Atkinson Hyperlegible Next',Verdana,sans-serif" fill="#5A4128">TV 42"</text>
+<path d="M0 88 H250" stroke="#B48E58" stroke-width="10"/></g>
+<!-- tire -->
+<g transform="translate(740 330)"><circle r="66" fill="#23272C"/><circle r="66" fill="none" stroke="#33383E" stroke-width="10" stroke-dasharray="10 8"/><circle r="36" fill="#8E959D"/><circle r="22" fill="#BAC1C8"/>
+${[0,72,144,216,288].map(a=>`<circle cx="${Math.cos(a*Math.PI/180)*28}" cy="${Math.sin(a*Math.PI/180)*28}" r="4" fill="#5E656D"/>`).join('')}</g>
+<!-- car bumper -->
+<g transform="translate(830 352)"><path d="M0 30 Q10 0 60 2 H290 Q340 0 350 30 L344 44 H6Z" fill="#C9CFD6"/><path d="M14 12 Q30 6 60 8 H290 Q320 6 336 12" stroke="#F1F4F7" stroke-width="7" fill="none" stroke-linecap="round"/>
+<rect x="30" y="34" width="290" height="8" rx="4" fill="#3A3F45"/><rect x="250" y="16" width="28" height="12" rx="3" fill="#E0A23B"/></g>
+${hotspot('maleta',150,280,150,236)}${hotspot('tele',515,210,515,166)}${hotspot('llanta',740,252,740,208)}${hotspot('parachoques',1005,338,1005,294)}`};
+
+/* ---------- 2. the courtyard house, raining ---------- */
+ART.casa=()=>{
+ let rain='';for(let i=0;i<70;i++){const x=270+((i*97)%660),y=((i*53)%420)-40;rain+=`<path d="M${x} ${y} l-6 34" />`}
+ let tiles='';for(let r=0;r<3;r++)for(let c=0;c<40;c++){if((r+c)%2)tiles+=`<rect x="${c*30}" y="${500+r*20}" width="30" height="20" fill="#2F3A3F"/>`}
+ const arch=(x,door)=>`<g transform="translate(${x} 150)"><rect x="0" y="0" width="200" height="290" fill="#F3D27C"/>
+ <path d="M24 290 V120 A76 76 0 0 1 176 120 V290Z" fill="#DDB45E"/>
+ <path d="M44 290 V132 A56 56 0 0 1 156 132 V290Z" fill="${door}"/>${[0,1,2,3,4,5,6,7,8,9].map(i=>`<path d="M48 ${150+i*14} H152" stroke="#2C5F80" stroke-width="5"/>`).join('')}
+ <path d="M100 82 V290" stroke="#2C5F80" stroke-width="5"/></g>`;
+ return `<rect width="1200" height="560" fill="#F3D27C"/>
+<rect x="250" y="0" width="700" height="150" fill="#9FB4C2"/><path d="M250 70 Q330 40 420 66 Q500 30 600 60 Q700 34 790 64 Q870 44 950 70 V0 H250Z" fill="#B9C9D4"/>
+<rect x="250" y="138" width="700" height="14" fill="#C9A24E"/>
+${arch(290,'#3E7FA6')}${arch(500,'#3E7FA6')}${arch(710,'#3E7FA6')}
+<rect x="250" y="440" width="700" height="70" fill="#C47A55"/><ellipse cx="460" cy="470" rx="120" ry="12" fill="#9FB4C2" opacity=".55"/><ellipse cx="760" cy="488" rx="90" ry="9" fill="#9FB4C2" opacity=".45"/>
+<g transform="translate(985 380)"><path d="M-46 60 Q-60 0 -30 -30 H30 Q60 0 46 60Z" fill="#B5653E"/><path d="M30 -30 Q60 0 46 60 H20 Q34 0 14 -30Z" fill="#9A5232"/><rect x="-34" y="-40" width="68" height="14" rx="6" fill="#9A5232"/><ellipse cx="0" cy="-36" rx="28" ry="5" fill="#7FA7BD"/></g>
+<g transform="translate(330 400)"><path d="M-26 50 L-34 0 H34 L26 50Z" fill="#B5653E"/>
+<path d="M0 0 C-10 -60 -60 -90 -90 -90 M0 0 C-4 -70 -20 -120 -40 -150 M0 0 C10 -70 40 -110 70 -130 M0 0 C14 -50 60 -60 90 -50" stroke="#3D7A4E" stroke-width="10" fill="none" stroke-linecap="round"/>
+<path d="M0 0 C-4 -70 -20 -120 -40 -150" stroke="#4F9461" stroke-width="5" fill="none"/></g>
+<g class="rain" stroke="#E8F0F5" stroke-width="2.4" stroke-linecap="round" opacity=".75">${rain}</g>
+<!-- covered hallway that frames the view -->
+<path d="M0 0 H1200 V40 H0Z" fill="#8B5E34"/>${[0,1,2,3,4,5,6,7,8,9,10,11].map(i=>`<rect x="${i*104}" y="40" width="22" height="24" fill="#6E4826"/>`).join('')}
+<path d="M0 64 H1200 V92 H0Z" fill="#E7BE62"/>
+<path d="M0 92 V560 H110 V230 A140 140 0 0 1 250 92Z" fill="#EFCB71"/><path d="M1200 92 V560 H1090 V230 A140 140 0 0 0 950 92Z" fill="#E2B65C"/>
+<rect x="0" y="500" width="1200" height="60" fill="#E9E1D2"/>${tiles}
+<g transform="translate(150 380)"><path d="M-40 110 Q0 126 40 110" stroke="#6E4826" stroke-width="8" fill="none"/><path d="M-34 110 L-26 30 M34 110 L26 30" stroke="#8B5E34" stroke-width="8" stroke-linecap="round"/>
+<rect x="-30" y="56" width="60" height="10" fill="#D9C08A"/><rect x="-28" y="10" width="56" height="44" rx="4" fill="#D9C08A"/>${[0,1,2,3].map(i=>`<path d="M-24 ${18+i*10} H24" stroke="#B89A62" stroke-width="3"/>`).join('')}</g>
+${kate(480,240,.78)}${caridad(760,232,.8,true)}
+${hotspot('patio',600,420,600,376)}${hotspot('lluvia',420,110,420,66)}${hotspot('mecedora',150,420,150,376)}${hotspot('tinajon',985,350,985,306)}`};
+
+/* ---------- 3. dinner ---------- */
+ART.cena=()=>{
+ let beans='';for(let i=0;i<46;i++){const a=i*2.4,r=8+((i*37)%40);beans+=`<ellipse cx="${Math.cos(a)*r}" cy="${Math.sin(a)*r*.55}" rx="5" ry="3.4" fill="${i%3?'#2A1E24':'#3D2C33'}"/>`}
+ let rice='';for(let i=0;i<70;i++){const a=i*2.399,r=50*Math.sqrt((i+.5)/70);rice+=`<ellipse cx="${Math.cos(a)*r}" cy="${Math.sin(a)*r*.36-6}" rx="3.4" ry="1.8" transform="rotate(${(i*47)%180} ${Math.cos(a)*r} ${Math.sin(a)*r*.36-6})" fill="#E9E2D2"/>`}
+ let beef='';for(let i=0;i<22;i++){const x=-44+((i*23)%88),y=-14+((i*13)%26);beef+=`<path d="M${x} ${y} q12 4 24 -2" stroke="${i%2?'#8C3A22':'#A3482B'}" stroke-width="5" fill="none" stroke-linecap="round"/>`}
+ const plate=(x,y,rx,inner)=>`<g transform="translate(${x} ${y})"><ellipse cx="0" cy="10" rx="${rx+8}" ry="${(rx+8)*.42}" fill="#6E4826" opacity=".25"/><ellipse rx="${rx}" ry="${rx*.42}" fill="#FBF8F2"/><ellipse rx="${rx-14}" ry="${(rx-14)*.42}" fill="#F0EADF"/>${inner}</g>`;
+ return `<rect width="1200" height="560" fill="#5FA9A5"/><rect y="0" width="1200" height="300" fill="#6DB4AF"/>
+<g transform="translate(120 60)"><rect width="230" height="170" rx="6" fill="#F7E7C4"/><rect x="12" y="12" width="206" height="146" fill="#BFE0E8"/><path d="M12 120 Q80 90 140 110 T218 100 V158 H12Z" fill="#8FC2A0"/><path d="M115 12 V158 M12 85 H218" stroke="#F7E7C4" stroke-width="8"/></g>
+<g transform="translate(980 40)"><path d="M0 0 V60" stroke="#6E4826" stroke-width="4"/><circle cx="0" cy="96" r="38" fill="#B5653E"/><rect x="-46" y="64" width="92" height="12" rx="6" fill="#9A5232"/></g>
+${caridad(820,120,.92,false)}
+<g transform="translate(870 300)"><ellipse cx="0" cy="0" rx="58" ry="20" fill="#3A3F45"/><rect x="-58" y="-36" width="116" height="36" fill="#4A5056"/><ellipse cx="0" cy="-36" rx="58" ry="20" fill="#5E656D"/><ellipse cx="0" cy="-36" rx="46" ry="14" fill="#8C3A22"/><path d="M-58 -28 h-22 M58 -28 h22" stroke="#3A3F45" stroke-width="8" stroke-linecap="round"/></g>
+${kate(260,150,.86,false)}
+<path d="M40 330 H1160 L1200 560 H0Z" fill="#9C6A3E"/><path d="M40 330 H1160 V346 H40Z" fill="#B88350"/>
+<path d="M80 346 H1120 L1150 560 H50Z" fill="#F4EBD9"/>${[0,1,2,3,4,5,6,7].map(i=>`<path d="M${120+i*130} 346 L${100+i*136} 560" stroke="#E7D7B8" stroke-width="10"/>`).join('')}
+${plate(300,430,96,`<g transform="translate(0 -10)"><ellipse cx="0" cy="6" rx="60" ry="20" fill="#E6DECB"/><ellipse cx="0" cy="-2" rx="56" ry="20" fill="#FFFFFF" stroke="#DDD2BA" stroke-width="2"/><ellipse cx="0" cy="-8" rx="40" ry="12" fill="#FFFFFF"/>${rice.replace(/#E9E2D2/g,'#DCD2BC')}</g>`)}
+${plate(540,410,92,`<g transform="translate(0 -4)"><ellipse rx="60" ry="22" fill="#4A3040"/>${beans}</g>`)}
+${plate(780,440,100,`<g transform="translate(0 -6)"><ellipse rx="64" ry="24" fill="#B4502F"/>${beef}<path d="M-30 -6 q10 -4 18 0 M10 6 q10 -4 20 2" stroke="#5E9C4A" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M-10 10 q8 -4 16 0" stroke="#E0A23B" stroke-width="5" fill="none" stroke-linecap="round"/></g>`)}
+${plate(1000,500,74,`<g>${[[-26,-6],[0,-10],[26,-4],[-12,8],[14,8]].map(([x,y])=>`<ellipse cx="${x}" cy="${y}" rx="17" ry="9" fill="#E3A83B"/><ellipse cx="${x}" cy="${y}" rx="10" ry="5" fill="#F2C76A"/>`).join('')}</g>`)}
+<g transform="translate(140 520)"><rect x="-22" y="-60" width="44" height="66" rx="8" fill="#F6B3B0" opacity=".9"/><rect x="-22" y="-60" width="44" height="14" rx="6" fill="#F9D2D0"/></g>
+${hotspot('arroz',390,420,390,376)}${hotspot('frijoles',628,392,628,348)}${hotspot('ropavieja',878,430,878,386)}${hotspot('tostones',1076,440,1076,396)}`};
+
+/* ---------- small picture cards ---------- */
+const P={
+ uk:`<svg viewBox="0 0 300 200"><rect x="40" y="30" width="220" height="140" fill="#24497A"/><path d="M40 30 L260 170 M260 30 L40 170" stroke="#fff" stroke-width="26"/><path d="M40 30 L260 170 M260 30 L40 170" stroke="#C8323D" stroke-width="9"/><path d="M150 30 V170 M40 100 H260" stroke="#fff" stroke-width="40"/><path d="M150 30 V170 M40 100 H260" stroke="#C8323D" stroke-width="22"/></svg>`,
+ cu:`<svg viewBox="0 0 300 200"><rect x="40" y="30" width="220" height="140" fill="#fff"/>${[0,2,4].map(i=>`<rect x="40" y="${30+i*28}" width="220" height="28" fill="#1F4C8F"/>`).join('')}<path d="M40 30 L140 100 L40 170Z" fill="#C8323D"/><path d="M78 88 l5 14 h15 l-12 9 l5 14 l-13 -9 l-13 9 l5 -14 l-12 -9 h15Z" fill="#fff"/></svg>`,
+ abierta:`<svg viewBox="0 0 300 200"><path d="M60 120 L240 120 L260 170 H40Z" fill="#C8553D"/><path d="M60 120 L90 40 H250 L240 120Z" fill="#A9432F"/><rect x="80" y="104" width="60" height="22" rx="4" fill="#F4EBD9"/><rect x="150" y="98" width="50" height="28" rx="4" fill="#7FB0C8"/><path d="M110 120 h40" stroke="#E0A23B" stroke-width="8"/></svg>`,
+ cerrada:`<svg viewBox="0 0 300 200"><rect x="70" y="60" width="160" height="110" rx="14" fill="#C8553D"/><rect x="160" y="60" width="70" height="110" fill="#A9432F"/><path d="M130 60 v-16 h40 v16" stroke="#3A2A22" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M86 80 v70 M214 80 v70" stroke="#8E3727" stroke-width="5"/><rect x="138" y="104" width="24" height="16" rx="3" fill="#E0A23B"/></svg>`,
+ comida:`<svg viewBox="0 0 300 200"><ellipse cx="150" cy="140" rx="110" ry="40" fill="#FBF8F2"/><ellipse cx="150" cy="136" rx="80" ry="28" fill="#B4502F"/>${[0,1,2,3,4,5].map(i=>`<path d="M${100+i*18} ${128+(i%2)*10} q10 4 20 -2" stroke="#8C3A22" stroke-width="5" fill="none" stroke-linecap="round"/>`).join('')}<path d="M120 100 q-10 -20 0 -40 M150 96 q-10 -22 0 -46 M180 100 q-10 -20 0 -40" stroke="#B9C9D4" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="246" cy="60" r="26" fill="#E0A23B"/><path d="M234 56 h0 M258 56 h0" stroke="#3A2A22" stroke-width="7" stroke-linecap="round"/><path d="M234 68 q12 12 24 0" stroke="#3A2A22" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`,
+ rica:`<svg viewBox="0 0 300 200"><rect x="150" y="60" width="120" height="110" fill="#F3D27C"/><path d="M140 64 L210 20 L280 64Z" fill="#C8553D"/><rect x="196" y="110" width="28" height="60" fill="#3E7FA6"/>${[0,1].map(i=>`<rect x="${164+i*78}" y="84" width="22" height="22" fill="#BFE0E8"/>`).join('')}<g transform="translate(70 90)"><ellipse cx="0" cy="40" rx="40" ry="44" fill="#3C8F6B"/><text x="0" y="56" text-anchor="middle" style="font:700 44px Georgia,serif" fill="#F4EBD9">$</text><path d="M-14 -2 q14 -14 28 0" stroke="#3C8F6B" stroke-width="10" fill="none"/></g>${[0,1,2].map(i=>`<ellipse cx="${40+i*30}" cy="${176-i*4}" rx="16" ry="6" fill="#E0A23B"/>`).join('')}</svg>`,
+ aburrido:`<svg viewBox="0 0 300 200"><circle cx="150" cy="100" r="64" fill="#C98F62"/><path d="M96 84 C96 30 204 30 204 84 C190 60 170 56 150 56 C126 56 108 62 96 84Z" fill="#2B1D14"/><path d="M118 98 h22 M160 98 h22" stroke="#23303A" stroke-width="6" stroke-linecap="round"/><path d="M128 136 h44" stroke="#7A3B2E" stroke-width="6" stroke-linecap="round"/><path d="M60 150 q-10 -40 20 -70" stroke="#C98F62" stroke-width="20" fill="none" stroke-linecap="round"/><text x="226" y="70" style="font:700 30px Georgia,serif" fill="#7A8A90">z z</text></svg>`,
+ feliz:`<svg viewBox="0 0 300 200"><circle cx="150" cy="100" r="64" fill="#C98F62"/><path d="M96 84 C96 30 204 30 204 84 C190 60 170 56 150 56 C126 56 108 62 96 84Z" fill="#2B1D14"/><ellipse cx="128" cy="98" rx="6" ry="8" fill="#23303A"/><ellipse cx="172" cy="98" rx="6" ry="8" fill="#23303A"/><path d="M118 124 q32 34 64 0Z" fill="#7A3B2E"/><path d="M64 70 l-18 -30 M236 70 l18 -30" stroke="#E0A23B" stroke-width="8" stroke-linecap="round"/><path d="M40 110 h-20 M260 110 h20" stroke="#E0A23B" stroke-width="8" stroke-linecap="round"/></svg>`
+};
+
+/* ===== La Habana art, part 2 ===== */
+const yoel=(x,y,s,wave)=>person({x,y,s,wave,skin:'#7A4E30',skin2:'#653F26',hair:'#1E1510',top:'#E0A23B',top2:'#C98C2A',pants:'#3E5C8A',shoe:'#F1EDE6'});
+
+/* the old car on the Malecón (fork A) */
+ART.carro=()=>{
+ let crowd='';for(let i=0;i<20;i++){const x=290+i*46,h=46+((i*17)%18);crowd+=`<g fill="${['#2E3A52','#5C3B4A','#3B5A55','#6B4A2E'][i%4]}"><circle cx="${x}" cy="${248-h}" r="9"/><rect x="${x-9}" y="${254-h}" width="18" height="${h-6}" rx="7"/></g>`}
+ return `<rect width="1200" height="560" fill="#F6C98A"/><rect y="0" width="1200" height="120" fill="#F3B27A"/>
+<circle cx="980" cy="150" r="54" fill="#FBE3A8"/>
+<path d="M0 210 H1200 V270 H0Z" fill="#3D7F99"/><path d="M0 222 Q60 214 120 222 T240 222 T360 222 T480 222 T600 222 T720 222 T840 222 T960 222 T1080 222 T1200 222" stroke="#6FA9BE" stroke-width="5" fill="none"/>
+<path d="M0 150 Q60 140 120 150 Q200 160 250 196 L270 214 H0Z" fill="#9A8B6E"/><path d="M0 196 Q120 180 270 214 H0Z" fill="#7E705A"/>
+<g fill="#D6C29A"><path d="M20 118 H230 V170 H20Z"/>${[0,1,2,3,4,5,6,7,8,9].map(i=>`<rect x="${20+i*22}" y="108" width="12" height="12"/>`).join('')}</g><path d="M20 150 H230" stroke="#BFA97E" stroke-width="5"/>
+<path d="M130 118 H230 V170 H130Z" fill="#C4AF85"/>
+<g transform="translate(176 40) scale(.8)"><path d="M-14 118 L-10 34 H10 L14 118Z" fill="#EFE6D2"/><path d="M0 118 L10 34 L14 118Z" fill="#D9CCB0"/><rect x="-16" y="22" width="32" height="14" rx="3" fill="#7E705A"/><rect x="-10" y="4" width="20" height="18" fill="#FFF1B0"/><path d="M-12 4 L0 -12 L12 4Z" fill="#7E705A"/><path d="M-10 52 h20 M-10 76 h20" stroke="#C8553D" stroke-width="5"/></g>
+${crowd}
+<rect y="250" width="1200" height="36" fill="#D9CDB4"/><rect y="250" width="1200" height="8" fill="#EDE4D0"/>
+<rect y="286" width="1200" height="274" fill="#5A5E63"/><path d="M0 420 H1200" stroke="#E9E1D2" stroke-width="6" stroke-dasharray="60 40"/>
+<g transform="translate(330 300)">
+ <ellipse cx="290" cy="214" rx="320" ry="16" fill="#2A1E14" opacity=".25"/>
+ <path d="M70 150 Q70 96 150 92 L300 92 L330 70 H350 L360 92 H500 Q560 96 570 140 L570 170 H70Z" fill="#F1E3C2"/>
+ <path d="M300 92 Q300 66 240 64 H150 Q110 66 106 96" fill="#E4D3AC"/>
+ <path d="M140 92 Q140 74 170 72 H232 Q262 74 262 92Z" fill="#8B4A2E"/><path d="M180 92 V76 M222 92 V76" stroke="#6E3A24" stroke-width="5"/>
+ <path d="M330 70 L340 22 H354 L350 70Z" fill="#9FC2CC" opacity=".85"/><path d="M330 70 L340 22 M354 22 L350 70" stroke="#5E656D" stroke-width="5" stroke-linecap="round"/>
+ <path d="M10 186 Q20 120 110 120 Q190 120 200 186Z" fill="#6E3A24"/><path d="M430 186 Q440 116 520 116 Q600 118 612 186Z" fill="#6E3A24"/>
+ <path d="M190 178 H440 V192 H190Z" fill="#5A3020"/>
+ <path d="M500 104 H570" stroke="#D9C59A" stroke-width="5"/>${[0,1,2,3].map(i=>`<path d="M${514+i*12} 110 V150" stroke="#C9B48E" stroke-width="4"/>`).join('')}
+ <rect x="590" y="120" width="20" height="40" rx="6" fill="#C9CFD6"/><circle cx="612" cy="116" r="15" fill="#FFF3C4" stroke="#C9CFD6" stroke-width="4"/>
+ <circle cx="30" cy="150" r="34" fill="#2A2D31"/><circle cx="30" cy="150" r="18" fill="#F1E3C2"/>
+ ${[110,520].map(x=>`<circle cx="${x}" cy="190" r="50" fill="#2A2D31"/><circle cx="${x}" cy="190" r="30" fill="#F1E3C2"/><circle cx="${x}" cy="190" r="10" fill="#8B4A2E"/>${[0,30,60,90,120,150].map(a=>`<path d="M${x-28*Math.cos(a*Math.PI/180)} ${190-28*Math.sin(a*Math.PI/180)} L${x+28*Math.cos(a*Math.PI/180)} ${190+28*Math.sin(a*Math.PI/180)}" stroke="#8B4A2E" stroke-width="3"/>`).join('')}`).join('')}
+</g>
+${hotspot('almendron',700,340,700,296)}${hotspot('malecon',820,236,820,192)}${hotspot('morro',250,180,250,136)}`};
+
+/* the beach (fork B) */
+ART.playa=()=>{
+ let waves='';for(let i=0;i<6;i++)waves+=`<path d="M0 ${250+i*22} Q100 ${244+i*22} 200 ${250+i*22} T400 ${250+i*22} T600 ${250+i*22} T800 ${250+i*22} T1000 ${250+i*22} T1200 ${250+i*22}" stroke="#E8FBFA" stroke-width="3" fill="none" opacity="${.5-i*.06}"/>`;
+ return `<rect width="1200" height="560" fill="#BFE6F2"/><rect y="0" width="1200" height="90" fill="#A9DCEE"/>
+<path d="M0 200 H1200 V230 H0Z" fill="#1F7FA6"/><path d="M0 230 H1200 V380 Q900 360 600 384 Q300 404 0 380Z" fill="#4FC1C4"/>${waves}
+<path d="M0 380 Q300 404 600 384 Q900 360 1200 380 V560 H0Z" fill="#F4E4C1"/><path d="M0 380 Q300 404 600 384 Q900 360 1200 380" stroke="#FFFFFF" stroke-width="8" fill="none" opacity=".8"/>
+<g transform="translate(1040 360)"><path d="M0 0 C-6 -120 10 -200 30 -260" stroke="#8B5E34" stroke-width="16" fill="none" stroke-linecap="round"/>
+<path d="M30 -260 C-30 -280 -80 -250 -110 -220 M30 -260 C80 -290 130 -270 160 -240 M30 -260 C10 -320 40 -350 70 -360 M30 -260 C70 -230 90 -190 96 -160 M30 -260 C-10 -230 -30 -190 -34 -160" stroke="#3D7A4E" stroke-width="16" fill="none" stroke-linecap="round"/></g>
+<g transform="translate(400 300)"><ellipse rx="34" ry="10" fill="#1F7FA6" opacity=".5"/><circle cx="0" cy="-8" r="14" fill="#F2C9A6"/><rect x="-14" y="-14" width="28" height="10" rx="4" fill="#2F7F86"/><path d="M14 -10 v-22" stroke="#E0A23B" stroke-width="5" stroke-linecap="round"/></g>
+<g transform="translate(220 470)"><rect x="-60" y="-10" width="120" height="16" rx="6" fill="#C8553D"/><path d="M0 -10 V-150" stroke="#8B5E34" stroke-width="6"/><path d="M-110 -120 Q0 -200 110 -120Z" fill="#E0A23B"/><path d="M-110 -120 Q-55 -150 0 -150 Q-30 -130 -40 -120Z" fill="#C8553D"/><path d="M110 -120 Q55 -150 0 -150 Q30 -130 40 -120Z" fill="#C8553D"/></g>
+<g transform="translate(720 470)"><path d="M-22 -60 L22 -60 L14 0 H-14Z" fill="#FFF8E7" opacity=".9"/><path d="M-20 -46 L20 -46 L14 0 H-14Z" fill="#F7E7B0"/><path d="M14 -60 L26 -96" stroke="#C8553D" stroke-width="5" stroke-linecap="round"/><circle cx="-14" cy="-62" r="10" fill="#E0A23B"/><path d="M-22 -62 h-8" stroke="#3D7A4E" stroke-width="6"/></g>
+<g transform="translate(860 480)"><path d="M-22 -60 L22 -60 L14 0 H-14Z" fill="#FFF8E7" opacity=".9"/><path d="M-20 -46 L20 -46 L14 0 H-14Z" fill="#F7E7B0"/><path d="M14 -60 L26 -96" stroke="#2F7F86" stroke-width="5" stroke-linecap="round"/><circle cx="-14" cy="-62" r="10" fill="#E0A23B"/></g>
+${hotspot('agua',640,300,640,256)}${hotspot('pinacolada',790,400,790,356)}${hotspot('snorkel',400,250,400,206)}`};
+
+/* wifi park (Puerta 3) */
+ART.wifi=()=>{
+ let people='';[[180,'#5C3B4A'],[300,'#3B5A55'],[760,'#2E3A52'],[880,'#8C5A86']].forEach(([x,c],i)=>{people+=`<g transform="translate(${x} 250)"><rect x="-40" y="140" width="80" height="16" rx="6" fill="#8B5E34"/><path d="M-26 60 Q0 40 26 60 L30 140 H-30Z" fill="${c}"/><circle cx="0" cy="30" r="22" fill="${['#7A4E30','#C98F62','#8A5A3C','#5B3A26'][i]}"/><path d="M-22 26 C-22 4 22 4 22 26 C14 14 -14 14 -22 26Z" fill="#1E1510"/><rect x="-14" y="66" width="26" height="40" rx="5" fill="#2A2D31"/><rect x="-11" y="70" width="20" height="30" rx="3" fill="#BFEAFF"/></g>`});
+ return `<rect width="1200" height="560" fill="#BFE0E8"/>
+<rect y="0" width="1200" height="260" fill="#CDE7EE"/>
+<g fill="#F3D27C"><rect x="0" y="90" width="260" height="200"/><rect x="940" y="70" width="260" height="220"/></g><g fill="#E2B65C"><rect x="180" y="90" width="80" height="200"/><rect x="940" y="70" width="70" height="220"/></g>
+${[0,1,2].map(i=>`<rect x="${30+i*70}" y="130" width="34" height="56" rx="16" fill="#3E7FA6"/>`).join('')}${[0,1,2].map(i=>`<rect x="${1030+i*56}" y="110" width="30" height="56" rx="14" fill="#3E7FA6"/>`).join('')}
+<g transform="translate(600 170)"><circle r="120" fill="#3D7A4E"/><circle cx="-90" cy="40" r="80" fill="#4F9461"/><circle cx="90" cy="40" r="80" fill="#3D7A4E"/><rect x="-14" y="80" width="28" height="140" fill="#8B5E34"/></g>
+<rect y="380" width="1200" height="180" fill="#D9CDB4"/><path d="M0 380 H1200" stroke="#C4B594" stroke-width="6"/>
+<g transform="translate(470 160)"><rect x="0" y="0" width="120" height="66" rx="10" fill="#1E4D6B"/><text x="60" y="30" text-anchor="middle" style="font:700 22px 'Atkinson Hyperlegible Next',Verdana,sans-serif" fill="#fff">WIFI</text><path d="M44 48 q16 -14 32 0 M50 54 q10 -8 20 0" stroke="#7FD3F0" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M60 66 V230" stroke="#5E656D" stroke-width="8"/></g>
+${people}
+${yoel(560,270,.82,true)}${kate(400,286,.78)}
+<g transform="translate(634 260) rotate(-12)"><rect x="-28" y="-18" width="56" height="36" rx="4" fill="#F4EBD9"/><rect x="-28" y="-18" width="56" height="10" fill="#2F7F86"/><rect x="-18" y="2" width="36" height="8" rx="2" fill="#B9C2C9"/></g>
+${hotspot('tarjeta',650,300,650,346)}${hotspot('parquewifi',690,120,690,78)}`};
+
+/* the Malecón at night (Puerta 4) */
+ART.noche=()=>{
+ let stars='';for(let i=0;i<40;i++)stars+=`<circle cx="${(i*131)%1200}" cy="${(i*53)%150}" r="${i%5?1.4:2.2}" fill="#FDF6D8" opacity=".8"/>`;
+ let crowd='';for(let i=0;i<30;i++){const x=10+i*41,h=44+((i*23)%22),c=['#26324A','#3A2C40','#24403F','#3B2E22'][i%4];
+  crowd+=`<g><circle cx="${x}" cy="${282-h}" r="9" fill="${c}"/><rect x="${x-9}" y="${288-h}" width="18" height="${h-4}" rx="7" fill="${c}"/>${i%3===0?`<rect x="${x-4}" y="${292-h}" width="8" height="12" rx="2" fill="#BFEAFF"/><circle cx="${x}" cy="${298-h}" r="14" fill="#BFEAFF" opacity=".18"/>`:''}</g>`}
+ return `<rect width="1200" height="560" fill="#16243F"/><rect y="0" width="1200" height="120" fill="#121D35"/>${stars}
+<circle cx="180" cy="80" r="34" fill="#FDF2C4"/><circle cx="194" cy="72" r="30" fill="#121D35" opacity=".0"/>
+<path d="M0 180 H1200 V250 H0Z" fill="#1D3657"/><g fill="#FDF2C4" opacity=".4"><rect x="160" y="192" width="40" height="4" rx="2"/><rect x="168" y="204" width="28" height="4" rx="2"/><rect x="172" y="216" width="20" height="3" rx="1.5"/><rect x="176" y="228" width="12" height="3" rx="1.5"/></g>
+<g transform="translate(1030 110)"><rect x="0" y="40" width="80" height="40" fill="#2B3C55"/><rect x="28" y="0" width="22" height="44" fill="#3A4E6B"/><circle cx="39" cy="4" r="8" fill="#FFF1B0"/><path d="M39 4 L-260 40 L-260 70Z" fill="#FFF1B0" opacity=".14"/></g>
+${crowd}
+<rect y="282" width="1200" height="40" fill="#8E8572"/><rect y="282" width="1200" height="8" fill="#A99F88"/>
+<rect y="322" width="1200" height="238" fill="#2B2A30"/>
+
+${person({x:170,y:250,s:.7,wave:true,skin:'#6B4428',skin2:'#573620',hair:'#1E1510',top:'#C8553D',top2:'#A9432F',pants:'#2F3540',shoe:'#3A2A22'})}
+<g transform="translate(176 368) rotate(-58)"><ellipse cx="0" cy="0" rx="24" ry="30" fill="#B0773A"/><ellipse cx="0" cy="12" rx="28" ry="22" fill="#B0773A"/><circle cx="0" cy="2" r="8" fill="#3A2A22"/><rect x="-4" y="-82" width="8" height="62" fill="#5B3A26"/><rect x="-7" y="-94" width="14" height="16" rx="3" fill="#3A2A22"/></g>
+${person({x:310,y:250,s:.7,wave:true,skin:'#C98F62',skin2:'#B07A50',hair:'#2B1D14',top:'#3E7FA6',top2:'#2C5F80',skirt:'#E0A23B',shoe:'#3A2A22',pony:true})}
+${kate(560,250,.74,false)}${yoel(760,262,.74,false)}
+<g transform="translate(796 392)"><rect x="-12" y="-20" width="24" height="38" rx="4" fill="#2A2D31"/><rect x="-9" y="-16" width="18" height="28" rx="2" fill="#BFEAFF"/><circle cx="0" cy="-2" r="6" fill="none" stroke="#3E7FA6" stroke-width="2.4" stroke-dasharray="20 8"/><circle cx="0" cy="0" r="30" fill="#BFEAFF" opacity=".16"/></g>
+<g transform="translate(980 470)"><ellipse cx="20" cy="40" rx="180" ry="10" fill="#000" opacity=".25"/><path d="M-120 30 Q-120 -10 -60 -14 L40 -16 Q120 -12 150 20 V36 H-120Z" fill="#B0303A"/><circle cx="-60" cy="36" r="24" fill="#1D1F22"/><circle cx="90" cy="36" r="24" fill="#1D1F22"/><path d="M150 6 L420 -40 L420 60Z" fill="#FFF1B0" opacity=".12"/><circle cx="148" cy="10" r="9" fill="#FFF7D6"/></g>
+${hotspot('malecon2',660,300,660,256)}${hotspot('guitarra',100,300,110,256)}`};
+
+/* picture cards for Embarque / Aduana: each pair shows the two meanings of the same adjective */
+const face=(x,y,skin,hair)=>`<circle cx="${x}" cy="${y}" r="30" fill="${skin}"/><path d="M${x-30} ${y-4} C${x-30} ${y-40} ${x+30} ${y-40} ${x+30} ${y-4} C${x+20} ${y-20} ${x-20} ${y-20} ${x-30} ${y-4}Z" fill="${hair}"/>`;
+Object.assign(P,{
+ lista:`<svg viewBox="0 0 300 200"><rect x="200" y="30" width="70" height="150" rx="4" fill="#8B5E34"/><circle cx="214" cy="110" r="5" fill="#E0A23B"/>${face(120,70,'#F2C9A6','#C99A55')}<ellipse cx="114" cy="66" rx="3" ry="4" fill="#23303A"/><ellipse cx="128" cy="66" rx="3" ry="4" fill="#23303A"/><path d="M112 82 q8 8 16 0" stroke="#7A3B2E" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M84 104 Q120 92 156 104 L162 180 H78Z" fill="#2F7F86"/><rect x="76" y="104" width="30" height="50" rx="10" fill="#B0773A"/><rect x="160" y="130" width="44" height="50" rx="8" fill="#C8553D"/><path d="M172 130 v-12 h20 v12" stroke="#3A2A22" stroke-width="5" fill="none"/><circle cx="60" cy="50" r="22" fill="#2E7D4F"/><path d="M50 50 l7 8 l14 -16" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+ lista2:`<svg viewBox="0 0 300 200">${face(110,80,'#F2C9A6','#C99A55')}<ellipse cx="104" cy="76" rx="3" ry="4" fill="#23303A"/><ellipse cx="118" cy="76" rx="3" ry="4" fill="#23303A"/><path d="M102 92 q8 8 16 0" stroke="#7A3B2E" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M74 114 Q110 102 146 114 L152 190 H68Z" fill="#2F7F86"/><g transform="translate(176 70) rotate(8)"><rect width="90" height="110" rx="6" fill="#fff" stroke="#D9CFBC" stroke-width="3"/><text x="45" y="62" text-anchor="middle" style="font:700 40px Georgia,serif" fill="#C8323D">A+</text>${[0,1].map(i=>`<path d="M14 ${80+i*12} h62" stroke="#D9CFBC" stroke-width="4"/>`).join('')}</g><g transform="translate(110 18)"><circle r="16" fill="#F5D66B"/><rect x="-7" y="14" width="14" height="10" rx="2" fill="#B9C2C9"/>${[0,1,2,3,4].map(i=>{const a=(-160+i*35)*Math.PI/180;return `<path d="M${Math.cos(a)*22} ${Math.sin(a)*22} L${Math.cos(a)*32} ${Math.sin(a)*32}" stroke="#E0A23B" stroke-width="4" stroke-linecap="round"/>`}).join('')}</g></svg>`,
+ perroEnfermo:`<svg viewBox="0 0 300 200"><rect x="30" y="120" width="240" height="60" rx="14" fill="#7FB0C8"/><rect x="30" y="110" width="80" height="34" rx="14" fill="#F4EBD9"/><ellipse cx="160" cy="124" rx="70" ry="32" fill="#C98F62"/><circle cx="96" cy="112" r="30" fill="#C98F62"/><path d="M72 100 q-14 20 -2 36" stroke="#8B5E34" stroke-width="14" fill="none" stroke-linecap="round"/><path d="M86 108 h10 M102 108 h10" stroke="#23303A" stroke-width="4" stroke-linecap="round"/><ellipse cx="80" cy="122" rx="7" ry="5" fill="#2A1E14"/><path d="M118 92 l30 -24" stroke="#fff" stroke-width="8" stroke-linecap="round"/><path d="M118 92 l30 -24" stroke="#C8323D" stroke-width="3" stroke-linecap="round"/><rect x="70" y="72" width="40" height="16" rx="8" fill="#7FD3F0"/><path d="M130 150 h120" stroke="#5E9FBA" stroke-width="6"/></svg>`,
+ perroMalo:`<svg viewBox="0 0 300 200"><ellipse cx="170" cy="130" rx="74" ry="36" fill="#6B4A2E"/><path d="M110 160 v24 M140 162 v24 M200 162 v24 M230 160 v24" stroke="#6B4A2E" stroke-width="14" stroke-linecap="round"/><circle cx="96" cy="104" r="34" fill="#6B4A2E"/><path d="M76 74 l-8 -24 l20 14 M112 72 l10 -22 l4 26" fill="#4A3220"/><path d="M80 94 l14 6 M114 94 l-14 6" stroke="#23303A" stroke-width="5" stroke-linecap="round"/><path d="M72 118 h44 v14 h-44Z" fill="#7A2A22"/><path d="M76 118 l6 8 l6 -8 l6 8 l6 -8 l6 8 l6 -8" stroke="#fff" stroke-width="3" fill="none"/><path d="M244 120 q30 -30 20 -60" stroke="#6B4A2E" stroke-width="12" fill="none" stroke-linecap="round"/><text x="20" y="60" style="font:700 30px Georgia,serif" fill="#C8553D">¡GRR!</text></svg>`,
+ chicoAburrido:P.aburrido,
+ chicoEsAburrido:`<svg viewBox="0 0 300 200">${face(150,80,'#C98F62','#2B1D14')}<ellipse cx="141" cy="76" rx="3" ry="4" fill="#23303A"/><ellipse cx="159" cy="76" rx="3" ry="4" fill="#23303A"/><ellipse cx="150" cy="96" rx="9" ry="7" fill="#7A3B2E"/><path d="M114 118 Q150 106 186 118 L192 194 H108Z" fill="#E0A23B"/><g transform="translate(176 6)"><rect width="110" height="40" rx="16" fill="#fff" stroke="#D9CFBC" stroke-width="3"/><text x="55" y="27" text-anchor="middle" style="font:700 17px Georgia,serif" fill="#7A8A90">bla bla bla…</text></g>${[[50,'#F2C9A6','#C99A55'],[250,'#8A5A3C','#1E1510']].map(([x,s,h])=>`${face(x,120,s,h)}<path d="M${x-12} 118 h8 M${x+4} 118 h8" stroke="#23303A" stroke-width="4" stroke-linecap="round"/><ellipse cx="${x}" cy="136" rx="7" ry="9" fill="#7A3B2E"/><text x="${x+18}" y="92" style="font:700 16px Georgia,serif" fill="#7A8A90">z z</text>`).join('')}</svg>`
+});
+
+</script>
+<script>
+{
+const $=s=>document.querySelector(s);
+/* telemetry: the shared Telemetry API through /js/story-tracking.js, stream 'espanol', as on La
+   selva. Only fixed keys, item ids (p1:ser) and 0/1 scores are sent: this page has no name entry
+   and no text input. #debug logs every call to the console. */
+const DBG=location.hash==='#debug';
+function dlog(k,o){if(!DBG)return;try{console.log('[la-habana]',k,o)}catch(e){}}
+const ST=window.StoryTrack||null;
+if(ST&&DBG)ST.setDebug(dlog);
+const TM=ST?ST.TM:{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{})};
+TM.init({module:'la-habana',gameName:'La Habana',stream:'espanol',stepsTotal:14});
+const T=(e,d)=>TM.track(e,Object.assign({v:'1.0'},d||{}));
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait=ms=>new Promise(r=>setTimeout(r,reduce?Math.min(ms,60):ms));
+/* ---------- audio: recorded voices, as in La selva (docs/espanol-audio.md) ----------
+   Every spoken line is an ElevenLabs clip pre-rendered to /assets/audio/espanol/la-habana/ and
+   looked up in its manifest by its text (curly quotes stripped, spaces collapsed). One shared
+   Audio element: each say() stops whatever was playing. The manifest is fetched as the page
+   loads, so the first ▶ plays at once. A line missing from the manifest, or a clip that fails,
+   falls back to the browser's speech voice. */
+let voices=[];const hasTTS='speechSynthesis' in window;const loadV=()=>{try{voices=speechSynthesis.getVoices()}catch(e){}};loadV();try{speechSynthesis.onvoiceschanged=loadV}catch(e){}
+function utter(t,lang){const u=new SpeechSynthesisUtterance(t);const pref=lang==='en'?['en-GB','en-US','en']:['es-US','es-MX','es-419','es'];
+  let v=null;for(const p of pref){v=voices.find(x=>x.lang&&x.lang.replace('_','-').startsWith(p));if(v)break}
+  u.lang=lang==='en'?'en-US':'es-MX';if(v)u.voice=v;u.rate=lang==='en'?1:.85;return u}
+function sayTTS(t,lang){if(!hasTTS)return;try{speechSynthesis.cancel();speechSynthesis.speak(utter(t,lang))}catch(e){}}
+const AUD={m:null,p:null,el:null,n:0,end:null};
+function audManifest(){return AUD.p||(AUD.p=fetch('/assets/audio/espanol/la-habana/manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(m=>AUD.m=m||{}))}
+audManifest();
+/* say() resolves when the line is over: the clip ended, a newer line replaced it, or a time cap. */
+function say(t,lang){const k=String(t).replace(/[“”]/g,'').replace(/\s+/g,' ').trim(),n=++AUD.n,est=900+k.length*75;
+  let done;const p=new Promise(r=>{done=r});
+  const tts=()=>{sayTTS(t,lang);setTimeout(done,est)};
+  if(hasTTS)try{speechSynthesis.cancel()}catch(e){}
+  if(AUD.end)AUD.end();AUD.end=done;
+  if(typeof Audio!=='function'){tts();return p}
+  let a=AUD.el;if(!a){a=AUD.el=new Audio();a.preload='none'}
+  try{a.pause()}catch(e){}
+  const go=m=>{if(n!==AUD.n){done();return}const u=m[k];if(!u){tts();return}
+    const fail=()=>{if(n===AUD.n){AUD.n++;tts()}};
+    a.onerror=fail;a.onended=()=>{if(n===AUD.n)done()};a.src=u;setTimeout(done,est+4000);
+    try{const q=a.play();if(q&&q.catch)q.catch(e=>{if(!e||e.name!=='AbortError')fail()})}catch(e){fail()}};
+  if(AUD.m)go(AUD.m);else audManifest().then(go);
+  return p}
+const spk='<svg aria-hidden="true"><use href="#speaker"/></svg>';
+const PH='/assets/espanol/la-habana/';
+const S={emb:[],adu:[],tr:[],gates:[],photos:[],fork:null,mode:'solo'};
+
+/* ---------- progress, summary, Presentar ---------- */
+/* Steps: a section counts once it crosses the middle of the screen (as on La selva). */
+const seen=new Set();
+const io=('IntersectionObserver' in window)?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){const n=+e.target.dataset.step;if(n&&!seen.has(n)){seen.add(n);TM.step(n)}}}),{rootMargin:'-45% 0px -45% 0px',threshold:0}):null;
+function watch(el){if(io&&el&&el.dataset.step)io.observe(el)}
+document.querySelectorAll('[data-step]').forEach(el=>{if(!el.classList.contains('locked'))watch(el)});
+/* first try 0|1 per Puerta, the fork, solo|class, and Embarque → Aduana (+ the transfer) */
+function gatesNow(){const g={};S.gates.forEach(x=>{g[x.n]=x.ok?1:0});return g}
+const checksNow=()=>({form:'A',emb:S.emb.slice(),adu:S.adu.slice(),tr:S.tr.slice()});
+function pushSummary(){TM.summary({gates:gatesNow(),path:{f1:S.fork||null},mode:S.mode,checks:checksNow()})}
+/* module_progress/la-habana: the dashboard's In progress pill and Mission Control's fallback.
+   `checks` is the shape Mission Control's growth view reads (public/espanol/la-habana/checks.json):
+   four Embarque items, four Aduana items, and the two transfer sentences (`tr`). Never written in
+   Presentar. */
+function saveProgress(fin){const st={done:{},choice:{},conf:{},path:{f1:S.fork||null}};S.gates.forEach(x=>{st.done[x.n]=1;st.choice[x.n]=x.k;st.conf[x.n]=x.ok?1:0});
+  const d={v:'1.0',finished:!!fin,state:JSON.stringify(st),checks:{v:1,form:'A',emb:S.emb.slice(),adu:S.adu.slice(),tr:S.tr.slice(),embDone:S.emb.length>=4,aduDone:S.adu.length>=4,trDone:S.tr.length>=2}};
+  if(ST)ST.saveProgress('la-habana',d);else dlog('saveModuleProgress',d)}
+/* Presentar en clase: the teacher taps the picture (and the verb) the class chose at Embarque,
+   Aduana and the transfer; those picks (never a count) go into the presented session through
+   window.StoryChecks. */
+const PRES={on:false,emb:[],adu:[],tr:[]};
+if(ST&&ST.presentar)ST.presentar.then(v=>{if(v){PRES.on=true;S.mode='class'}}).catch(()=>{});
+window.StoryChecks={presentedResults:()=>PRES.on&&PRES.emb.length?{v:1,form:'A',emb:PRES.emb.slice(),adu:PRES.adu.slice(),tr:PRES.tr.slice()}:null};
+const pmRefresh=()=>{if(window.StoryPresentar)window.StoryPresentar.refresh()};
+/* Embarque, Aduana and the transfer: Presentar's Siguiente waits (pmWait) until the class has answered. */
+const pmWait=(el,msg)=>{if(msg){el.dataset.pmWait='1';el.dataset.pmMsg=msg}else{delete el.dataset.pmWait;delete el.dataset.pmMsg}pmRefresh()};
+const PM_PICS='Primero las cuatro preguntas: toquen la imagen que eligió la clase.',PM_TR='Primero las dos frases: toquen el verbo que eligió la clase.';
+
+/* ---------- small builders ---------- */
+const L=(who,es,en,blur=true)=>`<div class="line"><button class="play say" aria-label="Escuchar" data-es="${es}">${spk}</button><span class="who">${who}</span><p class="es${blur?' blur':''}" tabindex="0" data-es="${es}">${es}</p>${en?`<span class="en-row"><button class="en-btn" aria-expanded="false">EN</button><p class="en" hidden>${en}</p></span>`:''}</div>`;
+const N=t=>`<div class="narr"><button class="play say" data-say="${t.replace(/<[^>]+>/g,'')}" aria-label="Listen">${spk}</button><p>${t}</p></div>`;
+/* Kate speaks English: her line gets a ▶ like every other line. A stage direction in brackets,
+   "(crying laughing)", is shown but not spoken. */
+const K=t=>`<div class="kate kline"><button class="play say" data-say="${t.replace(/^\([^)]*\)\s*/,'').replace(/"/g,'&quot;')}" aria-label="Listen">${spk}</button><p><b>Kate:</b> ${t}</p></div>`;
+const frame=(id,label)=>`<div class="frame"><svg viewBox="0 0 1200 560" id="${id}" role="img" aria-label="${label}"></svg></div>`;
+const sign=(n,t,b,id)=>`<div class="sign"><span class="n">${n}</span><span class="t">${t}<b>${b}</b></span><span class="status" id="${id}-st">EN CAMINO</span></div>`;
+const jodi=(t,ok)=>`<div class="jodi"><img src="/assets/jodi/jodi-${ok?'happy':'thinking'}.svg" alt="Jodi" width="64" height="64"><div><b>Jodi's take</b><p>${t}</p></div></div>`;
+const go=(id,txt)=>`<div class="row next"><button class="go" id="${id}" data-unlock>${txt}</button></div>`;
+document.addEventListener('click',e=>{
+  const p=e.target.closest('.line .play,.line .es');if(p){const es=p.closest('.line').querySelector('.es');es.classList.remove('blur');say(es.dataset.es,'es');T('ev_audio_play');return}
+  const b=e.target.closest('.en-btn');if(b){const en=b.nextElementSibling;en.hidden=!en.hidden;b.setAttribute('aria-expanded',String(!en.hidden));return}
+  const n=e.target.closest('.narr .play,.kline .play');if(n){say(n.dataset.say,'en');T('ev_audio_play');return}
+  const f=e.target.closest('.ficha .play');if(f){say(f.dataset.es,'es');T('ev_audio_play')}});
+document.addEventListener('keydown',e=>{const es=e.target.closest&&e.target.closest('.line .es');if(es&&(e.key==='Enter'||e.key===' ')){e.preventDefault();es.click()}});
+function unlock(...ids){ids.forEach(id=>{const el=$('#'+id);el.classList.remove('locked');watch(el)});setTimeout(()=>{sizePins();$('#'+ids[0]).scrollIntoView({block:'start'})},60);pmRefresh()}
+/* Pins are at least 44 px to tap at any width: the invisible hit circle grows as the picture shrinks. */
+function sizePins(){document.querySelectorAll('.frame>svg').forEach(svg=>{const w=svg.getBoundingClientRect().width;if(!w)return;
+  const vb=svg.viewBox&&svg.viewBox.baseVal,sc=w/((vb&&vb.width)||1200),r=Math.max(40,Math.ceil(23/sc));svg.querySelectorAll('.hot>.hit').forEach(c=>c.setAttribute('r',r))})}
+addEventListener('resize',sizePins);
+function stamp(n){const s=$('#s'+n);s.classList.add('on');s.setAttribute('aria-label','Puerta '+n+' stamped')}
+function photo(box,src,alt,cap){S.photos.push(src);$('#roll').textContent='Tus fotos: '+S.photos.length;
+  box.insertAdjacentHTML('beforeend',`<div class="real"><img src="${PH}${src}" alt="${alt}"><div><b>${cap}</b><small>William's photo · Havana, 2016 · saved to Tus fotos</small></div></div>`)}
+
+/* ---------- field cards ---------- */
+window.F={
+ maleta:{es:'la maleta',en:'the suitcase',fact:'Lots of Cuban travelers wrap their suitcases in plastic at the airport so nothing falls out (or gets taken).'},
+ tele:{es:'el televisor',en:'the TV',fact:'New TVs, phones and car parts were hard to buy in Cuba, so families flying home carried them back as luggage.'},
+ llanta:{es:'la llanta',en:'the tire',fact:'Cubans keep 1950s cars running for 60+ years. Parts like tires travel home in suitcases… or just like this.'},
+ parachoques:{es:'el parachoques',en:'the car bumper',fact:'"Parachoques" is para (stops) + choques (crashes). A whole bumper on the luggage belt is a very Havana sight.'},
+ patio:{es:'el patio',en:'the courtyard',fact:'Old Havana houses are built around an open patio. The rooms stay cool and the rain falls in the middle.',both:['El patio <span class="vb">es</span> bonito. <i>(what it is like)</i>','El patio <span class="vb2">está</span> mojado. <i>(how it is right now)</i>']},
+ lluvia:{es:'la lluvia',en:'the rain',fact:'Summer in Havana means short, heavy afternoon rain. Ten minutes later the sun is back.'},
+ mecedora:{es:'la mecedora',en:'the rocking chair',fact:'Almost every Cuban home has rocking chairs. Evenings are for rocking, talking and catching a breeze.'},
+ tinajon:{es:'el tinajón',en:'the big clay pot',fact:'Giant clay pots like this one catch rainwater. The city of Camagüey is famous for them.'},
+ arroz:{es:'el arroz blanco',en:'white rice',fact:'Rice is on the table at almost every Cuban meal.'},
+ frijoles:{es:'los frijoles negros',en:'black beans',fact:'Black beans and rice cooked together are called "moros y cristianos."'},
+ ropavieja:{es:'la ropa vieja',en:'shredded beef',fact:'The name means "old clothes," because the shredded beef looks like torn-up rags. It is one of Cuba\'s national dishes.'},
+ almendron:{es:'el almendrón',en:'the old American car',fact:'Cubans call their old American cars almendrones (big almonds) because of their round shape. Most are from the 1950s, but a few, like this one, are from around 1930. Many still work as taxis.',both:['El carro <span class="vb">es</span> viejo. <i>(what it is like: it\'s an old car)</i>','El carro <span class="vb2">está</span> limpio. <i>(how it is right now: freshly washed)</i>']},
+ malecon:{es:'el Malecón',en:'the seawall',fact:'An 8-kilometer seawall along Havana\'s coast. At night it becomes the city\'s living room.'},
+ morro:{es:'el Morro',en:'the fortress',fact:'A Spanish fortress from the 1500s guards the entrance to Havana Bay. Its lighthouse still shines every night.'},
+ agua:{es:'el agua',en:'the water',fact:'The water on Cuba\'s north coast is clear enough to see fish from the surface.',both:['El agua <span class="vb">es</span> azul. <i>(what it is like)</i>','El agua <span class="vb2">está</span> tibia. <i>(how it feels today: warm)</i>']},
+ pinacolada:{es:'la piña colada',en:'piña colada (no alcohol)',fact:'Pineapple, coconut and ice. William\'s cost 50 cents: cincuenta centavos.'},
+ snorkel:{es:'el esnórquel',en:'the snorkel',fact:'Cuba has one of the largest coral reef systems in the Caribbean.'},
+ tarjeta:{es:'la tarjeta de wifi',en:'the wifi card',fact:'In 2016 you bought a scratch card (about $2 for 2 hours) and could only use it in a few wifi parks and hotels.'},
+ parquewifi:{es:'el parque wifi',en:'the wifi park',fact:'When wifi parks opened, they filled up with people video-calling family abroad, day and night.'},
+ malecon2:{es:'el Malecón de noche',en:'the Malecón at night',fact:'Thousands of people sit on the wall at night: talking, fishing, playing music, dancing… and chasing a wifi signal.'},
+ guitarra:{es:'la guitarra',en:'the guitar',fact:'Cuban son music grew from the guitar, the bongos and the maracas. You\'ll hear it all along the Malecón.'},
+ tostones:{es:'los tostones',en:'fried plantains',fact:'Green plantains, fried, smashed flat, then fried again. Crunchy and salty.'}};
+function ficha(k){const f=F[k];return `<div class="ficha"><button class="play" aria-label="Escuchar: ${f.es}" data-es="${f.es}">${spk}</button><b>${f.es}</b><span class="sci">${f.en}</span><p>${f.fact}</p>${f.both?`<div class="real-row"><div class="kate">${f.both.join('<br>')}</div></div>`:''}</div>`}
+function wireHot(svg,box){svg.querySelectorAll('.hot').forEach(g=>{const act=()=>{const k=g.dataset.f;say(F[k].es,'es');box.innerHTML=ficha(k);g.querySelector('.ring').setAttribute('stroke','#2E7D4F');g.querySelector('.ring').setAttribute('stroke-width','6');T('explore',{k})};
+  g.onclick=act;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act()}}});sizePins()}
+
+/* ---------- Puerta engine: pick a sentence, say it, then hear how it lands ---------- */
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+/* Presentar's class-vote box for a Puerta (hidden unless presenting): one row, the sentences in
+   the order the page shows them. */
+const cvBox=(n,opts)=>`<div class="cv" data-g="${n}"><button class="cv-link" type="button" aria-expanded="false">¿Juegan en clase?</button><div class="cv-panel" hidden><div class="cv-row" data-r="0">${opts.map((x,i)=>`<span class="cv-o" data-o="${x.v}"><span class="cv-w">${'AB'[i]} · ${x.es}</span></span>`).join('')}</div></div></div>`;
+document.addEventListener('click',e=>{const l=e.target.closest('.cv-link');if(!l||l.getAttribute('aria-expanded')==='true')return;l.setAttribute('aria-expanded','true');if(S.mode!=='class'){S.mode='class';T('class_mode',{gate:+l.parentNode.dataset.g})}});
+function puerta(o){let pick=null,done=false;const box=$('#'+o.id+'-opts'),btn=$('#'+o.id+'go'),out=$('#'+o.id+'-out');
+  const opts=shuffle(o.opts);
+  opts.forEach((op,i)=>{const b=document.createElement('button');b.className='say-opt opt';b.dataset.k=op.v;b.setAttribute('aria-pressed','false');
+    b.innerHTML=`<span class="ab">${'AB'[i]}</span><span class="mini">${spk}</span><span class="q">${op.es}</span>`;
+    b.onclick=()=>{if(done)return;say(op.es,'es');pick=op;box.querySelectorAll('.say-opt').forEach(x=>{x.setAttribute('aria-pressed',x===b?'true':'false');x.classList.toggle('sel',x===b)});btn.disabled=false};box.appendChild(b)});
+  box.insertAdjacentHTML('afterend',cvBox(o.n,opts));
+  btn.onclick=async()=>{if(!pick||done)return;done=true;btn.hidden=true;const bs=[...box.querySelectorAll('.say-opt')];bs.forEach(x=>x.disabled=true);
+    const ok=!!pick.ok;
+    /* the pick as its item id only, p1:ser / p1:estar; choiceIndex is its place in report.json */
+    S.gates.push({n:o.n,k:pick.v,ok});
+    TM.choice({scenarioIndex:o.n,choiceIndex:o.opts.indexOf(pick),score:ok?1:0,category:'gate',choice:'p'+o.n+':'+pick.v});pushSummary();saveProgress();
+    out.innerHTML=L(o.who,ok?o.yes[0]:o.no[0],ok?o.yes[1]:o.no[1],false);say(ok?o.yes[0]:o.no[0],'es');
+    if(!ok&&o.kate){await wait(900);out.insertAdjacentHTML('beforeend',K(o.kate))}
+    await wait(700);bs.forEach((x,i)=>{if(opts[i].ok)x.classList.add('right');else if(x.getAttribute('aria-pressed')==='true')x.classList.add('wrongpick')});
+    out.insertAdjacentHTML('beforeend',jodi(o.jodi(ok),ok));
+    if(o.photo)photo(out,o.photo.src,o.photo.alt,o.photo.cap);
+    out.insertAdjacentHTML('beforeend',go(o.id+'-next','Sigue ↓'));
+    const st=$('#'+o.id+'-st');st.textContent='¡SELLADO!';st.classList.add('ok');stamp(o.n);
+    $('#'+o.id+'-next').onclick=()=>o.next()}}
+
+/* ---------- build the page ---------- */
+/* The sections are static so the build checks can read them: data-step is the section number
+   TM.step() reports (14 in all), and a scored Puerta is <section class="gate…" id="g<n>">.
+   pm-step / gate / fork / carta tell Presentar en clase how to step through them. A Puerta's
+   scene (casa, cena, wifi, noche) and its gate open together. */
+const fill=(id,html)=>{$('#'+id).innerHTML=html};
+fill('intro',`
+ <figure class="frame title-photo" style="margin:0"><img src="${PH}car-row.jpg" alt="A long row of colorful classic cars parked by Parque Central in Havana"><figcaption>William's photo · Parque Central, 2016</figcaption></figure>
+ <div class="card"><div class="start-grid"><div class="in">
+  <span class="eyebrow">Allgood Academy · Español · Novato</span>
+  <h1>La Habana</h1><p class="sub">Two verbs for "to be." One very confusing dinner.</p>
+  <div class="lvl"><i class="f"></i><i class="f"></i><i></i><i></i><span>Novato · ser vs. estar · 15–20 min</span></div>
+  ${N('Summer 2016. You and your friend Kate land in Havana, Cuba. Americans have only just started visiting again.')}
+  <div class="row"><button class="go" id="start">Empezar ↓</button></div></div>
+  <figure class="polaroid" style="margin:0"><img src="${PH}gran-teatro.jpg" alt="The Gran Teatro and the Capitolio dome under a bright blue sky">La Habana, 2016</figure></div>
+  <p class="based">Based on William's real trip to Cuba, 2016.</p></div>`);
+fill('embarque',`
+ <div class="bpass"><div class="bp-top"><b>EMBARQUE · ATL → HAV</b><span class="dots" id="emb-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+ <div class="bp-body"><p style="margin:0 0 4px">Before you fly: listen, then tap the picture that matches. Listen closely to the verb. No score, just packing your Spanish.</p>
+ <div id="emb-box"></div></div></div>`);
+fill('aeropuerto',`
+ ${frame('art-airport','The baggage claim at Havana airport. A TV, a tire and a car bumper ride the belt between the suitcases.')}
+ <div class="card">${N('You land at José Martí airport. At baggage claim, the belt starts moving… and it is not just suitcases.')}
+ <p style="margin:10px 0 0;font-size:15px">Tap the pins to explore.</p><div id="ficha-air" aria-live="polite"></div>
+ ${K('Is that… a car bumper?!')}
+ ${go('b-air','Vamos a la casa ↓')}</div>`);
+fill('casa',`
+ ${frame('art-casa','The courtyard of an old Havana house. Rain falls into the open patio; covered hallways run around it. Doña Caridad waves from a blue doorway.')}
+ <div class="card">${N('Your <i>casa particular</i> is an old house built around an open courtyard. It starts to rain. Doña Caridad comes out to meet you.')}
+ <p style="margin:10px 0 0;font-size:15px">Tap the pins to explore the house.</p><div id="ficha-casa" aria-live="polite"></div></div>`);
+fill('g1',`
+ ${sign('1','PUERTA 1 · LA CASA','¿De dónde son?','g1')}
+ <div class="card">${L('Doña Caridad','¡Bienvenidos, mis niños! ¿De dónde son?','Welcome, kids! Where are you from?')}
+ <p style="margin:12px 0 0"><b>What do you say?</b> Tap a sentence to hear it, then say it.</p>
+ <div class="says opts" id="g1-opts"></div><div class="row"><button class="go" id="g1go" disabled>¡Dilo!</button></div><div id="g1-out" aria-live="polite"></div></div>`);
+fill('cena',`
+ ${frame('art-cena','Dinner at Doña Caridad\'s table: white rice, black beans, shredded beef and fried plantains. Doña Caridad stands with a pot; Kate is ready to eat.')}
+ <div class="card">${N('That night, Doña Caridad cooks for you. Rice, black beans, and the best meat you have ever tasted.')}
+ <p style="margin:10px 0 0;font-size:15px">Tap the pins to see what's for dinner.</p><div id="ficha-cena" aria-live="polite"></div></div>`);
+fill('g2',`
+ ${sign('2','PUERTA 2 · LA CENA','¿Qué tal la comida?','g2')}
+ <div class="card">${L('Doña Caridad','¿Y qué tal? ¿Les gusta?','So? Do you like it?')}
+ <p style="margin:12px 0 0"><b>You want to say the food is delicious.</b> Pick your sentence.</p>
+ <div class="says opts" id="g2-opts"></div><div class="row"><button class="go" id="g2go" disabled>¡Dilo!</button></div><div id="g2-out" aria-live="polite"></div></div>`);
+fill('f1',`
+ <div class="card" style="margin-top:0"><span class="eyebrow">TU DECISIÓN</span><h2>Mañana libre</h2>
+ ${N('Tomorrow is a free day. Kate wants the beach. Doña Caridad says you have to ride in an old car at least once. You can only do one.')}
+ <div class="pics opts" id="fork-pics" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+  <button class="pic opt" id="f-carro" data-k="carro" aria-pressed="false" aria-label="Ride in an old car along the Malecón"><img src="${PH}car-red.jpg" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:8px"><b style="display:block;margin-top:6px">Un paseo en carro viejo</b><small>A ride along the Malecón</small></button>
+  <button class="pic opt" id="f-playa" data-k="playa" aria-pressed="false" aria-label="Take the bus to the beach"><img src="${PH}beach.jpg" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:8px"><b style="display:block;margin-top:6px">El autobús a la playa</b><small>Snorkeling and piña coladas</small></button>
+ </div><div id="f1body"></div></div>`);
+fill('wifi',`
+ ${frame('art-wifi','A wifi park in Havana. People sit on benches looking at their phones under a WIFI sign. Yoel holds up a scratch card.')}
+ <div class="card">${N('Kate needs to message her mum in England. Doña Caridad\'s nephew, Yoel, knows exactly what to do.')}
+ ${L('Yoel','¡Mira! Una tarjeta de wifi. Dos dólares, dos horas.','Look! A wifi card. Two dollars, two hours.')}
+ <p style="margin:10px 0 0;font-size:15px">Tap the pins to explore.</p><div id="ficha-wifi" aria-live="polite"></div></div>`);
+fill('g3',`
+ ${sign('3','PUERTA 3 · EL WIFI','¿Dónde?','g3')}
+ <div class="card"><p style="margin:0"><b>You have the card. Now ask Yoel where the wifi is.</b></p>
+ <div class="says opts" id="g3-opts"></div><div class="row"><button class="go" id="g3go" disabled>¡Dilo!</button></div><div id="g3-out" aria-live="polite"></div></div>`);
+fill('noche',`
+ ${frame('art-noche','The Malecón at night. Hundreds of people sit along the seawall under the stars, phones glowing. A man plays guitar, a couple dances. Yoel stares at his phone.')}
+ <div class="card">${N('That night, it seems like all of Havana is on the Malecón. Music, dancing, the lighthouse sweeping across the bay. Yoel has been staring at a loading screen for ten minutes.')}
+ <p style="margin:10px 0 0;font-size:15px">Tap the pins to explore.</p><div id="ficha-noche" aria-live="polite"></div>
+ ${K('What\'s up with Yoel? He hasn\'t said a word. Tell me in Spanish, I want to practice!')}</div>`);
+fill('g4',`
+ ${sign('4','PUERTA 4 · EL MALECÓN','¿Qué le pasa a Yoel?','g4')}
+ <div class="card"><p style="margin:0"><b>Yoel looks bored. Tell Kate.</b> (He can hear you.)</p>
+ <div class="says opts" id="g4-opts"></div><div class="row"><button class="go" id="g4go" disabled>¡Dilo!</button></div><div id="g4-out" aria-live="polite"></div></div>`);
+fill('aduana',`
+ <div class="bpass"><div class="bp-top"><b>ADUANA · HAV → ATL</b><span class="dots" id="adu-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+ <div class="bp-body"><p style="margin:0 0 4px">On the way home: same idea as Embarque. Listen closely to the verb, then tap the picture.</p>
+ <div id="adu-box"></div></div></div>`);
+fill('fin',`
+ <div class="card gin" style="margin-top:0;text-align:center"><span class="eyebrow">LA HABANA · 2016</span><h2>¡Hasta pronto, Habana!</h2>
+ ${L('Doña Caridad','¡Vuelvan pronto, mis niños! Aquí siempre están en casa.','Come back soon, kids! Here you are always at home.',false)}
+ <div id="fin-score"></div>
+ <h3 style="font:700 16px var(--font-ui);color:var(--teal-d);margin:18px 0 6px;text-align:left">Tus fotos</h3>
+ <div id="fin-photos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px"></div>
+ <p class="based">Every photo here is William's, from the real trip.</p></div>`);
+
+/* start */
+$('#start').onclick=()=>{if(!$('#embarque').classList.contains('locked'))return;unlock('embarque');buildEmb()};
+
+/* Embarque (Form A) and Aduana (Form B): four picture taps each, the same four skills in the
+   same order (slot i of checks.json), no score shown */
+const EMB=[{es:'Kate está lista.',opts:[{svg:P.lista,ok:1,label:'Kate ready to go, with her bags packed'},{svg:P.lista2,label:'Kate holding an A plus test, smart'}]},
+ {es:'La comida está rica.',opts:[{svg:P.comida,ok:1,label:'a plate of delicious food'},{svg:P.rica,label:'a rich person with a big house and money'}]},
+ {es:'El perro es malo.',opts:[{svg:P.perroMalo,ok:1,label:'a mean dog, growling'},{svg:P.perroEnfermo,label:'a sick dog in bed with a thermometer'}]},
+ {es:'El chico está aburrido.',opts:[{svg:P.chicoAburrido,ok:1,label:'a bored boy, yawning'},{svg:P.chicoEsAburrido,label:'a boring boy talking while others fall asleep'}]}];
+const ADU=[{es:'Kate es lista.',opts:[{svg:P.lista2,ok:1,label:'Kate holding an A plus test, smart'},{svg:P.lista,label:'Kate ready to go, with her bags packed'}]},
+ {es:'La señora es rica.',opts:[{svg:P.rica,ok:1,label:'a rich person with a big house and money'},{svg:P.comida,label:'a plate of delicious food'}]},
+ {es:'El perro está malo.',opts:[{svg:P.perroEnfermo,ok:1,label:'a sick dog in bed with a thermometer'},{svg:P.perroMalo,label:'a mean dog, growling'}]},
+ {es:'El chico es aburrido.',opts:[{svg:P.chicoEsAburrido,ok:1,label:'a boring boy talking while others fall asleep'},{svg:P.chicoAburrido,label:'a bored boy, yawning'}]}];
+function buildEmb(){pmWait($('#embarque'),PM_PICS);T('ev_embarque',{phase:'start',form:'A'});
+  taps(EMB,'emb',S.emb,PRES.emb,()=>{T('ev_embarque',{phase:'done',form:'A',res:S.emb});pmWait($('#embarque'),null);
+   $('#emb-box').innerHTML=`<div class="ready"><h2>¡Listo para el viaje!</h2></div>${go('b-emb','Aterrizar en La Habana ↓')}`;$('#b-emb').onclick=()=>{unlock('aeropuerto');buildAir()}})}
+function taps(LIST,pre,store,pres,done){let k=0;const box=$('#'+pre+'-box');
+  const step=()=>{if(k>=LIST.length){done();return}
+    const it=LIST[k];const opts=shuffle(it.opts);
+    box.innerHTML=`<div class="line" style="margin-top:12px"><button class="play say" id="${pre}-play" aria-label="Escuchar">${spk}</button><span class="who">${k+1} de ${LIST.length}</span><p class="es" style="grid-column:2">${it.es}</p></div><div class="pics" id="${pre}-pics"></div>`;
+    $('#'+pre+'-play').onclick=e=>{e.stopPropagation();say(it.es,'es')};
+    opts.forEach((o,i)=>{const b=document.createElement('button');b.className='pic';b.setAttribute('aria-label',o.label);b.innerHTML=`<span class="ab" aria-hidden="true">${'AB'[i]}</span>${o.svg}`;
+      b.onclick=()=>{store.push(o.ok?1:0);if(PRES.on)pres.push({pick:it.opts.indexOf(o),right:!!o.ok});saveProgress();pushSummary();b.setAttribute('aria-pressed','true');box.querySelectorAll('.pic').forEach(x=>x.disabled=true);$('#'+pre+'-dots').children[k].classList.add('d');k++;setTimeout(step,reduce?50:450)};$('#'+pre+'-pics').appendChild(b)});
+    say(it.es,'es')};step()}
+
+/* airport */
+function buildAir(){const svg=$('#art-airport');svg.innerHTML=ART.airport();wireHot(svg,$('#ficha-air'));
+  $('#b-air').onclick=()=>{unlock('casa','g1');buildCasa()}}
+
+/* casa + Puerta 1 */
+function buildCasa(){const svg=$('#art-casa');svg.innerHTML=ART.casa();wireHot(svg,$('#ficha-casa'));
+  puerta({id:'g1',n:1,who:'Doña Caridad',
+    opts:[{v:'ser',ok:1,es:'Soy de Georgia. Kate es de Inglaterra.'},{v:'estar',es:'Estoy de Georgia. Kate está de Inglaterra.'}],
+    yes:['¡Georgia! ¡Qué lejos! Y tú, Kate, ¿de Inglaterra? ¡Bienvenidas las dos visitas!','Georgia! So far away! And you, Kate, from England? Welcome, both of you!'],
+    no:['¿Están de Inglaterra? ¿Como de vacaciones? Ah… ¡son de Georgia y de Inglaterra! Bienvenidos.','You\'re "being" from England? Like, on vacation? Oh… you ARE from Georgia and England! Welcome.'],
+    kate:'She\'s smiling, but I think we said it a bit oddly.',
+    jodi:ok=>`${ok?'':'She got it, and she was sweet about it. '}Where you're <b>from</b> never changes, so it takes <span class="vb">ser</span>: <i>soy de Georgia, es de Inglaterra</i>. <span class="vb2">Estar</span> is for where you are and how you are <i>right now</i>.`,
+    photo:{src:'cathedral.jpg',alt:'The stone cathedral of Old Havana on a sunny plaza',cap:'La Catedral, around the corner'},
+    next:()=>{unlock('cena','g2');buildCena()}})}
+
+/* cena + Puerta 2 */
+function buildCena(){const svg=$('#art-cena');svg.innerHTML=ART.cena();wireHot(svg,$('#ficha-cena'));
+  puerta({id:'g2',n:2,who:'Doña Caridad',
+    opts:[{v:'estar',ok:1,es:'¡Está rica!'},{v:'ser',es:'¡Es rica!'}],
+    yes:['¡Ay, qué bueno! Coman, coman, que hay más.','Oh, good! Eat, eat, there\'s more.'],
+    no:['¿Rica yo? ¡Ay, no, mi niño! Rica está la comida.','Me, rich? Oh no, honey! The FOOD is delicious.'],
+    kate:'(crying laughing) You just told her she\'s RICH.',
+    jodi:ok=>`${ok?'Perfect compliment. ':'Funny, and now you\'ll never forget it. '}<span class="vb2">Está rica</span> = it tastes delicious (right now, this plate). <span class="vb">Es rica</span> = she's rich. Same word, a different verb, a totally different compliment.`,
+    next:()=>{unlock('f1');buildFork()}})}
+
+/* fork (never scored) */
+function buildFork(){const out=$('#f1body');
+  const pick=k=>{if(S.fork)return;S.fork=k;TM.choice({scenarioIndex:'f1',choiceIndex:['carro','playa'].indexOf(k),category:'fork',choice:k});pushSummary();saveProgress();
+   $('#f-carro').disabled=$('#f-playa').disabled=true;$('#f-'+k).setAttribute('aria-pressed','true');$('#f-'+k).classList.add('sel');
+   if(k==='carro'){out.innerHTML=`<div style="height:16px"></div>${frame('art-carro','A cream-colored 1930s convertible on the Malecón at sunset, people sitting along the seawall behind it.')}${N('You flag down a convertible from about 1930, older than your grandparents. The driver takes you all the way down the Malecón, past the fortress, with the top down.')}<p style="margin:10px 0 0;font-size:15px">Tap the pins to explore.</p><div id="ficha-carro" aria-live="polite"></div>`;
+     const svg=$('#art-carro');svg.innerHTML=ART.carro();wireHot(svg,$('#ficha-carro'));photo(out,'car-red.jpg','A red 1950s convertible parked on an Old Havana street','Un almendrón rojo, Habana Vieja')}
+   else{out.innerHTML=`<div style="height:16px"></div>${N('You take the bus east, over a bridge high above a green valley, to the beach. The water is so clear you can see your feet.')}`;
+     photo(out,'bridge.jpg','A long bridge over a deep green valley','El puente, on the way to the beach');
+     out.insertAdjacentHTML('beforeend',`<div style="height:12px"></div>${frame('art-playa','A white-sand beach with turquoise water, a palm tree, a beach umbrella and two piña coladas. Kate snorkels in the water.')}<p style="margin:10px 0 0;font-size:15px">Tap the pins to explore.</p><div id="ficha-playa" aria-live="polite"></div>`);
+     const svg=$('#art-playa');svg.innerHTML=ART.playa();wireHot(svg,$('#ficha-playa'))}
+   out.insertAdjacentHTML('beforeend',go('fork-next','Sigue ↓'));$('#fork-next').onclick=()=>{unlock('wifi','g3');buildWifi()};pmRefresh()};
+  $('#f-carro').onclick=()=>pick('carro');$('#f-playa').onclick=()=>pick('playa')}
+
+/* Puerta 3 */
+function buildWifi(){const svg=$('#art-wifi');svg.innerHTML=ART.wifi();wireHot(svg,$('#ficha-wifi'));
+  puerta({id:'g3',n:3,who:'Yoel',
+    opts:[{v:'estar',ok:1,es:'¿Dónde está el wifi?'},{v:'ser',es:'¿Dónde es el wifi?'}],
+    yes:['¡En el Malecón! Esta noche vamos todos.','On the Malecón! Tonight we\'re all going.'],
+    no:['¿Dónde es? Ah… ¿dónde está? ¡En el Malecón! Esta noche vamos todos.','Where "is" it? Oh… where is it located? On the Malecón! Tonight we\'re all going.'],
+    kate:'He got there. Eventually.',
+    jodi:ok=>`${ok?'':'Yoel worked it out, but he had to fix it first. '}Asking <b>where</b> something is? Always <span class="vb2">estar</span>: <i>¿Dónde está el wifi? ¿Dónde está el baño?</i>`,
+    photo:{src:'morro-view.jpg',alt:'Havana across the bay, seen from the El Morro fortress',cap:'La Habana from El Morro'},
+    next:()=>{unlock('noche','g4');buildNoche()}})}
+
+/* Puerta 4 */
+function buildNoche(){const svg=$('#art-noche');svg.innerHTML=ART.noche();wireHot(svg,$('#ficha-noche'));
+  puerta({id:'g4',n:4,who:'Yoel',
+    opts:[{v:'estar',ok:1,es:'Yoel está aburrido.'},{v:'ser',es:'Yoel es aburrido.'}],
+    yes:['Sí, estoy aburrido… ¡el wifi no funciona! Bueno, ¡vamos a bailar!','Yeah, I\'m bored… the wifi isn\'t working! OK, let\'s dance!'],
+    no:['¿¡Yo soy aburrido!? No, no… ¡estoy aburrido porque el wifi no funciona! Bueno, ¡vamos a bailar!','I\'M boring!? No, no… I\'m BORED because the wifi isn\'t working! OK, let\'s dance!'],
+    kate:'Oof. He heard you. Good thing he\'s laughing.',
+    jodi:ok=>`${ok?'Kind and correct. ':'He forgave you, and he pulled you in to dance. '}<span class="vb2">Está aburrido</span> = he's bored right now. <span class="vb">Es aburrido</span> = he's a boring person. That one little verb is the difference between a fact and an insult.`,
+    photo:{src:'convertible-night.jpg',alt:'William beside an old cream convertible on the Malecón at night, crowds on the seawall behind',cap:'El Malecón de noche'},
+    next:()=>{unlock('aduana');pmWait($('#aduana'),PM_PICS);T('ev_aduana',{phase:'start',form:'B'});
+      taps(ADU,'adu',S.adu,PRES.adu,()=>{T('ev_aduana',{phase:'done',form:'B',res:S.adu});transfer()})}})}
+
+/* Aduana transfer: describe the house. Tapping a verb says the sentence you built. */
+const TR=[{q:'La casa de Doña Caridad ___ bonita.',ok:'es',why:'what it is like'},{q:'Hoy el patio ___ mojado.',ok:'está',why:'how it is right now'}];
+function transfer(){const box=$('#adu-box'),sec=$('#aduana');let k=0;pmWait(sec,PM_TR);T('ev_transfer',{phase:'start'});
+  const step=()=>{if(k>=TR.length){T('ev_transfer',{phase:'done',res:S.tr});pmWait(sec,null);box.innerHTML=`<div class="ready"><h2>¡Bienvenidos a casa!</h2></div>${go('b-adu','Ver tu pasaporte ↓')}`;$('#b-adu').onclick=()=>{unlock('fin');buildFin()};return}
+    const it=TR[k];box.innerHTML=`<p style="margin:14px 0 4px"><b>Last thing:</b> describe Doña Caridad's house. Pick the verb.</p><p class="es" style="font-size:24px;margin:6px 0">${it.q}</p><div class="row" id="tr-row"></div>`;
+    ['es','está'].forEach((v,i)=>{const b=document.createElement('button');b.className='ghost tr-v';b.style.fontSize='20px';b.textContent=v;
+      b.onclick=()=>{const ok=v===it.ok;S.tr.push(ok?1:0);if(PRES.on)PRES.tr.push({pick:i,right:ok});say(it.q.replace('___',v),'es');T('transfer',{item:k,choice:v,score:ok?1:0});saveProgress();pushSummary();k++;step()};$('#tr-row').appendChild(b)})};step()}
+
+/* ending */
+function buildFin(){const E=S.emb.reduce((a,b)=>a+b,0),A=S.adu.reduce((a,b)=>a+b,0),t=S.tr.reduce((a,b)=>a+b,0);
+  $('#fin-score').innerHTML=`<div class="bpass" style="margin-top:14px;text-align:left"><div class="bp-top"><b>PASAPORTE · HAV</b><span>${S.gates.length} de 4 Puertas</span></div><div class="bp-body">
+   <p style="margin:0;font-size:18px">Al embarcar: <b>${E} de 4</b>. En la aduana: <b>${A} de 4</b>. La casa: <b>${t} de 2</b>.</p>
+   ${jodi(A>=E&&A>=3?'You heard the difference. <span class="vb">Ser</span> tells you what something <b>is</b>; <span class="vb2">estar</span> tells you where it is and how it is <b>right now</b>. Doña Caridad would be proud, and she\'d feed you again.':'Ser and estar trip up everyone at first. Here\'s the trick: <span class="vb">ser</span> = what it <b>is</b>, <span class="vb2">estar</span> = how it is <b>right now</b> or where it is. Try the story again and listen for the verb.',A>=E&&A>=3)}</div></div>`;
+  const all=['car-row.jpg','gran-teatro.jpg',...S.photos,'malecon-sunset.jpg'];
+  $('#fin-photos').innerHTML=[...new Set(all)].map(src=>`<img src="${PH}${src}" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:4px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,.2)">`).join('');
+  const c=S.gates.filter(g=>g.ok).length;
+  TM.complete({finalScore:c,percentage:c*25,summary:{gates:gatesNow(),path:{f1:S.fork||null},mode:S.mode,score:c,checks:checksNow()}});
+  if(ST)ST.logCompletion('La Habana',{score:c,finalScore:c,maxScore:4});else dlog('game_scores',{gameName:'La Habana',completed:true,score:c});saveProgress(true)}
+}
+</script>
+<!-- Presentar en clase: does nothing unless a signed-in teacher opened the page with ?mode=presentar, or from the
+     /espanol/ hub. It drives this page's own buttons; the story above is unchanged. La Habana draws its own
+     Embarque → Aduana (four picture taps each, then two transfer sentences), so /js/espanol-checks.js is not loaded. -->
+<script src="/js/story-presentar.js"></script>
+</body>
+</html>

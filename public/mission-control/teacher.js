@@ -1344,8 +1344,14 @@ function growthHtml(it, who) {
     return `<div class="box epu"><h3>Embarque → Aduana: before and after</h3>
         <p class="sub">${g.n} of ${who.length} students did both checks. Each skill shows how many got it on the first try before the story and after it.</p>
         ${g.worth ? `<div class="talk"><b>Worth five minutes tomorrow:</b> ${esc(g.worth)}</div>` : ''}
-        ${body}
+        ${body}${transferHtml(g.transfer)}
         <p class="note">${checks.slots.length} questions is a practice check, not a test of any one student.</p></div>`;
+}
+/* La Habana's transfer (two sentences after the Aduana): how many picked the right verb. */
+function transferHtml(t) {
+    if (!t || !t.n) return '';
+    return `<div class="eblank"><p class="q">${esc(t.label)} <span class="muted" style="font-weight:400">· ${t.n} did it</span></p>
+        ${t.items.map((it) => growthBar(`<span lang="es">${esc(it.q)}</span>`, it.right, t.n, it.pct, t.showPercent, 'after')).join('')}</div>`;
 }
 /* The postcard rubric, in a student's panel: four rows, three levels. The postcard itself is
    on paper or in Google Classroom; only these taps are saved, by the teacher, to their class. */

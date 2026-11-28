@@ -1,8 +1,8 @@
 # Español audio (recorded voices)
 
 Every Español story with a `scripts/espanol-audio/<story>.lines.json` plays pre-rendered MP3s
-instead of the browser's speech voice: El Viaje (`el-viaje`), La selva (`la-selva`, 2026-11-28) and
-El Mundial (`el-mundial`, 2026-11-28).
+instead of the browser's speech voice: El Viaje (`el-viaje`), La selva (`la-selva`, 2026-11-28),
+El Mundial (`el-mundial`, 2026-11-28) and La Habana (`la-habana`, 2026-11-28).
 Every spoken line is rendered once with ElevenLabs, committed, and served from our own `/assets/`.
 Students' browsers never talk to ElevenLabs. `<story>` below is the story's folder name.
 
@@ -87,6 +87,25 @@ Same player as La selva: the manifest is fetched as the page loads, `say()` stop
 and `sayQ()` queues a Puerta's replies behind the line before them (the bubbles keep their timing;
 only the voice waits). English lines (`data-lang="en"`, Olga) use the same lookup; the browser
 fallback reads them as en-US.
+
+### La Habana
+
+69 lines, 3,478 characters (first render 2026-11-28, `eleven_v4`). Files start `lh-` (the
+lines.json's `prefix`). Five speakers:
+
+| Speaker | Who | Voice | Tag |
+|---|---|---|---|
+| `caridad` | Doña Caridad, the host (Cuban) | Yenisel | `[warmly]`; `[laughing]` on "¿Rica yo?…" |
+| `yoel` | Yoel, her 15-year-old nephew (Cuban) | Aaron | `[excited]`; `[offended, then laughing]` on "¿¡Yo soy aburrido!?…" |
+| `kate` | Kate, British friend, in English (`K()` lines and the Puertas' `kate:` reactions) | Molly | `[cheerful]`; `[laughing]` on the "RICH" line |
+| `narr` | English narration, the `N()` lines | Carolyn | `[clearly]` |
+| `voz` | the Puerta sentences (what *you* say), Embarque / Aduana items, transfer sentences, field-card names | Ninoska | `[clearly]` |
+
+No voice speaks as William. Kate's stage direction "(crying laughing)" is shown, not spoken: `K()`
+and the test both drop a leading "(…)". The transfer has no blank to read aloud, so tapping
+*es* or *está* says the sentence the student built: both verbs are rendered for each sentence (4
+clips). Same player as La selva (one shared `Audio`, stop-before-play, manifest fetched on load);
+there is no queued line, so no `sayQ()`.
 
 ## Swap a character's voice
 

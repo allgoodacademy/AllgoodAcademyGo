@@ -1,4 +1,4 @@
-// Tracking for the Español stories (/espanol/el-viaje/, /espanol/el-mundial/, /espanol/la-selva/), 2026-11-27.
+// Tracking for the Español stories (/espanol/el-viaje/, /espanol/el-mundial/, /espanol/la-selva/, /espanol/la-habana/), 2026-11-27.
 //
 // Load as a CLASSIC script, before the story's own script:
 //   <script src="/js/story-tracking.js"></script>
