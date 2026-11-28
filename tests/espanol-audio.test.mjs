@@ -144,7 +144,7 @@ const EXTRACT = {
     for (const m of js.matchAll(new RegExp(`\\bsayQ?\\(${Q}`, 'g'))) add(m[1]);   // literal say('…')
 
     // Every call site passes something gathered above.
-    const OK = new Set(['es.dataset.es', 'n.dataset.say', 'f.dataset.es', 'F[k].es', 'it.es', 'ok?R:W', 'l2', 'lines[0]', 'W[n]', 'W[n-1]', 'NUM[i]', 'line', 'l']);
+    const OK = new Set(['es.dataset.es', 'n.dataset.say', 'f.dataset.es', 'F[k].es', 'it.es', 'ok?R:W', 'l2', 'lines[0]', 'W[n]', 'W[n-1]', 'W[i]', 'NUM[i]', 'line', 'l']);
     const sites = [...js.matchAll(/\b(say|sayQ)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)]
       .map(m => m[2].replace(/,'(es|en)'$/, '').trim())
       .filter(a => a && a !== 't,lang');
