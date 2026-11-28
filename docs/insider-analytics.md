@@ -255,48 +255,26 @@ already removed it.
 
 ### Who owns this — and who is allowed to delete
 
-**OWNER: UNASSIGNED — founder to fill in.**
+**OWNER: William (founder decision, 2026-11-27).**
 
-This is written as a blank on purpose. There is no `CODEOWNERS` file, no named owner in any
-document, and nothing in the repo that says whose job this is. The only named humans anywhere
-near this data are the two allowlisted admins in `firestore.rules:12`
-(`balgood93@gmail.com`, `learning@allgoodacademy.com`), and being able to read a collection is
-not the same as being accountable for its retention. Naming someone is a founder decision, so
-the blank stays a blank rather than being filled in by guesswork.
+**The policy** (public/privacy.html §8): we keep a student's progress while it's in use. Once a
+year, by hand, we delete student records with no activity in the past 2 years (730 days), and we
+delete a specific student's data anytime a parent, teacher or school asks. Nothing deletes on a
+schedule.
 
-Two distinct roles need a name, and they do not have to be the same person:
+**Every week:** `.github/workflows/retention-report.yml` runs a dry run of
+`scripts/prune-telemetry.js` (Mondays 07:00 UTC) and writes how much activity data is past the
+2-year window to the run's summary page. It deletes nothing, and a failed run is not an
+all-clear.
 
-| Role | Who | What they actually do |
-|---|---|---|
-| **Reviews the weekly report** | `UNASSIGNED` | Opens the latest **Retention report** run each week, reads the summary, and raises it if records are past the window |
-| **Authorises a destructive run** | `UNASSIGNED` | The only person who may approve actually deleting data, once the window is settled with counsel |
+**Once a year:** run **Actions → "Yearly student-data cleanup (deletes data)"**
+(`.github/workflows/retention-cleanup.yml`). Type `PREVIEW` first to see what would go, then run
+it again with `DELETE`. It removes activity logs past the window (`prune-telemetry.js
+--confirm-delete`), then student accounts inactive past the window, teachers never included
+(`delete-guest-accounts.js --live --inactive-days=730`). Both scripts refuse a window shorter
+than the policy's, and `prune-telemetry.js` no longer deletes unless `--confirm-delete` is
+passed (the old footgun is fixed).
 
-**How the weekly report works.** `.github/workflows/retention-report.yml` runs every Monday at
-07:00 UTC, and on demand from the Actions tab. It runs `npm run prune:dry-run` and **deletes
-nothing** — there is no input, flag or branch of that workflow that makes it destructive. The
-result is written to the run's summary page, so you can read the retention position in GitHub
-without opening a terminal or reading any code. It tells you how many records are past the
-window in each collection, the oldest record still stored, and the date the window is measured
-from.
-
-**A failed run is not an all-clear.** If the job cannot authenticate or cannot reach Firestore
-it fails red and says so on the summary page. An empty report means *unknown*, never *clean*.
-That distinction is the entire reason this job exists: the 90-day promise in
-`public/privacy.html` §4 went unkept from the day it was published because nothing ever checked,
-and nothing ever failed.
-
-**Nothing deletes on a schedule, and that is deliberate.** As of 2026-09-11 the 90-day window
-itself is an open question with counsel (see the Decisions & Context Log escalation). A real
-deletion run is `node scripts/prune-telemetry.js` with no `--dry-run` flag, invoked by hand.
-**Do not run it** until the window is settled and the owner above has a name.
-
-> ⚠️ **Known footgun.** The destructive path is the *default* — omitting `--dry-run` deletes.
-> No npm script and no workflow in this repo can invoke it that way, so it takes a deliberate
-> direct call, but the safer shape would be to require an explicit `--confirm-delete` flag and
-> make dry-run the default. That change was **not** made in this sprint: it alters the contract
-> of a script that touches children's data, and doing it in the same pass that built the
-> reporting would have meant shipping an untested change to the deletion path. Recommended as a
-> follow-up.
 
 ## 3. What Insider shows
 

@@ -1,0 +1,86 @@
+# Yearly student-data cleanup. DELETES DATA. Never runs on its own.
+# Two steps: activity logs past the window (prune-telemetry.js), then student accounts
+# inactive past the window (delete-guest-accounts.js --inactive-days).
+#
+# public/privacy.html §8 (founder decision 2026-11-27): once a year we delete student
+# records with no activity in the past 2 years (730 days). William owns it. Before running:
+# open the latest "Retention report (dry run — deletes nothing)" run and read what is past
+# the window, or run this with PREVIEW first. Then run it from Actions → "Yearly student-data
+# cleanup" → Run workflow, type DELETE in the confirm box, and leave days at 730 unless the policy changes.
+#
+# Same credential handling as retention-report.yml.
+name: Yearly student-data cleanup (deletes data)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type PREVIEW to see what would be deleted (deletes nothing), or DELETE to permanently delete student records past the window'
+        required: true
+        default: ''
+      days:
+        description: 'Days of inactivity (the privacy policy says 730, i.e. 2 years)'
+        required: true
+        default: '730'
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the confirm word
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          DAYS: ${{ inputs.days }}
+        run: |
+          if [ "$CONFIRM" != "DELETE" ] && [ "$CONFIRM" != "PREVIEW" ]; then
+            echo "::error title=Not confirmed::Type PREVIEW or DELETE in the confirm box. Nothing was deleted."
+            exit 1
+          fi
+          if [ "$DAYS" -lt 730 ]; then
+            echo "::error title=Window shorter than the policy::The privacy policy keeps records for 2 years (730 days). Nothing was deleted."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Write the credential to a file
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error title=No Firebase credential::No service account secret is set. Nothing was deleted."
+            exit 1
+          fi
+          printf '%s' "$SA" > "${RUNNER_TEMP}/sa.json"
+          node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "${RUNNER_TEMP}/sa.json" \
+            || { echo "::error title=Malformed credential::The Firebase service account secret is not valid JSON."; exit 1; }
+
+      - name: Delete records past the window
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          DAYS: ${{ inputs.days }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" = "DELETE" ]; then MODE=--confirm-delete; else MODE=--dry-run; fi
+          node scripts/prune-telemetry.js $MODE --days="$DAYS" --summary="$GITHUB_STEP_SUMMARY"
+
+      # Then the student accounts themselves: profile, name, progress, roster rows, messages
+      # and the sign-in, for any student (never a teacher) inactive past the window.
+      - name: Delete student accounts inactive past the window
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          DAYS: ${{ inputs.days }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" = "DELETE" ]; then LIVE=--live; else LIVE=; fi
+          node scripts/delete-guest-accounts.js $LIVE --inactive-days="$DAYS"

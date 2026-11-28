@@ -50,7 +50,12 @@ const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
 
 const SUBCOLLECTIONS = ['module_progress', 'continuity_bank', 'comms_receipts', 'comms_state'];
-const UID_FIELD_COLLECTIONS = ['events', 'sessions', 'course_feedback', 'topic_selections', 'messages'];
+// [collection, the field that holds the student's uid]. Messages carry senderUid, not uid.
+// classroom_members / classroom_assignments are the roster row and any "just for them" work.
+const UID_FIELD_COLLECTIONS = [
+  ['events', 'uid'], ['sessions', 'uid'], ['course_feedback', 'uid'], ['topic_selections', 'uid'],
+  ['messages', 'senderUid'], ['classroom_members', 'uid'], ['classroom_assignments', 'uid'],
+];
 const BATCH_SIZE = 400;
 const DEFAULT_SINCE = '2026-09-03';
 const DEFAULT_STALE_DAYS = 90;
@@ -62,17 +67,22 @@ function parseArgs(argv) {
     keepUids: new Set(),
     since: DEFAULT_SINCE,
     staleDays: DEFAULT_STALE_DAYS,
+    inactiveDays: null,
   };
   for (const raw of argv.slice(2)) {
     if (raw === '--live') args.live = true;
     else if (raw.startsWith('--app-id=')) args.appId = raw.slice('--app-id='.length);
     else if (raw.startsWith('--since=')) args.since = raw.slice('--since='.length);
     else if (raw.startsWith('--stale-days=')) args.staleDays = Number(raw.slice('--stale-days='.length));
+    else if (raw.startsWith('--inactive-days=')) args.inactiveDays = Number(raw.slice('--inactive-days='.length));
     else if (raw.startsWith('--keep-uid=')) {
       for (const uid of raw.slice('--keep-uid='.length).split(',')) {
         if (uid) args.keepUids.add(uid);
       }
     }
+  }
+  if (args.inactiveDays !== null && (!Number.isFinite(args.inactiveDays) || args.inactiveDays < 365)) {
+    throw new Error(`--inactive-days must be at least 365 (the privacy policy keeps records 2 years), got: ${args.inactiveDays}`);
   }
   if (!Number.isFinite(args.staleDays) || args.staleDays <= 0) {
     throw new Error(`--stale-days must be a positive number, got: ${args.staleDays}`);
@@ -135,6 +145,41 @@ async function classifyUser(db, appId, user, { sinceDate, staleCutoff }) {
   return { uid: user.uid, createdAt, reasons, role, recruitCode };
 }
 
+// YEARLY CLEANUP MODE (--inactive-days, privacy.html §8, founder decision 2026-11-27):
+// a STUDENT account — anonymous, save code or Google — whose last activity is older than the
+// window. Last activity is the newest of Firebase Auth's last token refresh, last sign-in and
+// creation time. Teachers are never targeted, and neither is an account with a real sign-in
+// but no profile document (we can't tell whose it is).
+const SAVE_DOMAIN = '@save.allgoodacademy.com';
+async function classifyInactive(db, appId, user, { inactiveCutoff }) {
+  const m = user.metadata || {};
+  const times = [m.lastRefreshTime, m.lastSignInTime, m.creationTime].filter(Boolean).map((t) => new Date(t).getTime());
+  const lastActive = new Date(Math.max(...times));
+  if (!(lastActive < inactiveCutoff)) return null;
+  const userSnap = await withRetry(() =>
+    db.collection('artifacts').doc(appId).collection('users').doc(user.uid).get()
+  );
+  const role = userSnap.exists ? userSnap.get('role') : null;
+  if (role === 'teacher') return null;
+  const realSignIn = (user.providerData || []).some((p) => p.email && !p.email.endsWith(SAVE_DOMAIN));
+  if (!userSnap.exists && realSignIn) return null;
+  return {
+    uid: user.uid, createdAt: new Date(m.creationTime || lastActive), reasons: [`inactive-since-${lastActive.toISOString().slice(0, 10)}`],
+    role, recruitCode: userSnap.exists ? userSnap.get('recruitCode') : null,
+  };
+}
+
+async function listAllUsers(auth) {
+  const all = [];
+  let pageToken;
+  do {
+    const page = await withRetry(() => auth.listUsers(1000, pageToken));
+    all.push(...page.users);
+    pageToken = page.pageToken;
+  } while (pageToken);
+  return all;
+}
+
 async function deleteDocsInBatches(db, refs, { live, label }) {
   for (let i = 0; i < refs.length; i += BATCH_SIZE) {
     const chunk = refs.slice(i, i + BATCH_SIZE);
@@ -168,9 +213,9 @@ async function deleteAccount(db, { appId, uid, recruitCode, live }) {
     await deleteDocsInBatches(db, [codeRef], { live, label: 'recruit_codes' });
   }
 
-  for (const collectionName of UID_FIELD_COLLECTIONS) {
+  for (const [collectionName, field] of UID_FIELD_COLLECTIONS) {
     const colRef = db.collection('artifacts').doc(appId).collection(collectionName);
-    const snap = await withRetry(() => colRef.where('uid', '==', uid).get());
+    const snap = await withRetry(() => colRef.where(field, '==', uid).get());
     await deleteDocsInBatches(db, snap.docs.map((d) => d.ref), { live, label: collectionName });
   }
 }
@@ -198,13 +243,18 @@ async function main() {
     (args.keepUids.size ? ` keeping=${[...args.keepUids].join(',')}` : '')
   );
 
-  const anonymousUsers = await listAllAnonymousUsers(auth);
-  console.log(`[delete-guest-accounts] scanning ${anonymousUsers.length} anonymous account(s)...`);
+  const yearly = args.inactiveDays !== null;
+  const inactiveCutoff = yearly ? new Date(Date.now() - args.inactiveDays * 24 * 60 * 60 * 1000) : null;
+  const scanUsers = yearly ? await listAllUsers(auth) : await listAllAnonymousUsers(auth);
+  console.log(`[delete-guest-accounts] scanning ${scanUsers.length} ${yearly ? '' : 'anonymous '}account(s)` +
+    (yearly ? ` for students inactive since ${inactiveCutoff.toISOString().slice(0, 10)} (yearly cleanup)` : '') + '...');
 
   const targets = [];
-  for (const user of anonymousUsers) {
+  for (const user of scanUsers) {
     if (args.keepUids.has(user.uid)) continue;
-    const classification = await classifyUser(db, args.appId, user, { sinceDate, staleCutoff });
+    const classification = yearly
+      ? await classifyInactive(db, args.appId, user, { inactiveCutoff })
+      : await classifyUser(db, args.appId, user, { sinceDate, staleCutoff });
     if (classification) targets.push(classification);
   }
 
@@ -255,4 +305,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, classifyUser };
+module.exports = { parseArgs, classifyUser, classifyInactive };

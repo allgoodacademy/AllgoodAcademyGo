@@ -1,16 +1,13 @@
 # Weekly retention report. REPORT ONLY — this workflow never deletes anything.
 #
-# public/privacy.html §4 promises that under-13 telemetry is purged after 90 days of
-# inactivity. Until 2026-09-11 nothing in this repository ran that prune: no workflow,
-# no npm script, no scheduled job of any kind, and scripts/prune-telemetry.js had never
-# been executed (it crashed on its first run — see the initializeApp note in that file).
-# This job exists so the gap between what the policy says and what the database holds is
-# visible every week instead of discovered during an audit.
+# public/privacy.html §8 (founder decision 2026-11-27): once a year, by hand, we delete
+# student records with no activity in the past 2 years. This job shows every week how much
+# is past that window, so the yearly cleanup is never a surprise and the gap between what
+# the policy says and what the database holds stays visible.
 #
-# It deliberately does NOT delete. The 90-day window is an open question with counsel as
-# of 2026-09-11, and deleting children's data on a schedule nobody has signed off is not
-# a decision CI should be making. The command below is --dry-run only; there is no input,
-# flag or branch of this workflow that makes it destructive.
+# It deliberately does NOT delete. The deleting run is .github/workflows/retention-cleanup.yml,
+# started by hand once a year with a confirm box. The command below is --dry-run only; there
+# is no input, flag or branch of this workflow that makes it destructive.
 #
 # On the service account: staging-deploy.yml reads
 # `FIREBASE_SERVICE_ACCOUNT || FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY` because a second

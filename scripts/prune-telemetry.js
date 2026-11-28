@@ -44,7 +44,7 @@
 // no npm script and no workflow in this repo can run it destructively. Before anyone
 // runs it for real, see the retention ownership section in docs/insider-analytics.md —
 // a destructive run needs the named owner's authorisation, and as of 2026-09-11 the
-// 90-day window itself is an open question with counsel.
+// window is 730 days, deleted once a year by hand (founder decision 2026-11-27).
 //
 // Exits non-zero on any batch failure so this is safe to wire into a cron/CI job
 // without silently swallowing errors.
@@ -60,15 +60,25 @@ const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 const fs = require('fs');
 
 function parseArgs(argv) {
-  const args = { dryRun: false, days: 90, appId: 'allgood-academy', summary: null };
+  // RETENTION POLICY (founder decision 2026-11-27, privacy.html §8): once a year, by hand,
+  // delete student records with no activity in the past 2 years (730 days). Nothing deletes
+  // on a schedule: the weekly report is a dry run, and a real run is the "Yearly student-data
+  // cleanup" workflow, started by a person with the confirm box filled in.
+  const args = { dryRun: false, confirmDelete: false, days: 730, appId: 'allgood-academy', summary: null };
   for (const raw of argv.slice(2)) {
     if (raw === '--dry-run') args.dryRun = true;
+    else if (raw === '--confirm-delete') args.confirmDelete = true;
     else if (raw.startsWith('--days=')) args.days = Number(raw.slice('--days='.length));
     else if (raw.startsWith('--app-id=')) args.appId = raw.slice('--app-id='.length);
     else if (raw.startsWith('--summary=')) args.summary = raw.slice('--summary='.length);
   }
   if (!Number.isFinite(args.days) || args.days <= 0) {
     throw new Error(`--days must be a positive number, got: ${args.days}`);
+  }
+  // Deleting children's data must be asked for in so many words. Without --dry-run AND
+  // without --confirm-delete, refuse rather than default to the destructive path.
+  if (!args.dryRun && !args.confirmDelete) {
+    throw new Error('Refusing to delete: pass --dry-run to report, or --confirm-delete for the yearly cleanup.');
   }
   return args;
 }
@@ -145,10 +155,10 @@ function renderSummary({ args, cutoffDate, ranAt, rows }) {
   lines.push('');
   lines.push(totalPast === 0
     ? `## ✅ Nothing is past our published window.`
-    : `## ⚠️ ${totalPast.toLocaleString()} record(s) are past our published window and have not been deleted.`);
+    : `## 🗓️ ${totalPast.toLocaleString()} record(s) are past our published window and are due at the next yearly cleanup.`);
   lines.push('');
-  lines.push(`Our privacy policy says under-13 telemetry is purged after **${args.days} days of inactivity**. `
-    + `That means anything whose last activity was before **${fmt(cutoffDate)}** should already be gone.`);
+  lines.push(`Our privacy policy says that once a year we delete student records with no activity in the past **${args.days} days**. `
+    + `Anything whose last activity was before **${fmt(cutoffDate)}** goes at the next yearly cleanup (Actions → "Yearly student-data cleanup").`);
   lines.push('');
   lines.push('| What | Past the window | Oldest record still stored | Clock measured from |');
   lines.push('|---|---|---|---|');
