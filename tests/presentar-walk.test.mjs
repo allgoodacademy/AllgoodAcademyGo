@@ -113,9 +113,25 @@ async function walk(browser, base, slug, viewport, exact = false) {
         if (/cinco preguntas/.test(m)) { await clickShown('.ea-votes .ea-v, #ea-go'); continue; }
         // La selva draws its own boarding pass: the teacher taps the picture the class chose.
         if (/tres preguntas/.test(m)) { await clickShown('[data-pm-wait="1"] .pic:not(:disabled)'); continue; }
-        // A tap the scene needs (La selva: «Miren aquí», the feeders, Bajar). SVG pins have no
-        // .click(), so dispatch the event.
-        if (/toquen «Miren aquí»|toquen los comederos|Toquen Bajar/.test(m)) {
+        // La selva's colibríes: put birds on the feeders and tap Listo. The first try places 3, so
+        // the count-together recast plays; then two more make five and Listo finishes the scene.
+        if (/cinco colibríes y toquen Listo/.test(m)) {
+            const birds = () => page.$$eval('#hums > g', (g) => g.length);
+            const target = (await birds()) === 0 ? 3 : 5;
+            for (let t = 0; t < 8 && (await birds()) < target; t++) {
+                await page.evaluate(() => { const el = Array.from(document.querySelectorAll('[data-feeder]')).find((x) => x.getClientRects().length && x.style.display !== 'none'); if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+            }
+            assert.equal(await birds(), target, `${slug}: the feeders did not take ${target} birds`);
+            await click('#hum-done');
+            if (target === 3) {
+                for (let t = 0; t < 120 && (await page.$eval('#hum-done', (b) => b.disabled)); t++) await sleep(100);
+                assert.match(await page.$eval('#hum-say', (e) => e.textContent), /Yo dije cinco/, `${slug}: no recast after 3 birds`);
+            } else assert.match(await page.$eval('#hum-say', (e) => e.textContent), /¡Perfecto!/, `${slug}: five birds did not finish`);
+            continue;
+        }
+        // A tap the scene needs (La selva: «Miren aquí», Bajar). SVG pins have no .click(), so
+        // dispatch the event.
+        if (/toquen «Miren aquí»|Toquen Bajar/.test(m)) {
             await page.evaluate(() => { const el = Array.from(document.querySelectorAll('[data-pm-tap]')).find((x) => x.getClientRects().length); if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
             continue;
         }
@@ -147,6 +163,8 @@ async function walk(browser, base, slug, viewport, exact = false) {
         if (/Toquen Revelar/.test(m)) { await clickShown('.pm-vote [data-reveal]'); await checkReveal(); continue; }
         if (/No hay mayoría/.test(m)) { await clickShown('.pm-vote [data-tie]'); await clickShown('.pm-vote [data-reveal]'); await checkReveal(); continue; }
         if (/elijan un camino/.test(m)) {
+            // La selva: the counted-hands run takes the colibríes path, the other the oxcart.
+            if (slug === 'la-selva' && exact) { await clickShown('section.fork:not(.locked) .opts .opt:last-child'); continue; }
             if (!(await clickShown('section.fork:not(.locked) .path'))) {
                 if (!(await clickShown('section.fork:not(.locked) .opts .opt'))) await clickShown('section.fork:not(.locked) .mi');
             }

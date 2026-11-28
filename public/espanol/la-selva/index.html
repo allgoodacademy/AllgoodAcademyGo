@@ -109,8 +109,9 @@ h2{font-size:clamp(26px,4vw,34px);line-height:1.1;letter-spacing:-.02em;margin:0
 .status.ok{background:var(--ok)}
 .binos{max-width:560px;margin:14px auto 0}
 .binos svg{width:100%;height:auto;display:block}
-.jodi{display:flex;gap:12px;align-items:flex-start;background:#fff;border:2px solid var(--paper);border-radius:14px;padding:12px 14px;margin-top:12px}
-.jav{flex:none;width:52px;height:52px;border-radius:50%;background:var(--paper);display:grid;place-items:center;font-family:var(--font-display);font-weight:700;color:var(--teal-d);font-size:22px}
+.jodi{display:flex;gap:14px;align-items:flex-start;background:#fff;border:2px solid var(--paper);border-radius:16px;padding:14px 18px;margin-top:12px}
+/* Jodi's real art, the same size as El Mundial's .jt (64 px, no frame around the face) */
+.jodi img{width:64px;height:64px;flex:none}
 .jodi p{margin:2px 0 0}
 .note{font-size:13px;color:#C9D9CF;text-align:center;margin:8px 0 0}
 .hot{cursor:pointer}.hot:focus{outline:none}.hot:focus-visible .ring{stroke:#FFB347;stroke-width:5}
@@ -138,6 +139,8 @@ h2{font-size:clamp(26px,4vw,34px);line-height:1.1;letter-spacing:-.02em;margin:0
 @keyframes develop{from{filter:brightness(2.4) blur(6px)}to{filter:none}}
 .feed{margin-top:12px}.feed svg{width:100%;height:auto;display:block;border-radius:14px}
 .hum-in{animation:fly .6s ease}@keyframes fly{from{transform:translateY(-40px);opacity:0}to{transform:none;opacity:1}}
+.hum-hi{filter:drop-shadow(0 0 6px #FFD54A) drop-shadow(0 0 3px #fff)}
+.hum-btns{justify-content:center;margin-top:6px}
 .roll-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;margin-top:12px}
 .roll-grid .polaroid{margin:0;transform:rotate(-1.5deg)}.roll-grid .polaroid:nth-child(even){transform:rotate(1.5deg)}
 .recap{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px}
@@ -517,7 +520,8 @@ const L=(who,es,en,blur=true)=>`<div class="line"><button class="play say" aria-
 const N=t=>`<div class="narr"><button class="play say" data-say="${t.replace(/<[^>]+>/g,'')}" aria-label="Listen">${spk}</button><p>${t}</p></div>`;
 const frame=(id,vb,label)=>`<div class="frame"><svg viewBox="${vb}" id="${id}" role="img" aria-label="${label}"></svg></div>`;
 const sign=(n,t,b,id)=>`<div class="sign"><span class="n">${n}</span><span class="t">${t}<b>${b}</b></span><span class="status" id="${id}-st">BUSCANDO</span></div>`;
-const jodi=t=>`<div class="jodi"><span class="jav" aria-hidden="true">J</span><div><b>Jodi's take</b><p>${t}</p></div></div>`;
+/* Jodi's take: happy when the class got it right, thinking when they didn't (as El Mundial). */
+const jodi=(t,ok)=>`<div class="jodi"><img src="/assets/jodi/jodi-${ok?'happy':'thinking'}.svg" alt="Jodi" width="64" height="64"><div><b>Jodi's take</b><p>${t}</p></div></div>`;
 const go=(id,txt)=>`<div class="row next"><button class="go" id="${id}" data-unlock>${txt}</button></div>`;
 document.addEventListener('click',e=>{
   const p=e.target.closest('.line .play,.line .es');if(p){const es=p.closest('.line').querySelector('.es');es.classList.remove('blur');say(es.dataset.es,'es');T('ev_audio_play');return}
@@ -557,7 +561,7 @@ function gate(o){let pick=null,done=false;const box=$('#'+o.id+'-pics'),btn=$('#
     await o.reveal(pick,out);
     box.querySelectorAll('.pic').forEach((x,i)=>{if(o.opts[i].ok)x.classList.add('right')});
     const m=document.createElement('div');out.appendChild(m);
-    m.insertAdjacentHTML('beforeend',jodi(o.jodi(ok,pick)));
+    m.insertAdjacentHTML('beforeend',jodi(o.jodi(ok,pick),ok));
     if(o.extra)m.insertAdjacentHTML('beforeend',o.extra);
     if(o.photo)realPhoto(m,o.photo.src,o.photo.alt,o.photo.cap,o.photo.date);
     m.insertAdjacentHTML('beforeend',go(o.id+'-next','Sigue ↓'));
@@ -841,7 +845,6 @@ ${heliconia(1080,540,1)}${heliconia(130,540,.9)}<path d="M0 70 H1200" stroke="#5
 ${[330,600,870].map((x,i)=>`<g transform="translate(${x} 70)"><path d="M0 0 V60" stroke="#3A3A3A" stroke-width="3"/><path d="M-22 60 h44 l-6 90 q-16 12 -32 0Z" fill="#E7F0F2" opacity=".8"/><path d="M-20 100 h40 l-4 50 q-16 12 -32 0Z" fill="#D8332A" opacity=".8"/>
 <ellipse cx="0" cy="160" rx="46" ry="12" fill="#C2261F"/>${[-30,0,30].map(d=>`<circle cx="${d}" cy="160" r="6" fill="#F2C531"/>`).join('')}</g>`).join('')}
 <g id="hums"></g>`}
-const HUMPOS=[[250,190],[400,210],[540,180],[690,215],[800,190],[930,220]];
 
 /* ================= FLOW ================= */
 /* Embarque (Form A) and Aduana (Form B): same skills, real Costa Rican species, no score shown */
@@ -906,13 +909,34 @@ function forkCart(){const out=$('#f1body');out.innerHTML=`${frame('art-ox','0 0 
  say('Miren: los bueyes y la carreta. ¡Qué colores!','es');
  out.insertAdjacentHTML('beforeend',`<p class="tip-line">One <i>buey</i>, two <i>bueyes</i>: another word that adds <b>-es</b>.</p>`);
  realPhoto(out,'/assets/espanol/la-selva/oxen.jpg','Two real white oxen with long horns, yoked to a painted red oxcart','Los bueyes, de verdad.');forkDone(out)}
-function forkHum(){const out=$('#f1body');out.innerHTML=`${frame('art-hum','0 0 1200 560','Red hummingbird feeders hang from a beam. Tap them to bring the hummingbirds.')}
- ${L('Marisol','Toquen los comederos. ¿Cuántos colibríes vienen?','Tap the feeders. How many hummingbirds come?',false)}<div class="counter" id="hum-count" aria-live="polite">0</div>`;setTimeout(sizePins,0);
- const svg=$('#art-hum');svg.innerHTML=humScene()+`<g class="hot pin" tabindex="0" role="button" aria-label="Tap the feeders" id="feed" data-pm-tap="Terminen la escena: toquen los comederos."><circle class="hit" cx="600" cy="230" r="44" fill="#fff" opacity="0"/><circle class="pulse" cx="600" cy="230" r="20" fill="none" stroke="#FBF6EE" stroke-width="4"/><circle cx="600" cy="230" r="20" fill="#FBF6EE" stroke="#B0773A" stroke-width="4"/><text x="600" y="237" text-anchor="middle" style="font:700 20px sans-serif" fill="#245866">+</text></g>`;
- const W=['un colibrí','dos colibríes','tres colibríes','cuatro colibríes','cinco colibríes','seis colibríes'];let n=0;
- const add=()=>{if(n>=6)return;const p=HUMPOS[n];$('#hums').insertAdjacentHTML('beforeend',`<use href="#hum" x="${p[0]}" y="${p[1]}" width="96" height="72" class="hum-in"/>`);say(W[n],'es');n++;$('#hum-count').textContent=W[n-1];
-  if(n===6){$('#feed').removeAttribute('data-pm-tap');$('#hum-count').textContent='¡seis colibríes!';out.insertAdjacentHTML('beforeend',`<p class="tip-line">One <i>colibrí</i>, many <i>colibríes</i>. Words that end in an accented <b>-í</b> usually add <b>-es</b>.</p><div class="fichas">${ficha('colibri')}${ficha('heliconia')}</div>`);forkDone(out)}};
- const f=$('#feed');f.onclick=add;f.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();add()}}}
+/* Los colibríes (never scored): Marisol asks for five, the class builds it at the three feeders and
+   commits with Listo. Two perches per feeder (6 at most); a full feeder's pin hides. A miss is recast
+   by counting the birds together, and the class fixes it and taps Listo again. Telemetry: hum:<n>. */
+function forkHum(){const out=$('#f1body'),TAP='Pongan cinco colibríes y toquen Listo.';
+ out.innerHTML=`${frame('art-hum','0 0 1200 560','Three red hummingbird feeders hang from a beam. Each has a plus pin: tap it to bring a hummingbird to that feeder.')}
+ ${L('Marisol','¡Llegan los colibríes! Pon cinco colibríes en los comederos.','Here come the hummingbirds! Put five hummingbirds on the feeders.',false)}<div class="counter" id="hum-count" aria-live="polite">0</div>
+ <div class="row hum-btns"><button class="go" id="hum-done" disabled>Listo</button><button class="ghost" id="hum-reset">Otra vez</button></div><div id="hum-say" aria-live="polite"></div>`;setTimeout(sizePins,0);
+ const FX=[330,600,870],svg=$('#art-hum');
+ svg.innerHTML=humScene()+FX.map((x,i)=>`<g class="hot pin" tabindex="0" role="button" aria-label="Add a hummingbird to this feeder" data-feeder="${i}" data-pm-tap="${TAP}"><circle class="hit" cx="${x}" cy="266" r="40" fill="#fff" opacity="0"/><circle class="pulse" cx="${x}" cy="266" r="22" fill="none" stroke="#FBF6EE" stroke-width="4"/><circle class="disc ring" cx="${x}" cy="266" r="22" fill="#FBF6EE" stroke="#B0773A" stroke-width="4"/><path d="M${x-10} 266 h20 M${x} 256 v20" stroke="#245866" stroke-width="4.5" stroke-linecap="round"/></g>`).join('');
+ const W=['un colibrí','dos colibríes','tres colibríes','cuatro colibríes','cinco colibríes','seis colibríes'];
+ let birds=[],busy=false,done=false;const per=[0,0,0],pins=[...svg.querySelectorAll('[data-feeder]')],cnt=$('#hum-count'),ok=$('#hum-done'),again=$('#hum-reset'),box=$('#hum-say');
+ /* perch 0 sits left of the feeder facing right, perch 1 right of it, mirrored; the beak meets a yellow port */
+ const perch=(f,k)=>{const x=FX[f];return k?`<g transform="translate(${x+136} 199) scale(-1 1)"><use href="#hum" width="110" height="82" class="hum-in"/></g>`:`<g transform="translate(${x-136} 199)"><use href="#hum" width="110" height="82" class="hum-in"/></g>`};
+ const paint=()=>{const n=birds.length;cnt.textContent=n?W[n-1]:'0';ok.disabled=busy||done||!n;again.disabled=busy||done||!n;
+  pins.forEach((g,i)=>{const show=!done&&per[i]<2;g.style.display=show?'':'none';g.setAttribute('tabindex',show?'0':'-1');g.setAttribute('aria-disabled',String(busy))})};
+ const add=i=>{if(busy||done||per[i]>=2||birds.length>=6)return;const had=document.activeElement===pins[i],k=per[i]++;$('#hums').insertAdjacentHTML('beforeend',perch(i,k));birds.push($('#hums').lastElementChild);
+  const n=birds.length;say(W[n-1],'es');paint();if(had&&per[i]>=2)(pins.find(g=>g.style.display!=='none')||ok).focus()};
+ pins.forEach(g=>{const i=+g.dataset.feeder;g.onclick=()=>add(i);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();add(i)}}});
+ again.onclick=()=>{if(busy||done)return;hush();birds=[];per.fill(0);$('#hums').innerHTML='';box.innerHTML='';paint();pins[0].focus()};
+ ok.onclick=async()=>{if(busy||done||!birds.length)return;const n=birds.length;T('ev_hum',{choice:'hum:'+n});
+  if(n===5){done=true;paint();ok.parentNode.style.display="none";pins.forEach(g=>g.removeAttribute('data-pm-tap'));cnt.textContent='¡cinco colibríes!';
+   box.innerHTML=L('Marisol','¡Cinco colibríes! ¡Perfecto!','Five hummingbirds! Perfect!',false)+jodi('<i>Cinco</i> is 5. Listen for the number before you start tapping.',true);say('¡Cinco colibríes! ¡Perfecto!','es');
+   out.insertAdjacentHTML('beforeend',`<p class="tip-line">One <i>colibrí</i>, many <i>colibríes</i>. Words that end in an accented <b>-í</b> usually add <b>-es</b>.</p><div class="fichas">${ficha('colibri')}${ficha('heliconia')}</div>`);forkDone(out);return}
+  busy=true;paint();box.innerHTML=L('Marisol','¡Uy! Contamos juntos.','Oops! Let\'s count together.',false);await say('¡Uy! Contamos juntos.','es');
+  for(let i=0;i<n;i++){if(!birds[i])break;birds.forEach(b=>b.classList.remove('hum-hi'));birds[i].classList.add('hum-hi');cnt.textContent=W[i];await Promise.all([sayQ(W[i]),wait(700)])}
+  birds.forEach(b=>b.classList.remove('hum-hi'));box.insertAdjacentHTML('beforeend',L('Marisol','Yo dije cinco. ¡Otra vez!','I said five. Try again!',false));await sayQ('Yo dije cinco. ¡Otra vez!');
+  busy=false;paint();(pins.find(g=>g.style.display!=='none')||again).focus()};
+ paint()}
 function forkDone(out){out.insertAdjacentHTML('beforeend',go('fork-next','Sigue ↓'));$('#fork-next').onclick=()=>unlock('g3');pmRefresh()}
 
 /* Puerta 3 · El tucán: tres, not trece */
@@ -966,7 +990,7 @@ function passport(){T('ev_aduana',{phase:'done',form:'B',res:S.adu});pmWait($('#
  <p class="pb-score">Al embarcar: <b>${E} de 3</b>. En la aduana: <b>${A} de 3</b>.</p>
  ${skills.map((s,i)=>{const e=S.emb[i],a=S.adu[i];const st=a&&!e?'<span class="stamp new">¡NUEVO!</span>':a&&e?'<span class="stamp had">YA LO SABÍAS</span>':'<span class="stamp try">PRACTICA</span>';
   return `<div class="pb-row">${st}<div><b>${s[0]}</b>${a?'':`<p>${s[1]}</p>`}</div></div>`}).join('')}
- ${jodi(A===3?'Look at that. You heard "more than one" in the endings, not just in the numbers. That\'s the whole trick.':A>E?'You grew on this trip. Keep listening to the ends of words: that\'s where Spanish tells you how many.':'Listening to the ends of words takes practice. Play again and listen for <i>-s</i>, <i>-es</i> and <i>las</i>.')}
+ ${jodi(A===3?'Look at that. You heard "more than one" in the endings, not just in the numbers. That\'s the whole trick.':A>E?'You grew on this trip. Keep listening to the ends of words: that\'s where Spanish tells you how many.':'Listening to the ends of words takes practice. Play again and listen for <i>-s</i>, <i>-es</i> and <i>las</i>.',A===3||A>E)}
  <div class="row"><button class="ghost" id="b-replay" style="color:#FBF6EE;border-color:#FBF6EE">Juega otra vez · elige otro camino</button></div></div>`;
  $('#b-replay').onclick=()=>{location.href=location.pathname+location.search};$('#passport').scrollIntoView({block:'start'});
  const c=S.gates.filter(g=>g.ok).length;
