@@ -28,7 +28,7 @@ function load(story) {
 }
 
 test('every story with recorded voices is checked', () => {
-  assert.ok(STORIES.includes('el-viaje') && STORIES.includes('la-selva'), `stories found: ${STORIES.join(', ')}`);
+  assert.ok(['el-viaje', 'la-selva', 'el-mundial'].every(s => STORIES.includes(s)), `stories found: ${STORIES.join(', ')}`);
 });
 
 for (const story of STORIES) {
@@ -153,6 +153,56 @@ const EXTRACT = {
     assert.deepEqual(unknown, [], 'say() is passed something this test does not know how to read: teach the la-selva extractor about it');
     return out;
   },
+
+  // El Mundial: data-say prompts, literal say()/sayQ() lines, the fork lines (plaza taps, metro
+  // ternary, the food words), glossary (.gl), plan words (.pl), verb chips (data-a and data-b), WORDS,
+  // the Puerta replies, and the TEMPLATED lines: every combination of the student's picks, built
+  // from the page's own template and chip values. Every say() / sayQ() call site must pass one of
+  // the expressions below, so a new kind of spoken line fails here until it is covered.
+  'el-mundial': ({ html, js }) => {
+    const out = new Set();
+    const add = t => out.add(norm(t));
+    const must = (re, s = js) => { const m = s.match(re); assert.ok(m, `pattern not found: ${re}`); return m; };
+    const grab = re => Function(`return (${must(re)[1]})`)();
+    for (const m of html.matchAll(/data-say="([^"$]+)"/g)) add(m[1]);
+    for (const m of js.matchAll(/\bsayQ?\('([^']+)'/g)) add(m[1]);
+    for (const m of html.matchAll(/class="gl"[^>]*>([^<]+)</g)) add(m[1]);
+    for (const m of html.matchAll(/class="pl" data-w="([^"]+)"/g)) add(m[1]);
+    const chips = {};
+    for (const m of html.matchAll(/class="chip" data-slot="(\d+)" data-a="([^"]+)" data-b="([^"]+)"/g)) { chips[m[1]] = [m[2], m[3]]; add(m[2]); add(m[3]); }
+    for (const [es] of grab(/const WORDS=(\[.*?\]\]);/)) add(es);
+    // Puerta 1 and the metro question: both arms of each ternary
+    for (const re of [/say\(k==='A'\?'([^']+)':'([^']+)'\)/, /const t=o\.dataset\.k==='a'\?'([^']+)':'([^']+)'/, /const q=k==='A'\?'([^']+)':'([^']+)'/]) { const m = must(re); add(m[1]); add(m[2]); }
+    // plaza taps (say(t) with "Facu: " dropped)
+    for (const t of grab(/const t=(\['La Catedral[^\]]*\])\[\+d\.dataset\.i\]/)) add(t.replace(/Facu: /, ''));
+    // supermercado: each food word, and Lucía's line for every ordered pair of two different items
+    const FOOD = grab(/const FOOD=(\[[\s\S]*?\]\n\]);/).map(f => f[1]);
+    FOOD.forEach(add);
+    const sup = must(/const t=`Lucía: “([^`]*)\$\{got\[0\]\}([^`]*)\$\{got\[1\]\}([^`]*)”`/);
+    for (const a of FOOD) for (const b of FOOD) if (a !== b) add(sup[1] + a + sup[2] + b + sup[3]);
+    // Puerta 3: the student's voice note for every chip combination, and Facu's replies
+    const g3 = must(/say\(`([^`]*)\$\{v\[1\]\}([^`]*)\$\{v\[2\]\}([^`]*)\$\{v\[3\]\}([^`]*)`\)/);
+    for (const a of chips[1]) for (const b of chips[2]) for (const c of chips[3]) add(g3[1] + a + g3[2] + b + g3[3] + c + g3[4]);
+    for (const m of must(/const R=\{1:([\s\S]*?)\};/)[1].matchAll(/'([^']+)'/g)) add(m[1]);
+    // Puerta 4: the student's answer for every chip combination, and Rosa's three replies
+    const g4 = must(/say\(`([^`]*)\$\{a\}([^`]*)\$\{b\}([^`]*)`\)/);
+    for (const a of chips[41]) for (const b of chips[42]) add(g4[1] + a + g4[2] + b + g4[3]);
+    const g4r = [...must(/\/\* PUERTA 4([\s\S]*?)\/\* PUERTA 5/)[1].matchAll(/t='([^']+)'/g)];
+    assert.equal(g4r.length, 3, 'Puerta 4 replies not found'); g4r.forEach(m => add(m[1]));
+
+    // Every call site passes something gathered above.
+    const OK = new Set(['r.dataset.w', 'b.dataset.say,b.dataset.lang', 'b.dataset.say', 'g.textContent', 'c.textContent', 't', 'q', 's.dataset.es',
+      "t.replace(/Facu: /,'').replace(/[“”]/g,'')", "t.replace('Lucía: ','').replace(/[“”]/g,'')", "R[i].replace(/[“”]/g,'')", "t.replace(/[“”]/g,'')",
+      "k==='A'?'¡Genial! Mañana vamos a la Plaza Roja. ¡Vení con nosotros!':'Jaja, no, ¡vos! Te pregunto a vos. ¿De dónde sos?'",
+      `\`${g3[0].slice(5, -2)}\``, `\`${g4[0].slice(5, -2)}\``]);
+    const sites = [...js.matchAll(/\b(say|sayQ)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)]
+      .map(m => m[2].replace(/,'(es|en)'$/, '').trim())
+      .filter(a => a && a !== 't,lang');
+    assert.ok(sites.length > 15, 'say() call sites not found');
+    const unknown = sites.filter(a => !OK.has(a) && !/^'[^']*'$/.test(a));
+    assert.deepEqual(unknown, [], 'say() is passed something this test does not know how to read: teach the el-mundial extractor about it');
+    return out;
+  },
 };
 
 test('El Viaje: say() keeps the speechSynthesis fallback and the existing telemetry call', () => {
@@ -167,5 +217,16 @@ test('La selva: one shared Audio element, stop-before-play, browser speech as th
   assert.match(js, /try\{a\.pause\(\)\}catch\(e\)\{\}/, 'stops what was playing before the next clip');
   assert.match(js, /const u=m\[k\];if\(!u\)\{tts\(\);return\}/, 'a line missing from the manifest falls back to the browser voice');
   assert.match(js, /function sayTTS\(t,lang\)\{if\(!hasTTS\)return;try\{speechSynthesis\.cancel\(\);speechSynthesis\.speak\(utter\(t,lang\)\)\}catch\(e\)\{\}\}/);
+  assert.match(js, /\naudManifest\(\);\n/, 'the manifest is fetched as the page loads, so the first tap plays at once');
+});
+
+test('El Mundial: one shared Audio element, stop-before-play, browser speech as the fallback, telemetry kept', () => {
+  const { js } = load('el-mundial');
+  assert.match(js, /let a=AUD\.el;if\(!a\)\{a=AUD\.el=new Audio\(\);a\.preload='none'\}/, 'one shared Audio element');
+  assert.match(js, /try\{a\.pause\(\)\}catch\(_\)\{\}/, 'stops what was playing before the next clip');
+  assert.match(js, /const u=m\[k\];if\(!u\)\{tts\(\);return\}/, 'a line missing from the manifest falls back to the browser voice');
+  assert.match(js, /function say\(t,lang\)\{T\('ev_audio_play',\{\}\);/, 'say() keeps the ev_audio_play telemetry call');
+  assert.match(js, /function sayTTS\(t,lang\)\{if\(!hasTTS\)return;try\{speechSynthesis\.cancel\(\);/);
+  assert.equal((js.match(/speechSynthesis\.speak\(/g) || []).length, 1, 'only sayTTS() may use the browser voice');
   assert.match(js, /\naudManifest\(\);\n/, 'the manifest is fetched as the page loads, so the first tap plays at once');
 });
