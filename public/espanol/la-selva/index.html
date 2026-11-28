@@ -124,6 +124,18 @@ h2{font-size:clamp(26px,4vw,34px);line-height:1.1;letter-spacing:-.02em;margin:0
 .real small{display:block;color:#B9D3C4;font-size:13px}
 @keyframes slide{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
 .roll{background:var(--bronze);color:#fff;border-radius:999px;padding:4px 10px;font-size:13px}
+/* A character line starts blurred: its ▶ pulses and a hint names the speaker until it is played
+   (2026-11-28). Reduced motion gets a still ring instead of the pulse. */
+.line>.who{grid-row:1}.line>.es{grid-row:2}.line>.en-row{grid-row:3}
+.line .hint{grid-column:2;grid-row:2;align-self:center;justify-self:start;z-index:1;pointer-events:none;background:var(--forest);color:#fff;font:700 14px var(--font-ui);border-radius:999px;padding:4px 12px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.line.unheard>.play{animation:hear 1.6s ease-out infinite}
+@keyframes hear{0%{box-shadow:0 0 0 0 rgba(255,179,71,.85)}100%{box-shadow:0 0 0 14px rgba(255,179,71,0)}}
+@media (prefers-reduced-motion:reduce){.line.unheard>.play{box-shadow:0 0 0 4px #FFB347}}
+/* A photo reward: the caption, then a line pointing at the header's Tus fotos pill, which lights up. */
+.real small.added{color:#FFD08A;font-weight:700;margin-top:2px}
+.roll{transition:background .3s,box-shadow .3s}
+.roll.bump{background:var(--orange);box-shadow:0 0 0 3px #FFD08A;animation:bump .55s ease 2}
+@keyframes bump{50%{transform:scale(1.18)}}
 .lens{max-width:420px;margin:14px auto 0}.lens svg{width:100%;height:auto;display:block}
 
 .ask{margin:8px 0 0;font-weight:700}
@@ -516,7 +528,7 @@ window.StoryChecks={presentedResults:()=>PRES.on&&PRES.emb.length?{v:1,form:'A',
 const pmRefresh=()=>{if(window.StoryPresentar)window.StoryPresentar.refresh()};
 
 /* ---------- small builders ---------- */
-const L=(who,es,en,blur=true)=>`<div class="line"><button class="play say" aria-label="Escuchar" data-es="${es}">${spk}</button><span class="who">${who}</span><p class="es${blur?' blur':''}" tabindex="0" data-es="${es}">${es}</p>${en?`<span class="en-row"><button class="en-btn" aria-expanded="false">EN</button><p class="en" hidden>${en}</p></span>`:''}</div>`;
+const L=(who,es,en,blur=true)=>`<div class="line${blur?' unheard':''}"><button class="play say" aria-label="Escuchar" data-es="${es}">${spk}</button><span class="who">${who}</span>${blur?`<span class="hint" aria-hidden="true">▶ Tap to hear ${who.split(',')[0]}</span>`:''}<p class="es${blur?' blur':''}" tabindex="0" data-es="${es}">${es}</p>${en?`<span class="en-row"><button class="en-btn" aria-expanded="false">EN</button><p class="en" hidden>${en}</p></span>`:''}</div>`;
 const N=t=>`<div class="narr"><button class="play say" data-say="${t.replace(/<[^>]+>/g,'')}" aria-label="Listen">${spk}</button><p>${t}</p></div>`;
 const frame=(id,vb,label)=>`<div class="frame"><svg viewBox="${vb}" id="${id}" role="img" aria-label="${label}"></svg></div>`;
 const sign=(n,t,b,id)=>`<div class="sign"><span class="n">${n}</span><span class="t">${t}<b>${b}</b></span><span class="status" id="${id}-st">BUSCANDO</span></div>`;
@@ -524,7 +536,7 @@ const sign=(n,t,b,id)=>`<div class="sign"><span class="n">${n}</span><span class
 const jodi=(t,ok)=>`<div class="jodi"><img src="/assets/jodi/jodi-${ok?'happy':'thinking'}.svg" alt="Jodi" width="64" height="64"><div><b>Jodi's take</b><p>${t}</p></div></div>`;
 const go=(id,txt)=>`<div class="row next"><button class="go" id="${id}" data-unlock>${txt}</button></div>`;
 document.addEventListener('click',e=>{
-  const p=e.target.closest('.line .play,.line .es');if(p){const es=p.closest('.line').querySelector('.es');es.classList.remove('blur');say(es.dataset.es,'es');T('ev_audio_play');return}
+  const p=e.target.closest('.line .play,.line .es');if(p){const ln=p.closest('.line'),es=ln.querySelector('.es'),h=ln.querySelector('.hint');es.classList.remove('blur');ln.classList.remove('unheard');if(h)h.remove();say(es.dataset.es,'es');T('ev_audio_play');return}
   const b=e.target.closest('.en-btn');if(b){const en=b.nextElementSibling;en.hidden=!en.hidden;b.setAttribute('aria-expanded',String(!en.hidden));return}
   const n=e.target.closest('.narr .play');if(n){say(n.dataset.say,'en');T('ev_audio_play');return}
   const f=e.target.closest('.ficha .play');if(f){say(f.dataset.es,'es');T('ev_audio_play')}});
@@ -534,8 +546,10 @@ function unlock(id){const el=$('#'+id);el.classList.remove('locked');watch(el);s
 function sizePins(){document.querySelectorAll('.frame>svg').forEach(svg=>{const w=svg.getBoundingClientRect().width;if(!w)return;
   const vb=svg.viewBox&&svg.viewBox.baseVal,sc=w/((vb&&vb.width)||1200),r=Math.max(40,Math.ceil(23/sc));svg.querySelectorAll('.hot>.hit').forEach(c=>c.setAttribute('r',r))})}
 addEventListener('resize',sizePins);
-function realPhoto(box,src,alt,cap,date){S.photos.push({src,alt,cap});$('#roll').textContent='Tus fotos: '+S.photos.length;
-  box.insertAdjacentHTML('beforeend',`<div class="real"><img src="${src}" alt="${alt}"><div><b>${cap}</b><small>William's photo · ${date||'May 6, 2015'} · saved to Tus fotos</small></div></div>`)}
+/* the header's Tus fotos pill lights up when a photo is added (a still highlight with reduced motion) */
+function bumpRoll(){const r=$('#roll');r.classList.remove('bump');void r.offsetWidth;r.classList.add('bump');clearTimeout(bumpRoll.t);bumpRoll.t=setTimeout(()=>r.classList.remove('bump'),1800)}
+function realPhoto(box,src,alt,cap,date){S.photos.push({src,alt,cap});$('#roll').textContent='Tus fotos: '+S.photos.length;bumpRoll();
+  box.insertAdjacentHTML('beforeend',`<div class="real"><img src="${src}" alt="${alt}"><div><b>${cap}</b><small>William's photo · ${date||'May 6, 2015'}</small><small class="added">📷 Added to Tus fotos ↑</small></div></div>`)}
 function stamp(n){const s=$('#s'+n);s.classList.add('on');s.setAttribute('aria-label','Puerta '+n+' stamped')}
 
 /* ---------- picture cards ---------- */
