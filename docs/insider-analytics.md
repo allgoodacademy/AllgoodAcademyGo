@@ -78,7 +78,7 @@ which is what every figure on Insider is computed from. A module that passes `st
 | `seasons` | Reasons for the Seasons (`/simulations/seasons/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
 | `wolves-and-deer` | Wolves & Deer (`/simulations/wolves-and-deer/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
 | `snowball` | The Snowball (`/simulations/snowball/`) | **no** — its own **Simulations** page (`#/simulations`), from its own stream-filtered queries; anonymous session only, no name or free text |
-| `espanol` | El Viaje (`/espanol/el-viaje/`), El Mundial (`/espanol/el-mundial/`) and La selva (`/espanol/la-selva/`), all on one stream | **no** — its own **Español** page (`#/espanol`), from its own stream-filtered queries; their `game_scores` rows are split out by gameName. The student's existing session (a class member keeps their uid, so the class's teacher can read it under rules 6, 10b and 11b). Never the start-screen name, anything typed or the class-vote hand counts. Sessions tagged `?src=test` are left out of the Español page |
+| `espanol` | El Viaje (`/espanol/el-viaje/`), El Mundial (`/espanol/el-mundial/`), La selva (`/espanol/la-selva/`) and La Habana (`/espanol/la-habana/`), all on one stream | **no** — its own **Español** page (`#/espanol`), from its own stream-filtered queries; their `game_scores` rows are split out by gameName. The student's existing session (a class member keeps their uid, so the class's teacher can read it under rules 6, 10b and 11b). Never the start-screen name, anything typed or the class-vote hand counts. Sessions tagged `?src=test` are left out of the Español page |
 
 **Español stories** (`/espanol/*`, 2026-11-27) report on one stream, `espanol`, loaded by
 `/js/story-tracking.js` (which loads AuthCore and Telemetry and queues the story's calls until
@@ -91,14 +91,19 @@ they are ready). What each records:
   how many dishes were ordered). La selva (2026-11-28): Puertas 1–4 are each one picture tap,
   `choiceIndex` the picture in report.json order and `choice` its item id only (`p1:roca`);
   its fork is `{ scenarioIndex: 'f1', choiceIndex, choice: 'f1:carreta'|'f1:colibries' }`.
+  La Habana (2026-11-28): Puertas 1–4 are each one sentence pick, `choiceIndex` in report.json order
+  (the page shuffles what it shows) and `choice` `p<n>:ser`|`p<n>:estar`; its fork is
+  `{ scenarioIndex: 'f1', choiceIndex, choice: 'carro'|'playa' }`. Each transfer tap sends
+  `transfer` `{ item: 0|1, choice: 'es'|'está', score: 0|1 }`.
 - the session `summary`: `{ gates: { 1: 0|1, … }, path: { f1, … }, mode: 'solo'|'class' }`,
   rewritten after every Puerta and fork, plus `score` at the end. Mission Control reads this.
 - `module_complete` once, on reaching la carta, and one `game_scores` doc
   `{ gameName, completed: true, score, finalScore, maxScore: 5 }` (El Viaje adds its own `confianza`;
-  La selva has 4 Puertas, so `maxScore: 4`, and completes at the passport after its Aduana).
-- `module_progress/{el-viaje|el-mundial|la-selva}`: `{ v, finished, state }`, `state` a JSON string of
+  La selva and La Habana have 4 Puertas, so `maxScore: 4`, and complete at the passport after their Aduana).
+- `module_progress/{el-viaje|el-mundial|la-selva|la-habana}`: `{ v, finished, state }`, `state` a JSON string of
   the Puertas and paths so far, for resume (La selva has no resume yet; it also writes its
-  Embarque → Aduana `checks` there itself, three picture taps each, instead of /js/espanol-checks.js).
+  Embarque → Aduana `checks` there itself, three picture taps each, instead of /js/espanol-checks.js;
+  La Habana does the same with four picture taps each, plus `tr` / `trDone` for its two transfer sentences).
 - custom events: `ev_start`, `ev_gate_lock`, `fork_open`, `class_mode` / `class_vote` (`{gate}`
   only), `resume`, `ev_audio_play` and a few more. None carries a name or typed text.
 
@@ -193,6 +198,7 @@ the moments that matter. Steps per module:
 | El Viaje | sections reached | 12 |
 | El Mundial | sections reached | 10 |
 | La selva | sections reached | 11 |
+| La Habana | sections reached | 14 |
 
 The table above is hand-written but no longer hand-*checked*: `node scripts/check-modules.js`
 verifies every row against Insider's `COURSES` and against the shared registry, and fails on a

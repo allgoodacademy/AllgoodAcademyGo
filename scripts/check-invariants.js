@@ -84,6 +84,7 @@ const LEARNER_SURFACES = [
   'public/espanol/el-viaje/index.html',
   'public/espanol/el-mundial/index.html',
   'public/espanol/la-selva/index.html',
+  'public/espanol/la-habana/index.html',
 ];
 
 // Extracts the body of `window.NAME = ... };` so we can ask what a function actually calls.
@@ -203,7 +204,7 @@ if (exists('public/mission-control/index.html')) {
 // and /js/telemetry.js, and the Firebase APIs they call). No external <script src>, no
 // external stylesheet, no analytics or cookie code in the tracking script they load.
 {
-  const STORY_PAGES = ['public/espanol/el-viaje/index.html', 'public/espanol/el-mundial/index.html', 'public/espanol/la-selva/index.html'];
+  const STORY_PAGES = ['public/espanol/el-viaje/index.html', 'public/espanol/el-mundial/index.html', 'public/espanol/la-selva/index.html', 'public/espanol/la-habana/index.html'];
   for (const file of STORY_PAGES) {
     if (!exists(file)) continue;
     const src = read(file);

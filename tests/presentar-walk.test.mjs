@@ -1,4 +1,4 @@
-// PRESENTAR WALK (2026-11-27, AA-16; La selva added 2026-11-28, AA-18): run each Español story start to finish in Presentar en
+// PRESENTAR WALK (2026-11-27, AA-16; La selva added 2026-11-28, AA-18; La Habana 2026-11-28, AA-22): run each Español story start to finish in Presentar en
 // clase the way a teacher does on a projector. Press only Siguiente, plus the taps the bar
 // asks for (a vote, Revelar, a fork's path or scene). Asserts that:
 //   - the recap ("Resumen de la clase") opens at the end, and
@@ -111,8 +111,10 @@ async function walk(browser, base, slug, viewport, exact = false) {
         if (!m) continue;
         assert.doesNotMatch(m, /Elijan la respuesta de la clase en la historia/, `${slug}: the vote could not drive the story`);
         if (/cinco preguntas/.test(m)) { await clickShown('.ea-votes .ea-v, #ea-go'); continue; }
-        // La selva draws its own boarding pass: the teacher taps the picture the class chose.
-        if (/tres preguntas/.test(m)) { await clickShown('[data-pm-wait="1"] .pic:not(:disabled)'); continue; }
+        // La selva and La Habana draw their own boarding pass: the teacher taps the picture the class
+        // chose (three items in La selva, four in La Habana), then La Habana's two transfer verbs.
+        if (/tres preguntas|cuatro preguntas/.test(m)) { await clickShown('[data-pm-wait="1"] .pic:not(:disabled)'); continue; }
+        if (/dos frases/.test(m)) { await clickShown('[data-pm-wait="1"] .tr-v'); continue; }
         // La selva's colibríes: put birds on the feeders and tap Listo. The first try places 3, so
         // the count-together recast plays; then two more make five and Listo finishes the scene.
         if (/cinco colibríes y toquen Listo/.test(m)) {
@@ -164,7 +166,8 @@ async function walk(browser, base, slug, viewport, exact = false) {
         if (/No hay mayoría/.test(m)) { await clickShown('.pm-vote [data-tie]'); await clickShown('.pm-vote [data-reveal]'); await checkReveal(); continue; }
         if (/elijan un camino/.test(m)) {
             // La selva: the counted-hands run takes the colibríes path, the other the oxcart.
-            if (slug === 'la-selva' && exact) { await clickShown('section.fork:not(.locked) .opts .opt:last-child'); continue; }
+            // La Habana: the counted-hands run takes the beach, the other the old car.
+            if ((slug === 'la-selva' || slug === 'la-habana') && exact) { await clickShown('section.fork:not(.locked) .opts .opt:last-child'); continue; }
             if (!(await clickShown('section.fork:not(.locked) .path'))) {
                 if (!(await clickShown('section.fork:not(.locked) .opts .opt'))) await clickShown('section.fork:not(.locked) .mi');
             }
@@ -210,7 +213,7 @@ async function walk(browser, base, slug, viewport, exact = false) {
 }
 
 const SIZES = [{ width: 1440, height: 660 }, { width: 1280, height: 720 }];
-for (const slug of ['el-viaje', 'el-mundial', 'la-selva']) {
+for (const slug of ['el-viaje', 'el-mundial', 'la-selva', 'la-habana']) {
     for (const [viewport, exact] of [[SIZES[0], false], [SIZES[1], true]]) {
         test(`Presentar walk: ${slug} at ${viewport.width}×${viewport.height}, Siguiente only, never back up the page, ${exact ? 'hands counted at Puerta 1' : 'quick votes only'}`, { skip: !chromium && 'Playwright is not installed', timeout: 600000 }, async () => {
             const srv = await serve();
