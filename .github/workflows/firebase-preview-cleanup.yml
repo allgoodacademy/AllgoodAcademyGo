@@ -1,0 +1,119 @@
+# Deletes Firebase Hosting PR preview channels so they don't use up the site's
+# channel quota (a full quota makes "Deploy to Firebase Hosting on PR" fail with
+# 429 "channel quota reached").
+#
+# - pull_request closed (merged or not): deletes that PR's preview channel.
+# - workflow_dispatch: one-off sweep that deletes EVERY channel except the
+#   protected ones (see is_protected below).
+#
+# Protected channels are never deleted: `live` (production) and the sprint
+# staging channel(s): `staging` and anything named `staging-*`.
+name: Clean up Firebase preview channels
+
+'on':
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'List what would be deleted without deleting anything'
+        type: boolean
+        default: false
+
+concurrency:
+  group: firebase-preview-cleanup
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: allgood-academy
+  FIREBASE_TOOLS: firebase-tools@13
+
+jobs:
+  cleanup:
+    # Same guard as firebase-hosting-pull-request.yml: fork PRs never got a
+    # channel (and can't read the secret).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write service account credentials
+        env:
+          SA_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}'
+        run: |
+          printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Delete preview channel(s)
+        env:
+          EVENT: '${{ github.event_name }}'
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
+          HEAD_REF: '${{ github.event.pull_request.head.ref }}'
+          DRY_RUN: '${{ inputs.dry_run }}'
+        run: |
+          set -euo pipefail
+
+          # GUARD: these channels must never be deleted.
+          is_protected() {
+            case "$1" in
+              live|staging|staging-*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          list_channels() {
+            npx -y "$FIREBASE_TOOLS" hosting:channel:list --project "$PROJECT_ID" --json \
+              | jq -r '.result.channels[]?.name | split("/") | last'
+          }
+
+          delete_channel() {
+            local ch="$1"
+            if is_protected "$ch"; then
+              echo "SKIP protected channel: $ch"
+              return 0
+            fi
+            if [ "${DRY_RUN:-false}" = "true" ]; then
+              echo "DRY RUN would delete: $ch"
+              return 0
+            fi
+            echo "Deleting: $ch"
+            npx -y "$FIREBASE_TOOLS" hosting:channel:delete "$ch" --project "$PROJECT_ID" --force
+          }
+
+          echo "Channels before:"
+          channels="$(list_channels)"
+          echo "$channels" | sed 's/^/  /'
+
+          if [ "$EVENT" = "pull_request" ]; then
+            # Same id FirebaseExtended/action-hosting-deploy@v0 builds:
+            # "pr<number>-<first 20 chars of head ref>", with any char outside
+            # [A-Za-z0-9_.-] replaced. Seen on PR #105: branch
+            # "claude/bold-gates-ix2q9g" -> channel "pr105-claude-bold-gates-ix"
+            # ("/" -> "-"). The action's newer source uses "_", so accept both.
+            raw="$(printf 'pr%s-%s' "$PR_NUMBER" "${HEAD_REF:0:20}")"
+            found=""
+            for channel in "$(printf '%s' "$raw" | sed 's/[^A-Za-z0-9_.-]/-/g')" \
+                           "$(printf '%s' "$raw" | sed 's/[^A-Za-z0-9_.-]/_/g')"; do
+              if printf '%s\n' "$channels" | grep -qxF "$channel"; then
+                echo "PR #$PR_NUMBER channel: $channel"
+                delete_channel "$channel"
+                found=1
+                break
+              fi
+            done
+            if [ -z "$found" ]; then
+              echo "No channel for PR #$PR_NUMBER (expired or already deleted). Nothing to do."
+            fi
+          else
+            while IFS= read -r ch; do
+              [ -n "$ch" ] || continue
+              delete_channel "$ch"
+            done <<< "$channels"
+          fi
+
+          echo "Channels after:"
+          list_channels | sed 's/^/  /'
+
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

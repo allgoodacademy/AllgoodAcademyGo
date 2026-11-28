@@ -7,3 +7,6 @@
 - Rendering needs a session on the **AllgoodAcademyGo** environment (the only one with the ElevenLabs network secret). If you're not on it, say so in the PR and leave the re-render for a session there.
 - `npm run test:espanol-audio` must pass. It covers every story with a lines.json, and a new one fails until its page extractor is added to tests/espanol-audio.test.mjs. Never change a line's wording just to make the test pass.
 - No slow version; no Jodi voice in Español; never commit or print an API key.
+
+## Firebase PR previews
+- A red "Deploy to Firebase Hosting on PR" check with `channel quota reached` (429) means old preview channels are filling the quota. It's not a code problem: run the "Clean up Firebase preview channels" workflow (`firebase-preview-cleanup.yml`, workflow_dispatch), then re-run the check.
