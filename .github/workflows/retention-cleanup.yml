@@ -53,6 +53,10 @@ jobs:
 
       - run: npm ci
 
+      # firebase-admin 14 loads Firestore from @google-cloud/firestore, which npm ci doesn't
+      # install here (the weekly report failed on this from October until 2026-11-27).
+      - run: npm install --no-save @google-cloud/firestore
+
       - name: Write the credential to a file
         env:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}
