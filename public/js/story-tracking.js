@@ -30,7 +30,54 @@
     var resolveReady;
     var ready = new Promise(function (r) { resolveReady = r; });
 
+    // STEP PROGRESS (AA-23, 2026-11-28). The dashboard's "N of M scenes" bar reads `step` (the
+    // furthest step() reached on this page) and `stepsTotal` (from init/plan) off the student's
+    // own module_progress/{slug}. Nothing new is collected: these are the same numbers
+    // Telemetry already puts on the session doc (maxStep / stepsTotal). They are merged into
+    // every saveProgress, and also written on their own when the step advances (merge, at most
+    // once per 10 s). A step-only write carries ONLY step and stepsTotal, so it never touches
+    // the story's resume `state` (tests/story-tracking.test.mjs holds this). Step 1 is "the page
+    // opened", not progress, so it is never written on its own.
+    var prog = { slug: '', step: 0, stepsTotal: null };
+    var STEP_EVERY_MS = 10000;
+    var lastStepWrite = 0;
+    var stepTimer = null;
+    function track(name, a) {
+        if (name === 'init' && a && typeof a === 'object') {
+            if (a.module) prog.slug = String(a.module);
+            if (typeof a.stepsTotal === 'number' && a.stepsTotal > 0) prog.stepsTotal = a.stepsTotal;
+        } else if (name === 'plan') {
+            if (typeof a === 'number' && a > 0) prog.stepsTotal = a;
+        } else if (name === 'step') {
+            if (typeof a === 'number' && isFinite(a) && a > prog.step) { prog.step = Math.floor(a); scheduleStep(); }
+        } else if (name === 'complete') {
+            if (prog.stepsTotal && prog.step < prog.stepsTotal) prog.step = prog.stepsTotal;
+        } else if (name === 'restart') {
+            prog.step = 0;
+        }
+    }
+    function stepFields() {
+        var f = {};
+        if (prog.step > 0) f.step = prog.step;
+        if (prog.stepsTotal) f.stepsTotal = prog.stepsTotal;
+        return f;
+    }
+    function scheduleStep() {
+        if (!prog.slug || prog.step < 2 || stepTimer) return;
+        var wait = Math.max(0, lastStepWrite + STEP_EVERY_MS - Date.now());
+        stepTimer = setTimeout(flushStep, wait);
+    }
+    function flushStep() {
+        if (stepTimer) { clearTimeout(stepTimer); stepTimer = null; }
+        if (!prog.slug || prog.step < 2) return;
+        lastStepWrite = Date.now();
+        write(prog.slug, stepFields());
+    }
+    // A step reached in the last few seconds before the tab closes is still written.
+    try { window.addEventListener('pagehide', function () { if (stepTimer) flushStep(); }); } catch (e) { /* ignore */ }
+
     function call(name, args) {
+        try { track(name, args[0]); } catch (e) { /* never block the story */ }
         if (debug) { try { debug(name, args[0]); } catch (e) { /* ignore */ } }
         if (real) {
             try { return real[name] && real[name].apply(real, args); } catch (e) { return undefined; }
@@ -111,8 +158,21 @@
         try { return JSON.parse(JSON.stringify(data || {})); } catch (e) { return {}; }
     }
 
+    // The story's own fields always win: step/stepsTotal are added only where the story's data
+    // does not already carry them, and nothing else is added.
     function saveProgress(slug, data) {
         var d = clean(data);
+        if (!prog.slug) prog.slug = String(slug || '');
+        if (String(slug) === prog.slug) {
+            var f = stepFields();
+            Object.keys(f).forEach(function (k) { if (d[k] === undefined) d[k] = f[k]; });
+            if (stepTimer) { clearTimeout(stepTimer); stepTimer = null; }
+            lastStepWrite = Date.now();
+        }
+        return write(slug, d);
+    }
+
+    function write(slug, d) {
         return presentar.then(function (on) {
             if (on) return undefined;
             return ready.then(function (core) {

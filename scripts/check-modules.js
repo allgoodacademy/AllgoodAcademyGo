@@ -282,6 +282,16 @@ for (const e of fs.readdirSync(path.join(root, 'public/simulations'), { withFile
   const stories = (JSON.parse(read(ES_FILE)).stories || []);
   for (const st of stories) {
     if (!st.url || !fs.existsSync(path.join(root, 'public', st.url, 'index.html'))) fail(`${ES_FILE}: "${st.id}" points at ${st.url}, which has no index.html`);
+    // AA-23: the card picture, shared by the hub and the dashboard (one file, cached a year).
+    if (!/^\/assets\/espanol\/cards\/[a-z0-9-]+\.svg$/.test(String(st.art || ''))) fail(`${ES_FILE}: "${st.id}" needs art: "/assets/espanol/cards/<name>.svg"`);
+    else if (!fs.existsSync(path.join(root, 'public', st.art))) fail(`${ES_FILE}: "${st.id}" art ${st.art} does not exist`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(st.added || ''))) fail(`${ES_FILE}: "${st.id}" needs added: "YYYY-MM-DD" (the dashboard's New pill)`);
+  }
+  {
+    const hub = read('public/espanol/index.html');
+    for (const st of stories) {
+      if (st.art && !hub.includes(`src="${st.art}"`)) fail(`public/espanol/index.html: the "${st.id}" postcard does not use ${st.art} (the hub and the dashboard share one card picture)`);
+    }
   }
   for (const e of fs.readdirSync(path.join(root, 'public/espanol'), { withFileTypes: true })) {
     if (e.isDirectory() && !stories.some((st) => st.url === `/espanol/${e.name}/`)) fail(`public/espanol/${e.name}/ is not in ${ES_FILE}, so no student can find it from the dashboard`);

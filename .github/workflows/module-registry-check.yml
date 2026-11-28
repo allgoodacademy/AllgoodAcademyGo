@@ -22,6 +22,7 @@
 # is one change in one file.
 # And the help check (scripts/check-help.js): every button a Help Center article or tour names
 # must still exist on the dashboard, so help can't quietly describe a screen that changed.
+# And the story-tracking test (AA-23): step progress writes must never overwrite a story's resume state.
 name: Module registry check
 
 on:
@@ -42,3 +43,4 @@ jobs:
       - run: node scripts/build-nav.js --check
       - run: node scripts/build-founder.js --check
       - run: node scripts/check-help.js
+      - run: node --test tests/story-tracking.test.mjs
