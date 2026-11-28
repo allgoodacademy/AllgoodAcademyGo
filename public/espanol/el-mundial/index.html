@@ -932,7 +932,30 @@ $$('img[data-jodi]').forEach(i=>i.src=JODI[i.dataset.jodi]);
 let VOICE=null;const hasTTS='speechSynthesis' in window;
 function pickVoice(){if(!hasTTS)return;const v=speechSynthesis.getVoices();VOICE=v.find(x=>/es[-_](AR|PE|MX)/i.test(x.lang))||v.find(x=>/es[-_]US/i.test(x.lang))||v.find(x=>/^es/i.test(x.lang))||null}
 if(hasTTS){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}else document.body.classList.add('showtext');
-function say(t,lang){T('ev_audio_play',{});if(!hasTTS)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(lang==='en'){u.lang='en-US'}else{u.lang=VOICE?VOICE.lang:'es-MX';if(VOICE)u.voice=VOICE}u.rate=.92;speechSynthesis.speak(u)}catch(_){}}
+function sayTTS(t,lang){if(!hasTTS)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(lang==='en'){u.lang='en-US'}else{u.lang=VOICE?VOICE.lang:'es-MX';if(VOICE)u.voice=VOICE}u.rate=.92;speechSynthesis.speak(u)}catch(_){}}
+/* recorded voices (ElevenLabs, pre-rendered to /assets/audio/espanol/el-mundial/; docs/espanol-audio.md). The manifest is fetched as the page loads; each clip loads on tap. Spanish and English (lang 'en') lines use the same lookup. Any miss or load error falls back to sayTTS. */
+const AUD={m:null,p:null,el:null,n:0,end:null,q:Promise.resolve(),qn:0};
+function audManifest(){return AUD.p||(AUD.p=fetch('/assets/audio/espanol/el-mundial/manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(m=>AUD.m=m||{}))}
+audManifest();
+/* play() resolves when the line is over: the clip ended, a newer line replaced it, or a time cap. */
+function play(t,lang){const k=String(t).replace(/[“”]/g,'').replace(/\s+/g,' ').trim(),n=++AUD.n,est=900+k.length*75;
+  let done;const p=new Promise(r=>{done=r});
+  const tts=()=>{sayTTS(t,lang);setTimeout(done,est)};
+  if(hasTTS)try{speechSynthesis.cancel()}catch(_){}
+  if(AUD.end)AUD.end();AUD.end=done;
+  if(typeof Audio!=='function'){tts();return p}
+  let a=AUD.el;if(!a){a=AUD.el=new Audio();a.preload='none'}
+  try{a.pause()}catch(_){}
+  const go=m=>{if(n!==AUD.n){done();return}const u=m[k];if(!u){tts();return}
+    const fail=()=>{if(n===AUD.n){AUD.n++;tts()}};
+    a.onerror=fail;a.onended=()=>{if(n===AUD.n)done()};a.src=u;setTimeout(done,est+4000);
+    try{const q=a.play();if(q&&q.catch)q.catch(e=>{if(!e||e.name!=='AbortError')fail()})}catch(_){fail()}};
+  if(AUD.m)go(AUD.m);else audManifest().then(go);
+  return p}
+/* say() stops whatever is playing (and drops anything queued). sayQ() waits for the line playing
+   now, so a Puerta's replies don't cut off the sentence before them; the bubbles keep their timing. */
+function say(t,lang){T('ev_audio_play',{});AUD.qn++;return AUD.q=play(t,lang)}
+function sayQ(t,lang){T('ev_audio_play',{});const g=AUD.qn;return AUD.q=AUD.q.then(()=>g===AUD.qn?play(t,lang):null)}
 function wireSay(root){(root||document).querySelectorAll('.say').forEach(b=>{if(b._w)return;b._w=1;b.innerHTML=SPK+' '+b.textContent;b.addEventListener('click',()=>{say(b.dataset.say,b.dataset.lang);const p=b.parentElement.querySelector('.ptxt');if(p)setTimeout(()=>p.classList.remove('blur'),1400)})})}
 wireSay();
 $$('.ptxt.blur').forEach(p=>{p.title='Tap to show the text';p.addEventListener('click',()=>p.classList.remove('blur'))});
@@ -1026,8 +1049,8 @@ const FOOD=[
 choose('#g2o','#g2go');
 $('#g2go').addEventListener('click',()=>{const k=sel('#g2o');if(!k||S.choice[2])return;S.choice[2]=k;lockOpts('#g2o');$('#g2go').disabled=true;T('ev_gate_lock',{gate:2,choice:k});
   const q=k==='A'?'¿Su hijo tenía los boletos cuando subieron al tren?':'¿Su hijo tuvo los boletos cuando subieron al tren?';say(q);
-  setTimeout(()=>{if(k==='A'){S.conf[2]=1;mood('g2m','smile');reply($('#g2rep'),'Rosa','“¡Sí! Él los <b>tenía</b>… ¡Mateo, tu mochila!” … Mateo abre la mochila: <b>¡los boletos!</b>');say('¡Sí! Él los tenía… ¡Mateo, tu mochila!');setTimeout(()=>{reply($('#g2rep'),'Tú · to Olga, in English','<span class="small">(You pass it on: “Yes, he had them. The boy has them in his backpack.”)</span>');setTimeout(()=>{reply($('#g2rep'),'Olga · in English','“Thank you. Enjoy the match.”');say('Thank you. Enjoy the match.','en');setTimeout(()=>{reply($('#g2rep'),'Rosa','“¡Gracias, gracias! ¡Eres nuestro ángel!”');say('¡Gracias, gracias! ¡Eres nuestro ángel!')},1500)},1400)},1500)}
-    else{S.conf[2]=0;mood('g2m','unsure');reply($('#g2rep'),'Rosa','“¿Que si los <b>tuvo</b>? ¿Que si se los dieron? No… ¿nos los tenían que dar en el tren?”');say('¿Que si los tuvo? ¿Que si se los dieron? No… ¿nos los tenían que dar en el tren?');setTimeout(()=>{reply($('#g2rep'),'Olga','<span class="small">(Olga espera y golpea su libreta con el bolígrafo. · Olga waits, tapping her notebook with her pen.)</span>');setTimeout(()=>{reply($('#g2rep'),'Rosa','“Ah… ¿quieres decir si los <b>tenía</b>? ¡Mateo, tu mochila!” <span class="small">(Mateo finds them. Olga sighs: “Thank you.”)</span>');say('Ah… ¿quieres decir si los tenía? ¡Mateo, tu mochila!')},1600)},1700)}
+  setTimeout(()=>{if(k==='A'){S.conf[2]=1;mood('g2m','smile');reply($('#g2rep'),'Rosa','“¡Sí! Él los <b>tenía</b>… ¡Mateo, tu mochila!” … Mateo abre la mochila: <b>¡los boletos!</b>');sayQ('¡Sí! Él los tenía… ¡Mateo, tu mochila!');setTimeout(()=>{reply($('#g2rep'),'Tú · to Olga, in English','<span class="small">(You pass it on: “Yes, he had them. The boy has them in his backpack.”)</span>');setTimeout(()=>{reply($('#g2rep'),'Olga · in English','“Thank you. Enjoy the match.”');sayQ('Thank you. Enjoy the match.','en');setTimeout(()=>{reply($('#g2rep'),'Rosa','“¡Gracias, gracias! ¡Eres nuestro ángel!”');sayQ('¡Gracias, gracias! ¡Eres nuestro ángel!')},1500)},1400)},1500)}
+    else{S.conf[2]=0;mood('g2m','unsure');reply($('#g2rep'),'Rosa','“¿Que si los <b>tuvo</b>? ¿Que si se los dieron? No… ¿nos los tenían que dar en el tren?”');sayQ('¿Que si los tuvo? ¿Que si se los dieron? No… ¿nos los tenían que dar en el tren?');setTimeout(()=>{reply($('#g2rep'),'Olga','<span class="small">(Olga espera y golpea su libreta con el bolígrafo. · Olga waits, tapping her notebook with her pen.)</span>');setTimeout(()=>{reply($('#g2rep'),'Rosa','“Ah… ¿quieres decir si los <b>tenía</b>? ¡Mateo, tu mochila!” <span class="small">(Mateo finds them. Olga sighs: “Thank you.”)</span>');sayQ('Ah… ¿quieres decir si los tenía? ¡Mateo, tu mochila!')},1600)},1700)}
     setTimeout(()=>{jodi(2,k==='A'?'happy':'thinking',`Some verbs change meaning in the past. <b>Tenía</b> (imperfect) = <i>had</i>: he was holding them, an ongoing state. <b>Tuvo</b> (preterite) = <i>got, received</i>: a one-time event. Olga asked if he <i>had</i> them, so <b>tenía</b>. With <i>tuvo</i>, Rosa heard "did he get them?" and started worrying about the ticket office.`);finish(2)},4600)},900)});
 
 
@@ -1042,7 +1065,7 @@ $('#g3go').addEventListener('click',()=>{if(S.choice[3])return;const v={1:val(1)
   const R={1:v[1]==='cantaban'?'“¡Ya estaban cantando cuando llegaron! Típico de los peruanos.”':'“¿Empezaron a cantar justo cuando entraste vos? ¡Qué entrada, che!”',
            2:v[2]==='falló'?'“Sí, lo vi. ¡Qué dolor ese penal!”':'“¿Fallaba? ¿Fallaron varios penales? Yo vi uno solo…”',
            3:v[3]==='cantaban'?'“¿Y seguían cantando al final? ¡Qué hinchada!”':'“¿Cantaron una vez al final y listo?”'};
-  let t=900;[1,2,3].forEach(i=>{setTimeout(()=>{reply($('#g3rep'),'Facu · audio',R[i]);say(R[i].replace(/[“”]/g,''))},t);t+=2600});
+  let t=900;[1,2,3].forEach(i=>{setTimeout(()=>{reply($('#g3rep'),'Facu · audio',R[i]);sayQ(R[i].replace(/[“”]/g,''))},t);t+=2600});
   const right=[1,2,3].filter(i=>v[i]===KEY3[i]).length;S.conf[3]=right===3?1:0;
   setTimeout(()=>{jodi(3,right===3?'happy':'thinking',`A past story runs on two tracks. The <b>imperfect</b> is the background: what <i>was going on</i> (the singing). The <b>preterite</b> is the events on top: what <i>happened</i> (the missed penalty, the final whistle). <i>Todavía</i> (still) is a clue that something was ongoing.${right<3?` You had ${right} of 3 on the right track. Check the timeline above.`:''}`);finish(3)},t+400)});
 
@@ -1052,7 +1075,7 @@ $('#g4go').addEventListener('click',()=>{if(S.choice[4])return;const a=val(41),b
   setTimeout(()=>{let t;if(ok){t='“¡Y ahora tienes familia en Perú! Si vas a Lima, nos llamas.”';mood('g4m','laugh')}
     else if(b==='conocía'){t='“¿Ya conocías a muchos peruanos? ¿De dónde? ¿De tu escuela?”';mood('g4m','unsure')}
     else{t='“¿No conociste a nadie… hasta hoy? Ah, bueno, pero hoy conociste a muchos, ¿no?”';mood('g4m','unsure')}
-    reply($('#g4rep'),'Rosa',t);say(t.replace(/[“”]/g,''));
+    reply($('#g4rep'),'Rosa',t);sayQ(t.replace(/[“”]/g,''));
     setTimeout(()=>{jodi(4,ok?'happy':'thinking',`<b>Conocía</b> (imperfect) = <i>knew</i>, an ongoing state: you didn't know anyone there. <b>Conocí</b> (preterite) = <i>met</i>, a one-time event: today you met lots of Peruvians. Same verb, two different English words.`);finish(4)},1400)},900)});
 
 /* PUERTA 5 · la postal (synthesis) */

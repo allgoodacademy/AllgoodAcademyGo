@@ -1,7 +1,8 @@
 # Español audio (recorded voices)
 
 Every Español story with a `scripts/espanol-audio/<story>.lines.json` plays pre-rendered MP3s
-instead of the browser's speech voice: El Viaje (`el-viaje`) and La selva (`la-selva`, 2026-11-28).
+instead of the browser's speech voice: El Viaje (`el-viaje`), La selva (`la-selva`, 2026-11-28) and
+El Mundial (`el-mundial`, 2026-11-28).
 Every spoken line is rendered once with ElevenLabs, committed, and served from our own `/assets/`.
 Students' browsers never talk to ElevenLabs. `<story>` below is the story's folder name.
 
@@ -17,7 +18,7 @@ Students' browsers never talk to ElevenLabs. `<story>` below is the story's fold
 Each line is `{ "text", "speaker", "tag" }`. `tag` is an optional delivery tag (`[warmly]`,
 `[curious]`…) that is sent in front of the text. File names are
 `<prefix>-<speaker>-<hash8>.mp3` (`prefix` is the lines.json's own `prefix`, else `ev`, so
-both stories' files start `ev-`; the test derives it the same way), where `hash8` is the first 8 hex characters of
+every story's files start `ev-`; the test derives it the same way), where `hash8` is the first 8 hex characters of
 sha256(`voice_id|model_id|tag|text`). Any change to a line, its tag, its voice or the model gives
 a new file name, so the one-year cache on `/assets/audio/**/*.mp3` never serves a stale clip.
 `manifest.json` (served no-cache) maps the normalized text (curly quotes stripped, whitespace
@@ -30,8 +31,8 @@ is not in the manifest or the file fails to load, it falls back to the old speec
 ## Re-render
 
 ```bash
-npm run audio:la-selva -- --dry-run   # line count + characters, spends nothing
-npm run audio:la-selva                # renders only the files that don't exist yet
+npm run audio:el-mundial -- --dry-run # line count + characters, spends nothing
+npm run audio:el-mundial              # renders only the files that don't exist yet
 npm run test:espanol-audio            # every story: every line has an MP3, every say() string is covered
 ```
 
@@ -59,6 +60,33 @@ field cards, and `narr`, an English narrator for the `N()` lines. A narration li
 its text without HTML tags (`data-say` already strips them). The manifest is fetched as the page
 loads so the first ▶ plays at once. `sayQ()` queues a line behind the one playing (the toucan's
 count); any `say()` drops what is still queued.
+
+### El Mundial
+
+122 lines, 5,604 characters (first render 2026-11-28, `eleven_v4`). Seven speakers:
+
+| Speaker | Who | Voice |
+|---|---|---|
+| `facu` | Facu, Argentine fan (voseo kept as written) | Tomás |
+| `lucia` | Lucía, Argentine fan | Julieta |
+| `rosa` | Rosa, Peruvian mom on the train | Nelly |
+| `olga` | Olga, Russian train attendant, in English | Natasha |
+| `tu` | the student's own Spanish (the sentences built at the Puertas) | El Viaje's narrador |
+| `tu_en` | the student's own English to Olga | Carolyn (in the cast; the page speaks no such line today) |
+| `voz` | word list, glossary taps, verb chips, plan words, food words | Ninoska |
+
+Mateo has no spoken lines; no voice speaks as William or Jodi.
+
+The **templated** lines are rendered whole, one clip per combination the page can build, because
+every template is small: Puerta 3's voice note (2 × 2 × 2 = 8), Puerta 4's answer (2 × 2 = 4) and
+Lucía's supermarket line (every ordered pair of two different foods, 12). The test builds the same
+combinations from the page's own template strings and chip values, so a new chip value or a reworded
+template fails until it is rendered. Puerta 5 says nothing but its chips.
+
+Same player as La selva: the manifest is fetched as the page loads, `say()` stops what is playing,
+and `sayQ()` queues a Puerta's replies behind the line before them (the bubbles keep their timing;
+only the voice waits). English lines (`data-lang="en"`, Olga) use the same lookup; the browser
+fallback reads them as en-US.
 
 ## Swap a character's voice
 
