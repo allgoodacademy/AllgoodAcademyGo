@@ -268,6 +268,7 @@ const PAGES = [
     { file: 'public/educational-games/index.html', slug: 'games',        skin: 'light' },
     { file: 'public/simulations/index.html',       slug: 'simulations',  skin: 'light' },
     { file: 'public/help/index.html',              slug: 'help',         skin: 'light' },
+    { file: 'public/how-i-build/index.html',       slug: 'how-i-build',  skin: 'light' },
     { file: 'public/dashboard/index.html',         slug: 'dashboard',    skin: 'light' },
     // Teacher sign-in. Its "Teacher sign in" link is the one marked as here (and the link
     // is gone for a signed-in teacher, whose class is on /dashboard/ — see the session script).
