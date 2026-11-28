@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>La selva · Allgood Academy</title>
+<meta name="robots" content="noindex, nofollow">
+<!-- A signed-in teacher who opens this story from the /espanol/ hub gets Presentar en clase by
+     default (/js/story-tracking.js). Everyone else gets the story. ?mode=solo turns it off. -->
+<meta name="ag-presentar-default" content="hub">
+<link rel="stylesheet" href="/assets/css/design-tokens.css">
+<script src="/js/reduced-motion.js"></script>
+<script src="/js/site-config.js"></script>
+<script src="/js/story-tracking.js"></script>
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<style>
+/* VOICE: a warm field guide for beginners, calm and clear, never babyish.
+   IDEA: a morning rainforest walk; gates are wooden trail markers, progress is the passport.
+   PICTURE: layered daylight canopy, real Costa Rican animals drawn flat and accurate.
+   COLOUR and TYPE: forest greens and morning sky, bronze signs, one orange action; Gelasio + Atkinson Hyperlegible Next.
+   LAYOUT: one centered column of scenes; each scene a framed 15:8 picture with its card under it. */
+:root{color-scheme:light;--orange:var(--color-orange);--orange-d:#A8380F;--teal:var(--color-teal);--teal-d:#245866;--bronze:#B0773A;--bronze-d:#7A4E1F;
+--cream:var(--color-cream);--paper:#F5E6D3;--ink:#1F2A24;--ink2:#4A5650;--ok:#2E7D4F;--ok-wash:#E3F1E7;--forest:#173F2B;--sky:#F7E3BF;
+--site-h:74px;--nav-h:74px;--nav-fade:var(--forest);--nav-fade-end:var(--forest)}
+*{box-sizing:border-box;min-width:0}
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--site-h) + 56px)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--forest);color:var(--ink);font:17px/1.55 var(--font-ui);overflow-x:clip}
+h1,h2,.serif{font-family:var(--font-display)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid #FFB347;outline-offset:3px}
+.bar{position:sticky;top:var(--site-h);transition:top .25s ease;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px max(4vw,14px);background:rgba(23,63,43,.94);color:#F4EFE6;font-size:14px}
+.bar b{font-weight:700}
+.pass{display:flex;align-items:center;gap:8px}
+.pass .bk{background:var(--teal-d);border-radius:8px;padding:5px 9px;display:flex;gap:6px;align-items:center}
+.slot{width:26px;height:26px;border-radius:50%;border:2px dashed #9FC2B4;display:grid;place-items:center;font-size:12px;font-weight:700;color:transparent}
+.slot.on{border:2px solid #fff;background:var(--ok);color:#fff;animation:thunk .5s ease}
+@keyframes thunk{0%{transform:scale(2.2) rotate(-20deg);opacity:0}70%{transform:scale(.9)}100%{transform:scale(1)}}
+.tools{display:flex;gap:6px;align-items:center}
+.tool{display:none;background:var(--bronze);color:#fff;border-radius:999px;padding:4px 10px;font-size:13px}
+.tool.on{display:inline-block}
+.sec{max-width:1040px;margin:0 auto;padding:28px max(4vw,14px) 40px}
+.locked{display:none}
+.frame{position:relative;border-radius:18px;overflow:hidden;box-shadow:0 2px 4px rgba(10,30,20,.18),0 14px 34px rgba(10,30,20,.22);background:var(--sky)}
+.frame>svg{display:block;width:100%;height:auto}
+.card{background:var(--cream);border-radius:16px;padding:20px 24px;margin-top:-28px;position:relative;box-shadow:0 1px 2px rgba(10,30,20,.12),0 10px 24px rgba(10,30,20,.18);border:1px solid #EADFCB;max-width:760px;margin-inline:auto}
+.card+.card{margin-top:14px}
+.eyebrow{font-size:14px;color:var(--teal-d);font-weight:700}
+h1{font-size:clamp(40px,7vw,64px);line-height:1.05;letter-spacing:-.02em;margin:4px 0 2px;color:var(--forest)}
+h2{font-size:clamp(26px,4vw,34px);line-height:1.1;letter-spacing:-.02em;margin:0 0 6px;color:var(--forest)}
+.sub{font-size:20px;color:var(--ink2);margin:0 0 10px}
+.lvl{display:flex;gap:4px;align-items:center;font-size:14px;color:var(--ink2)}
+.lvl i{width:34px;height:8px;border-radius:4px;background:#D8D2C6}.lvl i.f{background:var(--bronze)}
+.go{background:var(--orange);color:#fff;border:0;border-radius:999px;padding:12px 26px;font-weight:700;font-size:18px;min-height:48px}
+.go:hover{background:var(--orange-d)}.go[disabled]{background:#B9B2A6;cursor:not-allowed}
+.ghost{background:none;border:2px solid var(--teal);color:var(--teal-d);border-radius:999px;padding:8px 18px;font-weight:700;min-height:44px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
+.start-grid{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:18px;align-items:center}
+.polaroid{background:#fff;padding:10px 10px 30px;border-radius:4px;transform:rotate(3deg);box-shadow:0 6px 14px rgba(0,0,0,.25);font-size:13px;color:var(--ink2);text-align:center}
+.polaroid div{aspect-ratio:1;background:repeating-linear-gradient(45deg,#E9E2D4 0 10px,#F2ECE0 10px 20px);display:grid;place-items:center;margin-bottom:6px;font-size:12px;padding:8px}
+@media(max-width:600px){.start-grid{grid-template-columns:1fr}.polaroid{width:170px;margin:4px auto 0}}
+.line{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 12px;align-items:start;margin:10px 0}
+.who{grid-column:2;font-size:13px;font-weight:700;color:var(--teal-d)}
+.play{grid-row:span 3;width:44px;height:44px;border-radius:50%;border:0;background:var(--teal);color:#fff;display:grid;place-items:center}
+.play svg{width:22px;height:22px}
+.es{grid-column:2;margin:0;font-size:21px;font-family:var(--font-display);transition:filter .3s}
+.es.blur{filter:blur(6px);cursor:pointer;user-select:none}
+.en-row{grid-column:2;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.en-btn{background:none;border:1px solid #B9B2A6;border-radius:6px;font-size:13px;padding:1px 8px;color:var(--ink2);min-height:28px}
+.en{margin:0;color:var(--ink2);font-size:15px}
+.narr{display:flex;gap:12px;align-items:center;font-size:17px}
+.narr .play{grid-row:auto;background:var(--bronze);flex:none}
+.narr p{margin:0}
+.tip{border-bottom:2px dotted var(--teal);cursor:help}
+.ficha{display:grid;grid-template-columns:44px minmax(0,1fr);gap:2px 12px;background:#fff;border:2px solid #D9E7DC;border-radius:14px;padding:12px 14px;margin-top:12px}
+.ficha .play{grid-row:span 3;background:var(--ok)}.ficha b{font-family:var(--font-display);font-size:19px}.ficha .sci{font-size:13px;color:var(--ink2)}.ficha p{margin:2px 0 0;font-size:15px}
+.fichas h3{font:700 15px var(--font-ui);color:var(--teal-d);margin:16px 0 0}
+.cerca{background:#F6F1E7;border-radius:12px;padding:10px;margin-top:8px;max-width:340px}.cerca svg{display:block;width:100%;height:auto}
+.real-row{grid-column:2;margin-top:6px}
+.foto summary,.foto-link{display:inline-block;cursor:pointer;font-weight:700;font-size:14px;color:var(--teal-d);border:2px solid var(--teal);border-radius:999px;padding:5px 14px;text-decoration:none;list-style:none}
+.foto summary::-webkit-details-marker{display:none}.foto[open] summary{background:var(--teal);color:#fff}
+.foto img{display:block;width:min(320px,100%);border-radius:10px;margin-top:8px;border:4px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.18)}.foto small{display:block;font-size:13px;color:var(--ink2);margin-top:4px}
+.pin .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.8s ease-out infinite}
+@keyframes pulse{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+.pin:hover .disc,.pin:focus-visible .disc{fill:#fff}
+.why{background:#FFF8EC;border:2px solid #F0DDBE;border-radius:14px;padding:12px 14px;margin-top:12px;font-size:15px}
+.culture{background:#EAF1E4;border-left:0;border-radius:12px;padding:10px 14px;font-size:15px;margin-top:10px}
+/* boarding pass */
+.bpass{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:760px;margin:0 auto}
+.bp-top{background:var(--bronze);color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.bp-top b{font-family:var(--font-display);font-size:22px}
+.dots{display:flex;gap:6px}.dots i{width:14px;height:14px;border-radius:50%;border:2px solid #fff}.dots i.d{background:#fff}
+.bp-body{padding:16px 18px 20px;border-top:3px dashed #E1D3BE}
+.pics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:10px}
+.pic{position:relative;background:#F6F1E7;border:3px solid #E1D8C6;border-radius:14px;padding:8px;min-height:120px}
+.pic svg{width:100%;height:auto;display:block}
+.pic:hover{border-color:var(--teal)}
+.pic[aria-pressed=true]{border-color:var(--orange);background:#FFF4EC}
+.pic .ab{position:absolute;top:6px;left:8px;font-size:13px;font-weight:700;color:var(--ink2)}
+.pic.right{border-color:var(--ok);background:var(--ok-wash)}
+.pic[disabled]{cursor:default}
+.ready{text-align:center;padding:10px 0 4px}
+.ready h2{color:var(--ok)}
+/* gate sign */
+.sign{background:var(--bronze);color:#fff;border-radius:12px;padding:12px 18px;display:flex;gap:16px;align-items:center;box-shadow:inset 0 -6px 0 rgba(0,0,0,.18),0 6px 14px rgba(0,0,0,.3);max-width:760px;margin:0 auto 16px;flex-wrap:wrap}
+.sign .n{font-family:var(--font-display);font-size:44px;line-height:1;font-weight:700}
+.sign .t{font-size:14px;letter-spacing:.02em}.sign .t b{display:block;font-size:20px}
+.status{margin-left:auto;background:#4A2E12;border-radius:8px;padding:6px 12px;font-weight:700;font-size:15px}
+.status.ok{background:var(--ok)}
+.binos{max-width:560px;margin:14px auto 0}
+.binos svg{width:100%;height:auto;display:block}
+.jodi{display:flex;gap:12px;align-items:flex-start;background:#fff;border:2px solid var(--paper);border-radius:14px;padding:12px 14px;margin-top:12px}
+.jav{flex:none;width:52px;height:52px;border-radius:50%;background:var(--paper);display:grid;place-items:center;font-family:var(--font-display);font-weight:700;color:var(--teal-d);font-size:22px}
+.jodi p{margin:2px 0 0}
+.note{font-size:13px;color:#C9D9CF;text-align:center;margin:8px 0 0}
+.hot{cursor:pointer}.hot:focus{outline:none}.hot:focus-visible .ring{stroke:#FFB347;stroke-width:5}
+.tchip{font:700 18px var(--font-ui)}
+.fin{text-align:center;color:#F4EFE6}
+.polaroid img{display:block;width:100%;aspect-ratio:1;object-fit:cover;margin-bottom:6px}
+.based{font-size:14px;color:var(--ink2);margin:10px 0 0}
+.real{display:flex;gap:14px;align-items:center;background:#1F2A24;color:#F4EFE6;border-radius:14px;padding:10px 12px;margin-top:12px;animation:slide .5s ease}
+.real img{width:96px;height:96px;object-fit:cover;border-radius:6px;border:4px solid #fff;transform:rotate(-3deg);flex:none}
+.real small{display:block;color:#B9D3C4;font-size:13px}
+@keyframes slide{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+.roll{background:var(--bronze);color:#fff;border-radius:999px;padding:4px 10px;font-size:13px}
+.lens{max-width:420px;margin:14px auto 0}.lens svg{width:100%;height:auto;display:block}
+
+.ask{margin:8px 0 0;font-weight:700}
+.tip-line{margin:12px 0 0;font-size:15px;background:#EAF1E4;border-radius:12px;padding:10px 14px}
+.card.wide{max-width:960px;margin-top:0}
+.road{max-width:760px;margin:0 auto 18px;text-align:center}
+.road-board{display:inline-block;background:var(--bronze);color:#fff;font:700 30px var(--font-display);padding:12px 28px;border-radius:12px;box-shadow:inset 0 -6px 0 rgba(0,0,0,.18),0 6px 14px rgba(0,0,0,.3)}
+.road-arrows{display:flex;justify-content:center;gap:14px;margin-top:8px}.road-arrows span{background:#8F5F2C;color:#fff;font-weight:700;padding:8px 16px;border-radius:8px}
+.bronze-sign .status{display:none}
+.counter{font:700 34px var(--font-display);color:var(--forest);text-align:center;min-height:44px;margin-top:10px}
+.dev{background:#fff;padding:12px 12px 34px;border-radius:4px;width:min(360px,100%);margin:14px auto 0;transform:rotate(-2deg);box-shadow:0 8px 20px rgba(0,0,0,.25);text-align:center;font-size:14px;color:var(--ink2)}
+.dev-img svg{display:block;width:100%;height:auto;animation:develop 1.8s ease forwards}
+@keyframes develop{from{filter:brightness(2.4) blur(6px)}to{filter:none}}
+.feed{margin-top:12px}.feed svg{width:100%;height:auto;display:block;border-radius:14px}
+.hum-in{animation:fly .6s ease}@keyframes fly{from{transform:translateY(-40px);opacity:0}to{transform:none;opacity:1}}
+.roll-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;margin-top:12px}
+.roll-grid .polaroid{margin:0;transform:rotate(-1.5deg)}.roll-grid .polaroid:nth-child(even){transform:rotate(1.5deg)}
+.recap{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px}
+.tile{background:#fff;border:2px solid #E1D8C6;border-radius:14px;padding:12px 14px;font-size:15px;display:flex;flex-direction:column;gap:4px}
+.tile.ok{border-color:var(--ok);background:var(--ok-wash)}.tile .tn{font-size:13px;font-weight:700;color:var(--teal-d)}
+.pass-book{max-width:760px;margin:22px auto 0;background:#21384A;color:#F4EFE6;border-radius:18px;padding:22px 24px;box-shadow:0 14px 34px rgba(0,0,0,.35)}
+.pb-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #3E5A70;padding-bottom:8px}.pb-head b{font:700 28px var(--font-display)}
+.pb-score{font-size:19px;margin:14px 0}
+.pb-row{display:flex;gap:14px;align-items:center;background:var(--cream);color:var(--ink);border-radius:12px;padding:10px 14px;margin-top:10px}.pb-row p{margin:2px 0 0;font-size:15px}
+.stamp{flex:none;font:700 13px var(--font-ui);border:3px solid;border-radius:8px;padding:6px 10px;transform:rotate(-6deg)}
+.stamp.new{color:var(--ok);border-color:var(--ok)}.stamp.had{color:var(--teal-d);border-color:var(--teal-d)}.stamp.try{color:#8F5F2C;border-color:#8F5F2C}
+.pass-book .jodi{color:var(--ink)}
+/* The site nav (generated, nav/nav.js) sits above the story bar and slides away on scroll-down,
+   as on El Mundial. --site-h is how much of it shows; the script after the nav keeps it exact. */
+body .nav-shell{z-index:61;transition:transform .25s ease}
+body .nav-shell.nav-away{transform:translateY(-100%)}
+/* Presentar en clase (/js/story-presentar.js): each Puerta's class-vote box lives in .cv, which
+   only shows there. Its stylesheet sizes .opt / .slot / .chip for a projector; keep this page's. */
+/* Narrow screens: the site nav above already names Allgood Academy, so the bar keeps just the photo
+   count and the passport, and neither pill is squeezed (at 375 px they wrapped and overlapped). */
+.tools>*,.pass .bk>*{flex:none}.roll{white-space:nowrap}
+@media(max-width:520px){.bar>span:first-child{display:none}.bar{justify-content:flex-end}}
+.cv{display:none}
+body.presentar .cv{display:block;margin-top:12px}
+body.presentar .pic.opt{padding:8px;font-size:inherit}
+body.presentar .bar .slot{font-size:12px}
+</style>
+</head>
+<body>
+<!-- BEGIN GENERATED NAV -->
+<!-- Generated from nav/nav.js by `npm run build:nav`. Do NOT hand-edit: the next
+     build overwrites it, and `npm run check:nav` fails CI when it drifts. Add or
+     change a link in nav/nav.js and every page picks it up. -->
+<div class="nav-shell">
+  <div class="wrap">
+    <nav class="nav site-nav">
+      <a class="wordmark" href="/">Allgood<em>Academy</em></a>
+      <div class="nav-right">
+        <div class="nav-links" id="site-nav-links">
+          <a class="nav-link" href="/educational-games/">Games</a>
+          <a class="nav-link" href="/simulations/">Simulations</a>
+          <a class="nav-link" href="/for-teachers/">For teachers</a>
+          <a class="nav-link" href="/about/">About</a>
+          <a class="nav-link" href="/about/#contact">Contact</a>
+          <a class="nav-link nav-signin" href="/mission-control/">Teacher sign in</a>
+        </div>
+        <a class="nav-cta" href="/dashboard/">Start learning</a>
+        <button class="nav-menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-nav-links"><svg class="bars" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="x" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+    </nav>
+  </div>
+</div>
+<style>
+.nav-shell{padding:16px 0 0;position:sticky;top:0;z-index:50;background:linear-gradient(var(--nav-fade,var(--color-canvas)) 72%,var(--nav-fade-end,transparent))}
+.nav-shell.activity{position:relative;z-index:auto;flex:0 0 auto;background:transparent;padding-bottom:12px}
+body.present .nav-shell.activity{display:none}
+.nav-shell,.nav-shell *{box-sizing:border-box}
+.nav-shell .wordmark,.nav-shell .nav-right,.nav-shell .nav-links,.nav-shell .nav-link{margin:0;min-height:0;float:none}
+.nav-shell .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.nav-shell .nav{position:relative;width:auto;max-width:none;height:auto;min-height:0;border:0;backdrop-filter:none;background:var(--color-surface);border-radius:999px;box-shadow:0 2px 10px -2px color-mix(in srgb,var(--color-ink) 14%,transparent);padding:11px 14px 11px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;color:var(--color-ink);font-family:var(--font-display);font-size:17px;line-height:1.7;text-align:left}
+.nav-shell .wordmark{display:block;font-family:var(--font-display);font-size:22px;font-weight:700;font-style:normal;color:var(--color-teal-deep);text-decoration:none;letter-spacing:-.03em;white-space:nowrap;line-height:1.7;opacity:1}
+.nav-shell .wordmark em{font-style:normal;color:var(--color-orange)}
+.nav-shell .nav-right{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-link{display:inline-block;font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--color-ink-soft);text-decoration:none;padding:10px 15px;border-radius:999px;letter-spacing:-.01em;white-space:nowrap;line-height:1.7;background:transparent}
+.nav-shell .nav-link:hover{background:var(--color-teal-wash);color:var(--color-teal-deep)}
+.nav-shell .nav-link.here{background:var(--color-teal-wash);color:var(--color-teal-deep);font-weight:700}
+.nav-shell .nav-signin{font-weight:700;color:var(--color-ink)}
+.nav-shell .nav-cta{font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--color-orange);border:1.5px solid var(--color-orange);color:var(--color-surface);padding:10px 22px;border-radius:999px;cursor:pointer;margin-left:6px;letter-spacing:-.01em;white-space:nowrap;text-decoration:none;display:inline-block;line-height:1.7}
+.nav-shell .nav-cta:hover{background:var(--color-orange-deep);border-color:var(--color-orange-deep);color:var(--color-surface)}
+.nav-shell :focus-visible{outline:3px solid var(--color-orange);outline-offset:4px;border-radius:6px}
+@media(max-width:440px){ .nav-shell .nav-cta{padding:10px 15px} }
+</style>
+<style>
+.site-nav .nav-links{display:flex;align-items:center;gap:4px}
+.nav-shell .nav-menu{display:none}
+@media(max-width:960px){
+  .site-nav{flex-wrap:wrap;height:auto;row-gap:2px}
+  .site-nav.nav{border-radius:22px;padding:10px 12px 6px 18px}
+  nav.site-nav:not(.nav){padding-top:10px;padding-bottom:4px}
+  .site-nav .nav-right{display:contents}
+  .site-nav .nav-cta{order:1;margin-left:auto;flex:none}
+  .site-nav .nav-links{order:2;flex:1 0 100%;min-width:0;flex-wrap:wrap;margin:0 -8px;gap:0}
+  .site-nav .nav-links .nav-link{display:inline-block;flex:none;white-space:nowrap;max-width:none;line-height:1.3;padding:9px 10px}
+  .nav-shell{padding-top:10px}
+  .nav-shell .wrap{padding-left:12px;padding-right:12px}
+  .site-nav.has-menu.nav{flex-wrap:wrap;gap:6px;row-gap:0;border-radius:26px;padding:6px 6px 6px 18px}
+  .site-nav.has-menu .wordmark{font-size:20px;margin-right:auto;min-width:0;overflow:hidden;text-overflow:clip}
+  .site-nav.has-menu .nav-cta{order:1;margin-left:0;padding:8px 16px}
+  .site-nav.has-menu .nav-menu{order:2;display:inline-flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;padding:0;margin:0;border:0;border-radius:999px;background:var(--color-teal-wash);color:var(--color-teal-deep);cursor:pointer}
+  .site-nav.has-menu .nav-menu svg{display:block;width:20px;height:20px}
+  .site-nav.has-menu .nav-menu .x,.site-nav.has-menu.open .nav-menu .bars{display:none}
+  .site-nav.has-menu.open .nav-menu .x{display:block}
+  .site-nav.has-menu .nav-links{order:3;display:none;margin:8px 0 4px;padding:6px 12px 0 0;border-top:1px solid var(--color-teal-wash)}
+  .site-nav.has-menu.open .nav-links{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+  .site-nav.has-menu.open .nav-links .nav-link{display:block;font-size:15px;line-height:1.4;padding:12px 14px;border-radius:14px;white-space:normal;max-width:none;text-align:left}
+}
+@media(max-width:380px){
+  .nav-shell .wrap{padding-left:10px;padding-right:10px}
+  .site-nav.nav{padding-left:14px;padding-right:8px}
+  .site-nav .wordmark{font-size:18px}
+  .site-nav .nav-cta{padding-left:12px;padding-right:12px}
+  .site-nav .nav-links .nav-link{padding-left:8px;padding-right:8px}
+  .site-nav.has-menu.nav{padding-left:14px;padding-right:6px;gap:4px}
+  .site-nav.has-menu .wordmark{font-size:17px}
+  .site-nav.has-menu .nav-cta{padding:8px 11px;font-size:12px}
+  .site-nav.has-menu .nav-menu{width:38px;height:38px}
+}
+</style>
+<script>
+(function(){
+  var s=false,a=false;
+  try{s=localStorage.getItem('ag_signed_in')==='1';a=localStorage.getItem('ag_account')==='1';}catch(e){/* storage blocked - the defaults stand */}
+  var cta=document.querySelector('.nav-cta'),signin=document.querySelector('.nav-signin');
+  if((s||a)&&cta)cta.textContent='My dashboard';
+  if(a&&signin)signin.remove();
+  // Where this visit came from, kept for the visit (sessionStorage) so a click from a hub
+  // into a simulation still reads 'email'. Cookie-free; the referrer HOST only. /js/telemetry.js
+  // writes it onto the session doc. See docs/insider-analytics.md.
+  try{if(!sessionStorage.getItem('ag_src')){var q=new URLSearchParams(location.search),c=function(v){v=String(v||'').toLowerCase();return /^[a-z0-9._-]{1,40}$/.test(v)?v:(v?'other':'');},r='';try{var h=document.referrer?new URL(document.referrer).host:'';r=h&&h!==location.host?c(h):'';}catch(e){}var o={src:c(q.get('src')),utmSource:c(q.get('utm_source')),utmMedium:c(q.get('utm_medium')),utmCampaign:c(q.get('utm_campaign')),refHost:r};sessionStorage.setItem('ag_src',JSON.stringify(o));}}catch(e){/* storage blocked - no source recorded */}
+  var nav=document.querySelector('.site-nav'),btn=nav&&nav.querySelector('.nav-menu');
+  if(!btn)return;
+  nav.classList.add('has-menu');
+  function set(o){nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false');btn.setAttribute('aria-label',o?'Close menu':'Menu');}
+  btn.addEventListener('click',function(){set(!nav.classList.contains('open'));});
+  nav.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('.nav-links a'))set(false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&nav.classList.contains('open')){set(false);btn.focus();}});
+  document.addEventListener('click',function(e){if(!nav.contains(e.target))set(false);});
+})();
+</script>
+<!-- END GENERATED NAV -->
+<script>
+// The site nav slides away on scroll-down and comes back on scroll-up, so a phone keeps its
+// screen for the story; the story's own bar (.bar) stays pinned under it. Same as El Mundial:
+//   --nav-h   the site nav's closed height
+//   --site-h  how much of the site nav is showing right now: --nav-h, or 0 while it is away
+(function(){var s=document.querySelector('.nav-shell');if(!s)return;var r=document.documentElement,away=false,last=Math.max(0,scrollY),navH=s.offsetHeight;
+function open(){return !!s.querySelector('.site-nav.open')}
+function set(){if(open())away=false;else navH=s.offsetHeight;s.classList.toggle('nav-away',away);
+  r.style.setProperty('--nav-h',navH+'px');r.style.setProperty('--site-h',(away?0:navH)+'px')}
+function scrolled(){var y=Math.max(0,scrollY),d=y-last;if(Math.abs(d)<8&&y>navH)return;last=y;
+  var a=d>0&&y>navH&&!open()&&!s.contains(document.activeElement);if(a!==away){away=a;set()}}
+s.addEventListener('focusin',function(){if(away){away=false;set()}});
+addEventListener('scroll',scrolled,{passive:true});addEventListener('resize',set);
+if(window.ResizeObserver){var ro=new ResizeObserver(set);ro.observe(s)}
+set();})();
+</script>
+<header class="bar">
+  <span><b>Allgood Academy</b> · Español · Novato</span>
+  <span class="tools"><span class="roll" id="roll" aria-live="polite">Tus fotos: 0</span>
+  <span class="pass" aria-label="Pasaporte: 4 Puertas"><span class="bk"><span>Pasaporte</span>
+    <span class="slot" id="s1">1</span><span class="slot" id="s2">2</span><span class="slot" id="s3">3</span><span class="slot" id="s4">4</span></span></span></span>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="frog" viewBox="0 0 100 80">
+   <ellipse cx="50" cy="74" rx="34" ry="4" fill="#173F2B" opacity=".18"/>
+   <ellipse cx="22" cy="66" rx="10" ry="5" fill="#F08A24"/><ellipse cx="78" cy="66" rx="10" ry="5" fill="#F08A24"/>
+   <ellipse cx="50" cy="50" rx="32" ry="20" fill="#5BAF3A"/>
+   <path d="M22 54 Q50 70 78 54 Q72 66 50 68 Q28 66 22 54Z" fill="#3F8A2A"/>
+   <path d="M26 50 Q34 58 42 56" stroke="#2F6FB5" stroke-width="5" fill="none" stroke-linecap="round"/>
+   <path d="M74 50 Q66 58 58 56" stroke="#2F6FB5" stroke-width="5" fill="none" stroke-linecap="round"/>
+   <circle cx="34" cy="32" r="11" fill="#5BAF3A"/><circle cx="66" cy="32" r="11" fill="#5BAF3A"/>
+   <circle cx="34" cy="31" r="8.5" fill="#D8332A"/><circle cx="66" cy="31" r="8.5" fill="#D8332A"/>
+   <ellipse cx="34" cy="31" rx="2.4" ry="6" fill="#1B1B1B"/><ellipse cx="66" cy="31" rx="2.4" ry="6" fill="#1B1B1B"/>
+   <circle cx="31" cy="27" r="1.8" fill="#fff"/><circle cx="63" cy="27" r="1.8" fill="#fff"/>
+   <path d="M41 47 H59" stroke="#2F6A22" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="dartR" viewBox="0 0 100 80">
+   <ellipse cx="50" cy="73" rx="36" ry="4.5" fill="#173F2B" opacity=".2"/>
+   <ellipse cx="22" cy="58" rx="15" ry="11" fill="#24408E"/><ellipse cx="78" cy="58" rx="15" ry="11" fill="#2F4FA8"/>
+   <path d="M8 68 Q16 64 26 69 M74 69 Q84 64 92 68" stroke="#2F4FA8" stroke-width="5" stroke-linecap="round" fill="none"/>
+   <g fill="#2F4FA8"><circle cx="8" cy="68.5" r="2.6"/><circle cx="92" cy="68.5" r="2.6"/></g>
+   <path d="M22 60 C18 38 32 26 50 26 C68 26 82 38 78 60 C68 68 32 68 22 60Z" fill="#D8332A"/>
+   <path d="M24 56 C36 64 64 64 76 56 C74 64 64 68 50 68 C36 68 26 64 24 56Z" fill="#B8261F"/>
+   <circle cx="37" cy="28" r="9" fill="#D8332A"/><circle cx="63" cy="28" r="9" fill="#D8332A"/>
+   <circle cx="37" cy="27" r="5.4" fill="#141414"/><circle cx="63" cy="27" r="5.4" fill="#141414"/><circle cx="35.4" cy="25.2" r="1.6" fill="#fff"/><circle cx="61.4" cy="25.2" r="1.6" fill="#fff"/>
+   <path d="M38 42 Q50 44 62 42" stroke="#9E1F19" stroke-width="2" fill="none" stroke-linecap="round"/>
+   <path d="M38 54 L35 68 M62 54 L65 68" stroke="#2F4FA8" stroke-width="6" stroke-linecap="round"/>
+   <g fill="#2F4FA8"><circle cx="31" cy="70" r="2.4"/><circle cx="35" cy="71" r="2.4"/><circle cx="39" cy="70" r="2.4"/><circle cx="61" cy="70" r="2.4"/><circle cx="65" cy="71" r="2.4"/><circle cx="69" cy="70" r="2.4"/></g>
+  </symbol>
+  <symbol id="dartG" viewBox="0 0 100 80">
+   <ellipse cx="50" cy="73" rx="36" ry="4.5" fill="#173F2B" opacity=".2"/>
+   <ellipse cx="22" cy="58" rx="15" ry="11" fill="#6CC48C"/><ellipse cx="78" cy="58" rx="15" ry="11" fill="#7ED39B"/>
+   <g fill="#16241B"><path d="M14 54 q8 -6 14 2 q-6 6 -14 -2Z"/><path d="M74 60 q8 -8 14 0 q-6 6 -14 0Z"/></g>
+   <path d="M8 68 Q16 64 26 69 M74 69 Q84 64 92 68" stroke="#6CC48C" stroke-width="5" stroke-linecap="round" fill="none"/>
+   <g fill="#6CC48C"><circle cx="8" cy="68.5" r="2.6"/><circle cx="92" cy="68.5" r="2.6"/></g>
+   <path d="M22 60 C18 38 32 26 50 26 C68 26 82 38 78 60 C68 68 32 68 22 60Z" fill="#7ED39B"/>
+   <g fill="#16241B"><path d="M30 46 Q38 38 48 44 Q44 52 32 52Z"/><path d="M54 48 Q64 42 72 50 Q66 58 56 56Z"/><path d="M44 58 Q50 54 56 60 Q50 64 44 60Z"/><circle cx="50" cy="36" r="3.4"/></g>
+   <circle cx="37" cy="28" r="9" fill="#7ED39B"/><circle cx="63" cy="28" r="9" fill="#7ED39B"/>
+   <circle cx="37" cy="27" r="5.4" fill="#141414"/><circle cx="63" cy="27" r="5.4" fill="#141414"/><circle cx="35.4" cy="25.2" r="1.6" fill="#fff"/><circle cx="61.4" cy="25.2" r="1.6" fill="#fff"/>
+   <path d="M38 54 L35 68 M62 54 L65 68" stroke="#6CC48C" stroke-width="6" stroke-linecap="round"/>
+   <g fill="#6CC48C"><circle cx="31" cy="70" r="2.4"/><circle cx="35" cy="71" r="2.4"/><circle cx="39" cy="70" r="2.4"/><circle cx="61" cy="70" r="2.4"/><circle cx="65" cy="71" r="2.4"/><circle cx="69" cy="70" r="2.4"/></g>
+  </symbol>
+  <symbol id="toucan" viewBox="0 0 130 110">
+   <path d="M10 92 H120" stroke="#6B4E33" stroke-width="7" stroke-linecap="round"/>
+   <path d="M40 88 L32 104 M50 88 L56 104" stroke="#1E1E1E" stroke-width="5" stroke-linecap="round"/>
+   <ellipse cx="44" cy="58" rx="22" ry="32" fill="#1E1E1E"/><ellipse cx="52" cy="40" rx="12" ry="13" fill="#F7D23E"/>
+   <path d="M58 30 Q92 24 118 40 Q100 50 60 44 Z" fill="#F2C531"/><path d="M60 38 Q92 40 116 42 Q100 50 60 44 Z" fill="#6B2E22"/>
+   <circle cx="50" cy="30" r="6" fill="#9BD16A"/><circle cx="50" cy="30" r="2.6" fill="#111"/>
+  </symbol>
+  <symbol id="coati" viewBox="0 0 60 60"><ellipse cx="30" cy="54" rx="22" ry="3" fill="#173F2B" opacity=".18"/>
+   <path d="M14 40 C10 28 8 16 12 6" stroke="#7A5638" stroke-width="6" fill="none" stroke-linecap="round" stroke-dasharray="4 3"/><path d="M14 40 C10 28 8 16 12 6" stroke="#D9C2A0" stroke-width="6" fill="none" stroke-linecap="round" stroke-dasharray="3 4" stroke-dashoffset="4"/>
+   <ellipse cx="30" cy="40" rx="16" ry="10" fill="#9A6B45"/><ellipse cx="30" cy="44" rx="13" ry="5" fill="#86593A"/>
+   <path d="M20 48 V54 M27 48 V54 M35 48 V54 M41 48 V54" stroke="#5E4029" stroke-width="3.4" stroke-linecap="round"/>
+   <path d="M42 34 C48 32 54 34 58 40 C52 42 46 42 42 40Z" fill="#9A6B45"/><path d="M50 36 C54 37 57 39 58 40 C54 41 52 41 50 40Z" fill="#E8D8BF"/><circle cx="58" cy="40" r="1.8" fill="#222"/>
+   <circle cx="46" cy="35.5" r="1.6" fill="#141414"/><path d="M43 31 l2 -4 l2 3" fill="#86593A"/></symbol>
+  <symbol id="trumpet" viewBox="0 0 60 60"><path d="M30 40 V58" stroke="#6B4E33" stroke-width="3" stroke-linecap="round"/>
+   <g fill="currentColor"><path d="M30 34 C22 30 16 20 18 12 C24 14 28 20 30 26Z"/><path d="M30 34 C38 30 44 20 42 12 C36 14 32 20 30 26Z"/><path d="M30 32 C26 22 26 10 30 4 C34 10 34 22 30 32Z"/></g>
+   <g fill="#000" opacity=".14"><path d="M30 34 C38 30 44 20 42 12 C36 14 32 20 30 26Z"/></g><circle cx="30" cy="34" r="3" fill="#6B4E33"/></symbol>
+  <symbol id="tanager" viewBox="0 0 60 60"><ellipse cx="30" cy="55" rx="18" ry="2.5" fill="#173F2B" opacity=".16"/>
+   <path d="M10 50 H50" stroke="#6B4E33" stroke-width="3" stroke-linecap="round"/>
+   <path d="M12 30 L2 38 L6 40 Z" fill="#5FA3D6"/><ellipse cx="26" cy="34" rx="15" ry="11" fill="#9DB6C8"/><path d="M14 30 C22 24 34 26 38 36 C30 40 20 38 14 30Z" fill="#5FA3D6"/>
+   <circle cx="40" cy="24" r="9" fill="#A9C0D0"/><path d="M48 23 L54 25 L48 27Z" fill="#2B2B2B"/><circle cx="42" cy="22.5" r="2" fill="#111"/>
+   <path d="M24 44 V50 M30 44 V50" stroke="#3B3B3B" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="speaker" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+<symbol id="morpho" viewBox="0 0 100 80">
+   <ellipse cx="30" cy="30" rx="26" ry="20" fill="#173A63" transform="rotate(-20 30 30)"/>
+   <ellipse cx="70" cy="30" rx="26" ry="20" fill="#173A63" transform="rotate(20 70 30)"/>
+   <ellipse cx="32" cy="31" rx="21" ry="15" fill="#2E7FD8" transform="rotate(-20 32 31)"/>
+   <ellipse cx="68" cy="31" rx="21" ry="15" fill="#2E7FD8" transform="rotate(20 68 31)"/>
+   <ellipse cx="34" cy="58" rx="15" ry="12" fill="#173A63"/><ellipse cx="66" cy="58" rx="15" ry="12" fill="#173A63"/>
+   <ellipse cx="36" cy="57" rx="11" ry="8" fill="#2E7FD8"/><ellipse cx="64" cy="57" rx="11" ry="8" fill="#2E7FD8"/>
+   <rect x="47" y="20" width="6" height="48" rx="3" fill="#2A2A2A"/>
+   <path d="M49 21 Q44 8 40 6 M51 21 Q56 8 60 6" stroke="#2A2A2A" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </symbol>
+<symbol id="sloth" viewBox="0 0 110 120">
+   <path d="M0 14 H110" stroke="#6B4E33" stroke-width="9" stroke-linecap="round"/>
+   <path d="M30 16 Q28 40 38 56 M80 16 Q82 40 72 56" stroke="#8A6A4C" stroke-width="12" fill="none" stroke-linecap="round"/>
+   <ellipse cx="55" cy="72" rx="30" ry="32" fill="#9B7B5C"/>
+   <ellipse cx="55" cy="82" rx="22" ry="20" fill="#86684B"/>
+   <circle cx="55" cy="54" r="18" fill="#A88A6A"/>
+   <ellipse cx="55" cy="57" rx="13" ry="10" fill="#E8D8BF"/>
+   <ellipse cx="48" cy="55" rx="5" ry="3" fill="#3B2A1C" transform="rotate(-15 48 55)"/>
+   <ellipse cx="62" cy="55" rx="5" ry="3" fill="#3B2A1C" transform="rotate(15 62 55)"/>
+   <circle cx="55" cy="60" r="2" fill="#3B2A1C"/>
+  </symbol>
+  <symbol id="owlB" viewBox="0 0 100 80">
+   <path d="M49 40 C34 12 10 8 5 26 C1 42 22 54 47 46Z" fill="#8C7A62"/><path d="M51 40 C66 12 90 8 95 26 C99 42 78 54 53 46Z" fill="#8C7A62"/>
+   <path d="M49 40 C38 22 20 18 14 28 C24 26 36 32 47 44Z" fill="#A89878"/><path d="M51 40 C62 22 80 18 86 28 C76 26 64 32 53 44Z" fill="#A89878"/>
+   <path d="M47 47 C30 50 16 62 24 74 C34 80 45 68 49 53Z" fill="#6E5E4A"/><path d="M53 47 C70 50 84 62 76 74 C66 80 55 68 51 53Z" fill="#6E5E4A"/>
+   <g fill="none" stroke="#C9BA9C" stroke-width="1.6" stroke-linecap="round"><path d="M12 30 Q24 34 38 30"/><path d="M88 30 Q76 34 62 30"/><path d="M16 38 Q28 42 40 38"/><path d="M84 38 Q72 42 60 38"/></g>
+   <circle cx="31" cy="65" r="9.5" fill="#E8C766"/><circle cx="31" cy="65" r="6.4" fill="#1E1A14"/><circle cx="29" cy="63" r="1.8" fill="#fff"/>
+   <circle cx="69" cy="65" r="9.5" fill="#E8C766"/><circle cx="69" cy="65" r="6.4" fill="#1E1A14"/><circle cx="67" cy="63" r="1.8" fill="#fff"/>
+   <rect x="47.5" y="20" width="5" height="44" rx="2.5" fill="#3A3128"/><path d="M49 21 Q44 8 40 6 M51 21 Q56 8 60 6" stroke="#3A3128" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="hum" viewBox="0 0 80 60">
+   <ellipse cx="34" cy="18" rx="20" ry="6" fill="#DCEFE5" opacity=".85" transform="rotate(-35 34 18)"/>
+   <path d="M14 44 L27 36 L29 46Z" fill="#1F5E3C"/>
+   <path d="M24 36 C24 26 34 21 44 25 C51 29 51 37 45 41 C37 45 28 43 24 36Z" fill="#2E8B57"/>
+   <path d="M28 40 C34 44 42 43 46 38 C40 40 34 41 28 40Z" fill="#1F6E45"/>
+   <circle cx="50" cy="27" r="7.5" fill="#2E8B57"/><path d="M45 31 C47 36 53 36 55 31Z" fill="#7B4FA8"/>
+   <path d="M57 26 L77 23" stroke="#1B1B1B" stroke-width="2.4" stroke-linecap="round"/><circle cx="52.5" cy="25" r="1.7" fill="#111"/><circle cx="52" cy="24.4" r=".6" fill="#fff"/>
+   <ellipse cx="40" cy="19" rx="15" ry="5" fill="#EEF7F2" opacity=".9" transform="rotate(-55 40 19)"/>
+  </symbol>
+  <symbol id="pap" viewBox="0 0 40 40"><path d="M8 14 L20 8 L32 14 L32 28 L20 34 L8 28Z" fill="#F08A3C"/><path d="M8 14 L20 20 L32 14 L20 8Z" fill="#F9B06A"/><path d="M20 20 V34 L32 28 V14Z" fill="#D9712A"/></symbol>
+  <symbol id="iguana" viewBox="0 0 100 60">
+   <ellipse cx="50" cy="56" rx="38" ry="3" fill="#173F2B" opacity=".18"/>
+   <path d="M32 42 C22 46 12 48 2 44 C12 50 24 52 34 46Z" fill="#5C8C3C"/>
+   <path d="M30 41 C40 30 64 30 73 38 C67 47 40 49 30 41Z" fill="#6FA34A"/>
+   <path d="M71 36 C77 29 87 29 93 34 C91 40 81 42 73 40Z" fill="#7DB357"/><path d="M80 40 C81 47 76 50 73 45Z" fill="#A6C973"/>
+   <circle cx="86" cy="33.5" r="1.9" fill="#111"/>
+   <path d="M38 33 l3 -6 l3 6 l3 -6 l3 6 l3 -6 l3 6 l3 -6 l3 6 l3 -5 l3 5 l3 -4 l3 4" fill="#4E7A31" stroke="#4E7A31" stroke-width="1.5" stroke-linejoin="round"/>
+   <path d="M42 45 L37 55 M62 45 L66 55" stroke="#5C8C3C" stroke-width="4.5" stroke-linecap="round"/>
+   <g stroke="#4E7A31" stroke-width="2"><path d="M10 45 v3"/><path d="M18 46 v3"/><path d="M26 45 v3"/></g>
+  </symbol>
+  <symbol id="parrot" viewBox="0 0 60 70">
+   <path d="M8 62 H52" stroke="#6B4E33" stroke-width="4" stroke-linecap="round"/>
+   <path d="M24 58 L20 69 L30 62Z" fill="#2E8A3A"/>
+   <path d="M22 58 C14 40 18 18 32 14 C44 12 48 26 44 40 C42 50 36 58 30 62Z" fill="#3FA64A"/>
+   <path d="M24 42 C28 31 40 31 42 41 C38 51 28 53 24 42Z" fill="#2E8A3A"/><path d="M26 50 C30 46 38 46 40 50" stroke="#2F6FB5" stroke-width="3" fill="none" stroke-linecap="round"/>
+   <circle cx="36" cy="21" r="10" fill="#3FA64A"/><path d="M29 14 C33 11 40 11 43 14" stroke="#D8332A" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+   <path d="M44 18 C51 18 51 27 44 27 C46 23 46 21 44 18Z" fill="#E6D3B3"/><circle cx="38.5" cy="19.5" r="2" fill="#111"/>
+  </symbol>
+  <symbol id="macaw" viewBox="0 0 60 70">
+   <path d="M8 56 H52" stroke="#6B4E33" stroke-width="4" stroke-linecap="round"/>
+   <path d="M26 54 L18 70 L24 70 L32 56Z" fill="#D8332A"/><path d="M24 70 L32 56 L34 58 L28 70Z" fill="#2F6FB5"/>
+   <path d="M22 54 C14 38 18 16 32 12 C44 10 48 24 44 38 C42 46 36 52 30 56Z" fill="#D8332A"/>
+   <path d="M24 38 C28 28 40 28 42 38 C38 48 28 50 24 38Z" fill="#F2C531"/><path d="M24 44 C30 52 38 50 42 44 C38 48 30 50 24 44Z" fill="#2F6FB5"/>
+   <circle cx="36" cy="19" r="10" fill="#D8332A"/><ellipse cx="38" cy="19" rx="5" ry="6" fill="#F4EFE6"/>
+   <path d="M44 15 C52 15 52 26 44 26 C46 22 46 18 44 15Z" fill="#E6D3B3"/><path d="M44 22 C48 24 48 26 44 26Z" fill="#2B2B2B"/><circle cx="38.5" cy="18" r="1.9" fill="#111"/>
+  </symbol>
+
+</defs></svg>
+<main id="story">
+<!-- The sections are static so the build checks can read them: data-step is the section number
+     TM.step() reports (11 in all), and a scored Puerta is <section class="gate…" id="g<n>">. The
+     story's script fills each one. pm-step / gate / fork / carta tell Presentar en clase how to
+     step through them. -->
+<section class="sec pm-step" id="intro" data-step="1" aria-label="La selva"></section>
+<section class="sec pm-step locked" id="heredia" data-step="2" aria-label="Heredia: la escuela"></section>
+<section class="sec pm-step locked" id="embarque" data-step="3" aria-label="Embarque"></section>
+<section class="sec pm-step locked" id="bosque" data-step="4" aria-label="El bosque nuboso"></section>
+<section class="gate sec locked" id="g1" data-step="5" aria-label="Puerta 1"></section>
+<section class="gate sec locked" id="g2" data-step="6" aria-label="Puerta 2"></section>
+<section class="fork sec locked" id="f1" data-step="7" aria-label="Elige tu camino"></section>
+<section class="gate sec locked" id="g3" data-step="8" aria-label="Puerta 3"></section>
+<section class="sec pm-step locked" id="cata" data-step="9" aria-label="Las cataratas"></section>
+<section class="gate sec locked" id="g4" data-step="10" aria-label="Puerta 4"></section>
+<section class="carta sec locked" id="fin" data-step="11" aria-label="Tus fotos y la aduana"></section>
+</main>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+/* telemetry: the shared Telemetry API through /js/story-tracking.js, stream 'espanol', as on El
+   Mundial. Only fixed keys, item ids (p1:roca) and 0/1 scores are sent: this page has no name
+   entry and no text input (grades 4–8). #debug logs every call to the console. */
+const DBG=location.hash==='#debug';
+function dlog(k,o){if(!DBG)return;try{console.log('[la-selva]',k,o)}catch(e){}}
+const ST=window.StoryTrack||null;
+if(ST&&DBG)ST.setDebug(dlog);
+const TM=ST?ST.TM:{init:o=>dlog('init',o),step:n=>dlog('step',{n}),choice:o=>dlog('choice',o),complete:o=>dlog('complete',o),summary:o=>dlog('summary',o),track:(e,m)=>dlog('track:'+e,m||{})};
+TM.init({module:'la-selva',gameName:'La selva',stream:'espanol',stepsTotal:11});
+const T=(e,d)=>TM.track(e,Object.assign({v:'1.3'},d||{}));
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait=ms=>new Promise(r=>setTimeout(r,reduce?Math.min(ms,60):ms));
+/* ---------- audio: recorded voices, as in El Viaje (docs/espanol-audio.md) ----------
+   Every spoken line is an ElevenLabs clip pre-rendered to /assets/audio/espanol/la-selva/ and
+   looked up in its manifest by its text (curly quotes stripped, spaces collapsed). One shared
+   Audio element: each say() stops whatever was playing. The manifest is fetched as the page
+   loads, so the first ▶ plays at once. A line missing from the manifest, or a clip that fails,
+   falls back to the browser's speech voice. sayQ() waits for the line before it (the toucan's
+   count), and any say() drops what is still queued. */
+let voices=[];const hasTTS='speechSynthesis' in window;const loadV=()=>{try{voices=speechSynthesis.getVoices()}catch(e){}};loadV();try{speechSynthesis.onvoiceschanged=loadV}catch(e){}
+function utter(t,lang){const u=new SpeechSynthesisUtterance(t);const pref=lang==='en'?['en-US','en']:['es-CR','es-MX','es-US','es-419','es'];
+  let v=null;for(const p of pref){v=voices.find(x=>x.lang&&x.lang.replace('_','-').startsWith(p));if(v)break}
+  u.lang=lang==='en'?'en-US':'es-MX';if(v)u.voice=v;u.rate=lang==='en'?1:.82;return u}
+function sayTTS(t,lang){if(!hasTTS)return;try{speechSynthesis.cancel();speechSynthesis.speak(utter(t,lang))}catch(e){}}
+const AUD={m:null,p:null,el:null,n:0,end:null,q:Promise.resolve(),qn:0};
+function audManifest(){return AUD.p||(AUD.p=fetch('/assets/audio/espanol/la-selva/manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(m=>AUD.m=m||{}))}
+audManifest();
+/* play() resolves when the line is over: the clip ended, a newer line replaced it, or a time cap. */
+function play(t,lang){const k=String(t).replace(/[“”]/g,'').replace(/\s+/g,' ').trim(),n=++AUD.n,est=900+k.length*75;
+  let done;const p=new Promise(r=>{done=r});
+  const tts=()=>{sayTTS(t,lang);setTimeout(done,est)};
+  if(hasTTS)try{speechSynthesis.cancel()}catch(e){}
+  if(AUD.end)AUD.end();AUD.end=done;
+  if(typeof Audio!=='function'){tts();return p}
+  let a=AUD.el;if(!a){a=AUD.el=new Audio();a.preload='none'}
+  try{a.pause()}catch(e){}
+  const go=m=>{if(n!==AUD.n){done();return}const u=m[k];if(!u){tts();return}
+    const fail=()=>{if(n===AUD.n){AUD.n++;tts()}};
+    a.onerror=fail;a.onended=()=>{if(n===AUD.n)done()};a.src=u;setTimeout(done,est+4000);
+    try{const q=a.play();if(q&&q.catch)q.catch(e=>{if(!e||e.name!=='AbortError')fail()})}catch(e){fail()}};
+  if(AUD.m)go(AUD.m);else audManifest().then(go);
+  return p}
+function say(t,lang){AUD.qn++;return play(t,lang)}
+function sayQ(t,lang){const g=AUD.qn;return AUD.q=AUD.q.then(()=>g===AUD.qn?play(t,lang||'es'):null)}
+function hush(){AUD.qn++;AUD.n++;if(AUD.end)AUD.end();AUD.end=null;try{if(AUD.el)AUD.el.pause()}catch(e){}if(hasTTS)try{speechSynthesis.cancel()}catch(e){}}
+const spk='<svg aria-hidden="true"><use href="#speaker"/></svg>';
+const S={emb:[],adu:[],gates:[],fork:null,photos:[],mode:'solo'};
+
+/* ---------- progress, summary, Presentar ---------- */
+/* Steps: a section counts once it crosses the middle of the screen (as on El Mundial). */
+const seen=new Set();
+const io=('IntersectionObserver' in window)?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){const n=+e.target.dataset.step;if(n&&!seen.has(n)){seen.add(n);TM.step(n)}}}),{rootMargin:'-45% 0px -45% 0px',threshold:0}):null;
+function watch(el){if(io&&el&&el.dataset.step)io.observe(el)}
+document.querySelectorAll('[data-step]').forEach(el=>{if(!el.classList.contains('locked'))watch(el)});
+/* first try 0|1 per Puerta, the fork, solo|class, and Embarque → Aduana (Form A, then Form B) */
+function gatesNow(){const g={};S.gates.forEach(x=>{g[x.n]=x.ok?1:0});return g}
+const checksNow=()=>({form:'A',emb:S.emb.slice(),adu:S.adu.slice()});
+function pushSummary(){TM.summary({gates:gatesNow(),path:{f1:S.fork||null},mode:S.mode,checks:checksNow()})}
+/* module_progress/la-selva: the dashboard's In progress pill and Mission Control's fallback.
+   `state` is one string so each save replaces it whole. `checks` is the shape Mission Control's
+   growth view reads (public/espanol/la-selva/checks.json). Never written in Presentar. */
+function saveProgress(fin){const st={done:{},choice:{},conf:{},path:{f1:S.fork||null}};S.gates.forEach(x=>{st.done[x.n]=1;st.choice[x.n]=x.k;st.conf[x.n]=x.ok?1:0});
+  const d={v:'1.3',finished:!!fin,state:JSON.stringify(st),checks:{v:1,form:'A',emb:S.emb.slice(),adu:S.adu.slice(),embDone:S.emb.length>=3,aduDone:S.adu.length>=3}};
+  if(ST)ST.saveProgress('la-selva',d);else dlog('saveModuleProgress',d)}
+/* Presentar en clase: the teacher taps the picture the class chose at Embarque and Aduana; those
+   picks (never a count) go into the presented session through window.StoryChecks. */
+const PRES={on:false,emb:[],adu:[]};
+if(ST&&ST.presentar)ST.presentar.then(v=>{if(v){PRES.on=true;S.mode='class'}}).catch(()=>{});
+window.StoryChecks={presentedResults:()=>PRES.on&&PRES.emb.length?{v:1,form:'A',emb:PRES.emb.slice(),adu:PRES.adu.slice()}:null};
+const pmRefresh=()=>{if(window.StoryPresentar)window.StoryPresentar.refresh()};
+
+/* ---------- small builders ---------- */
+const L=(who,es,en,blur=true)=>`<div class="line"><button class="play say" aria-label="Escuchar" data-es="${es}">${spk}</button><span class="who">${who}</span><p class="es${blur?' blur':''}" tabindex="0" data-es="${es}">${es}</p>${en?`<span class="en-row"><button class="en-btn" aria-expanded="false">EN</button><p class="en" hidden>${en}</p></span>`:''}</div>`;
+const N=t=>`<div class="narr"><button class="play say" data-say="${t.replace(/<[^>]+>/g,'')}" aria-label="Listen">${spk}</button><p>${t}</p></div>`;
+const frame=(id,vb,label)=>`<div class="frame"><svg viewBox="${vb}" id="${id}" role="img" aria-label="${label}"></svg></div>`;
+const sign=(n,t,b,id)=>`<div class="sign"><span class="n">${n}</span><span class="t">${t}<b>${b}</b></span><span class="status" id="${id}-st">BUSCANDO</span></div>`;
+const jodi=t=>`<div class="jodi"><span class="jav" aria-hidden="true">J</span><div><b>Jodi's take</b><p>${t}</p></div></div>`;
+const go=(id,txt)=>`<div class="row next"><button class="go" id="${id}" data-unlock>${txt}</button></div>`;
+document.addEventListener('click',e=>{
+  const p=e.target.closest('.line .play,.line .es');if(p){const es=p.closest('.line').querySelector('.es');es.classList.remove('blur');say(es.dataset.es,'es');T('ev_audio_play');return}
+  const b=e.target.closest('.en-btn');if(b){const en=b.nextElementSibling;en.hidden=!en.hidden;b.setAttribute('aria-expanded',String(!en.hidden));return}
+  const n=e.target.closest('.narr .play');if(n){say(n.dataset.say,'en');T('ev_audio_play');return}
+  const f=e.target.closest('.ficha .play');if(f){say(f.dataset.es,'es');T('ev_audio_play')}});
+document.addEventListener('keydown',e=>{const es=e.target.closest&&e.target.closest('.line .es');if(es&&(e.key==='Enter'||e.key===' ')){e.preventDefault();es.click()}});
+function unlock(id){const el=$('#'+id);el.classList.remove('locked');watch(el);setTimeout(()=>{sizePins();el.scrollIntoView({block:'start'})},60);pmRefresh()}
+/* Pins are at least 44 px to tap at any width: the invisible hit circle grows as the picture shrinks. */
+function sizePins(){document.querySelectorAll('.frame>svg').forEach(svg=>{const w=svg.getBoundingClientRect().width;if(!w)return;
+  const vb=svg.viewBox&&svg.viewBox.baseVal,sc=w/((vb&&vb.width)||1200),r=Math.max(40,Math.ceil(23/sc));svg.querySelectorAll('.hot>.hit').forEach(c=>c.setAttribute('r',r))})}
+addEventListener('resize',sizePins);
+function realPhoto(box,src,alt,cap,date){S.photos.push({src,alt,cap});$('#roll').textContent='Tus fotos: '+S.photos.length;
+  box.insertAdjacentHTML('beforeend',`<div class="real"><img src="${src}" alt="${alt}"><div><b>${cap}</b><small>William's photo · ${date||'May 6, 2015'} · saved to Tus fotos</small></div></div>`)}
+function stamp(n){const s=$('#s'+n);s.classList.add('on');s.setAttribute('aria-label','Puerta '+n+' stamped')}
+
+/* ---------- picture cards ---------- */
+function group(sym,n,color,bg){const cols=n<=1?1:n<=4?2:n<=6?3:n<=8?4:n<=10?5:5,rows=Math.ceil(n/cols),cw=300/cols,ch=180/rows,sz=Math.min(cw,ch)*.9;let u='';
+  for(let i=0;i<n;i++){const c=i%cols,r=Math.floor(i/cols);const s=Array.isArray(sym)?sym[i%sym.length]:sym;u+=`<use href="#${s}" x="${c*cw+(cw-sz)/2}" y="${r*ch+(ch-sz)/2+10}" width="${sz}" height="${sz}" style="color:${color||'#000'}"/>`}
+  return `<svg viewBox="0 0 300 200" aria-hidden="true">${bg||''}${u}</svg>`}
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+function pics(box,opts,onPick){box.innerHTML='';box.classList.add('opts');opts.forEach((o,i)=>{const b=document.createElement('button');b.className='pic opt';b.dataset.k=o.k||o.v||'';b.setAttribute('aria-pressed','false');
+  b.setAttribute('aria-label',o.label);b.innerHTML=`<span class="ab" aria-hidden="true">${'ABC'[i]}</span>${o.svg||group(o.sym,o.n,o.color)}`;b.onclick=()=>onPick(o,b);box.appendChild(b)})}
+
+/* ---------- the gate engine: commit, then reveal ---------- */
+/* Presentar's class-vote box for a Puerta (hidden unless presenting): one row, one option per picture. */
+const cvBox=(n,opts)=>`<div class="cv" data-g="${n}"><button class="cv-link" type="button" aria-expanded="false">¿Juegan en clase?</button><div class="cv-panel" hidden><div class="cv-row" data-r="0">${opts.map((x,i)=>`<span class="cv-o" data-o="${x.k}"><span class="cv-w">${'ABC'[i]} · ${x.saw}</span></span>`).join('')}</div></div></div>`;
+document.addEventListener('click',e=>{const l=e.target.closest('.cv-link');if(!l||l.getAttribute('aria-expanded')==='true')return;l.setAttribute('aria-expanded','true');if(S.mode!=='class'){S.mode='class';T('class_mode',{gate:+l.parentNode.dataset.g})}});
+function gate(o){let pick=null,done=false;const box=$('#'+o.id+'-pics'),btn=$('#'+o.id+'go'),out=$('#'+o.id+'-out');
+  box.insertAdjacentHTML('afterend',cvBox(o.n,o.opts));
+  pics(box,o.opts,(opt,b)=>{if(done)return;pick=opt;box.querySelectorAll('.pic').forEach(x=>{x.setAttribute('aria-pressed',x===b?'true':'false');x.classList.toggle('sel',x===b)});btn.disabled=false});
+  btn.onclick=async()=>{if(!pick||done)return;done=true;btn.hidden=true;box.querySelectorAll('.pic').forEach(x=>x.disabled=true);
+    const ok=!!pick.ok;
+    /* the pick as its item id only, e.g. p1:roca; choiceIndex is its place in report.json */
+    S.gates.push({n:o.n,k:pick.k,heard:o.heard,saw:pick.saw,ok,rightSaw:o.opts.find(x=>x.ok).saw});
+    TM.choice({scenarioIndex:o.n,choiceIndex:o.opts.indexOf(pick),score:ok?1:0,category:'gate',choice:'p'+o.n+':'+pick.k});pushSummary();saveProgress();
+    await o.reveal(pick,out);
+    box.querySelectorAll('.pic').forEach((x,i)=>{if(o.opts[i].ok)x.classList.add('right')});
+    const m=document.createElement('div');out.appendChild(m);
+    m.insertAdjacentHTML('beforeend',jodi(o.jodi(ok,pick)));
+    if(o.extra)m.insertAdjacentHTML('beforeend',o.extra);
+    if(o.photo)realPhoto(m,o.photo.src,o.photo.alt,o.photo.cap,o.photo.date);
+    m.insertAdjacentHTML('beforeend',go(o.id+'-next','Sigue ↓'));
+    const st=$('#'+o.id+'-st');st.textContent=o.found;st.classList.add('ok');stamp(o.n);
+    $('#'+o.id+'-next').onclick=()=>o.next()}}
+
+/* ---------- build the story ---------- */
+const sec=(id,label,inner)=>{$('#'+id).innerHTML=inner;return ''};
+const built=
+sec('intro','La selva',`${frame('art-start','0 0 1200 640','The cloud forest in Costa Rica, in the mist')}
+ <div class="card"><div class="start-grid"><div>
+  <div class="in"><div class="eyebrow">Allgood Academy · Español · Novato</div><h1>La selva</h1><p class="sub">Costa Rica</p>
+  <div class="lvl" aria-label="Level 1 of 3: Novato"><i class="f"></i><i></i><i></i><span>&nbsp;Novato</span></div>
+  <p>Listen, look, tap. The Spanish you hear decides what you see.</p>
+  <div class="row"><button class="go" id="start">Empezar</button><span style="color:var(--ink2);font-size:15px">~14 min · 4 Puertas</span></div>
+  <p class="based">Based on William's day in Costa Rica's cloud forest, May 2015.</p></div></div>
+  <figure class="polaroid" style="margin:0"><img src="/assets/espanol/la-selva/oxen-william.jpg" alt="William kneeling in front of two white oxen wearing a painted yoke, with the painted oxcart behind them">William, Costa Rica, 2015</figure></div></div>`,false)+
+sec('heredia','Heredia: la escuela',`${frame('art-school','0 0 1200 560','A school courtyard in Heredia with a big painted sun on the wall')}
+ <div class="card">${N('You\'re studying Spanish in <b>Heredia, Costa Rica</b>. Class is Monday to Thursday. Today is Wednesday, and class is almost over.')}
+ ${L('La profe Daniela','¡Clase! Hoy vamos al bosque nuboso.','Class! Today we\'re going to the cloud forest.')}
+ <div class="culture"><b>El bosque nuboso</b> is a cloud forest: a forest so high up the mountain that it sits inside the clouds.</div>${go('b-bus','Subir al bus')}</div>`)+
+sec('embarque','Embarque',`<div class="bpass"><div class="bp-top"><b>Embarque · Antes de subir al bus</b><span class="dots" aria-hidden="true"><i id="d0"></i><i id="d1"></i><i id="d2"></i></span></div><div class="bp-body" id="emb"></div></div>
+ <p class="note">Form A shown. Students never see a score here; a ✓ only means "saved".</p>`)+
+sec('bosque','El bosque nuboso',`${frame('art-gate','0 0 1200 640','The park gate in the cloud forest, in fog. Marisol the guide waves. Pins mark things to explore.')}
+ <div class="card">${N('The bus climbs the mountain. The city disappears, and the fog rolls in.')}
+ <p style="margin:8px 0 0;font-size:15px;color:var(--ink2)">Explore: tap the round pins in the picture.</p><div id="ficha-bosque" aria-live="polite"></div>
+ ${L('Marisol, la guía','¡Hola, chicos! ¡Pura vida! Soy Marisol. Bienvenidos al bosque nuboso.','Hi, everyone! Pura vida! I\'m Marisol. Welcome to the cloud forest.')}
+ <div class="culture"><b>¡Pura vida!</b> Costa Ricans say it for hello, goodbye, thanks and "all good". It means "pure life".</div>
+ ${L('Marisol','Aquí hay ranas, mariposas… ¡y cinco cataratas!','Here there are frogs, butterflies… and five waterfalls!')}${go('b-vamos','Vamos')}</div>`)+
+sec('g1','Puerta 1',`${sign('PUERTA 1','LA CASA DE LAS RANAS','Las ranas','g1')}${frame('art-frogs','0 0 1200 520','Inside the warm frog house: a big leaf on the left, a mossy rock on the right. Something is hiding.')}
+ <div class="card">${L('Marisol, en voz baja','¡Shhh! Miren… las ranas. ¿Dónde están las ranas?','Shhh! Look… the frogs. Where are the frogs?')}
+ <p class="ask">Tap the picture that shows what she means.</p><div class="pics" id="g1-pics"></div><div class="row"><button class="go" id="g1go" disabled>Mirar</button></div><div id="g1-out"></div></div>`)+
+sec('g2','Puerta 2',`${sign('PUERTA 2','LA CASA DE LAS MARIPOSAS','La mariposa azul','g2')}${frame('art-butter','0 0 1200 560','The butterfly house: mesh roof, red heliconia flowers, a plate of banana. Butterflies fly everywhere.')}
+ <div class="card">${N('Next door is the butterfly house. Marisol hands you her phone.')}
+ ${L('Marisol','¡Qué bonito! Toma una foto de la mariposa azul.','How pretty! Take a photo of the blue butterfly.')}
+ <p class="ask">Tap what you'll photograph.</p><div class="pics" id="g2-pics"></div><div class="row"><button class="go" id="g2go" disabled>Tomar la foto</button></div><div id="g2-out"></div></div>`)+
+sec('f1','Elige tu camino',`<div class="road"><div class="road-board">Elige tu camino</div><div class="road-arrows"><span>← la carreta</span><span>los colibríes →</span></div></div>
+ <div class="card">${L('Marisol','¿Quieren ver la carreta o los colibríes?','Do you want to see the oxcart or the hummingbirds?')}
+ <p class="ask">Your choice. There's no wrong way.</p><div class="pics" id="fork-pics"></div><div id="f1body"></div></div>`)+
+sec('g3','Puerta 3',`${sign('PUERTA 3','EL AVIARIO','El tucán','g3')}${frame('art-avi','0 0 1200 560','The aviary: a toucan on a branch next to a tray of papaya and banana. The keeper stands beside it.')}
+ <div class="card">${N('In the aviary, the keeper lets you feed a toucan.')}
+ ${L('El cuidador','Tranquilo. Dale tres pedazos de papaya.','Easy now. Give him three pieces of papaya.')}
+ <p class="ask">Tap the plate you'll give him.</p><div class="pics" id="g3-pics"></div><div class="row"><button class="go" id="g3go" disabled>Darle la papaya</button></div><div id="g3-out"></div></div>`)+
+sec('cata','Las cataratas',`<div class="sign bronze-sign"><span class="n">→</span><span class="t">SENDERO<b>Las cataratas</b></span></div>${frame('art-gorge','0 0 1200 640','A deep green gorge with metal stairs going down past waterfalls.')}
+ <div class="card">${N('The trail goes down metal stairs into a gorge. Count the waterfalls with Marisol.')}
+ <div class="counter" id="cata-count" aria-live="polite">0</div><div class="row"><button class="go" id="b-bajar2" data-pm-tap="Toquen Bajar: cuenten las cataratas.">Bajar</button></div><div id="cata-out"></div></div>`)+
+sec('g4','Puerta 4',`${sign('PUERTA 4','HEREDIA · LUNES','El lunes en clase','g4')}${frame('art-class','0 0 1200 600','Back in class on Monday. La profe Daniela stands next to a projector screen showing William\'s photo of the misty cloud forest.')}
+ <div class="card">${N('Monday morning, back in Heredia. La profe Daniela wants to see your photos from the trip.')}
+ ${L('La profe Daniela','A ver… ¿en qué foto hay dos ranas y un tucán?','Let\'s see… which photo has two frogs and one toucan?')}
+ <p class="ask">Tap the photo on your phone.</p><div class="pics" id="g4-pics"></div><div class="row"><button class="go" id="g4go" disabled>Mostrar la foto</button></div><div id="g4-out"></div></div>`)+
+sec('fin','Tus fotos y la aduana',`<div class="card wide gin"><div class="eyebrow">El fin del viaje</div><h2>Tus fotos</h2><p>Every photo here is real: William took them on May 6, 2015.</p><div class="roll-grid" id="roll-grid"></div>
+ <h2 style="margin-top:22px">Lo que tu español hizo</h2><div class="recap" id="recap"></div></div>
+ <div class="ea-aduana" id="aduana"><div class="bpass" style="margin-top:22px"><div class="bp-top"><b>Aduana · De vuelta a casa</b><span class="dots" aria-hidden="true"><i id="a0"></i><i id="a1"></i><i id="a2"></i></span></div><div class="bp-body" id="adu"></div></div>
+ <div id="passport"></div></div>`);
+
+/* ---------- ART ---------- */
+/* ===== ART (Art Director pass v1.1b): detailed flat, one shade tone per color, gradients only for sky, light and mist ===== */
+let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+function crownPath(cx,cy,r,n){let pts=[];for(let i=0;i<n;i++){const a=i/n*Math.PI*2,rr=r*(.84+.16*rnd());pts.push([cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*.82])}
+  let d=`M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;for(let i=0;i<n;i++){const p=pts[i],q=pts[(i+1)%n],a=(i+.5)/n*Math.PI*2,k=r*1.12;
+  d+=` Q${(cx+Math.cos(a)*k).toFixed(1)} ${(cy+Math.sin(a)*k*.82).toFixed(1)} ${q[0].toFixed(1)} ${q[1].toFixed(1)}`}return d+'Z'}
+function crown(cx,cy,r,base,shade,light){return `<path d="${crownPath(cx,cy+r*.1,r,9)}" fill="${shade}"/><path d="${crownPath(cx-r*.04,cy-r*.04,r*.9,9)}" fill="${base}"/>${light?`<path d="${crownPath(cx-r*.28,cy-r*.3,r*.38,7)}" fill="${light}"/>`:''}`}
+function row(y,r,count,base,shade,light,jit){let s='';const step=1300/count;for(let i=0;i<=count;i++){s+=crown(-50+i*step+rnd()*jit,y+rnd()*jit*.5,r*(.8+.4*rnd()),base,shade,light)}return s}
+function fern(x,y,s,c,c2){let f='';for(let i=0;i<9;i++){const a=-160+i*17.5;f+=`<g transform="translate(${x} ${y}) rotate(${a}) scale(${s})"><path d="M0 0 Q50 -14 100 6 Q50 4 0 0Z" fill="${i%2?c:c2}"/></g>`}
+  return `<path d="M${x} ${y} L${x+4} ${y+260}" stroke="#4A3828" stroke-width="${10*s}" stroke-linecap="round"/>${f}`}
+function moss(x,y,len){let p=`M${x} ${y}`;for(let i=1;i<=6;i++)p+=` Q${x+(i%2?8:-8)} ${y+len*(i-.5)/6} ${x} ${y+len*i/6}`;return `<path d="${p}" stroke="#A9C79A" stroke-width="3" fill="none" stroke-linecap="round" opacity=".85"/>`}
+function bigLeaf(x,y,rot,s,c,c2){return `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})"><path d="M0 0 C40 -60 140 -60 200 0 C140 50 40 50 0 0Z" fill="${c}"/><path d="M0 0 C60 10 140 10 200 0 C140 50 40 50 0 0Z" fill="${c2}"/><path d="M4 0 Q100 -4 196 0" stroke="${c2}" stroke-width="3" fill="none"/></g>`}
+function mossClump(x,y){let b='';for(let i=0;i<9;i++){const a=i/9*Math.PI*2;b+=`<circle cx="${(x+Math.cos(a)*16).toFixed(1)}" cy="${(y+Math.sin(a)*10).toFixed(1)}" r="${(9+((i*7)%5)).toFixed(1)}"/>`}
+  return `<g fill="#5E8B3E">${b}</g><g fill="#7FA858"><circle cx="${x-6}" cy="${y-6}" r="9"/><circle cx="${x+8}" cy="${y-4}" r="7"/></g>${moss(x-10,y+8,46)}${moss(x+10,y+8,34)}`}
+function brom(x,y){return `<g transform="translate(${x} ${y})">${[-55,-25,0,25,55].map((a,i)=>`<path d="M0 0 Q${a*.5} -26 ${a*.9} -40" stroke="${i%2?'#B8532F':'#7FA858'}" stroke-width="9" fill="none" stroke-linecap="round"/>`).join('')}<ellipse cx="0" cy="2" rx="12" ry="6" fill="#5E8B3E"/></g>`}
+const DEFS=`<defs><linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEF3EF"/><stop offset="1" stop-color="#D3E2D7"/></linearGradient>
+<linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFBEA" stop-opacity=".55"/><stop offset="1" stop-color="#FFFBEA" stop-opacity="0"/></linearGradient>
+<linearGradient id="fogband" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F4F8F5" stop-opacity="0"/><stop offset=".5" stop-color="#F4F8F5" stop-opacity=".55"/><stop offset="1" stop-color="#F4F8F5" stop-opacity="0"/></linearGradient></defs>`;
+const fog=(y,h)=>`<rect x="0" y="${y}" width="1200" height="${h}" fill="url(#fogband)"/>`;
+function cloudForest(extra,front){seed=11;return DEFS+`<rect width="1200" height="640" fill="url(#mist)"/>
+<path d="M0 250 C160 190 260 230 380 200 C520 160 600 120 760 170 C900 210 1000 150 1200 190 V640 H0Z" fill="#BFD3C5"/>${fog(200,90)}
+<g>${row(300,90,9,'#A7C2AF','#97B5A1',null,30)}</g><rect y="300" width="1200" height="340" fill="#A7C2AF"/>${fog(290,110)}
+<g>${row(390,100,8,'#7FA58A','#6E967B','#8DB197',36)}</g><rect y="400" width="1200" height="240" fill="#6E967B"/>
+<g>${[150,520,880].map(x=>`<polygon points="${x},0 ${x+90},0 ${x-60},640 ${x-190},640" fill="url(#shaft)"/>`).join('')}</g>${fog(420,80)}
+<g>${fern(250,330,1.1,'#4F8A61','#437A55')}${fern(980,350,1,'#4F8A61','#437A55')}</g>
+<g stroke="#4A3828" stroke-linecap="round"><path d="M95 640 C100 500 90 380 110 210" stroke-width="34"/><path d="M1095 640 C1090 480 1100 360 1080 190" stroke-width="38"/></g>
+<path d="M95 640 C100 500 90 380 110 210" stroke="#5E4733" stroke-width="10" fill="none" transform="translate(-10 0)"/>
+${mossClump(108,300)}${mossClump(100,420)}${mossClump(1088,320)}${mossClump(1094,450)}${brom(132,262)}${brom(1060,282)}
+${[100,120,1070,1090,1110].map((x,i)=>moss(x,230+i*12,90+i*14)).join('')}
+<g>${crown(110,190,120,'#2F5E43','#244D36','#3B6E50')}${crown(230,230,80,'#2F5E43','#244D36')}${crown(1080,170,130,'#2F5E43','#244D36','#3B6E50')}${crown(950,210,86,'#2F5E43','#244D36')}</g>
+<path d="M0 560 C200 520 400 540 600 530 C800 520 1000 540 1200 520 V640 H0Z" fill="#3D6B4C"/>${extra||''}
+${bigLeaf(-40,600,-18,1.1,'#1F4A33','#173D29')}${bigLeaf(1240,610,200,1.1,'#1F4A33','#173D29')}${bigLeaf(780,660,-30,.8,'#255437','#1B4430')}
+<rect x="0" y="540" width="1200" height="100" fill="url(#fogband)" opacity=".5"/>${front||''}`}
+/* ===== Fichas de campo: real species, tap to learn (exploration, never graded) ===== */
+const F={
+ sombrilla:{img:'/assets/espanol/la-selva/sombrilla.jpg',alt:"Real photo: giant poor man's umbrella leaves covering a cliff above a pool with three small waterfalls, in the fog",by:"William's photo, May 6, 2015",es:'la sombrilla de pobre',en:"poor man's umbrella (gunnera)",fact:'In Costa Rica people call this plant the poor man\'s umbrella. Its leaves can grow more than a meter (about 4 feet) wide.'},
+ pizote:{art:['coati',1],es:'el pizote',en:'white-nosed coati',fact:'A cousin of the raccoon. It walks with its long striped tail held straight up.'},
+ corteza:{art:['trumpet',1,'#F2C531'],es:'la corteza amarilla',en:'yellow trumpet tree',fact:'In the dry season this tree drops its leaves and turns completely yellow with flowers.'},
+ tangara:{art:['tanager',1],es:'la tangara azuleja',en:'blue-gray tanager',fact:'One of the most common birds in Costa Rica. You can see it in the forest and even in the city.'},
+ helecho:{img:'/assets/espanol/la-selva/helecho.jpg',alt:"Real photo: tree ferns above a bed of red flowers in the cloud forest",by:"William's photo, May 6, 2015",es:'el helecho arborescente',en:'tree fern',fact:'A fern as tall as a tree. Ferns were growing on Earth before the dinosaurs.'},
+ musgo:{img:'/assets/espanol/la-selva/musgo.jpg',alt:"Real photo: moss and hanging plants on the trees beside a waterfall",by:"William's photo, May 6, 2015",es:'el musgo',en:'moss',fact:'In the cloud forest, moss and small plants grow right on the trees and drink water from the clouds.'},
+ niebla:{img:'/assets/espanol/la-selva/niebla.jpg',alt:"Real photo: fog over the treetops and the park's thatched roofs",by:"William's photo, May 6, 2015",es:'la niebla',en:'fog',fact:'This forest is so high up the mountain that the clouds sit in the trees. That is why it is called el bosque nuboso, the cloud forest.'},
+ ojosrojos:{img:'/assets/espanol/la-selva/red-eyed-frog.jpg',alt:"Real photo: a bright green red-eyed tree frog with orange feet on a big leaf",by:"William's photo, May 6, 2015",es:'la rana de ojos rojos',en:'red-eyed tree frog',fact:'It sleeps on leaves during the day. If something bothers it, it pops open its bright red eyes, which can startle a hungry bird.'},
+ rojaazul:{img:'/assets/espanol/la-selva/frog-red.jpg',alt:"Real photo: a tiny red frog with blue legs on a gray rock",by:"William's photo, May 6, 2015",es:'la rana roja y azul',en:'strawberry poison frog',fact:'People call it the "blue jeans" frog because of its blue legs. It is about the size of your thumbnail.'},
+ verdenegra:{img:'/assets/espanol/la-selva/frog-green.jpg',alt:"Real photo: a green-and-black poison frog on a gray rock",by:"William's photo, May 6, 2015",es:'la rana verde y negra',en:'green-and-black poison frog',fact:'Its bright colors are a warning to birds and snakes: "Don\'t eat me!"'}};
+function fichaArt(a){if(a==='wheel')return `<svg viewBox="0 0 300 300">${wheel(150,150,130)}</svg>`;
+ if(a==='cart')return `<svg viewBox="560 120 560 360">${oxScene()}</svg>`;
+ if(a==='heli')return `<svg viewBox="-150 -300 300 320">${heliconia(0,0,1.1)}</svg>`;
+ return group(a[0],a[1],a[2]||null,'<rect width="300" height="200" rx="12" fill="#E7F0E9"/>')}
+function ficha(k){const f=F[k];const real=f.img?`<details class="foto"><summary>Ver foto real</summary><img src="${f.img}" alt="${f.alt}"><small>${f.by}</small></details>`
+  :f.art?`<details class="foto"><summary>Ver de cerca</summary><div class="cerca">${fichaArt(f.art)}</div></details>`:'';
+  return `<div class="ficha"><button class="play" aria-label="Escuchar: ${f.es}" data-es="${f.es}">${spk}</button><b>${f.es}</b><span class="sci">${f.en}</span><p>${f.fact}</p><div class="real-row">${real}</div></div>`}
+function hotspot(k,x,y,lx,ly){const lab=F[k].es,w=lab.length*12+30;lx=lx??x;ly=ly??y+46;return `<g class="hot pin" tabindex="0" role="button" aria-label="Explore: ${lab}, ${F[k].en}" data-f="${k}">
+<circle class="hit" cx="${x}" cy="${y}" r="40" fill="#fff" opacity="0"/><circle class="pulse" cx="${x}" cy="${y}" r="20" fill="none" stroke="#FBF6EE" stroke-width="4"/>
+<circle class="disc ring" cx="${x}" cy="${y}" r="20" fill="#FBF6EE" stroke="#B0773A" stroke-width="4"/><circle cx="${x-3}" cy="${y-3}" r="7" fill="none" stroke="#245866" stroke-width="3.4"/><path d="M${x+2} ${y+2} l7 7" stroke="#245866" stroke-width="3.6" stroke-linecap="round"/>
+<rect x="${lx-w/2}" y="${ly-18}" width="${w}" height="34" rx="17" fill="#173F2B" opacity=".86"/><text x="${lx}" y="${ly+5}" text-anchor="middle" style="font:700 17px 'Atkinson Hyperlegible Next',Verdana,sans-serif" fill="#FBF6EE">${lab}</text></g>`}
+function wireHot(svg,box){svg.querySelectorAll('.hot').forEach(g=>{const act=()=>{const k=g.dataset.f;say(F[k].es,'es');box.innerHTML=ficha(k);g.querySelector('.ring').setAttribute('stroke','#2E7D4F');g.querySelector('.ring').setAttribute('stroke-width','6');T('explore',{k})};
+  g.onclick=act;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act()}}})}
+
+/* people: drawn to the house construction (rounded caps, one shade tone, warm floor shadow) */
+function person(o){const {x,y,skin,skin2,hair,top,top2,pants,shoe,wave,pony,jacket}=o;return `<g transform="translate(${x} ${y})">
+<ellipse cx="0" cy="292" rx="62" ry="9" fill="#2A1E14" opacity=".16"/>
+<path d="M-18 180 L-22 280 M18 180 L22 280" stroke="${pants}" stroke-width="24" stroke-linecap="round"/>
+<path d="M-34 286 h26 M8 286 h26" stroke="${shoe}" stroke-width="12" stroke-linecap="round"/>
+<path d="M-46 96 C-46 76 -26 66 0 66 C26 66 46 76 46 96 L50 196 C30 204 -30 204 -50 196Z" fill="${top}"/>
+<path d="M10 70 C30 72 46 82 46 100 L50 196 C40 200 26 202 14 202Z" fill="${top2}"/>
+${jacket?`<path d="M0 70 V200" stroke="${top2}" stroke-width="3"/><path d="M-30 66 Q0 52 30 66 Q0 76 -30 66Z" fill="${top2}"/>`:`<path d="M-14 68 Q0 84 14 68" stroke="${top2}" stroke-width="4" fill="none"/>`}
+<path d="M-44 94 C-62 120 -62 160 -48 184" stroke="${top}" stroke-width="20" fill="none" stroke-linecap="round"/><circle cx="-47" cy="190" r="9" fill="${skin}"/>
+${wave?`<path d="M44 92 C66 76 72 46 64 20" stroke="${top2}" stroke-width="20" fill="none" stroke-linecap="round"/><circle cx="63" cy="12" r="10" fill="${skin}"/>`
+:`<path d="M44 94 C62 120 62 160 48 184" stroke="${top2}" stroke-width="20" fill="none" stroke-linecap="round"/><circle cx="47" cy="190" r="9" fill="${skin}"/>`}
+<rect x="-9" y="44" width="18" height="24" rx="6" fill="${skin2}"/>
+${pony?`<path d="M20 4 C40 10 44 40 34 62" stroke="${hair}" stroke-width="13" fill="none" stroke-linecap="round"/>`:''}
+<ellipse cx="0" cy="22" rx="27" ry="30" fill="${skin}"/><ellipse cx="-26" cy="24" rx="5" ry="8" fill="${skin2}"/><ellipse cx="26" cy="24" rx="5" ry="8" fill="${skin2}"/>
+<path d="M-28 18 C-30 -14 30 -14 28 18 C22 2 10 -2 0 -2 C-14 -2 -24 4 -28 18Z" fill="${hair}"/>
+<ellipse cx="-10" cy="24" rx="3.2" ry="3.8" fill="#23303A"/><ellipse cx="10" cy="24" rx="3.2" ry="3.8" fill="#23303A"/><circle cx="-9" cy="22.6" r="1" fill="#fff"/><circle cx="11" cy="22.6" r="1" fill="#fff"/>
+<path d="M0 28 Q-3 34 1 35" stroke="${skin2}" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M-7 41 Q0 46 7 41" stroke="#7A3B2E" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<ellipse cx="-16" cy="34" rx="5" ry="3" fill="#E08A6E" opacity=".35"/><ellipse cx="16" cy="34" rx="5" ry="3" fill="#E08A6E" opacity=".35"/></g>`}
+const marisol=person({x:860,y:300,skin:'#B97E55',skin2:'#A06A44',hair:'#2B1D14',top:'#8E3B2F',top2:'#74302A',pants:'#3B3B46',shoe:'#4A3828',wave:true,pony:true,jacket:true});
+const profe=person({x:520,y:236,skin:'#C98F62',skin2:'#B07A50',hair:'#3A2618',top:'#4C6A8E',top2:'#3E587A',pants:'#2F3540',shoe:'#5B4029',wave:true});
+
+/* Heredia school courtyard (after William's photo: tile floor, plants, painted sun) */
+$('#art-school').innerHTML=`<defs><linearGradient id="sunlight" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF6DD" stop-opacity=".7"/><stop offset="1" stop-color="#FFF6DD" stop-opacity="0"/></linearGradient></defs>
+<rect width="1200" height="560" fill="#F1DDB4"/><rect width="1200" height="96" fill="#8B5A3C"/><g fill="#7A4D33">${Array.from({length:25},(_,i)=>`<rect x="${i*50}" y="70" width="30" height="26"/>`).join('')}</g><rect y="92" width="1200" height="10" fill="#6E4530"/>
+<g>${[70,330].map(x=>`<path d="M${x} 440 V220 A110 110 0 0 1 ${x+220} 220 V440Z" fill="#E6CB98"/><path d="M${x+26} 440 V226 A84 84 0 0 1 ${x+194} 226 V440Z" fill="#5E7A5A"/><path d="M${x+26} 300 Q${x+110} 260 ${x+194} 300 V440 H${x+26}Z" fill="#4E6A4B"/>`).join('')}</g>
+<g transform="translate(830 255)"><g fill="#E8762B">${Array.from({length:16},(_,i)=>`<path d="M-12 -150 L0 -104 L12 -150Z" transform="rotate(${i*22.5})"/>`).join('')}</g><circle r="96" fill="#E8762B"/><circle r="84" fill="#F2B33D"/><circle r="66" fill="#F7CE5B"/><path d="M-40 -40 A60 60 0 0 1 30 -54" stroke="#FBE3A0" stroke-width="10" fill="none" stroke-linecap="round"/></g>
+<polygon points="0,96 520,96 900,560 0,560" fill="url(#sunlight)"/>
+<rect y="440" width="1200" height="120" fill="#B5643C"/><g fill="#A55733">${Array.from({length:14},(_,i)=>Array.from({length:3},(_,j)=>(i+j)%2?`<polygon points="${i*90-j*30},${440+j*40} ${i*90+90-j*30},${440+j*40} ${i*90+80-j*30-10},${480+j*40} ${i*90-10-j*30},${480+j*40}"/>`:'').join('')).join('')}</g>
+<g transform="translate(1060 440)"><path d="M-40 0 h80 l-12 -64 h-56z" fill="#9C4A2E"/><path d="M-40 0 h80 l-3 -16 h-74z" fill="#843C24"/>
+${[-60,-30,0,30,60].map((a,i)=>`<path d="M0 -60 Q${a*.9} -130 ${a*1.6} -190" stroke="${i%2?'#3F7A4F':'#4E8A5E'}" stroke-width="22" fill="none" stroke-linecap="round"/>`).join('')}</g>
+${profe}<rect x="20" y="114" width="214" height="40" rx="20" fill="#FBF6EE" opacity=".92"/><text x="40" y="141" class="tchip" fill="#245866">Heredia, Costa Rica</text>`;
+
+/* park gate in the cloud forest */
+function gunnera(x,y,s){let g='';[[-90,-40,70],[0,-80,84],[90,-36,66],[-40,10,56],[50,14,52]].forEach(([dx,dy,r])=>{g+=`<path d="M${dx} ${dy+r*.6} L0 90" stroke="#A0412C" stroke-width="7" stroke-linecap="round"/>`+`<path d="${crownPath(dx,dy,r,11)}" fill="#5F9A55"/><path d="${crownPath(dx-4,dy-4,r*.82,11)}" fill="#6FAA62"/>`+Array.from({length:7},(_,i)=>{const a=Math.PI*(1.1+i*.13);return `<path d="M${dx} ${dy+r*.5} L${(dx+Math.cos(a)*r*.9).toFixed(1)} ${(dy+Math.sin(a)*r*.9).toFixed(1)}" stroke="#4E8A47" stroke-width="2.4"/>`}).join('')});return `<g transform="translate(${x} ${y}) scale(${s})">${g}</g>`}
+$('#art-gate').innerHTML=cloudForest(`${gunnera(640,520,1)}<g transform="translate(300 330)"><rect x="-8" y="10" width="18" height="220" rx="4" fill="#5B4029"/><rect x="232" y="10" width="18" height="220" rx="4" fill="#5B4029"/>
+<rect x="-34" y="-24" width="310" height="78" rx="12" fill="#7A4E1F"/><rect x="-30" y="-28" width="302" height="74" rx="12" fill="#B0773A"/>
+<text x="121" y="20" text-anchor="middle" style="font:700 30px Gelasio,Georgia,serif;letter-spacing:.04em" fill="#FBF6EE">BOSQUE NUBOSO</text>
+${moss(-2,40,70)}${moss(242,40,56)}</g>${marisol}${hotspot('helecho',232,346,190,280)}${hotspot('musgo',108,420,132,476)}${hotspot('niebla',560,250,560,312)}${hotspot('sombrilla',650,450,650,512)}`);
+wireHot($('#art-gate'),$('#ficha-bosque'));
+
+/* frog house: glass, warm and wet */
+seed=21;
+$('#art-frogs').innerHTML=DEFS+`<rect width="1200" height="520" fill="#C9DFCF"/><g stroke="#EEF5F0" stroke-width="5" opacity=".75">${[0,200,400,600,800,1000,1200].map(x=>`<path d="M${x} 0 V290"/>`).join('')}<path d="M0 100 H1200 M0 200 H1200"/></g>
+<g fill="#fff" opacity=".35"><polygon points="220,0 280,0 120,290 60,290"/><polygon points="860,0 900,0 760,290 720,290"/></g>
+<g>${row(300,90,9,'#5F9A6F','#4F8A61','#6FA87E',24)}</g><rect y="320" width="1200" height="200" fill="#3E6B4C"/>
+${fern(1100,320,.9,'#4F8A61','#437A55')}
+<g transform="translate(300 360)"><path d="M10 160 C14 100 0 60 6 20" stroke="#2F6B45" stroke-width="12" fill="none" stroke-linecap="round"/>
+${bigLeaf(-150,40,-14,1.5,'#3F9A55','#338447')}</g>
+<g transform="translate(860 420)"><path d="M-200 80 C-200 10 -120 -30 -10 -34 C110 -36 200 0 210 80Z" fill="#8A8F86"/><path d="M-170 70 C-160 20 -100 -12 -10 -16 C90 -18 150 10 160 60Z" fill="#A3A89E"/>
+<g fill="#6E9A62"><path d="M-150 30 q30 -24 70 -10 q-30 10 -70 10Z"/><path d="M60 -8 q40 -10 70 14 q-40 0 -70 -14Z"/></g></g>
+<rect y="490" width="1200" height="30" fill="#2F5A3E"/>
+<text x="300" y="512" text-anchor="middle" class="tchip" fill="#FBF6EE">la hoja</text><text x="860" y="512" text-anchor="middle" class="tchip" fill="#FBF6EE">la roca</text>`;
+$('#art-start').innerHTML=cloudForest(`<use href="#toucan" x="170" y="150" width="120" height="102"/>`);
+
+Object.assign(F,{
+ morfo:{art:['morpho',1],es:'la mariposa morfo azul',en:'blue morpho butterfly',fact:'Its wings are bright blue on top and brown underneath, so it seems to flash on and off as it flies.'},
+ buho:{img:'/assets/espanol/la-selva/owl-butterfly.jpg',alt:"Real photo: an owl butterfly with a big eye spot on its wing, resting on a wooden wall",by:"William's photo, May 6, 2015",es:'la mariposa búho',en:'owl butterfly',fact:'The big spots on its wings look like an owl\'s eyes. That can scare away a hungry bird.'},
+ heliconia:{art:'heli',es:'la heliconia',en:'heliconia (lobster-claw flower)',fact:'Hummingbirds drink nectar from its bright red flowers.'},
+ bueyes:{img:'/assets/espanol/la-selva/oxen.jpg',alt:"Real photo: two white oxen with long horns, yoked to a painted red oxcart",by:"William's photo, May 6, 2015",es:'los bueyes',en:'oxen',fact:'Oxen once pulled carts of coffee from the Central Valley over the mountains to the Pacific coast. The trip took 10 to 15 days.'},
+ carreta:{art:'cart',es:'la carreta',en:'oxcart',fact:'UNESCO recognizes Costa Rica\'s oxcart traditions. Each cart was built to make its own "song" as it rolled.'},
+ ruedas:{art:'wheel',es:'las ruedas',en:'wheels',fact:'The wheels are painted with stars and flowers. Long ago, each region had its own design, so you could tell where a driver came from.'},
+ colibri:{art:['hum',1],es:'el colibrí',en:'hummingbird',fact:'Costa Rica has more than 50 kinds of hummingbirds. Their wings beat so fast that they hum.'},
+ tucan:{img:'/assets/espanol/la-selva/toucan-tray.jpg',alt:"Real photo: a toucan with a huge yellow-and-brown bill beside a tray of chopped papaya",by:"William's photo, May 6, 2015",es:'el tucán pico castaño',en:'yellow-throated (chestnut-mandibled) toucan',fact:'The biggest toucan in Costa Rica. Its huge bill is very light, with lots of tiny air spaces inside.'},
+ catarata:{img:'/assets/espanol/la-selva/catarata-lapaz.jpg',alt:"Real photo: a tall waterfall falling into mist between green cliffs",by:"William's photo, May 6, 2015",es:'la catarata',en:'waterfall',fact:'Cloud forests soak up water from the clouds. That water feeds the rivers that pour over these cliffs.'}});
+
+/* butterfly house */
+function heliconia(x,y,s){let b='';for(let i=0;i<6;i++){const yy=-60-i*26,dir=i%2?1:-1;b+=`<path d="M0 ${yy} q${dir*34} -4 ${dir*46} -24 q${-dir*10} 18 ${-dir*46} 30Z" fill="${i%2?'#D8332A':'#C2261F'}"/><path d="M${dir*40} ${yy-20} q${dir*6} -2 ${dir*6} -6" stroke="#F2C531" stroke-width="5" stroke-linecap="round"/>`}
+  return `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 0 V-220" stroke="#3E7A3E" stroke-width="7"/>${b}${bigLeaf(0,-40,-120,.8,'#3F8A4A','#337A3E')}${bigLeaf(0,-20,-60,.7,'#3F8A4A','#337A3E')}</g>`}
+function lantana(x,y){let c='';const cols=['#F28C38','#F2C531','#E25B7A'];for(let i=0;i<10;i++){const a=i*0.63;c+=`<circle cx="${(x+Math.cos(a)*14).toFixed(1)}" cy="${(y+Math.sin(a)*10).toFixed(1)}" r="6" fill="${cols[i%3]}"/>`}return c+`<circle cx="${x}" cy="${y}" r="6" fill="#F2C531"/>`}
+seed=31;
+$('#art-butter').innerHTML=DEFS+`<rect width="1200" height="560" fill="#E4EFE8"/>
+<g stroke="#FFFFFF" stroke-width="2" opacity=".7">${Array.from({length:31},(_,i)=>`<path d="M${i*40} 0 V300"/>`).join('')}${Array.from({length:8},(_,i)=>`<path d="M0 ${i*40} H1200"/>`).join('')}</g>
+<path d="M0 0 H1200 V20 H0Z" fill="#5B4029"/><g fill="#5B4029">${[0,300,600,900,1180].map(x=>`<rect x="${x}" y="0" width="20" height="300"/>`).join('')}</g>
+<g>${row(330,90,9,'#7FA58A','#6E967B','#8DB197',30)}</g><rect y="330" width="1200" height="230" fill="#5E8B5A"/>
+${heliconia(170,520,1.1)}${heliconia(1040,530,1)}${fern(620,370,.9,'#4F8A61','#437A55')}
+<g>${[[330,420],[380,450],[760,430],[820,460],[290,470]].map(p=>lantana(p[0],p[1])).join('')}</g>
+<g transform="translate(900 430)"><ellipse cx="0" cy="40" rx="80" ry="16" fill="#3A2A1C" opacity=".25"/><path d="M-70 20 Q0 50 70 20 L60 34 Q0 58 -60 34Z" fill="#8C6A46"/><ellipse cx="0" cy="20" rx="72" ry="14" fill="#A5825A"/>
+${[-40,-14,12,38].map(x=>`<ellipse cx="${x}" cy="16" rx="13" ry="7" fill="#F4E3A8"/><ellipse cx="${x}" cy="16" rx="5" ry="3" fill="#E5CF84"/>`).join('')}<use href="#owlB" x="-52" y="-62" width="104" height="84"/></g>
+<use href="#morpho" x="420" y="120" width="96" height="78"/><use href="#morpho" x="740" y="80" width="70" height="56" transform="rotate(12 775 108)"/><use href="#morpho" x="580" y="220" width="56" height="45"/>
+<rect y="520" width="1200" height="40" fill="#4A7548"/>`;
+
+/* aviary */
+const keeper=person({x:1010,y:250,skin:'#A46B45',skin2:'#8C5A38',hair:'#1F1610',top:'#5E7A3A',top2:'#4E6830',pants:'#3B3B46',shoe:'#4A3828',wave:false});
+function aviary(extra){seed=41;return DEFS+`<rect width="1200" height="560" fill="#CFE0D2"/>
+<g>${row(300,110,8,'#5F9A6F','#4F8A61','#6FA87E',30)}</g><rect y="320" width="1200" height="240" fill="#3E6B4C"/>
+${fern(140,330,1,'#4F8A61','#437A55')}
+<g stroke="#2E3A33" stroke-width="2" opacity=".45">${Array.from({length:40},(_,i)=>`<path d="M${i*32} 0 L${i*32-200} 560"/><path d="M${i*32-400} 0 L${i*32-200} 560"/>`).join('')}</g>
+<path d="M120 300 C320 280 560 290 760 300" stroke="#5B4029" stroke-width="22" stroke-linecap="round" fill="none"/><path d="M120 300 C320 280 560 290 760 300" stroke="#6E4E33" stroke-width="8" fill="none" transform="translate(0 -6)"/>
+<use href="#toucan" x="380" y="138" width="230" height="195"/>
+<g transform="translate(720 440)"><rect x="-40" y="0" width="80" height="120" fill="#5B4029"/><ellipse cx="0" cy="0" rx="40" ry="10" fill="#7A5A3A"/>
+<path d="M-110 -10 H110 L96 14 H-96Z" fill="#B9BDC0"/><path d="M-110 -10 H110 L108 -4 H-108Z" fill="#D8DCDE"/>
+${Array.from({length:14},(_,i)=>`<use href="#pap" x="${-96+(i%7)*26}" y="${-34-Math.floor(i/7)*14}" width="26" height="26"/>`).join('')}
+${[-70,-10,50].map(x=>`<ellipse cx="${x}" cy="-30" rx="14" ry="6" fill="#F4E3A8"/>`).join('')}</g>
+${keeper}${extra||''}`}
+$('#art-avi').innerHTML=aviary();
+
+/* gorge with n waterfalls showing: a rock wall in the cloud forest, falls revealed as you go down the stairs */
+function rockFace(){let r='';seed=57;for(let i=0;i<26;i++){const x=rnd()*1200,y=140+rnd()*300,w=60+rnd()*140,h=18+rnd()*30;r+=`<path d="M${x.toFixed(0)} ${y.toFixed(0)} q${(w/2).toFixed(0)} -${h.toFixed(0)} ${w.toFixed(0)} 0 q-${(w/2).toFixed(0)} ${(h*.6).toFixed(0)} -${w.toFixed(0)} 0Z" fill="#4E5D54"/>`}
+ let m='';for(let i=0;i<22;i++){const x=rnd()*1200,y=150+rnd()*300;m+=crown(x,y,14+rnd()*22,'#5E8B4E','#4E7A40')}return r+m}
+function fall(x,top,bot,w,on,i){const spr=`<g fill="#fff" opacity=".75"><ellipse cx="${x}" cy="${bot}" rx="${w*2.2}" ry="22"/><ellipse cx="${x-w}" cy="${bot-10}" rx="${w*1.2}" ry="16"/><ellipse cx="${x+w}" cy="${bot-12}" rx="${w*1.1}" ry="14"/></g>`;
+ const body=`<path d="M${x-w*.5} ${top} C${x-w*.6} ${top+(bot-top)*.4} ${x-w} ${bot-30} ${x-w*1.3} ${bot} H${x+w*1.3} C${x+w} ${bot-30} ${x+w*.6} ${top+(bot-top)*.4} ${x+w*.5} ${top}Z" fill="#EEF5F6"/>
+ <g stroke="#BFD6DC" stroke-width="3" stroke-linecap="round">${[-.3,0,.3].map(k=>`<path d="M${x+w*k*.6} ${top+10} C${x+w*k*.8} ${top+(bot-top)*.5} ${x+w*k*1.3} ${bot-40} ${x+w*k*1.6} ${bot-10}"/>`).join('')}</g>
+ <path d="M${x-w*.6} ${top-6} q${w*.6} -10 ${w*1.2} 0" stroke="#3F4C44" stroke-width="10" fill="none" stroke-linecap="round"/>`;
+ return on?`<g>${body}${spr}<rect x="${x-24}" y="${top-58}" width="48" height="36" rx="18" fill="#173F2B" opacity=".9"/><text x="${x}" y="${top-33}" text-anchor="middle" style="font:700 22px Gelasio,Georgia,serif" fill="#FBF6EE">${i+1}</text></g>`
+   :`<g opacity=".55">${body}</g><ellipse cx="${x}" cy="${(top+bot)/2}" rx="${w*3}" ry="${(bot-top)*.6}" fill="#E9F0EC" opacity=".92"/>`}
+function gorge(n){seed=51;const F5=[[160,180,470,26],[380,230,470,20],[600,150,470,34],[820,210,470,22],[1030,170,470,28]];
+ return DEFS+`<rect width="1200" height="640" fill="url(#mist)"/>
+<g>${row(120,80,10,'#3F6E51','#335C43','#4E8061',24)}</g>
+<path d="M0 130 C200 110 400 140 600 120 C800 100 1000 130 1200 115 V480 H0Z" fill="#5A6A60"/>${rockFace()}
+<path d="M0 130 C200 110 400 140 600 120 C800 100 1000 130 1200 115 V150 C1000 160 800 140 600 156 C400 170 200 146 0 166Z" fill="#3F6E51"/>
+${[60,240,470,700,930,1150].map((x,i)=>moss(x,140+(i%2)*10,60+(i%3)*30)).join('')}
+${F5.map((f,i)=>fall(f[0],f[1],f[2],f[3],i<n,i)).join('')}
+<path d="M0 470 C300 456 900 456 1200 470 V560 H0Z" fill="#7FA39C"/><g stroke="#E6F1EF" stroke-width="3" stroke-linecap="round" opacity=".8">${Array.from({length:14},(_,i)=>`<path d="M${i*90+20} ${490+(i%3)*14} h40"/>`).join('')}</g>
+<rect y="420" width="1200" height="120" fill="url(#fogband)" opacity=".6"/>
+<g stroke="#6F7A7E" stroke-width="7" fill="none" stroke-linecap="round"><path d="M40 640 L130 580 L40 520 L130 460 L40 400"/><path d="M40 600 V640 M130 580 V620 M40 520 V560 M130 460 V500"/></g>
+<g transform="translate(0 572)"><path d="M180 0 H1200" stroke="#5B4029" stroke-width="16" stroke-linecap="round"/>${Array.from({length:11},(_,i)=>`<path d="M${200+i*100} -6 V80" stroke="#4A3828" stroke-width="14"/><path d="M${200+i*100} 8 C${230+i*100} 40 ${270+i*100} 40 ${300+i*100} 8" stroke="#6E4E33" stroke-width="7" fill="none"/>`).join('')}</g>
+${bigLeaf(1240,640,200,1,'#1F4A33','#173D29')}`}
+$('#art-gorge').innerHTML=gorge(0);
+
+/* Monday classroom with a projector */
+const daniela=person({x:190,y:260,skin:'#C98F62',skin2:'#B07A50',hair:'#3A2618',top:'#4C6A8E',top2:'#3E587A',pants:'#2F3540',shoe:'#5B4029',wave:true});
+function classroom(screen){return `<rect width="1200" height="600" fill="#F1E4C8"/><rect y="0" width="1200" height="60" fill="#E2D2B0"/>
+<rect x="900" y="90" width="230" height="170" fill="#A9CBE0"/><rect x="900" y="90" width="230" height="170" fill="none" stroke="#FBF6EE" stroke-width="12"/><path d="M1015 90 V260 M900 175 H1130" stroke="#FBF6EE" stroke-width="6"/>
+<rect x="340" y="70" width="500" height="320" rx="6" fill="#FBFBF8" stroke="#D4C7A8" stroke-width="4"/><path d="M590 60 V70" stroke="#7A7A7A" stroke-width="6"/>
+<g id="screen">${screen||`<image href="/assets/espanol/la-selva/slide-bosque.jpg" x="360" y="86" width="460" height="288" preserveAspectRatio="xMidYMid slice"/><rect x="360" y="300" width="460" height="74" fill="#173F2B" opacity=".8"/><text x="590" y="333" text-anchor="middle" style="font:700 24px Gelasio,Georgia,serif" fill="#FBF6EE">Mi viaje al bosque nuboso</text><text x="590" y="360" text-anchor="middle" style="font:15px 'Atkinson Hyperlegible Next',Verdana,sans-serif" fill="#E8F0EA">6 de mayo · fotos de la clase</text>`}</g>
+<rect y="430" width="1200" height="170" fill="#B5643C"/><g fill="#A55733">${Array.from({length:12},(_,i)=>`<rect x="${i*100}" y="430" width="50" height="170" opacity=".35"/>`).join('')}</g>
+${[300,560,820].map(x=>`<g transform="translate(${x} 470)"><rect x="-90" y="0" width="180" height="22" rx="6" fill="#8C6A46"/><path d="M-80 22 V110 M80 22 V110" stroke="#5B4029" stroke-width="10"/>
+<circle cx="-40" cy="-30" r="28" fill="#3A2618"/><circle cx="40" cy="-34" r="26" fill="#6B4A2E"/><path d="M-70 0 Q-40 -14 -10 0Z M10 0 Q40 -16 70 0Z" fill="#4C6A8E"/></g>`).join('')}${daniela}`}
+$('#art-class').innerHTML=classroom();
+
+/* photo composites for Puerta 4 */
+function snap(f,t){let u='';const cw=300/(f+t);for(let i=0;i<f;i++)u+=`<use href="#${i%2?'dartG':'dartR'}" x="${i*cw+cw*.08}" y="${t?96:70}" width="${cw*.84}" height="${cw*.67}"/>`;
+ for(let j=0;j<t;j++)u+=`<use href="#toucan" x="${(f+j)*cw}" y="40" width="${cw}" height="${cw*.85}"/>`;
+ return `<svg viewBox="0 0 300 200" aria-hidden="true"><rect width="300" height="200" rx="10" fill="#CFE0D2"/><rect y="150" width="300" height="50" fill="#8A8F86"/>${u}</svg>`}
+
+/* lens for Puerta 1 */
+function lens(place){const inner=place==='hoja'
+   ?`<ellipse cx="200" cy="150" rx="230" ry="80" fill="#3F9A55" transform="rotate(-12 200 150)"/><path d="M0 200 L400 110" stroke="#2C7A42" stroke-width="5"/><use href="#frog" x="140" y="80" width="130" height="104"/>`
+   :`<ellipse cx="200" cy="190" rx="260" ry="120" fill="#A3A89E"/><use href="#dartR" x="80" y="90" width="120" height="96"/><use href="#dartG" x="210" y="70" width="120" height="96"/>`;
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="${place==='hoja'?'Up close: one red-eyed tree frog on the leaf':'Up close: two frogs on the rock, one red and blue, one green and black'}"><defs><clipPath id="lc${place}"><circle cx="200" cy="150" r="140"/></clipPath></defs>
+  <g clip-path="url(#lc${place})"><rect width="400" height="300" fill="#BFD8C6"/>${inner}</g><circle cx="200" cy="150" r="140" fill="none" stroke="#B0773A" stroke-width="12"/><path d="M300 250 L370 300" stroke="#7A4E1F" stroke-width="22" stroke-linecap="round"/></svg>`}
+
+/* oxcart scene */
+function wheel(cx,cy,r){let pts='';for(let i=0;i<16;i++){const a=i/16*Math.PI*2,rr=i%2?r*.42:r*.86;pts+=`${(cx+Math.cos(a)*rr).toFixed(1)},${(cy+Math.sin(a)*rr).toFixed(1)} `}
+ let dots='';for(let i=0;i<16;i++){const a=(i+.5)/16*Math.PI*2;dots+=`<circle cx="${(cx+Math.cos(a)*r*.9).toFixed(1)}" cy="${(cy+Math.sin(a)*r*.9).toFixed(1)}" r="${r*.05}" fill="#FBF6EE"/>`}
+ return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#B8261F"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#3A2A1C" stroke-width="${r*.08}"/><polygon points="${pts}" fill="#F2C531"/>${dots}
+ <circle cx="${cx}" cy="${cy}" r="${r*.36}" fill="#2F6FB5"/><circle cx="${cx}" cy="${cy}" r="${r*.22}" fill="#FBF6EE"/><circle cx="${cx}" cy="${cy}" r="${r*.1}" fill="#3A2A1C"/>`}
+function ox(x,y,s,flip){return `<g transform="translate(${x} ${y}) scale(${flip?-s:s} ${s})"><ellipse cx="0" cy="118" rx="110" ry="10" fill="#2A1E14" opacity=".2"/>
+<path d="M-70 40 L-74 116 M-40 46 L-38 116 M50 46 L46 116 M80 40 L84 116" stroke="#D9D2C4" stroke-width="16" stroke-linecap="round"/><path d="M-74 112 h-6 M84 112 h6" stroke="#4A3828" stroke-width="8" stroke-linecap="round"/>
+<path d="M-90 20 C-90 -10 -50 -24 0 -24 C40 -24 80 -16 96 10 C104 34 90 56 60 58 L-60 58 C-84 56 -92 40 -90 20Z" fill="#ECE7DE"/>
+<path d="M-60 58 C-40 50 40 50 60 58 C80 56 96 40 96 20 C80 40 40 44 0 44 C-40 44 -70 40 -90 24 C-90 40 -80 54 -60 58Z" fill="#D6CFC2"/>
+<path d="M-60 -20 C-50 -50 -20 -50 -14 -22Z" fill="#E2DCCF"/>
+<g transform="translate(-104 -6)"><path d="M10 -18 C-6 -40 -2 -56 10 -62" stroke="#D9C9A8" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M34 -18 C50 -40 46 -56 34 -62" stroke="#D9C9A8" stroke-width="9" fill="none" stroke-linecap="round"/>
+<path d="M-2 -10 C-26 -6 -32 14 -22 26 C-14 18 -6 6 -2 -2Z" fill="#DDD5C7"/><path d="M46 -10 C70 -6 76 14 66 26 C58 18 50 6 46 -2Z" fill="#DDD5C7"/>
+<path d="M0 -14 C0 -28 44 -28 44 -14 L40 46 C36 62 8 62 4 46Z" fill="#ECE7DE"/><path d="M8 34 C8 56 36 56 36 34Z" fill="#8F8A82"/><circle cx="15" cy="44" r="2.6" fill="#3A3A3A"/><circle cx="29" cy="44" r="2.6" fill="#3A3A3A"/>
+<circle cx="10" cy="6" r="3.6" fill="#23303A"/><circle cx="34" cy="6" r="3.6" fill="#23303A"/></g></g>`}
+function oxScene(){seed=61;return `<rect width="1200" height="560" fill="#3B2E22"/><g fill="#4A3A2B">${Array.from({length:24},(_,i)=>`<rect x="${i*52}" y="0" width="46" height="420"/>`).join('')}</g>
+<rect x="0" y="0" width="1200" height="34" fill="#2A2018"/><rect y="420" width="1200" height="140" fill="#7A5A3E"/><g fill="#6A4C33">${Array.from({length:18},()=>`<ellipse cx="${(rnd()*1200).toFixed(0)}" cy="${(440+rnd()*110).toFixed(0)}" rx="${(14+rnd()*20).toFixed(0)}" ry="4"/>`).join('')}</g>
+<g transform="translate(620 230)"><path d="M0 0 H420 L400 120 H20Z" fill="#B8261F"/><path d="M20 14 H400 L392 60 H28Z" fill="#F2C531"/>
+${Array.from({length:9},(_,i)=>`<polygon points="${40+i*42},20 ${61+i*42},56 ${19+i*42},56" fill="${['#2F6FB5','#2E7D4F','#FBF6EE'][i%3]}"/>`).join('')}
+<path d="M28 70 H392" stroke="#7A1E16" stroke-width="6"/><path d="M0 120 L-220 150" stroke="#6B4E33" stroke-width="16" stroke-linecap="round"/>
+${wheel(210,170,96)}</g>
+<path d="M200 252 H470" stroke="#6B4E33" stroke-width="18" stroke-linecap="round"/><path d="M210 246 Q335 220 460 246" stroke="#C97D1A" stroke-width="10" fill="none"/>
+${ox(250,300,1,false)}${ox(430,310,1,false)}`}
+function humScene(){seed=71;return DEFS+`<rect width="1200" height="560" fill="#D9E7DC"/><g>${row(260,110,8,'#7FA58A','#6E967B','#8DB197',30)}</g><rect y="280" width="1200" height="280" fill="#5E8B5A"/>
+${heliconia(1080,540,1)}${heliconia(130,540,.9)}<path d="M0 70 H1200" stroke="#5B4029" stroke-width="18"/>
+${[330,600,870].map((x,i)=>`<g transform="translate(${x} 70)"><path d="M0 0 V60" stroke="#3A3A3A" stroke-width="3"/><path d="M-22 60 h44 l-6 90 q-16 12 -32 0Z" fill="#E7F0F2" opacity=".8"/><path d="M-20 100 h40 l-4 50 q-16 12 -32 0Z" fill="#D8332A" opacity=".8"/>
+<ellipse cx="0" cy="160" rx="46" ry="12" fill="#C2261F"/>${[-30,0,30].map(d=>`<circle cx="${d}" cy="160" r="6" fill="#F2C531"/>`).join('')}</g>`).join('')}
+<g id="hums"></g>`}
+const HUMPOS=[[250,190],[400,210],[540,180],[690,215],[800,190],[930,220]];
+
+/* ================= FLOW ================= */
+/* Embarque (Form A) and Aduana (Form B): same skills, real Costa Rican species, no score shown */
+const EMB=[{es:'los pizotes',opts:[{sym:'coati',n:3,ok:1,label:'three coatis'},{sym:'coati',n:1,label:'one coati'}]},
+ {es:'las flores amarillas',opts:[{sym:'trumpet',n:3,color:'#F2C531',ok:1,label:'three yellow flowers'},{sym:'trumpet',n:1,color:'#F2C531',label:'one yellow flower'},{sym:'trumpet',n:3,color:'#D8332A',label:'three red flowers'}]},
+ {es:'seis pájaros',opts:[{sym:'tanager',n:6,ok:1,label:'six birds'},{sym:'tanager',n:7,label:'seven birds'},{sym:'tanager',n:10,label:'ten birds'}]}];
+const ADU=[{es:'las iguanas',opts:[{sym:'iguana',n:3,ok:1,label:'three iguanas'},{sym:'iguana',n:1,label:'one iguana'}]},
+ {es:'los loros verdes',opts:[{sym:'parrot',n:3,ok:1,label:'three green parrots'},{sym:'parrot',n:1,label:'one green parrot'},{sym:'macaw',n:3,label:'three red macaws'}]},
+ {es:'dos perezosos',opts:[{sym:'sloth',n:2,ok:1,label:'two sloths'},{sym:'sloth',n:10,label:'ten sloths'},{sym:'sloth',n:12,label:'twelve sloths'}]}];
+function check(items,boxId,dotPre,store,done){let k=0;const box=$('#'+boxId),pres=boxId==='emb'?PRES.emb:PRES.adu;
+  const step=()=>{if(k>=items.length){done();return}const it=items[k];
+    box.innerHTML=`<p style="margin:0 0 4px;color:var(--ink2);font-size:15px">${k+1} de 3 · Listen, then tap the picture.</p>
+    <div class="row" style="margin-top:4px"><button class="play" style="grid-row:auto" id="${boxId}-play" aria-label="Escuchar">${spk}</button><span class="serif" style="font-size:20px">Escucha.</span></div><div class="pics" id="${boxId}-pics"></div>`;
+    $('#'+boxId+'-play').onclick=()=>say(it.es,'es');
+    pics($('#'+boxId+'-pics'),shuffle(it.opts),(o,b)=>{store.push(o.ok?1:0);if(PRES.on)pres.push({pick:it.opts.indexOf(o),right:!!o.ok});saveProgress();pushSummary();b.setAttribute('aria-pressed','true');$('#'+dotPre+k).classList.add('d');
+      box.querySelectorAll('.pic').forEach(x=>x.disabled=true);k++;setTimeout(step,reduce?50:450)});say(it.es,'es')};
+  step()}
+
+$('#start').onclick=()=>{if(!$('#heredia').classList.contains('locked'))return;unlock('heredia')};
+/* Embarque and Aduana: Presentar's Siguiente waits (pmWait) until the class has answered all three. */
+const pmWait=(el,on)=>{if(on){el.dataset.pmWait='1';el.dataset.pmMsg="Primero las tres preguntas: toquen la imagen que eligió la clase."}else{delete el.dataset.pmWait;delete el.dataset.pmMsg}pmRefresh()};
+$('#b-bus').onclick=()=>{if(S.emb.length||!$('#embarque').classList.contains('locked'))return;unlock('embarque');pmWait($('#embarque'),true);T('ev_embarque',{phase:'start',form:'A'});check(EMB,'emb','d',S.emb,()=>{T('ev_embarque',{phase:'done',form:'A',res:S.emb});pmWait($('#embarque'),false);
+  $('#emb').innerHTML=`<div class="ready"><h2>¡Listo para el bosque!</h2><p>Your bus ticket is done.</p></div><div class="fichas"><h3>Real Costa Rica: who was on your ticket?</h3>${ficha('pizote')}${ficha('corteza')}${ficha('tangara')}</div>${go('b-bajar','Bajar del bus')}`;
+  $('#b-bajar').onclick=()=>unlock('bosque');$('#b-bajar').focus()})};
+$('#b-vamos').onclick=()=>unlock('g1');
+
+/* Puerta 1 · Las ranas */
+gate({id:'g1',n:1,found:'¡ENCONTRADAS!',heard:'«las ranas»',
+ opts:[{sym:'frog',n:1,v:'one',k:'hoja',saw:'una rana',label:'one frog on a leaf'},{sym:['dartR','dartG'],n:2,v:'many',k:'roca',ok:1,saw:'dos ranas',label:'two frogs on a rock'}],
+ reveal:async(p,out)=>{const ok=!!p.ok;const R='¡Sí! Las ranas: una roja y azul, y una verde y negra. ¡Dos ranas!',W='Mmm… esa es una rana. Muy bonita, pero yo dije «las ranas»: más de una. ¡Miren aquí!';
+  out.innerHTML=`<div class="lens" id="lview">${lens(ok?'roca':'hoja')}</div>${L('Marisol',ok?R:W,ok?'Yes! The frogs: a red-and-blue one and a green-and-black one. Two frogs!':'Hmm… that\'s one frog. Very pretty, but I said "the frogs": more than one. Look here!',false)}`;say(ok?R:W,'es');
+  if(!ok){await new Promise(res=>{out.insertAdjacentHTML('beforeend',`<div class="row"><button class="ghost" id="b-aqui" data-pm-tap="Terminen la escena: toquen «Miren aquí».">Miren aquí →</button></div>`);
+   $('#b-aqui').onclick=()=>{const l2='¡Ahí están! Una roja y azul, y una verde y negra. ¡Dos ranas!';$('#lview').innerHTML=lens('roca');$('#b-aqui').parentNode.outerHTML=L('Marisol',l2,'There they are! A red-and-blue one and a green-and-black one. Two frogs!',false);say(l2,'es');res()};$('#b-aqui').focus()})}},
+ jodi:ok=>`${ok?'':'You found a frog, and a gorgeous one. Good eyes. '}<i>Rana</i> is one frog. <i>Ranas</i> is more than one. And <i>la</i> turned into <i>las</i>. Spanish says "more than one" twice, so you get two chances to catch it.`,
+ extra:`<div class="fichas"><h3>Ficha de campo: las ranas</h3>${ficha('ojosrojos')}${ficha('rojaazul')}${ficha('verdenegra')}</div>
+ <div class="why"><b>Why "dart frog"?</b> In Colombia, the Emberá people used the poison of three very toxic frogs on the tips of their blowgun darts to hunt. Most dart frogs, like these two, were never used that way. Wild dart frogs get their poison from the tiny ants and mites they eat, so the frogs in the park, which eat crickets, aren't poisonous. <i>Never touch a dart frog in the wild.</i></div>`,
+ photo:{src:'/assets/espanol/la-selva/dart-frogs.jpg',alt:'Two real poison dart frogs on a rock, one green and black, one red with blue legs',cap:'Las ranas, de verdad.'},
+ next:()=>unlock('g2')});
+
+/* Puerta 2 · La mariposa azul */
+gate({id:'g2',n:2,found:'¡FOTO LISTA!',heard:'«la mariposa azul»',
+ opts:[{sym:'morpho',n:1,v:'one-blue',k:'morfo',ok:1,saw:'una mariposa azul',label:'one blue butterfly'},{sym:'morpho',n:3,v:'three-blue',k:'tres-morfos',saw:'tres mariposas azules',label:'three blue butterflies'},{sym:'owlB',n:1,v:'owl',k:'buho',saw:'una mariposa gris y café',label:'one gray-brown butterfly with big eye spots'}],
+ reveal:async(p,out)=>{const lines={'one-blue':['¡Perfecto! La mariposa azul. Es una morfo azul.','Perfect! The blue butterfly. It\'s a blue morpho.'],
+   'three-blue':['¡Qué bonita foto! Pero son tres: las mariposas azules. Yo dije la mariposa azul. Una.','What a pretty photo! But that\'s three: the blue butterflies. I said the blue butterfly. One.'],
+   'owl':['Es una mariposa, sí. Pero no es azul. Es gris y café. ¡Mira los ojos!','It is a butterfly, yes. But it isn\'t blue. It\'s gray and brown. Look at the eyes!']}[p.v];
+  out.innerHTML=`<div class="dev"><div class="dev-img">${group(p.sym,p.n,null,'<rect width="300" height="200" fill="#CFE3D3"/><ellipse cx="150" cy="210" rx="200" ry="60" fill="#5E8B5A"/>')}</div><span>Tu foto</span></div>${L('Marisol',lines[0],lines[1],false)}`;say(lines[0],'es');await wait(900)},
+ jodi:(ok,p)=>`${ok?'':p.v==='owl'?'You found a real beauty; that one is famous. But listen for the color word: <i>azul</i>. ':'Great eye: there were three. But listen to the ending. '}One: <i>la mariposa azul</i>. More than one: <i>las mariposas azules</i>. Even the color gets an ending, and <i>azul</i> adds <b>-es</b>, not just -s.`,
+ extra:`<div class="fichas"><h3>Ficha de campo: las mariposas</h3>${ficha('morfo')}${ficha('buho')}${ficha('heliconia')}</div>`,
+ photo:{src:'/assets/espanol/la-selva/owl-butterfly.jpg',alt:'A real owl butterfly with big eye spots on a wooden wall',cap:'William didn\'t find the blue one. He found this.'},
+ next:()=>{unlock('f1');buildFork()}});
+
+/* Elige tu camino (never scored) */
+function buildFork(){if($('#fork-pics').children.length)return;
+ const cart=`<svg viewBox="0 0 1200 560" aria-hidden="true">${oxScene()}</svg>`;
+ const hums=`<svg viewBox="0 0 300 200" aria-hidden="true"><rect width="300" height="200" fill="#D9E7DC"/><use href="#hum" x="40" y="40" width="110" height="82"/><use href="#hum" x="150" y="80" width="110" height="82"/><ellipse cx="150" cy="190" rx="70" ry="14" fill="#C2261F"/></svg>`;
+ pics($('#fork-pics'),[{svg:cart,v:'carreta',label:'the painted oxcart'},{svg:hums,v:'colibries',label:'the hummingbirds'}],(o,b)=>{if(S.fork)return;S.fork=o.v;TM.choice({scenarioIndex:'f1',choiceIndex:['carreta','colibries'].indexOf(o.v),category:'fork',choice:'f1:'+o.v});pushSummary();saveProgress();
+  $('#fork-pics').querySelectorAll('.pic').forEach(x=>{x.disabled=true;x.setAttribute('aria-pressed',x===b?'true':'false');x.classList.toggle('sel',x===b)});o.v==='carreta'?forkCart():forkHum()})}
+function forkCart(){const out=$('#f1body');out.innerHTML=`${frame('art-ox','0 0 1200 560','Two white oxen in a painted yoke beside a painted oxcart. Pins mark things to explore.')}<div id="ficha-ox" aria-live="polite"></div>
+ ${L('Marisol','Miren: los bueyes y la carreta. ¡Qué colores!','Look: the oxen and the oxcart. What colors!',false)}
+ <div class="culture"><b>La carreta</b> is a symbol of Costa Rica. Oxcarts once carried the country's coffee over the mountains to the coast.</div>`;
+ const svg=$('#art-ox');svg.innerHTML=oxScene()+hotspot('bueyes',340,250,340,212)+hotspot('carreta',900,260,900,222)+hotspot('ruedas',830,400,830,362);wireHot(svg,$('#ficha-ox'));sizePins();
+ say('Miren: los bueyes y la carreta. ¡Qué colores!','es');
+ out.insertAdjacentHTML('beforeend',`<p class="tip-line">One <i>buey</i>, two <i>bueyes</i>: another word that adds <b>-es</b>.</p>`);
+ realPhoto(out,'/assets/espanol/la-selva/oxen.jpg','Two real white oxen with long horns, yoked to a painted red oxcart','Los bueyes, de verdad.');forkDone(out)}
+function forkHum(){const out=$('#f1body');out.innerHTML=`${frame('art-hum','0 0 1200 560','Red hummingbird feeders hang from a beam. Tap them to bring the hummingbirds.')}
+ ${L('Marisol','Toquen los comederos. ¿Cuántos colibríes vienen?','Tap the feeders. How many hummingbirds come?',false)}<div class="counter" id="hum-count" aria-live="polite">0</div>`;setTimeout(sizePins,0);
+ const svg=$('#art-hum');svg.innerHTML=humScene()+`<g class="hot pin" tabindex="0" role="button" aria-label="Tap the feeders" id="feed" data-pm-tap="Terminen la escena: toquen los comederos."><circle class="hit" cx="600" cy="230" r="44" fill="#fff" opacity="0"/><circle class="pulse" cx="600" cy="230" r="20" fill="none" stroke="#FBF6EE" stroke-width="4"/><circle cx="600" cy="230" r="20" fill="#FBF6EE" stroke="#B0773A" stroke-width="4"/><text x="600" y="237" text-anchor="middle" style="font:700 20px sans-serif" fill="#245866">+</text></g>`;
+ const W=['un colibrí','dos colibríes','tres colibríes','cuatro colibríes','cinco colibríes','seis colibríes'];let n=0;
+ const add=()=>{if(n>=6)return;const p=HUMPOS[n];$('#hums').insertAdjacentHTML('beforeend',`<use href="#hum" x="${p[0]}" y="${p[1]}" width="96" height="72" class="hum-in"/>`);say(W[n],'es');n++;$('#hum-count').textContent=W[n-1];
+  if(n===6){$('#feed').removeAttribute('data-pm-tap');$('#hum-count').textContent='¡seis colibríes!';out.insertAdjacentHTML('beforeend',`<p class="tip-line">One <i>colibrí</i>, many <i>colibríes</i>. Words that end in an accented <b>-í</b> usually add <b>-es</b>.</p><div class="fichas">${ficha('colibri')}${ficha('heliconia')}</div>`);forkDone(out)}};
+ const f=$('#feed');f.onclick=add;f.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();add()}}}
+function forkDone(out){out.insertAdjacentHTML('beforeend',go('fork-next','Sigue ↓'));$('#fork-next').onclick=()=>unlock('g3');pmRefresh()}
+
+/* Puerta 3 · El tucán: tres, not trece */
+const plate=n=>{let u='';for(let i=0;i<n;i++)u+=`<use href="#pap" x="${60+(i%5)*38}" y="${70-Math.floor(i/5)*22+((i%2)*4)}" width="40" height="40"/>`;
+ return `<svg viewBox="0 0 300 200" aria-hidden="true"><ellipse cx="150" cy="140" rx="130" ry="36" fill="#D8DCDE"/><ellipse cx="150" cy="134" rx="118" ry="30" fill="#EEF1F2"/>${u.replace(/y="(-?\d+)"/g,(m,y)=>`y="${+y+50}"`)}</svg>`};
+gate({id:'g3',n:3,found:'¡ESTÁ CONTENTO!',heard:'«tres pedazos»',
+ opts:[{svg:plate(3),v:'3',k:'tres',ok:1,saw:'tres pedazos',label:'a plate with 3 pieces of papaya'},{svg:plate(13),v:'13',k:'trece',saw:'trece pedazos',label:'a plate with 13 pieces of papaya'},{svg:plate(2),v:'2',k:'dos',saw:'dos pedazos',label:'a plate with 2 pieces of papaya'}],
+ reveal:async(p,out)=>{const NUM=['uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece'];const n=+p.v;
+  out.innerHTML=`<div class="feed"><svg viewBox="0 0 600 260" id="feed-svg" role="img" aria-label="Feeding the toucan, one piece at a time"><rect width="600" height="260" rx="14" fill="#CFE0D2"/><path d="M40 210 C200 196 400 196 560 210" stroke="#5B4029" stroke-width="16" stroke-linecap="round" fill="none"/><use href="#toucan" x="40" y="40" width="230" height="195"/><g id="pile"></g></svg><div class="counter" id="feed-count" aria-live="polite"></div></div>`;
+  hush();
+  for(let i=0;i<n;i++){$('#pile').insertAdjacentHTML('beforeend',`<use href="#pap" x="${300+(i%6)*44}" y="${150-Math.floor(i/6)*34}" width="44" height="44"/>`);$('#feed-count').textContent=NUM[i];sayQ(NUM[i]);await wait(n>10?380:700)}
+  let line,en;if(n===3){line='Uno, dos, tres. ¡Perfecto! Está contento.';en='One, two, three. Perfect! He\'s happy.'}
+  else if(n===13){line='¡Trece no! Tres. ¡Este tucán va a explotar!';en='Not thirteen! Three. This toucan is going to explode!'}
+  else{await wait(300);$('#pile').insertAdjacentHTML('beforeend',`<use href="#pap" x="${300+2*44}" y="150" width="44" height="44"/>`);$('#feed-count').textContent='tres';line='Uno, dos… ¡falta uno! Tres.';en='One, two… one\'s missing! Three.'}
+  out.insertAdjacentHTML('beforeend',L('El cuidador',line,en,false));sayQ(line)},
+ jodi:(ok,p)=>`${ok?'':p.v==='13'?'Generous! But listen to the end of the word. ':'So close: you counted right, just one short. '}<i>Tres</i> is 3. <i>Trece</i> is 13. Same start, so listen to the end: <i>tres</i> stops short, <i>trece</i> keeps going.`,
+ extra:`<div class="fichas"><h3>Ficha de campo: el tucán</h3>${ficha('tucan')}</div>`,
+ photo:{src:'/assets/espanol/la-selva/toucan-tray.jpg',alt:'A real toucan with a huge yellow-and-brown bill next to a tray of chopped papaya and fruit',cap:'El tucán y su papaya, de verdad.'},
+ next:()=>unlock('cata')});
+
+/* Las cataratas: count five */
+{const W=['una catarata','dos cataratas','tres cataratas','cuatro cataratas','cinco cataratas'];let n=0;
+ $('#b-bajar2').onclick=()=>{if(n>=5)return;n++;$('#art-gorge').innerHTML=gorge(n);$('#cata-count').textContent=W[n-1];say(W[n-1],'es');
+  if(n===5){$('#b-bajar2').hidden=true;$('#b-bajar2').removeAttribute('data-pm-tap');const out=$('#cata-out');const l='¡Cinco cataratas! ¡Estamos mojados!';
+   out.innerHTML=L('Marisol',l,'Five waterfalls! We\'re soaked!',false)+`<p class="tip-line"><i>Una catarata</i>, then <i>dos cataratas</i>: the <b>-s</b> shows up as soon as there's more than one.</p><div class="fichas">${ficha('catarata')}</div>`;
+   sayQ(l);realPhoto(out,'/assets/espanol/la-selva/waterfall.jpg','William, soaked through, leaning on a railing in front of a roaring waterfall in the cloud forest','Así quedó William.');
+   out.insertAdjacentHTML('beforeend',go('cata-next','Sigue ↓'));$('#cata-next').onclick=()=>unlock('g4')}}}
+
+/* Puerta 4 · El lunes en clase */
+gate({id:'g4',n:4,found:'¡BIEN!',heard:'«dos ranas y un tucán»',
+ opts:[{svg:snap(2,1),v:'2+1',k:'2ranas-1tucan',ok:1,saw:'dos ranas y un tucán',label:'photo with two frogs and one toucan'},{svg:snap(1,2),v:'1+2',k:'1rana-2tucanes',saw:'una rana y dos tucanes',label:'photo with one frog and two toucans'},{svg:snap(2,2),v:'2+2',k:'2ranas-2tucanes',saw:'dos ranas y dos tucanes',label:'photo with two frogs and two toucans'}],
+ reveal:async(p,out)=>{const [f,t]=p.v.split('+').map(Number);
+  $('#screen').innerHTML=`<g transform="translate(350 80)">${snap(f,t).replace('<svg viewBox="0 0 300 200" aria-hidden="true">','<svg width="480" height="300" viewBox="0 0 300 200">')}</g>`;
+  $('#art-class').scrollIntoView({block:'center'});
+  const lines={'2+1':['¡Sí! Dos ranas y un tucán. ¡Qué bonito!','Yes! Two frogs and one toucan. How nice!'],'1+2':['¿Dos tucanes? Mmm… yo dije un tucán. Y dos ranas.','Two toucans? Hmm… I said one toucan. And two frogs.'],'2+2':['Dos ranas, sí. Pero un tucán, no dos.','Two frogs, yes. But one toucan, not two.']}[p.v];
+  await wait(500);out.innerHTML=L('La profe Daniela',lines[0],lines[1],false);say(lines[0],'es');
+  if(!p.ok){await wait(1600);$('#screen').innerHTML=`<g transform="translate(350 80)">${snap(2,1).replace('<svg viewBox="0 0 300 200" aria-hidden="true">','<svg width="480" height="300" viewBox="0 0 300 200">')}</g>`;out.insertAdjacentHTML('beforeend',`<p class="tip-line">She swipes to the right photo: <i>dos ranas y un tucán</i>.</p>`)}},
+ jodi:(ok,p)=>`${ok?'':p.v==='1+2'?'You heard both animals. The numbers just swapped places. ':'You got the frogs. Now the toucan: '}<i>Dos ranas</i>: two, and an <b>-s</b>. <i>Un tucán</i>: one, no <b>-es</b>. Every word in the phrase agreed on how many.`,
+ next:()=>{unlock('fin');buildEnd()}});
+
+/* The end: your photos, what your Spanish did, Aduana, the passport */
+function buildEnd(){if($('#roll-grid').children.length)return;pmWait($('#aduana'),true);T('ev_aduana',{phase:'start',form:'B'});
+ $('#roll-grid').innerHTML=S.photos.map(p=>`<figure class="polaroid"><img src="${p.src}" alt="${p.alt}">${p.cap}</figure>`).join('');
+ $('#recap').innerHTML=S.gates.map(g=>`<div class="tile ${g.ok?'ok':''}"><span class="tn">Puerta ${g.n}</span><b>You heard ${g.heard}</b><span>You picked: ${g.saw}${g.ok?' ✓':` · It meant: ${g.rightSaw}`}</span></div>`).join('')+
+  `<div class="tile"><span class="tn">Tu camino</span><b>${S.fork==='carreta'?'La carreta':'Los colibríes'}</b><span>Never scored. Play again to see the other path.</span></div>`;
+ check(ADU,'adu','a',S.adu,passport)}
+function passport(){T('ev_aduana',{phase:'done',form:'B',res:S.adu});pmWait($('#aduana'),false);const E=S.emb.reduce((a,b)=>a+b,0),A=S.adu.reduce((a,b)=>a+b,0);
+ const skills=[['One or more','<i>Las ranas</i> means more than one, even with no number.'],['Color + plural','<i>Las mariposas azules</i>: the color word gets <b>-es</b> too.'],['Numbers','<i>Tres</i> is 3, <i>trece</i> is 13. Listen to the end.']];
+ $('#adu').innerHTML=`<div class="ready"><h2>¡De vuelta en casa!</h2><p>Customs is done.</p></div>`;
+ $('#passport').innerHTML=`<div class="pass-book"><div class="pb-head"><b>Pasaporte</b><span>La selva · Costa Rica</span></div>
+ <p class="pb-score">Al embarcar: <b>${E} de 3</b>. En la aduana: <b>${A} de 3</b>.</p>
+ ${skills.map((s,i)=>{const e=S.emb[i],a=S.adu[i];const st=a&&!e?'<span class="stamp new">¡NUEVO!</span>':a&&e?'<span class="stamp had">YA LO SABÍAS</span>':'<span class="stamp try">PRACTICA</span>';
+  return `<div class="pb-row">${st}<div><b>${s[0]}</b>${a?'':`<p>${s[1]}</p>`}</div></div>`}).join('')}
+ ${jodi(A===3?'Look at that. You heard "more than one" in the endings, not just in the numbers. That\'s the whole trick.':A>E?'You grew on this trip. Keep listening to the ends of words: that\'s where Spanish tells you how many.':'Listening to the ends of words takes practice. Play again and listen for <i>-s</i>, <i>-es</i> and <i>las</i>.')}
+ <div class="row"><button class="ghost" id="b-replay" style="color:#FBF6EE;border-color:#FBF6EE">Juega otra vez · elige otro camino</button></div></div>`;
+ $('#b-replay').onclick=()=>{location.href=location.pathname+location.search};$('#passport').scrollIntoView({block:'start'});
+ const c=S.gates.filter(g=>g.ok).length;
+ TM.complete({finalScore:c,percentage:c*25,summary:{gates:gatesNow(),path:{f1:S.fork||null},mode:S.mode,score:c,checks:checksNow()}});
+ if(ST)ST.logCompletion('La selva',{score:c,finalScore:c,maxScore:4});else dlog('game_scores',{gameName:'La selva',completed:true,score:c});saveProgress(true)}
+
+}
+</script>
+<!-- Presentar en clase: does nothing unless a signed-in teacher opened the page with ?mode=presentar, or from the
+     /espanol/ hub. It drives this page's own buttons; the story above is unchanged. La selva draws its own
+     Embarque → Aduana (three picture taps each), so /js/espanol-checks.js is not loaded here. -->
+<script src="/js/story-presentar.js"></script>
+</body>
+</html>

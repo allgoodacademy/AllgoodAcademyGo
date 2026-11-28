@@ -151,17 +151,19 @@ export function playedStoryIds(stories, students = []) {
 }
 
 /* EMBARQUE → ADUANA: the class's growth, skill by skill (only where ESPANOL_CHECKS_ON is
-   true). Reads each student's own module_progress/{story}.checks: { form, emb: [0|1 x5],
-   adu: [0|1 x5], embDone, aduDone }, slot i being the story's i-th skill whichever form the
-   student got. Only students who did BOTH count, so the two columns are the same people.
-   Five questions is a practice check, not a test of any one student: this is a class view. */
+   true). Reads each student's own module_progress/{story}.checks: { form, emb: [0|1 x N],
+   adu: [0|1 x N], embDone, aduDone }, N being the story's number of slots in checks.json (five
+   for El Viaje and El Mundial, three for La selva), slot i being the story's i-th skill whichever
+   form the student got. Only students who did BOTH count, so the two columns are the same people.
+   A few questions is a practice check, not a test of any one student: this is a class view. */
 export function growthReport(checksCfg, storyId, students = []) {
     const slots = (checksCfg && checksCfg.slots) || [];
+    const need = slots.length || 5;
     const rows = students.map((s) => {
         const p = s && s.raw && s.raw.progress && s.raw.progress[storyId];
         const c = p && p.checks;
         if (!c || !Array.isArray(c.emb) || !Array.isArray(c.adu)) return { emb: null, adu: null };
-        return { emb: c.emb.length >= 5 ? c.emb : null, adu: c.adu.length >= 5 && c.aduDone !== false ? c.adu : null };
+        return { emb: c.emb.length >= need ? c.emb : null, adu: c.adu.length >= need && c.aduDone !== false ? c.adu : null };
     });
     const boarded = rows.filter((r) => r.emb).length;
     const both = rows.filter((r) => r.emb && r.adu);

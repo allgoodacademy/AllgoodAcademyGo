@@ -264,6 +264,7 @@ const PAGES = [
     { file: 'public/espanol/index.html',            slug: 'espanol',       skin: 'light' },
     { file: 'public/espanol/el-viaje/index.html',   slug: 'espanol-story', skin: 'light' },
     { file: 'public/espanol/el-mundial/index.html', slug: 'espanol-story', skin: 'light' },
+    { file: 'public/espanol/la-selva/index.html',   slug: 'espanol-story', skin: 'light' },
     // Hubs.
     { file: 'public/educational-games/index.html', slug: 'games',        skin: 'light' },
     { file: 'public/simulations/index.html',       slug: 'simulations',  skin: 'light' },

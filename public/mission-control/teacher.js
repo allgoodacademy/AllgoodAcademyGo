@@ -1345,7 +1345,7 @@ function growthHtml(it, who) {
         <p class="sub">${g.n} of ${who.length} students did both checks. Each skill shows how many got it on the first try before the story and after it.</p>
         ${g.worth ? `<div class="talk"><b>Worth five minutes tomorrow:</b> ${esc(g.worth)}</div>` : ''}
         ${body}
-        <p class="note">5 questions is a practice check, not a test of any one student.</p></div>`;
+        <p class="note">${checks.slots.length} questions is a practice check, not a test of any one student.</p></div>`;
 }
 /* The postcard rubric, in a student's panel: four rows, three levels. The postcard itself is
    on paper or in Google Classroom; only these taps are saved, by the teacher, to their class. */
