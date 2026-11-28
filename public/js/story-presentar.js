@@ -35,15 +35,24 @@
 (function () {
     var q;
     try { q = new URLSearchParams(location.search); } catch (e) { return; }
-    if (q.get('mode') !== 'presentar') return;
+    // Asked for: ?mode=presentar, or (La selva, 2026-11-28) a story opened from the /espanol/ hub
+    // that makes Presentar its default for teachers. /js/story-tracking.js decides both.
+    var ST0 = window.StoryTrack;
+    if (!ST0 || !ST0.presentar || !ST0.presentarAsked) return;
+
+    // FROM THE HUB, no ?mode=: students are the usual visitors here, so nothing is covered and
+    // nothing is said. A teacher gets Presentar; anyone else just plays the story.
+    var FROM_HUB = !!ST0.presentarFromHub;
+    if (FROM_HUB) {
+        ST0.presentar.then(function (isTeacher) { if (isTeacher) activate(); }).catch(function () { /* plays solo */ });
+        return;
+    }
 
     // TEACHERS ONLY. The parameter alone turns nothing on: /js/story-tracking.js decides
     // (StoryTrack.presentar) whether the signed-in user is a teacher. For anyone else the
     // parameter is ignored and the story runs normally, tracked like any solo play. While
     // that is being checked a plain cover hides the page, so a projector never shows the
     // start screen's name box.
-    var ST0 = window.StoryTrack;
-    if (!ST0 || !ST0.presentar) return;
     var cover = document.createElement('div');
     cover.className = 'pm-cover';
     cover.setAttribute('role', 'status');
@@ -69,7 +78,8 @@
   }
 
   function activate() {
-    var CODE = String(q.get('class') || '').toUpperCase();
+    // The class code rides on the dashboard's link; from the hub it is the teacher's own class.
+    var CODE = String(q.get('class') || (ST0.presentarInfo && ST0.presentarInfo.classCode) || '').toUpperCase();
     if (!/^[A-Z0-9]{4,12}$/.test(CODE)) CODE = '';
     var SLUG = location.pathname.split('/').filter(Boolean).pop();
     var $ = function (s, r) { return (r || document).querySelector(s); };
@@ -113,7 +123,7 @@
             } else if (sec.classList.contains('fork')) {
                 out.push(sec);
                 $$('.menu, [id$="body"]', sec).forEach(function (b) { if (b.children.length) out.push(b); });
-            } else if (sec.classList.contains('ea-sec')) out.push(sec);
+            } else if (sec.classList.contains('ea-sec') || sec.classList.contains('pm-step')) out.push(sec);   // pm-step: a plain one-anchor section (La selva)
         });
         return out.filter(laidOut);
     }
@@ -168,9 +178,10 @@
             setTimeout(function () { show(1); }, 80);
             return;
         }
-        // Embarque / Aduana: the class answers all five before the story goes on.
+        // Embarque / Aduana: the class answers every item before the story goes on. A story that
+        // draws its own pass (La selva: three picture taps) says what to do in data-pm-msg.
         if (list[cur].dataset && list[cur].dataset.pmWait === '1') {
-            block({ msg: 'Primero las cinco preguntas: el voto de la clase.', el: $('.ea-votes, .ea-cta, .ea-pass', list[cur]) || list[cur] });
+            block({ msg: list[cur].dataset.pmMsg || 'Primero las cinco preguntas: el voto de la clase.', el: $('.ea-votes, .ea-cta, .ea-pass, .opts', list[cur]) || list[cur] });
             return;
         }
         if (cur < list.length - 1) { show(cur + 1); return; }
@@ -222,9 +233,13 @@
         var l = String(row.label || '').trim();
         return /^\d+$/.test(l) ? 'de la frase ' + l : /^turno\b/i.test(l) ? 'del ' + l : l ? 'de ' + l : '';
     }
+    // A tap the scene needs before it can go on (La selva: «Miren aquí», the hummingbird feeders,
+    // Bajar at the waterfalls). The story marks it with data-pm-tap="what the bar should say".
+    var tapNeeded = function (sec) { return $$('[data-pm-tap]', sec).filter(laidOut)[0] || null; };
     function pending(sec) {
         var wait = { msg: 'Un momento…', wait: true, sec: sec };
         if (!sec) return { msg: 'Un momento…' };
+        var tap;
         if (sec.classList.contains('gate')) {
             var n = Number(sec.id.slice(1)), v = votes[n];
             if (document.body.classList.contains('pm-manual') && unanswered(sec)) return { msg: 'Elijan la respuesta de la clase en la historia.', el: unanswered(sec) };
@@ -239,12 +254,14 @@
                 return { msg: 'Toquen Revelar.', el: $('#g' + n + ' [data-reveal]') };
             }
             if (v.busy) return wait;
+            if ((tap = tapNeeded(sec))) return { msg: tap.dataset.pmTap, el: tap };
             var fix = unanswered(sec);       // a follow-up in the story (Puerta 3's repair)
             if (fix) return { msg: 'Terminen la escena: respondan.', el: fix };
             return wait;
         }
         if (sec.classList.contains('fork')) {
             if (!$('.path.sel, .opt.sel, .mi.sel', sec)) return { msg: 'Primero elijan un camino.', el: $('.paths, .opts, .menu', sec) };
+            if ((tap = tapNeeded(sec))) return { msg: tap.dataset.pmTap, el: tap };
             var rack = $('.rack', sec);
             if (rack && laidOut(rack) && !$('.sel', rack)) return { msg: 'Terminen la escena: toquen una prenda.', el: rack };
             var bell = $('.bell', sec);
@@ -257,6 +274,7 @@
             }
             return wait;
         }
+        if ((tap = tapNeeded(sec))) return { msg: tap.dataset.pmTap, el: tap };
         return { msg: 'Un momento…' };
     }
     // "Un momento…": the story is still talking, or on a timer. Watch the section (no polling)
@@ -290,6 +308,7 @@
         + '<button class="pm-b" type="button" data-pm="audio">Audio<kbd>Espacio</kbd></button>'
         + '<button class="pm-b" type="button" data-pm="en" aria-pressed="false">English<kbd>E</kbd></button>'
         + '<button class="pm-b" type="button" data-pm="full" aria-pressed="false">Pantalla completa</button>'
+        + (FROM_HUB ? '<a class="pm-b" href="?mode=solo" style="text-decoration:none;display:inline-flex;align-items:center">Jugar solo</a>' : '')
         + '<a class="pm-b" href="/dashboard/#espanol" style="text-decoration:none;display:inline-flex;align-items:center">Salir</a>';
     document.body.appendChild(bar);
     var msgTimer = null;

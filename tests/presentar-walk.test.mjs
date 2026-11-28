@@ -1,4 +1,4 @@
-// PRESENTAR WALK (2026-11-27, AA-16): run each Español story start to finish in Presentar en
+// PRESENTAR WALK (2026-11-27, AA-16; La selva added 2026-11-28, AA-18): run each Español story start to finish in Presentar en
 // clase the way a teacher does on a projector. Press only Siguiente, plus the taps the bar
 // asks for (a vote, Revelar, a fork's path or scene). Asserts that:
 //   - the recap ("Resumen de la clase") opens at the end, and
@@ -111,6 +111,14 @@ async function walk(browser, base, slug, viewport, exact = false) {
         if (!m) continue;
         assert.doesNotMatch(m, /Elijan la respuesta de la clase en la historia/, `${slug}: the vote could not drive the story`);
         if (/cinco preguntas/.test(m)) { await clickShown('.ea-votes .ea-v, #ea-go'); continue; }
+        // La selva draws its own boarding pass: the teacher taps the picture the class chose.
+        if (/tres preguntas/.test(m)) { await clickShown('[data-pm-wait="1"] .pic:not(:disabled)'); continue; }
+        // A tap the scene needs (La selva: «Miren aquí», the feeders, Bajar). SVG pins have no
+        // .click(), so dispatch the event.
+        if (/toquen «Miren aquí»|toquen los comederos|Toquen Bajar/.test(m)) {
+            await page.evaluate(() => { const el = Array.from(document.querySelectorAll('[data-pm-tap]')).find((x) => x.getClientRects().length); if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+            continue;
+        }
         if (exact && !counted && /Primero voten|Primero el voto/.test(m)) {
             // Count hands at the first Puerta: 3 for the first option, 1 for the second.
             counted = true;
@@ -184,7 +192,7 @@ async function walk(browser, base, slug, viewport, exact = false) {
 }
 
 const SIZES = [{ width: 1440, height: 660 }, { width: 1280, height: 720 }];
-for (const slug of ['el-viaje', 'el-mundial']) {
+for (const slug of ['el-viaje', 'el-mundial', 'la-selva']) {
     for (const [viewport, exact] of [[SIZES[0], false], [SIZES[1], true]]) {
         test(`Presentar walk: ${slug} at ${viewport.width}×${viewport.height}, Siguiente only, never back up the page, ${exact ? 'hands counted at Puerta 1' : 'quick votes only'}`, { skip: !chromium && 'Playwright is not installed', timeout: 600000 }, async () => {
             const srv = await serve();

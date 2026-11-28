@@ -1,4 +1,4 @@
-// Tracking for the Español stories (/espanol/el-viaje/, /espanol/el-mundial/), 2026-11-27.
+// Tracking for the Español stories (/espanol/el-viaje/, /espanol/el-mundial/, /espanol/la-selva/), 2026-11-27.
 //
 // Load as a CLASSIC script, before the story's own script:
 //   <script src="/js/story-tracking.js"></script>
@@ -80,11 +80,31 @@
     // teacher sign-in and a class they own. For anyone else, and when sign-in or the profile
     // can't be read, the parameter is ignored and the story runs normally, tracked.
     // `presentar` is a promise for that answer; everything below waits for it.
-    var ASKED = /[?&]mode=presentar(&|$)/.test(location.search);
+    //
+    // PRESENTAR BY DEFAULT FROM THE HUB (2026-11-28, AA-18). A story page that carries
+    // <meta name="ag-presentar-default" content="hub"> (La selva) also asks for the mode when it
+    // was opened from the /espanol/ hub (same-origin referrer) with no ?mode= of its own. The
+    // same teacher-only gate decides: a student from the hub gets the normal story, tracked.
+    // ?mode=solo always plays solo. The class code comes from the teacher's own profile.
+    var MODE_PARAM = /[?&]mode=([a-z]+)/.exec(location.search);
+    var FROM_HUB = !MODE_PARAM && (function () {
+        try {
+            var m = document.querySelector('meta[name="ag-presentar-default"]');
+            if (!m || m.getAttribute('content') !== 'hub' || !document.referrer) return false;
+            var r = new URL(document.referrer);
+            return r.origin === location.origin && r.pathname === '/espanol/';
+        } catch (e) { return false; }
+    })();
+    var ASKED = /[?&]mode=presentar(&|$)/.test(location.search) || FROM_HUB;
+    var presentarInfo = { fromHub: FROM_HUB, classCode: '' };
     var presentar = !ASKED ? Promise.resolve(false) : ready.then(function (core) {
         var user = core && core.auth && core.auth.currentUser;
         if (!user || user.isAnonymous || !core.getAccount) return false;
-        return core.getAccount(user.uid).then(function (acct) { return !!acct && acct.role === 'teacher'; });
+        return core.getAccount(user.uid).then(function (acct) {
+            var teacher = !!acct && acct.role === 'teacher';
+            if (teacher && acct.classroomCode) presentarInfo.classCode = String(acct.classroomCode);
+            return teacher;
+        });
     }).catch(function () { return false; });
 
     function clean(data) {
@@ -133,6 +153,8 @@
     window.StoryTrack = {
         TM: TM,
         presentarAsked: ASKED,
+        presentarFromHub: FROM_HUB,   // asked only because a hub link opened the page (see above)
+        presentarInfo: presentarInfo, // { fromHub, classCode }: classCode is set once a teacher is confirmed
         presentar: presentar,   // Promise<boolean>: true only for a signed-in teacher who asked for it
         ready: ready,
         setDebug: function (fn) { debug = typeof fn === 'function' ? fn : null; },

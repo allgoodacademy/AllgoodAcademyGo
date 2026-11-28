@@ -1137,15 +1137,15 @@ test('choiceLevelRows: one row per student per scored step, with the real choice
 });
 
 /* ── Español stories (2026-11-27) ─────────────────────────────────────────── */
-test('buildCatalog puts both Español stories in their own group beside the simulations, as sims matched by module', () => {
+test('buildCatalog puts every Español story in its own group beside the simulations, as sims matched by module', () => {
     const cat = buildCatalog(REGISTRY.modules);
     const grp = cat.simPacks.find((p) => p.slug === 'espanol');
     assert.ok(grp, 'an espanol group exists');
-    assert.deepEqual(grp.items.map((x) => x.id).sort(), ['el-mundial', 'el-viaje']);
+    assert.deepEqual(grp.items.map((x) => x.id).sort(), ['el-mundial', 'el-viaje', 'la-selva']);
     for (const it of grp.items) {
         assert.equal(it.type, 'sim');
         assert.equal(it.kind, 'story');
-        assert.equal(it.stream, null, 'both stories share a stream, so a story must not match by it');
+        assert.equal(it.stream, null, 'the stories share a stream, so a story must not match by it');
         assert.ok(it.stepsTotal > 0);
         assert.ok(cat.simIds.includes(it.id), 'assignable');
     }
@@ -1305,6 +1305,36 @@ test('growth view: five or more students shows percentages; nothing to flag when
     assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ pick: 'split', right: null }], adu: [] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 'split', adu: null });
     assert.deepEqual(presentedGrowth(CHECKS_CFG, { emb: [{ pick: 1, right: 5 }], adu: [{ pick: 0, right: 90 }] })[0], { skill: CHECKS_CFG.slots[0].skill, emb: 'other', adu: 'right' });
     assert.equal(presentedGrowth(CHECKS_CFG, { emb: [{ pick: 'split', right: 50 }] })[0].emb, 'split');
+});
+
+test('growth view: La selva has three picture-tap items per check, and its students count', () => {
+    const cfg = JSON.parse(readFileSync(new URL('../public/espanol/la-selva/checks.json', import.meta.url), 'utf8'));
+    assert.equal(cfg.slots.length, 3);
+    assert.equal(cfg.A.length, 3);
+    assert.equal(cfg.B.length, 3);
+    const kid = (uid, checks) => ({ uid, name: uid, events: [], raw: { sessions: [], scores: [], progress: { 'la-selva': { checks } } } });
+    const g = growthReport(cfg, 'la-selva', [
+        kid('a', { v: 1, form: 'A', emb: [0, 1, 0], adu: [1, 1, 1], embDone: true, aduDone: true }),
+        kid('b', { v: 1, form: 'A', emb: [1, 0, 0], adu: [1, 0, 1], embDone: true, aduDone: true }),
+        kid('c', { v: 1, form: 'A', emb: [1, 1], adu: [], embDone: false, aduDone: false }),   // left mid-Embarque
+    ]);
+    assert.equal(g.n, 2);
+    assert.equal(g.boarded, 2);
+    assert.deepEqual(g.slots.map((s) => [s.emb, s.adu]), [[1, 2], [1, 1], [0, 2]]);
+    assert.match(g.worth, /^Color \+ plural/);
+});
+
+test('La selva report: each Puerta is one picture tap; first tries and the fork come from choice events', () => {
+    const cfg = JSON.parse(readFileSync(new URL('../public/espanol/la-selva/report.json', import.meta.url), 'utf8'));
+    const SELVA = { id: 'la-selva', name: 'La selva', gameNames: ['La selva'], stepsTotal: 11 };
+    const ev = (n, choiceIndex, score) => ({ module: 'la-selva', event: 'choice', clientTs: 1000 + n, meta: { scenarioIndex: n, choiceIndex, score, category: 'gate', choice: `p${n}:x` } });
+    const s = { uid: 'k', name: 'k', events: [ev(1, 1, 1), ev(2, 2, 0), ev(3, 1, 0), ev(4, 0, 1),
+        { module: 'la-selva', event: 'choice', clientTs: 1002, meta: { scenarioIndex: 'f1', choiceIndex: 1, category: 'fork', choice: 'f1:colibries' } }],
+    raw: { sessions: [{ module: 'la-selva', startedAt: 500, lastSeenAt: 5000, completed: true }], scores: [{ gameName: 'La selva', completed: true }], progress: {} } };
+    const r = studentStory(SELVA, cfg, s);
+    assert.equal(r.finished, true);
+    assert.deepEqual(r.puertas.map((p) => [p.n, p.right, p.picks[null] ?? p.picks.null]), [[1, true, 'roca'], [2, false, 'buho'], [3, false, 'trece'], [4, true, '2ranas-1tucan']]);
+    assert.deepEqual(r.forks.map((f) => f.pick), ['colibries']);
 });
 
 /* ── Presented sessions: no invented percentages (2026-11-27, AA-17) ──────────── */
