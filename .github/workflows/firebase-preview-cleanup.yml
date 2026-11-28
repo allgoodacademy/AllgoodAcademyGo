@@ -37,6 +37,9 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      # The Firebase CLI refuses to run outside a directory with firebase.json.
+      - uses: actions/checkout@v4
+
       - name: Write service account credentials
         env:
           SA_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ALLGOOD_ACADEMY }}'
@@ -62,8 +65,12 @@ jobs:
           }
 
           list_channels() {
-            npx -y "$FIREBASE_TOOLS" hosting:channel:list --project "$PROJECT_ID" --json \
-              | jq -r '.result.channels[]?.name | split("/") | last'
+            local out
+            if ! out="$(npx -y "$FIREBASE_TOOLS" hosting:channel:list --project "$PROJECT_ID" --json)"; then
+              echo "hosting:channel:list failed: $out" >&2
+              return 1
+            fi
+            printf '%s' "$out" | jq -r '.result.channels[]?.name | split("/") | last'
           }
 
           delete_channel() {
